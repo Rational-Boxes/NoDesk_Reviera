@@ -6,7 +6,7 @@
 # target, x86_64-pc-windows-gnu), and stages a portable folder and a ZIP:
 #
 #   packaging/windows/cross/build-cross.sh            # dependencies (cached), app, stage, zip
-#   REVIERA_VERSION=0.1.0-pre.5 packaging/windows/cross/build-cross.sh
+#   REVIERA_VERSION=0.1.0-pre.6 packaging/windows/cross/build-cross.sh
 #
 # Needs (Fedora): mingw64-gcc-c++ mingw64-boost mingw64-eigen3 mingw64-zlib
 # mingw64-winpthreads-static, cmake, ninja-build, curl, and the Rust target
@@ -27,7 +27,7 @@ ROOT="$(cd "$HERE/../../.." && pwd)"
 BUILD="$HERE/build"
 PREFIX="$BUILD/prefix"
 DIST="$ROOT/dist"
-VERSION="${REVIERA_VERSION:-0.1.0-pre.5}"
+VERSION="${REVIERA_VERSION:-0.1.0-pre.6}"
 TRIPLE=x86_64-w64-mingw32
 TARGET=x86_64-pc-windows-gnu
 SYSROOT=/usr/$TRIPLE/sys-root/mingw

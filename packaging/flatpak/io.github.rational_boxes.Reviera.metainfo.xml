@@ -74,6 +74,11 @@
   </supports>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.0~pre.6" date="2026-10-30" type="development">
+      <description>
+        <p>Sixth pre-release (tag 0.1.0-pre.6), for testing: models on FileEngine (Proxima File Vault): connections and sign-in with an API credential, opening a model from a folder, saving new versions with Ctrl+S that stop if someone else saved first (save a copy beside it, overwrite, or open theirs read-only), and the version history, to open or restore any version. BIMserver gains history, compare and restore, a sync lock, conflicts decided one by one, and advisory ownership of the elements being edited. Also a performance profiler, and greenhouse screens, quick heat loss, ventilation, CO₂ enrichment and heating sizing.</p>
+      </description>
+    </release>
     <release version="0.1.0~pre.5" date="2026-10-29" type="development">
       <description>
         <p>Fifth pre-release (tag 0.1.0-pre.5), for testing: BIMserver projects (File › BIMserver…): servers and login, publishing a project, opening a server project as a working copy, checking in, and Get Latest and Synchronise, which merge other users' changes element by element and parameter by parameter and stop at conflicts for a choice. Greenhouses gain sawtooth ranges, frame systems, side and gable vents, roll-up sides, a headhouse, glazed vaults and domes, geodesic domes, high-wire gutters, growing layouts in rooms, crop climates, crop light by month and grow lights. The Flatpak may now use the network, for the servers the user adds.</p>

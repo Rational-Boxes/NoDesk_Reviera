@@ -59,6 +59,19 @@ pub(crate) fn stamp(v: &str) -> String {
     }
 }
 
+/// Unix seconds as `2026-10-30 22:53` (UTC).
+fn changed(t: i64) -> String {
+    // Days to a civil date: Howard Hinnant's days_from_civil, inverted.
+    let z = t.div_euclid(86_400) + 719_468;
+    let (era, doe) = (z.div_euclid(146_097), z.rem_euclid(146_097));
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let (d, m) = (doy - (153 * mp + 2) / 5 + 1, if mp < 10 { mp + 3 } else { mp - 9 });
+    let secs = t.rem_euclid(86_400);
+    format!("{}-{m:02}-{d:02} {:02}:{:02}", yoe + era * 400 + i64::from(m <= 2), secs / 3600, secs % 3600 / 60)
+}
+
 fn size(bytes: u64) -> String {
     match bytes {
         0 => String::new(),
@@ -128,14 +141,14 @@ fn browser(frame: &Frame, s: &Shown<'_>) -> Closed {
             vec![
                 if folder { format!("📁 {}", e["name"].as_str().unwrap_or("")) } else { e["name"].as_str().unwrap_or("").to_owned() },
                 if folder { String::new() } else { size(e["size"].as_u64().unwrap_or(0)) },
-                if folder { String::new() } else { e["versions"].as_u64().unwrap_or(0).to_string() },
+                e["modified_at"].as_i64().filter(|&t| t > 0).map(changed).unwrap_or_default(),
                 e["modified_by"].as_str().filter(|m| !m.is_empty()).or(e["owner"].as_str()).unwrap_or("").to_owned(),
                 if e["working_copy"].as_bool() == Some(true) { "Yes".into() } else { String::new() },
             ]
         })
         .collect();
     let where_ = StaticText::builder(&dialog).with_label(&format!("Folder: /{}", s.path.join("/"))).build();
-    let view = list(&dialog, &[("Name", 320), ("Size", 80), ("Versions", 70), ("Changed by", 220), ("Here", 50)], &rows, None);
+    let view = list(&dialog, &[("Name", 320), ("Size", 80), ("Changed (UTC)", 130), ("By", 200), ("Here", 50)], &rows, None);
     view.set_min_size(Size::new(760, 320));
     let d = dialog;
     view.on_item_activated(move |_| d.end_modal(ENTER));
@@ -620,5 +633,16 @@ impl Gui {
                 _ => return,
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn listing_times_read_as_utc_dates() {
+        assert_eq!(super::changed(0), "1970-01-01 00:00");
+        assert_eq!(super::changed(1_793_400_785), "2026-10-30 22:53");
+        assert_eq!(super::changed(951_782_400), "2000-02-29 00:00");
+        assert_eq!(super::stamp("20261030_225305.571"), "2026-10-30 22:53:05");
     }
 }

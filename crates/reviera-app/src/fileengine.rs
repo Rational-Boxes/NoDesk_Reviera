@@ -539,6 +539,8 @@ pub struct EntryOut {
     /// An IFC model Reviera can open.
     pub model: bool,
     pub size: u64,
+    /// The listing's version count. Proxima File Vault reports 1 however many versions a
+    /// file has, so `fileengine.versions` is the one to trust.
     pub versions: u64,
     pub owner: String,
     pub modified_by: String,
