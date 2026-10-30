@@ -61,6 +61,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(EnclosureSetScreens),
         registry.add(EnclosureScreenLibrary),
         registry.add(EnclosureHeatLoss),
+        registry.add(EnclosureVentilation),
+        registry.add(EnclosureCo2),
         registry.add(EnclosureCreate),
         registry.add(EnclosureSet),
         registry.add(EnclosureDetach),
@@ -4721,6 +4723,33 @@ read_command!(
     crate::hothouse::HeatLossParams,
     crate::hothouse::HeatLoss,
     crate::hothouse::heat_loss
+);
+
+read_command!(
+    EnclosureVentilation,
+    "enclosure.ventilation",
+    "Size a glazed enclosure's ventilation",
+    "Ventilation sizing (ARC-GLZ-012) by the published rules: fan airflow at 8 cfm/ft² of floor (10 in a hot \
+     `climate`, ¾ when not used in summer), raised for `elevation` and 15 % with `pads`; the fan count for \
+     `fan_airflow` m³/s fans of `fan_diameter` m; inlets at least 1.25 × the fans' face area; pad area at \
+     1.27 m/s (100 mm) or 2.03 m/s (150 mm) face velocity against 1 m² per 20 m² of floor; HAF and winter \
+     airflow; the natural vents as a share of the floor against 15–20 %, with notes.",
+    crate::hothouse::VentilationParams,
+    crate::hothouse::Ventilation,
+    crate::hothouse::ventilation
+);
+
+read_command!(
+    EnclosureCo2,
+    "enclosure.co2",
+    "Size a glazed enclosure's CO₂ enrichment",
+    "CO₂ enrichment sizing (ARC-GLZ-013): the supply to hold `setpoint` ppm (the climate's, else 1,000) with \
+     the vents shut, by `glazing` (glass 0.50–0.60, plastic 0.25–0.35 kg/h per 100 m² at 1,300 ppm, scaled \
+     to the set point's excess over 400 ppm), the natural-gas burner capacity (glass 30–36, plastic 15–18 kW \
+     per 1,000 m²), the gas and water at that supply, and the control and safety notes.",
+    crate::hothouse::Co2Params,
+    crate::hothouse::Co2,
+    crate::hothouse::co2
 );
 
 edit_command!(

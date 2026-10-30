@@ -176,6 +176,12 @@ air leakage, between the crop's night temperature and the weather's heating desi
 (<code>enclosure.heat_loss</code> takes other temperatures, wind speeds and air changes). With an
 energy screen it also gives the loss with the screen closed. It is a quick estimate for sizing
 the heating; the full heating and cooling loads come later.</p>
+<p><b>Fan Ventilation</b> sizes summer fans at one air change a minute (8 cfm per ft² of floor), the
+inlets they need, and <b>Natural Vents</b> compares the roof and side vents with the 15–20 %
+guidance; <code>enclosure.ventilation</code> also sizes evaporative pads, horizontal air-flow fans and
+winter airflow, for a hot climate and the site's altitude. <b>CO₂ Supply</b> gives the CO₂ needed to
+hold the crop's set point with the vents shut and the burner capacity, with the safety limits
+(<code>enclosure.co2</code>).</p>
 
 <h2 id="later">Coming later</h2>
 <p>Gutter-connected arch ranges; rafters, purlins and Venlo trusses; opening and closing vents in

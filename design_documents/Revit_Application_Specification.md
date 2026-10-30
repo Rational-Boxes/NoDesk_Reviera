@@ -13207,6 +13207,47 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 *Built (2026-10-30):* `enclosure.heat_loss` (`reviera_core::hothouse`): parts' U·A (roof glazing by its regenerated area, glazed walls by their panels and mullions, knee walls by their regenerated faces), C, W (`wind_factor`), N, V, ΔT, transmission, infiltration, total, W/m², and `with_screen`. Properties › Growing Climate › *Heat Loss*. The construction factor follows the roofs' glazing-bar spacing (1.125 m: 1.05). Not yet: a bar spacing from the glazing type itself, the headhouse's shared wall, the gable areas of arched ends by the tables (the arch is regenerated instead), and radiation to a clear sky.
 
 
+### 3.6a.12 Ventilation sizing
+**ID:** ARC-GLZ-012 · **Priority:** P1 · **Ref:** research/09 §4.1–4.3, §6.4 (G010, G016, G038); GLAZED_ENCLOSURES_PLAN §5.1, §7 (*Ventilation sizing*)
+
+**Purpose.** Size a greenhouse's mechanical ventilation and evaporative cooling, and check its natural vents, by the published rules, from its floor area and climate.
+
+**Behaviour & rules.**
+- **Fans.** Summer design airflow of one air change a minute for an 8 ft (2.44 m) height: 8 cfm/ft² of floor (0.0406 m³/s·m²), 10 cfm/ft² for a hot climate (`climate: hot`), ¾ of it for a house not used in summer (`summer: false`); raised for altitude by the air's density (× 1/(1 − 2.26×10⁻⁵·h)^5.26 at h m above sea level). The **fan count** from one fan's airflow (default 10 m³/s, a 1.2 m box fan; E-61), and a draw distance check (at most 46 m, 150 ft: longer houses draw from both ends).
+- **Inlets** (shutters and louvres): at least 1.25 × the fans' total face area (from the fan's diameter).
+- **Pad cooling**: pad area = airflow ÷ pad face velocity (1.27 m/s, 250 fpm, for 100 mm cellulose pads; 2.03 m/s, 400 fpm, for 150 mm), checked against the rule of about 1 m² of pad per 20 m² of floor; the fans' airflow raised 15 % when pads are fitted (`pads`).
+- **Horizontal air flow** (HAF) fans: 2 cfm/ft² (0.0102 m³/s·m²), and fan-jet winter airflow of ½ cfm/ft².
+- **Natural vents**: the enclosure's roof and side vents' free area as a share of the floor, against the 15–20 % guidance for each (ARC-GLZ-004).
+- Values provisional (EXPERT_REVIEW E-61).
+
+**Commands.** `enclosure.ventilation(enclosure_id, climate?: temperate|hot, summer?, pads?: none|100|150, fan_airflow?, fan_diameter?, elevation?) -> ventilation_report`.
+
+**Acceptance criteria.**
+- [x] A 9.6 × 40 m house at sea level in a temperate climate needs about 15.6 m³/s of fan airflow (8 cfm/ft² × 4,133 ft²), two 10 m³/s fans, at least 1.25 × their face area of inlets, and with 100 mm pads the airflow raised 15 % to 17.9 m³/s and about 14.1 m² of pad.
+- [x] Its natural vents are reported as a share of the floor against 15–20 %.
+
+*Built (2026-10-30):* `enclosure.ventilation` (`reviera_core::hothouse`): airflow, per m², the altitude factor, fan count, inlet area, pad area and the 1-in-20 rule's, HAF and winter airflow, roof and side vents' free area as shares of the floor, and notes (draw distance over 46 m, vents under 15 %, fan height and efficiency). Properties › Growing Climate › *Fan Ventilation*, *Natural Vents*. Not yet: fans and pads placed as equipment in the model, the heat-balance method (EP406) and stack and wind natural ventilation.
+
+### 3.6a.13 CO₂ enrichment sizing
+**ID:** ARC-GLZ-013 · **Priority:** P2 · **Ref:** research/11 §B2 (C038–C041, C054)
+
+**Purpose.** Size the CO₂ supply of a closed greenhouse for its crop's set point, and state the safety limits the controls must keep.
+
+**Behaviour & rules.**
+- **Supply rate** to hold about 1,300 ppm with the vents shut: 0.50–0.60 kg/h per 100 m² for single glass, 0.25–0.35 for double poly (the midpoint is reported, the range kept); a lower set point is scaled from 1,300 ppm above ambient (400 ppm).
+- **Burner capacity** (natural gas): 30–36 kW per 1,000 m² for glass, 15–18 for plastic; gas at 1.8 kg CO₂ per m³ of natural gas, and its water (1.4 L/m³).
+- **Control notes**: dose from half an hour after sunrise to near sunset; drop to 400–600 ppm or stop once vents are more than 10 % open.
+- **Safety**: CO₂ above 5,000 ppm harms people; a flue CO cut-off of 6–10 ppm; ethylene damages crops from 0.05 ppm; fuel sulphur at most 0.02 %.
+- Values provisional (EXPERT_REVIEW E-62).
+
+**Commands.** `enclosure.co2(enclosure_id, setpoint?, glazing?: glass|plastic) -> co2_report`.
+
+**Acceptance criteria.**
+- [x] A 1,000 m² glasshouse at 1,000 ppm reports about 3.7 kg/h of CO₂ (0.55 kg/h per 100 m² at 1,300 ppm, scaled by 600/900 ppm above ambient) and 30–36 kW of burner capacity.
+
+*Built (2026-10-30):* `enclosure.co2`: set point (the climate's by default), glazing (by the roof's glazing; tunnels plastic), supply and its range, burner capacity, gas and water per hour, and the control and safety notes. Properties › Growing Climate › *CO₂ Supply*. Not yet: liquid CO₂ and CHP exhaust as sources, seasonal use, and dosing tied to the vents in the energy model.
+
+
 ## 3.7 Stairs, railings and ramps
 
 ### 3.7.1 Stair assembly model
@@ -15279,6 +15320,8 @@ All commands below are registered once in the command registry and exposed autom
 | `enclosure.set_screens` | enclosure_id, screens: [{kind, material?}] | — | Yes | ARC-GLZ-010 |
 | `enclosure.screen_library` | — | [entry] | No (query) | ARC-GLZ-010 |
 | `enclosure.heat_loss` | enclosure_id, inside?, outside?, wind?, air_changes? | heat_loss | No (query) | ARC-GLZ-011 |
+| `enclosure.ventilation` | enclosure_id, climate?, summer?, pads?, fan_airflow?, fan_diameter?, elevation? | ventilation_report | No (query) | ARC-GLZ-012 |
+| `enclosure.co2` | enclosure_id, setpoint?, glazing? | co2_report | No (query) | ARC-GLZ-013 |
 | `growing.crops` | — | [crop] | No (query) | ARC-GLZ-008 |
 | `enclosure.set_climate` | enclosure_id, crop?, target_dli?, day_temperature?, night_temperature?, humidity?, co2?, photoperiod?, clear? | — | Yes | ARC-GLZ-008 |
 | `enclosure.crop_light` | enclosure_id, clearness?, outdoor_dli? | {source, transmission, months, darkest_month, required_ppfd, lamp_ppfd} | No (query) | ARC-GLZ-009 |
@@ -28123,14 +28166,14 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 39 | 8 | 0 | 123 |
 | DM | 91 | 65 | 34 | 3 | 193 |
-| ARC | 77 | 71 | 10 | 1 | 159 |
+| ARC | 77 | 72 | 11 | 1 | 161 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 28 | 0 | 29 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
 | COL | 8 | 45 | 6 | 1 | 60 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **306** | **192** | **7** | **825** |
+| **Total** | **320** | **307** | **193** | **7** | **827** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -28312,7 +28355,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2208 unique commands** in 422 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2210 unique commands** in 422 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -28434,7 +28477,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `element` | 39 |
 | `elevationmarker` | 1 |
 | `embodied_carbon` | 5 |
-| `enclosure` | 11 |
+| `enclosure` | 13 |
 | `energy_location` | 1 |
 | `energy_model` | 4 |
 | `energy_settings` | 3 |
@@ -29284,6 +29327,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `embodied_carbon.import_factors` | 4 | path, format: "ilcd"\ | "csv" | library_id | Yes |
 | `embodied_carbon.match` | 4 | material_id, factor_ref | — | Yes | ANA-CARB-001 |
 | `embodied_carbon.run` | 4 | scope?, options? | job_id | Results only | ANA-CARB-001 |
+| `enclosure.co2` | 3 | enclosure_id, setpoint?, glazing? | co2_report | No (query) | ARC-GLZ-013 |
 | `enclosure.create` | 3 | form, footprint \ | host_wall_ids, level_id, params | element_id | Yes |
 | `enclosure.crop_light` | 3 | enclosure_id, clearness?, outdoor_dli? | {source, transmission, months, darkest_month, required_ppfd, lamp_ppfd} | No (query) | ARC-GLZ-009 |
 | `enclosure.detach` | 3 | part_ids | — | Yes | ARC-GLZ-001 |
@@ -29295,6 +29339,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `enclosure.set_climate` | 3 | enclosure_id, crop?, target_dli?, day_temperature?, night_temperature?, humidity?, co2?, photoperiod?, clear? | — | Yes | ARC-GLZ-008 |
 | `enclosure.set_screens` | 3 | enclosure_id, screens: [{kind, material?}] | — | Yes | ARC-GLZ-010 |
 | `enclosure.set_vents` | 3 | enclosure_id, kind (roof\ | side\ | roll_up\ | gable), target_percent?, height?, opening_angle?, discharge?, actuator? |
+| `enclosure.ventilation` | 3 | enclosure_id, climate?, summer?, pads?, fan_airflow?, fan_diameter?, elevation? | ventilation_report | No (query) | ARC-GLZ-012 |
 | `energy_location.set` | 4 | lat, lon, elevation?, weather_file? | — | Yes | ANA-EM-001 |
 | `energy_model.create` | 4 | options? | job_id | Yes | ANA-EM-003 |
 | `energy_model.delete` | 4 | — | — | Yes | ANA-EM-003 |

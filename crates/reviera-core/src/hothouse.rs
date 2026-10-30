@@ -1154,3 +1154,210 @@ pub(crate) fn heat_loss(store: &Store, p: HeatLossParams) -> Result<HeatLoss> {
         screen: screen.map(|m| m.name.to_owned()),
     })
 }
+
+// ---- Ventilation sizing (ARC-GLZ-012) ----
+
+/// m³/s per m² of floor for 1 cfm per ft².
+const CFM_PER_FT2: f64 = 0.000_471_947 / 0.092_903;
+
+/// The climate the fans are sized for.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum VentClimate {
+    #[default]
+    Temperate,
+    /// 10 cfm/ft² (southern climates).
+    Hot,
+}
+
+/// Evaporative pads.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Pads {
+    #[default]
+    None,
+    /// 100 mm (4 in) cellulose pads, 1.27 m/s face velocity.
+    #[serde(rename = "100")]
+    Mm100,
+    /// 150 mm (6 in), 2.03 m/s.
+    #[serde(rename = "150")]
+    Mm150,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct VentilationParams {
+    pub enclosure_id: ElementRef,
+    #[serde(default)]
+    pub climate: VentClimate,
+    /// Used in summer (default true; ¾ of the airflow otherwise).
+    pub summer: Option<bool>,
+    #[serde(default)]
+    pub pads: Pads,
+    /// One fan's airflow, m³/s (default 10), and its diameter, m (default 1.22).
+    pub fan_airflow: Option<f64>,
+    pub fan_diameter: Option<f64>,
+    /// The site's elevation, m (default the project location's).
+    pub elevation: Option<f64>,
+}
+
+/// What `enclosure.ventilation` returns (m³/s, m², m).
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct Ventilation {
+    pub floor_area: f64,
+    /// The design airflow (with the altitude and pads allowances), and per m² of floor.
+    pub airflow: f64,
+    pub airflow_per_area: f64,
+    pub altitude_factor: f64,
+    pub fans: u32,
+    pub fan_airflow: f64,
+    /// The inlets' least free area: 1.25 × the fans' face area.
+    pub inlet_area: f64,
+    /// Pad area, and the 1-in-20 rule's area for comparison.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pad_area: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pad_rule_area: Option<f64>,
+    /// Horizontal air-flow fans' and winter fan-jets' airflow.
+    pub haf_airflow: f64,
+    pub winter_airflow: f64,
+    /// The natural vents' free area as a share of the floor (percent): the roof's and the
+    /// side walls', against 15–20 % each.
+    pub roof_vent_percent: f64,
+    pub side_vent_percent: f64,
+    pub notes: Vec<String>,
+}
+
+/// `enclosure.ventilation`.
+pub(crate) fn ventilation(store: &Store, p: VentilationParams) -> Result<Ventilation> {
+    let (id, r) = enclosure(store, &p.enclosure_id)?;
+    let floor_area = r.width() * r.length;
+    let rate = match p.climate {
+        VentClimate::Temperate => 8.0,
+        VentClimate::Hot => 10.0,
+    } * CFM_PER_FT2;
+    let summer = p.summer.unwrap_or(true);
+    let elevation = p.elevation.unwrap_or_else(|| crate::location::get(store).elevation);
+    if !(-500.0..=6000.0).contains(&elevation) {
+        return Err(bad("growing.bad_value", "the elevation is −500 to 6,000 m"));
+    }
+    // Thinner air carries less heat: the same mass flow needs more volume.
+    let altitude_factor = 1.0 / (1.0 - 2.25577e-5 * elevation).powf(5.25588);
+    let pads_factor = if p.pads == Pads::None { 1.0 } else { 1.15 };
+    let airflow = floor_area * rate * if summer { 1.0 } else { 0.75 } * altitude_factor * pads_factor;
+    let fan_airflow = p.fan_airflow.unwrap_or(10.0);
+    let fan_diameter = p.fan_diameter.unwrap_or(1.22);
+    if !(0.1..=50.0).contains(&fan_airflow) || !(0.2..=3.0).contains(&fan_diameter) {
+        return Err(bad("growing.bad_value", "a fan moves 0.1 to 50 m³/s and is 0.2 to 3 m across"));
+    }
+    let fans = (airflow / fan_airflow).ceil().max(1.0) as u32;
+    let face = std::f64::consts::PI * fan_diameter * fan_diameter / 4.0;
+    let inlet_area = 1.25 * face * f64::from(fans);
+    let (pad_area, pad_rule_area) = match p.pads {
+        Pads::None => (None, None),
+        Pads::Mm100 => (Some(airflow / 1.27), Some(floor_area / 20.0)),
+        Pads::Mm150 => (Some(airflow / 2.03), Some(floor_area / 20.0)),
+    };
+    let info = crate::enclosures::get(store, crate::enclosures::GetParams { enclosure_id: ElementRef::Id(id) })?;
+    let roof_free = info.free_vent_area - info.side_vent_area.min(info.free_vent_area);
+    let roof_vent_percent = 100.0 * roof_free / floor_area.max(1e-9);
+    let side_vent_percent = 100.0 * info.side_vent_area / floor_area.max(1e-9);
+    let mut notes = Vec::new();
+    let draw = r.length;
+    if draw > 46.0 {
+        notes.push(format!("the house is {draw:.0} m long: fans draw at most 46 m (150 ft), so draw from both ends or across"));
+    }
+    for (what, pc) in [("roof", roof_vent_percent), ("side", side_vent_percent)] {
+        if pc < 15.0 {
+            notes.push(format!("the {what} vents open {pc:.1} % of the floor; 15–20 % is the guidance (more in warm climates)"));
+        }
+    }
+    notes.push("fans and inlets sit about 0.9 m above the floor; aim for at least 15 cfm/W (7 L/s per W)".into());
+    Ok(Ventilation {
+        floor_area,
+        airflow,
+        airflow_per_area: airflow / floor_area.max(1e-9),
+        altitude_factor,
+        fans,
+        fan_airflow,
+        inlet_area,
+        pad_area,
+        pad_rule_area,
+        haf_airflow: floor_area * 2.0 * CFM_PER_FT2,
+        winter_airflow: floor_area * 0.5 * CFM_PER_FT2,
+        roof_vent_percent,
+        side_vent_percent,
+        notes,
+    })
+}
+
+// ---- CO₂ enrichment (ARC-GLZ-013) ----
+
+/// What the glazing is, for the CO₂ supply's leakage.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Cladding {
+    Glass,
+    Plastic,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Co2Params {
+    pub enclosure_id: ElementRef,
+    /// ppm (default the climate's set point, else 1,000).
+    pub setpoint: Option<f64>,
+    /// Default by the roof glazing.
+    pub glazing: Option<Cladding>,
+}
+
+/// What `enclosure.co2` returns.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct Co2 {
+    pub floor_area: f64,
+    pub setpoint: f64,
+    pub glazing: Cladding,
+    /// kg/h to hold the set point with the vents shut: the estimate and its range.
+    pub supply: f64,
+    pub supply_range: [f64; 2],
+    /// Natural-gas burner capacity, kW (range), and the gas it burns at the estimated supply.
+    pub burner_kw: [f64; 2],
+    pub gas_m3_per_hour: f64,
+    pub water_l_per_hour: f64,
+    pub notes: Vec<String>,
+}
+
+/// `enclosure.co2`.
+pub(crate) fn co2(store: &Store, p: Co2Params) -> Result<Co2> {
+    let (id, r) = enclosure(store, &p.enclosure_id)?;
+    let floor_area = r.width() * r.length;
+    let setpoint = p.setpoint.or(climate(store.get(id).expect("resolved")).map(|c| c.co2)).unwrap_or(1000.0);
+    if !(400.0..=2000.0).contains(&setpoint) {
+        return Err(bad("growing.bad_value", "an enrichment set point is 400 to 2,000 ppm (5,000 ppm harms people)"));
+    }
+    let glazing = p.glazing.unwrap_or_else(|| if r.form.tunnel() || plastic_roof(store, &r) { Cladding::Plastic } else { Cladding::Glass });
+    // kg/h per 100 m² to hold 1,300 ppm, scaled by the excess over 400 ppm outdoors.
+    let (lo, hi, kw) = match glazing {
+        Cladding::Glass => (0.50, 0.60, [30.0, 36.0]),
+        Cladding::Plastic => (0.25, 0.35, [15.0, 18.0]),
+    };
+    let scale = (setpoint - 400.0).max(0.0) / 900.0 * floor_area / 100.0;
+    let supply = (lo + hi) / 2.0 * scale;
+    let gas = supply / 1.8;
+    let notes = vec![
+        "dose from half an hour after sunrise to near sunset; drop to 400–600 ppm, or stop, once the vents are more than 10 % open".into(),
+        "keep CO₂ below 5,000 ppm where people work; cut burners off at 6–10 ppm CO in the flue".into(),
+        "ethylene harms crops from 0.05 ppm and SO₂ from 0.2 ppm: fuel sulphur at most 0.02 %, low-NOx burners".into(),
+    ];
+    Ok(Co2 { floor_area, setpoint, glazing, supply, supply_range: [lo * scale, hi * scale], burner_kw: [kw[0] * floor_area / 1000.0, kw[1] * floor_area / 1000.0], gas_m3_per_hour: gas, water_l_per_hour: gas * 1.4, notes })
+}
+
+/// The roof glazing is plastic (film, sheet).
+fn plastic_roof(store: &Store, r: &EnclosureRecipe) -> bool {
+    r.parts.iter().filter_map(|g| store.get(store.find_by_guid(&GlobalId::parse(g)?)?)).filter(|e| crate::roofs::roof_recipe(e).is_some()).any(|e| {
+        e.param("@type")
+            .and_then(|v| store.get(store.find_by_guid(&GlobalId::parse(v.as_str()?)?)?))
+            .and_then(crate::glazing_library::of_type)
+            .is_some_and(|g| g.safety == crate::glazing_library::Safety::Plastic)
+    })
+}

@@ -210,3 +210,40 @@ fn the_quick_heat_loss_follows_the_table_method() {
     assert_eq!((t["construction_factor"].as_f64(), t["air_changes"].as_f64()), (Some(1.02), Some(0.8)));
     assert!(run(&r, &mut doc, "enclosure.set_screens", json!({ "enclosure_id": tunnel, "screens": [{ "kind": "energy" }] })).is_err());
 }
+
+#[test]
+fn ventilation_and_co2_are_sized_by_the_published_rules() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_project, mut doc) = LocalProject::new(Schema::Ifc4, &dir.path().join("vent.ifc")).unwrap();
+    let r = registry();
+    let level = doc.store().iter().find(|e| e.class == "IfcBuildingStorey").unwrap().id();
+    let gh = run(&r, &mut doc, "enclosure.create", json!({ "form": "gable", "level_id": level.0, "length": 40.0, "span": 9.6, "bay": 4.0 })).unwrap();
+    // 8 cfm/ft² of 4,133 ft²: 15.6 m³/s, two 10 m³/s fans, 1.25 × their face of inlets.
+    let v = run(&r, &mut doc, "enclosure.ventilation", json!({ "enclosure_id": gh, "elevation": 0 })).unwrap();
+    let f = |k: &str| v[k].as_f64().unwrap();
+    assert!((f("airflow") - 15.6).abs() < 0.05, "{v}");
+    assert_eq!(v["fans"], 2);
+    assert!((f("inlet_area") - 1.25 * 2.0 * std::f64::consts::PI * 1.22 * 1.22 / 4.0).abs() < 1e-9);
+    assert!(v["pad_area"].is_null());
+    assert!((f("haf_airflow") - 15.6 / 4.0).abs() < 0.02 && (f("roof_vent_percent") > 0.0), "{v}");
+    // With 100 mm pads: 15 % more air and the pads for it; a hot climate and altitude ask more.
+    let p = run(&r, &mut doc, "enclosure.ventilation", json!({ "enclosure_id": gh, "elevation": 0, "pads": "100" })).unwrap();
+    assert!((p["airflow"].as_f64().unwrap() - 17.94).abs() < 0.05 && (p["pad_area"].as_f64().unwrap() - 14.13).abs() < 0.05, "{p}");
+    assert!((p["pad_rule_area"].as_f64().unwrap() - 19.2).abs() < 1e-9);
+    let hot = run(&r, &mut doc, "enclosure.ventilation", json!({ "enclosure_id": gh, "climate": "hot", "elevation": 1500 })).unwrap();
+    assert!(hot["airflow"].as_f64().unwrap() > 15.6 * 1.25 * 1.15, "{hot}");
+    // A long house draws from both ends.
+    let long = run(&r, &mut doc, "enclosure.create", json!({ "form": "gable", "level_id": level.0, "origin": [0, 30], "length": 60.0 })).unwrap();
+    let lv = run(&r, &mut doc, "enclosure.ventilation", json!({ "enclosure_id": long })).unwrap();
+    assert!(lv["notes"].as_array().unwrap().iter().any(|n| n.as_str().unwrap().contains("both ends")), "{lv}");
+
+    // CO₂ at 1,000 ppm: 0.55 kg/h per 100 m² at 1,300 ppm, scaled by 600/900; burners 30–36 kW per 1,000 m².
+    let c = run(&r, &mut doc, "enclosure.co2", json!({ "enclosure_id": gh, "setpoint": 1000 })).unwrap();
+    let area = 384.0;
+    assert_eq!(c["glazing"], "glass");
+    assert!((c["supply"].as_f64().unwrap() - 0.55 * area / 100.0 * 600.0 / 900.0).abs() < 1e-9, "{c}");
+    assert!((c["burner_kw"][0].as_f64().unwrap() - 30.0 * area / 1000.0).abs() < 1e-9);
+    assert!(run(&r, &mut doc, "enclosure.co2", json!({ "enclosure_id": gh, "setpoint": 6000 })).is_err());
+    let tunnel = run(&r, &mut doc, "enclosure.create", json!({ "form": "hoop", "level_id": level.0, "origin": [0, 60] })).unwrap();
+    assert_eq!(run(&r, &mut doc, "enclosure.co2", json!({ "enclosure_id": tunnel })).unwrap()["glazing"], "plastic");
+}

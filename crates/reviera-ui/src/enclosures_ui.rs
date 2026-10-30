@@ -344,6 +344,22 @@ impl Gui {
             }
         }
         grid.set_property_read_only("gc_heat_loss", true);
+        // Ventilation (ARC-GLZ-012) and CO₂ (ARC-GLZ-013) sizing.
+        if let Ok(v) = self.run("enclosure.ventilation", json!({ "enclosure_id": owner })) {
+            let text = format!("{:.1} m³/s: {} fan(s) of {:.0} m³/s, {:.1} m² of inlets", v["airflow"].as_f64().unwrap_or(0.0), v["fans"], v["fan_airflow"].as_f64().unwrap_or(0.0), v["inlet_area"].as_f64().unwrap_or(0.0));
+            grid.append(Property::string("Fan Ventilation", "gc_fans", text));
+            grid.set_help_string("gc_fans", "Summer fan airflow at 8 cfm/ft² of floor (one air change a minute), with inlets of at least 1.25 × the fans' face area; enclosure.ventilation sizes pads and HAF too");
+            let text = format!("roof {:.0} %, sides {:.0} % of the floor (15–20 % each)", v["roof_vent_percent"].as_f64().unwrap_or(0.0), v["side_vent_percent"].as_f64().unwrap_or(0.0));
+            grid.append(Property::string("Natural Vents", "gc_vents", text));
+            grid.set_property_read_only("gc_fans", true);
+            grid.set_property_read_only("gc_vents", true);
+        }
+        if let Ok(c) = self.run("enclosure.co2", json!({ "enclosure_id": owner })) {
+            let text = format!("{:.1} kg/h at {:.0} ppm (burner {:.0}–{:.0} kW)", c["supply"].as_f64().unwrap_or(0.0), c["setpoint"].as_f64().unwrap_or(0.0), c["burner_kw"][0].as_f64().unwrap_or(0.0), c["burner_kw"][1].as_f64().unwrap_or(0.0));
+            grid.append(Property::string("CO₂ Supply", "gc_co2_supply", text));
+            grid.set_property_read_only("gc_co2_supply", true);
+            grid.set_help_string("gc_co2_supply", "To hold the set point with the vents shut; dose from half an hour after sunrise, cut back once the vents open more than 10 %");
+        }
         match self.run("enclosure.crop_light", json!({ "enclosure_id": owner })) {
             Ok(l) => {
                 let m = &l["months"][l["darkest_month"].as_u64().unwrap_or(1) as usize - 1];
