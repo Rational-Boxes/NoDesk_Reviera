@@ -375,14 +375,18 @@ host!(BimAddServer, "bimserver.add_server", "Add a BIMserver",
     if settings.servers.iter().any(|x| x.url == url) {
         return Err(bad("bimserver.duplicate", format!("{url} is already a server profile")));
     }
-    let mut n = settings.servers.len() + 1;
+    // Unique across settings files, so a new profile never finds an old profile's secret in the
+    // keychain under its id.
+    let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
+    let mut n = 0u32;
     let id = loop {
-        let id = format!("server-{n}");
+        let id = format!("server-{:x}", (nanos as u64) ^ (u64::from(std::process::id()) << 32) ^ u64::from(n));
         if settings.servers.iter().all(|x| x.id != id) {
             break id;
         }
         n += 1;
     };
+    s.delete_secret(&id);
     let profile = Profile { id: id.clone(), name, url, allow_http: p.allow_http, username: None, login: LoginKind::Password, version: Some(info.version) };
     settings.servers.push(profile.clone());
     s.save(&settings)?;

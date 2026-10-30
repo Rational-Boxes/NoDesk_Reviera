@@ -1,0 +1,57 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>BIMserver projects</h1>
+<p class="lead">An <a href="https://github.com/opensourceBIM/BIMserver">Open Source BIMserver</a>
+keeps a shared model and its revisions. Reviera can publish a project to one, open a server
+project as a working copy on your computer, and check your changes in as new revisions.</p>
+<nav class="toc">
+  <a href="#servers">Servers and logging in</a>
+  <a href="#open">Opening a server project</a>
+  <a href="#publish">Publishing a project</a>
+  <a href="#checkin">Checking in</a>
+  <a href="#security">How passwords are kept</a>
+  <a href="#later">Coming later</a>
+</nav>
+
+<h2 id="servers">Servers and logging in</h2>
+<p><a href="reviera:action/ui.bimserver">File › BIMserver…</a> lists your servers. <b>Add
+Server…</b> asks for a name and the server's address, for example
+<code>https://bim.example.org</code> (where the server's <code>/json</code> is). Plain
+<code>http://</code> is accepted only for a server on this computer. Reviera asks the server for its
+version before adding it, then asks you to log in: with your user name and password, or with the
+<b>user token</b> shown on your BIMserver user page. <b>Log Out</b> ends the session and can forget
+the stored password; <b>Remove Server</b> removes the server and its password (your working copies
+stay).</p>
+
+<h2 id="open">Opening a server project</h2>
+<p>Choose a project, then <b>Open Latest</b>, or choose a revision and <b>Open Revision</b>. Reviera
+downloads it into a <b>working copy</b> on this computer and opens it; the title bar shows the
+project and the revision it is based on. Save (Ctrl+S) saves the working copy only: nothing reaches
+the server until you check in. Opening a project you already have a working copy of opens that
+copy with your work in it, never overwriting it, and says when the server has newer revisions.</p>
+
+<h2 id="publish">Publishing a project</h2>
+<p>With a project open from a file, choose the server project and <b>Publish Current
+Project…</b>: Reviera checks it in as that project's first revision and the open project becomes
+its working copy. A project that already has revisions asks you to confirm a new revision over
+them. The schemas must match (IFC4 or IFC2X3). Creating projects on the server needs the rights
+the server gives (by default only administrators make new top-level projects).</p>
+
+<h2 id="checkin">Checking in</h2>
+<p><b>Check In…</b> saves the working copy and uploads it as a new revision, with your comment.
+If someone else checked in a newer revision since yours was downloaded, Reviera refuses rather
+than overwrite their work; merging their changes into yours comes with <i>Synchronise</i>.</p>
+
+<h2 id="security">How passwords are kept</h2>
+<p>Your password or user token is kept in the system keychain (or, where there is none, only until
+Reviera closes), never in a Reviera file or a project. Server addresses and user names are your own
+settings, not part of any project. AI agents connected to Reviera can list projects and use a
+session you started, but can never log in with a password or remove a server.</p>
+<p><code>bimserver.add_server</code>, <code>bimserver.login</code>, <code>bimserver.list_projects</code>,
+<code>bimserver.list_revisions</code>, <code>bimserver.open</code>, <code>bimserver.publish_local</code>,
+<code>bimserver.check_in</code>, <code>bimserver.download_revision</code>, <code>model.mode</code></p>
+
+<h2 id="later">Coming later</h2>
+<p>Get Latest and Synchronise with merging of other users' changes, change notifications, the
+revision history and restore, worksets and element ownership, progress and cancel for large
+downloads and uploads.</p>

@@ -1772,7 +1772,7 @@ area by area (reviewed against the spec on 2026-10-15).
   downloading a revision as IFC (`bimserver.*`, `model.mode`; the client is
   `clients/bimserver`, MIT). Checked against BIMserver 1.6.1. **Not yet:** get latest and
   synchronise with the three-way merge, notifications, history, worksets and ownership, streamed
-  upload of large models, calls off the UI thread, and the File › Open › From BIMserver dialog.
+  upload of large models, and calls off the UI thread. File › BIMserver... lists servers, projects and revisions, logs in, opens, publishes and checks in.
 - **Families and collaboration** (OpenCDE, Godot) are specified but not started.
 - **Remote computation subsystem** (DM-RPC-001 … 010): in development; the first milestone is
   built (see [Analysis and remote computation](#analysis-and-remote-computation-in-development)).

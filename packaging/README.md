@@ -74,8 +74,10 @@ The manifest, `io.github.rational_boxes.Reviera.yml`:
   follows Flathub's rules (pinned sources, no build network, AppStream, desktop file, icons).
 - **Sandbox** (`finish-args`): Wayland with X11 fallback, IPC, DRI for the wgpu viewport, the
   home folder (models live anywhere; wxWidgets' GTK file dialogs are not portal-based, so a
-  portal-only sandbox would show no files), and `org.freedesktop.secrets` for the live-store
-  keys in the keyring. No network: this build of Reviera opens no connections. Links in Help
+  portal-only sandbox would show no files), `org.freedesktop.secrets` for the live-store
+  keys and the BIMserver and remote-analysis secrets in the keyring, and the network, for the
+  BIMserver servers and remote analysis services the user adds (Reviera connects to none until
+  one is added). Links in Help
   open the browser through the OpenURI portal.
 - **Desktop integration**: `io.github.rational_boxes.Reviera.desktop` (`reviera gui %f`),
   hicolor PNG icons from 16 to 512 px (no scalable SVG: `appstreamcli compose` runs on the

@@ -2527,6 +2527,12 @@ actions = ["file.open", "file.save", "edit.undo", "edit.redo", "view.default_3d"
 # ---- Ribbon tabs (default order, §1.8.1) ----
 
 [[action]]
+id = "ui.bimserver"
+label = "BIMserver..."
+icon = "remote_analysis"
+help = "BIMserver projects: add a server and log in, open a project as a working copy, publish the open project to one, or check the working copy in (COL-BIM-001)"
+
+[[action]]
 id = "ui.remote_analysis"
 label = "Remote Analysis"
 icon = "remote_analysis"
@@ -4508,7 +4514,7 @@ panels = [{ label = "Window", tools = [{ action = "insert.flip_facing", size = "
 
 [[menu]]
 label = "&File"
-items = ["file.new", "file.open", "file.save", "file.save_as", "file.close", "-", "ui.model_properties", "ui.remote_analysis", "-", "export.pdf", "export.cobie", "gbxml.export", "gbxml.import_loads", "hbjson.export", "bcf.import", "bcf.export", "bcf.export_viewpoint", "bcf.import_viewpoint", "-", "app.exit"]
+items = ["file.new", "file.open", "file.save", "file.save_as", "file.close", "-", "ui.bimserver", "-", "ui.model_properties", "ui.remote_analysis", "-", "export.pdf", "export.cobie", "gbxml.export", "gbxml.import_loads", "hbjson.export", "bcf.import", "bcf.export", "bcf.export_viewpoint", "bcf.import_viewpoint", "-", "app.exit"]
 
 [[menu]]
 label = "&Edit"

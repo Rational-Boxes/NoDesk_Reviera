@@ -712,6 +712,10 @@ fn title(d: &OpenDocument) -> String {
     if d.untitled {
         return "Untitled".into();
     }
+    // A BIMserver working copy is its project (COL-MODE-001).
+    if let Some(st) = bimserver::state_of(d.project.path()) {
+        return st.project;
+    }
     d.project
         .path()
         .file_stem()

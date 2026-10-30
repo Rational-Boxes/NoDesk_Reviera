@@ -26,6 +26,9 @@ finish-args:
   - --filesystem=home
   # Live-store encryption keys in the user's keyring (keyring crate, Secret Service over D-Bus).
   - --talk-name=org.freedesktop.secrets
+  # BIMserver projects (COL-BIM-001) and remote analysis subscriptions (DM-RPC-011) talk to the
+  # servers the user adds; Reviera connects to none until one is added.
+  - --share=network
   # The Terminal pane (UI-AGENT-004) runs the user's shell and CLI agents on the host through
   # `flatpak-spawn --host`; this lets the app start host programs, as terminal apps do.
   - --talk-name=org.freedesktop.Flatpak

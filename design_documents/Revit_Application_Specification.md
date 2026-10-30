@@ -25841,7 +25841,7 @@ The MCP tool for `bimserver.login` never accepts a password from an agent; it ca
 - [ ] The browser lists projects and sub-projects as a tree matching the server's structure.
 - [ ] Creating a sub-project under "Hospital" shows it nested under that project immediately.
 
-*Built (2026-10-29):* `bimserver.list_projects` (with `working_copy` marking projects that have one here), `bimserver.list_revisions` (user names resolved and cached per call), `bimserver.create_project`. Not yet: the browser dialog and the `[reviera:…]` revision labels.
+*Built (2026-10-29):* `bimserver.list_projects` (with `working_copy` marking projects that have one here), `bimserver.list_revisions` (user names resolved and cached per call), `bimserver.create_project`. *Since (2026-10-29):* File › BIMserver… (`ui.bimserver`): the server choice (with its connection state), the chosen server's projects (schema, revision count, working copy here) and the chosen project's revisions newest first (number, date, user, first line of the comment); Add Server… (then Log In…), Log In… (user name and password or user token, *Remember in the system keychain*), Log Out (optionally forgetting the secret), Remove Server, Open Latest, Open Revision, Publish Current Project…, Check In…; the title bar shows a working copy's project and base revision; help page *BIMserver projects*. Not yet: the project tree of sub-projects, New project and New sub-project buttons, and the `[reviera:…]` revision labels.
 
 ### Open and download
 **ID:** COL-BIM-003 · **Priority:** P1 · **Ref:** TECH_STACK §3.7.1 (*Download*)

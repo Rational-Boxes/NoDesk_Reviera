@@ -55,6 +55,7 @@ mod path_arrays;
 mod radial;
 mod mep_ui;
 mod remote_analysis_ui;
+mod bimserver_ui;
 mod terminal_ui;
 mod mep_electrical_ui;
 mod mep_cables_ui;
@@ -1280,7 +1281,11 @@ impl Gui {
     fn update_title(&self, frame: &Frame) {
         let Some(id) = self.doc else { return };
         let info = self.app.documents().into_iter().find(|d| d.id == id);
-        let title = info.as_ref().map_or("Untitled".into(), |d| d.title.clone());
+        let mut title = info.as_ref().map_or("Untitled".into(), |d| d.title.clone());
+        // A BIMserver working copy: its project and base revision (COL-MODE-001).
+        if let Some(st) = self.app.document(id).and_then(|d| reviera_app::bimserver::state_of(d.project.path())) {
+            title = format!("{} (BIMserver, revision {})", st.project, st.base_revision);
+        }
         let read_only = info.is_some_and(|d| d.read_only);
         frame.set_title(&format!(
             "{title}{} - BIM Reviera",
@@ -4726,6 +4731,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "ui.pane.terminal" => Gui::toggle_terminal(gui),
         "ui.pane.sizing_calculator" => Gui::toggle_sizing_calculator(gui),
         "ui.remote_analysis" => with(gui, Gui::remote_analysis),
+        "ui.bimserver" => with(gui, Gui::bimserver_dialog),
         "mep_type.load_starters" => with(gui, Gui::load_mep_types),
         "mep.place_component" => with(gui, Gui::place_mep_component),
         "mep.connect_touching" => with(gui, Gui::connect_touching),
