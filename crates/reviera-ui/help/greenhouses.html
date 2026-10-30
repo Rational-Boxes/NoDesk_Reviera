@@ -176,6 +176,9 @@ air leakage, between the crop's night temperature and the weather's heating desi
 (<code>enclosure.heat_loss</code> takes other temperatures, wind speeds and air changes). With an
 energy screen it also gives the loss with the screen closed. It is a quick estimate for sizing
 the heating; the full heating and cooling loads come later.</p>
+<p><b>Heating</b> turns the heat loss into unit heaters (at least one per 18 m of length) or
+perimeter fin pipe (about 1.15 kW per metre); <code>enclosure.heating</code> also gives under-bench
+pipe for the benches and the share root-zone heat would cover.</p>
 <p><b>Fan Ventilation</b> sizes summer fans at one air change a minute (8 cfm per ft² of floor), the
 inlets they need, and <b>Natural Vents</b> compares the roof and side vents with the 15–20 %
 guidance; <code>enclosure.ventilation</code> also sizes evaporative pads, horizontal air-flow fans and

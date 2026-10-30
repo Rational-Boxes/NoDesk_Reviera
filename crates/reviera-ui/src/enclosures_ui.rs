@@ -344,6 +344,13 @@ impl Gui {
             }
         }
         grid.set_property_read_only("gc_heat_loss", true);
+        // Heating sizing (ARC-GLZ-014).
+        if let Ok(h) = self.run("enclosure.heating", json!({ "enclosure_id": owner })) {
+            let text = format!("{} unit heater(s) of {:.0} kW, or {:.0} m of perimeter fin pipe ({:.1} runs)", h["unit_heaters"], h["heater_kw"].as_f64().unwrap_or(0.0), h["perimeter_fin_m"].as_f64().unwrap_or(0.0), h["perimeter_runs"].as_f64().unwrap_or(0.0));
+            grid.append(Property::string("Heating", "gc_heating", text));
+            grid.set_property_read_only("gc_heating", true);
+            grid.set_help_string("gc_heating", "Sized on the heat loss: unit heaters (one per 18 m of length at least), perimeter fin pipe at 1.15 kW/m; enclosure.heating also gives under-bench and root-zone heat");
+        }
         // Ventilation (ARC-GLZ-012) and CO₂ (ARC-GLZ-013) sizing.
         if let Ok(v) = self.run("enclosure.ventilation", json!({ "enclosure_id": owner })) {
             let text = format!("{:.1} m³/s: {} fan(s) of {:.0} m³/s, {:.1} m² of inlets", v["airflow"].as_f64().unwrap_or(0.0), v["fans"], v["fan_airflow"].as_f64().unwrap_or(0.0), v["inlet_area"].as_f64().unwrap_or(0.0));

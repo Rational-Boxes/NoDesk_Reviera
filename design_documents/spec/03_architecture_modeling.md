@@ -3026,6 +3026,28 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 *Built (2026-10-30):* `enclosure.co2`: set point (the climate's by default), glazing (by the roof's glazing; tunnels plastic), supply and its range, burner capacity, gas and water per hour, and the control and safety notes. Properties › Growing Climate › *CO₂ Supply*. Not yet: liquid CO₂ and CHP exhaust as sources, seasonal use, and dosing tied to the vents in the energy model.
 
 
+### 3.6a.14 Heating sizing
+**ID:** ARC-GLZ-014 · **Priority:** P1 · **Ref:** research/11 §B3 (C049–C053); research/09 §4.5
+
+**Purpose.** Turn a greenhouse's design heat loss (ARC-GLZ-011) into the heating it needs, for the common systems, by their published outputs.
+
+**Behaviour & rules.**
+- The **design load** is the quick heat loss (with its inside and outside temperatures); with an energy screen closed at night, the load with it closed is shown too (heating is sized on the open screen: it may be open on a cold night with snow).
+- **Unit heaters**: at least one per 18 m (60 ft) of house length, and enough at a chosen size (default the load spread over that count, within 3.5–205 kW per heater).
+- **Perimeter fin pipe**: the length at about 1.15 kW/m (1¼ in pipe, 38 fins per foot, 82 °C water), and how many runs round the house's perimeter that is.
+- **Under-bench fin pipe**: the length at 0.1–0.19 kW/m (0.15 used), and the runs under the growing layout's benches (two loops, four runs, for a 1.8 m bench).
+- **Root-zone (floor or bench) heat**: about 63 W/m² for soil beds or 47 W/m² for flats over the growing area, and its share of the load (usually under 25 %; the rest from another system).
+- **Notes**: each 1 °F (0.56 K) lower set point saves about 3 % of fuel; keep heating pipes at least 0.3 m from plants; houses wider than 9 m need heat under the crop as well as round the perimeter; reference annual demands (tomato 45–413 kWh/m², pepper about 487, cucumber about 460).
+- Values provisional (EXPERT_REVIEW E-63). Not yet: pipe-rail and grow-pipe heating (no published output figure gathered), boilers and their water temperatures, and the pipes laid out in the model.
+
+**Commands.** `enclosure.heating(enclosure_id, inside?, outside?, wind?, heater_kw?) -> heating_report`.
+
+**Acceptance criteria.**
+- [x] A 9.6 × 40 m glasshouse losing about 128 kW (15 °C inside, −10 °C outside) needs at least three unit heaters (40 m ÷ 18 m), about 111 m of perimeter fin pipe (some 1.1 runs round its 99 m perimeter), and root-zone heat over its benches covers under a quarter of the load.
+
+*Built (2026-10-30):* `enclosure.heating` (`reviera_core::hothouse`): load (and with the energy screen closed), unit heaters and their size, perimeter fin pipe and its runs, under-bench fin pipe for the whole load and the runs the benches take, growing area, root-zone heat and its share, notes. Properties › Growing Climate › *Heating*.
+
+
 ## 3.7 Stairs, railings and ramps
 
 ### 3.7.1 Stair assembly model
@@ -5100,6 +5122,7 @@ All commands below are registered once in the command registry and exposed autom
 | `enclosure.heat_loss` | enclosure_id, inside?, outside?, wind?, air_changes? | heat_loss | No (query) | ARC-GLZ-011 |
 | `enclosure.ventilation` | enclosure_id, climate?, summer?, pads?, fan_airflow?, fan_diameter?, elevation? | ventilation_report | No (query) | ARC-GLZ-012 |
 | `enclosure.co2` | enclosure_id, setpoint?, glazing? | co2_report | No (query) | ARC-GLZ-013 |
+| `enclosure.heating` | enclosure_id, inside?, outside?, wind?, heater_kw? | heating_report | No (query) | ARC-GLZ-014 |
 | `growing.crops` | — | [crop] | No (query) | ARC-GLZ-008 |
 | `enclosure.set_climate` | enclosure_id, crop?, target_dli?, day_temperature?, night_temperature?, humidity?, co2?, photoperiod?, clear? | — | Yes | ARC-GLZ-008 |
 | `enclosure.crop_light` | enclosure_id, clearness?, outdoor_dli? | {source, transmission, months, darkest_month, required_ppfd, lamp_ppfd} | No (query) | ARC-GLZ-009 |

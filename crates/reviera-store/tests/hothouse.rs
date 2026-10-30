@@ -247,3 +247,24 @@ fn ventilation_and_co2_are_sized_by_the_published_rules() {
     let tunnel = run(&r, &mut doc, "enclosure.create", json!({ "form": "hoop", "level_id": level.0, "origin": [0, 60] })).unwrap();
     assert_eq!(run(&r, &mut doc, "enclosure.co2", json!({ "enclosure_id": tunnel })).unwrap()["glazing"], "plastic");
 }
+
+#[test]
+fn heating_is_sized_from_the_heat_loss() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_project, mut doc) = LocalProject::new(Schema::Ifc4, &dir.path().join("heat.ifc")).unwrap();
+    let r = registry();
+    let level = doc.store().iter().find(|e| e.class == "IfcBuildingStorey").unwrap().id();
+    let gh = run(&r, &mut doc, "enclosure.create", json!({ "form": "gable", "level_id": level.0, "length": 40.0, "span": 9.6, "bay": 4.0 })).unwrap();
+    run(&r, &mut doc, "growing.layout", json!({ "host_id": gh, "system": "benches", "direction": "along" })).unwrap();
+    let h = run(&r, &mut doc, "enclosure.heating", json!({ "enclosure_id": gh, "inside": 15.0, "outside": -10.0 })).unwrap();
+    let f = |k: &str| h[k].as_f64().unwrap();
+    let loss = run(&r, &mut doc, "enclosure.heat_loss", json!({ "enclosure_id": gh, "inside": 15.0, "outside": -10.0 })).unwrap()["total"].as_f64().unwrap();
+    assert!((f("load_kw") - loss / 1000.0).abs() < 1e-9 && (120.0..140.0).contains(&f("load_kw")), "{h}");
+    // At least one heater per 18 m of the 40 m length.
+    assert!(h["unit_heaters"].as_u64().unwrap() >= 3 && f("heater_kw") * h["unit_heaters"].as_f64().unwrap() >= f("load_kw") - 1e-9, "{h}");
+    assert!((f("perimeter_fin_m") - loss / 1150.0).abs() < 1e-6 && (f("perimeter_m") - 99.2).abs() < 1e-9);
+    // Root-zone heat over the benches: under a quarter of the load; the benches' own runs.
+    assert!(f("growing_area") > 0.0 && f("root_zone_percent") < 25.0 && h["bench_runs_m"].as_f64().unwrap() > 0.0, "{h}");
+    assert!(h["notes"].as_array().unwrap().iter().any(|n| n.as_str().unwrap().contains("wide")));
+    assert!(run(&r, &mut doc, "enclosure.heating", json!({ "enclosure_id": gh, "outside": -10.0, "heater_kw": 500 })).is_err());
+}

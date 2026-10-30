@@ -63,6 +63,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(EnclosureHeatLoss),
         registry.add(EnclosureVentilation),
         registry.add(EnclosureCo2),
+        registry.add(EnclosureHeating),
         registry.add(EnclosureCreate),
         registry.add(EnclosureSet),
         registry.add(EnclosureDetach),
@@ -4750,6 +4751,20 @@ read_command!(
     crate::hothouse::Co2Params,
     crate::hothouse::Co2,
     crate::hothouse::co2
+);
+
+read_command!(
+    EnclosureHeating,
+    "enclosure.heating",
+    "Size a glazed enclosure's heating",
+    "Heating sizing (ARC-GLZ-014) from the quick heat loss (`inside`, `outside`, `wind` as \
+     enclosure.heat_loss): unit heaters (at least one per 18 m of length, `heater_kw` each, 3.5–205 kW), \
+     perimeter fin pipe at 1.15 kW/m and its runs round the house, under-bench fin pipe at 0.15 kW/m and the \
+     runs the growing layout's benches take, root-zone heat at 63 W/m² over the growing area and its share \
+     of the load, with notes.",
+    crate::hothouse::HeatingParams,
+    crate::hothouse::Heating,
+    crate::hothouse::heating
 );
 
 edit_command!(

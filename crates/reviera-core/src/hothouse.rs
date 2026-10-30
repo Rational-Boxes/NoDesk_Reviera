@@ -1361,3 +1361,107 @@ fn plastic_roof(store: &Store, r: &EnclosureRecipe) -> bool {
             .is_some_and(|g| g.safety == crate::glazing_library::Safety::Plastic)
     })
 }
+
+// ---- Heating sizing (ARC-GLZ-014) ----
+
+/// Perimeter fin pipe's output (W/m), under-bench fin pipe's (W/m), root-zone heat (W/m²).
+const PERIMETER_FIN: f64 = 1150.0;
+const UNDER_BENCH_FIN: f64 = 150.0;
+const ROOT_ZONE: f64 = 63.0;
+/// One unit heater per this much house length; a heater's range (kW).
+const HEATER_REACH: f64 = 18.0;
+const HEATER_KW: [f64; 2] = [3.5, 205.0];
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct HeatingParams {
+    pub enclosure_id: ElementRef,
+    /// As enclosure.heat_loss.
+    pub inside: Option<f64>,
+    pub outside: Option<f64>,
+    pub wind: Option<f64>,
+    /// One unit heater's output, kW (default the load over the least count).
+    pub heater_kw: Option<f64>,
+}
+
+/// What `enclosure.heating` returns (kW, m).
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct Heating {
+    /// The design load, and with the energy screen closed.
+    pub load_kw: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub load_screened_kw: Option<f64>,
+    pub unit_heaters: u32,
+    pub heater_kw: f64,
+    /// Perimeter fin pipe: length, the house's perimeter, and runs round it.
+    pub perimeter_fin_m: f64,
+    pub perimeter_m: f64,
+    pub perimeter_runs: f64,
+    /// Under-bench fin pipe for the whole load, and the runs the benches take (four under a
+    /// bench 1.5 m wide or more, else two) with their length.
+    pub under_bench_fin_m: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bench_runs_m: Option<f64>,
+    /// Root-zone heat over the growing area, and its share of the load (percent).
+    pub growing_area: f64,
+    pub root_zone_kw: f64,
+    pub root_zone_percent: f64,
+    pub notes: Vec<String>,
+}
+
+/// `enclosure.heating`.
+pub(crate) fn heating(store: &Store, p: HeatingParams) -> Result<Heating> {
+    let loss = heat_loss(store, HeatLossParams { enclosure_id: p.enclosure_id.clone(), inside: p.inside, outside: p.outside, wind: p.wind, air_changes: None })?;
+    let (id, r) = enclosure(store, &p.enclosure_id)?;
+    let load_kw = loss.total / 1000.0;
+    let least = (r.length / HEATER_REACH).ceil().max(1.0) as u32;
+    let heater_kw = match p.heater_kw {
+        Some(k) if (HEATER_KW[0]..=HEATER_KW[1]).contains(&k) => k,
+        Some(_) => return Err(bad("growing.bad_value", "a unit heater gives 3.5 to 205 kW")),
+        None => (load_kw / f64::from(least)).clamp(HEATER_KW[0], HEATER_KW[1]),
+    };
+    let unit_heaters = least.max((load_kw / heater_kw).ceil() as u32);
+    let perimeter_m = 2.0 * (r.length + r.width());
+    let perimeter_fin_m = loss.total / PERIMETER_FIN;
+    // The growing layouts on this enclosure: their pieces' area and bench runs.
+    let guid = store.get(id).expect("resolved").guid().to_string();
+    let mut growing_area = 0.0;
+    let mut bench_runs = 0.0;
+    let mut benches = false;
+    for l in store.iter().filter_map(crate::growing::recipe).filter(|l| l.enclosure == guid) {
+        let parts: Vec<crate::growing::PartRecipe> = l.parts.iter().filter_map(|g| store.get(store.find_by_guid(&GlobalId::parse(g)?)?)).filter_map(crate::growing::part_recipe).collect();
+        growing_area += crate::growing::growing_area(&parts);
+        if matches!(l.system, crate::growing::System::Benches | crate::growing::System::RollingBenches | crate::growing::System::EbbFlow) {
+            benches = true;
+            let runs = if l.width >= 1.5 { 4.0 } else { 2.0 };
+            bench_runs += parts.iter().map(|q| (q.end[0] - q.start[0]).hypot(q.end[1] - q.start[1])).sum::<f64>() * runs;
+        }
+    }
+    let root_zone_kw = growing_area * ROOT_ZONE / 1000.0;
+    let mut notes = vec![
+        "each 0.56 K (1 °F) lower set point saves about 3 % of the fuel".to_owned(),
+        "keep heating pipes at least 0.3 m from the plants".to_owned(),
+        "annual heating demand for reference: tomato 45–413, cucumber about 460, pepper about 487 kWh/m² (by region and strategy)".to_owned(),
+    ];
+    if r.width() > 9.0 {
+        notes.insert(0, format!("at {:.1} m wide, heat under the crop or benches as well as round the perimeter", r.width()));
+    }
+    if benches && bench_runs * UNDER_BENCH_FIN / 1000.0 < load_kw {
+        notes.push(format!("under-bench pipe in the benches' runs gives about {:.0} kW of the {load_kw:.0} kW: the rest from the perimeter or unit heaters", bench_runs * UNDER_BENCH_FIN / 1000.0));
+    }
+    Ok(Heating {
+        load_kw,
+        load_screened_kw: loss.with_screen.map(|w| w / 1000.0),
+        unit_heaters,
+        heater_kw,
+        perimeter_fin_m,
+        perimeter_m,
+        perimeter_runs: perimeter_fin_m / perimeter_m.max(1e-9),
+        under_bench_fin_m: loss.total / UNDER_BENCH_FIN,
+        bench_runs_m: benches.then_some(bench_runs),
+        growing_area,
+        root_zone_kw,
+        root_zone_percent: 100.0 * root_zone_kw / load_kw.max(1e-9),
+        notes,
+    })
+}
