@@ -137,7 +137,34 @@ Select the layout or any piece and Properties › <b>Growing Layout</b> shows it
 its share of the floor; change a size there, or the greenhouse's, and it is laid out again.
 <code>growing.layout</code>, <code>growing.set_layout</code>, <code>growing.summary</code></p>
 
+<h2 id="climate">Growing climate and crop light</h2>
+<p>Select a greenhouse and, in Properties › <b>Growing Climate</b>, choose the <b>Crop</b>: tomato,
+cucumber, sweet pepper, head lettuce, strawberry, bedding and potted plants, or propagation. Each
+brings its target daily light integral (DLI, mol/m²·d), day and night temperatures, CO₂ set point
+and photoperiod (the longest day it takes under lamps), from public extension sources; change any
+of them there. <i>None</i> removes the climate. <code>growing.crops</code>,
+<code>enclosure.set_climate</code></p>
+<p>The rows under it show the crop's light month by month (<code>enclosure.crop_light</code>):</p>
+<ul>
+  <li>the outdoor light, from the weather file (Sustainability › Site › Weather; import it again if
+    it was imported before this release) or, without one, an estimate from the project's latitude
+    (Manage › Project Location) with a clearness index of 0.5;</li>
+  <li>through the roof: × the roof glazing's PAR transmission and the share its bars leave open
+    (<b>Roof Transmission</b>);</li>
+  <li>the <b>Darkest Month</b>'s natural light and what the lamps add, the <b>Lamp PPFD</b> it needs
+    over the photoperiod, and the <b>Months Short of Target</b>.</li>
+</ul>
+<p><b>Grow lights.</b> With the greenhouse selected, <b>Architecture › Build › Grow Lights</b>
+<a class="run" href="reviera:action/growing.lights">Grow Lights</a> hangs LED top-lights under
+the gutters on a grid across each span, enough for the darkest month (110 µmol/m²·s without a
+climate). Each fixture is a light fixture element (1,500 µmol/s at 600 W unless changed); select
+one and Properties › <b>Grow Lights</b> changes the photon flux, power, target PPFD, height and
+maintenance factor, and shows the count, mean PPFD, the DLI the lamps add, the load in kW and W/m²,
+and a warning for fixtures below 2.3 µmol/J. They are laid out again when the greenhouse changes.
+<code>growing.lights</code>, <code>growing.set_lights</code>, <code>growing.lights_summary</code></p>
+
 <h2 id="later">Coming later</h2>
 <p>Gutter-connected arch ranges; rafters, purlins and Venlo trusses; opening and closing vents in
-the view, and gutter vents; shading devices; atriums; heating, cooling and energy analysis of the
+the view, and gutter vents; energy, shade and blackout screens, heating pipes, pad-and-fan cooling
+and CO₂ enrichment; shading devices; atriums; heating, cooling and energy analysis of the
 enclosure; residential conservatories and orangeries; and building-code checks.</p>

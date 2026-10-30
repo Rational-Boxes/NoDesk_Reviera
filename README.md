@@ -1686,13 +1686,13 @@ area by area (reviewed against the spec on 2026-10-15).
 **Other chapters:**
 
 - **Glazed enclosures** (`design_documents/GLAZED_ENCLOSURES_PLAN.md`; spec §3.6a,
-  ARC-GLZ-001 … 007): greenhouses, hothouses, solariums, conservatories and atriums built from the
+  ARC-GLZ-001 … 009): greenhouses, hothouses, solariums, conservatories and atriums built from the
   existing roofs, sloped glazing, curtain walls, gutters and members by one Glazed Enclosure
   tool: commercial forms first (gable, gutter-connected multispan, Venlo, hoop, gothic, sawtooth),
   a glazing and frame library, vents, growing layouts (benches, rolling benches, NFT and
   high-wire gutters), glazed vaults, domes and geodesic domes, and Reviera-defined types and
-  `Reviera_*` property sets for what IFC lacks. Later phases: hothouse climate and crop light,
-  louvres, baffles and other shading devices with sun-tracking control, atriums with smoke and
+  `Reviera_*` property sets for what IFC lacks. Later phases: hothouse screens, heating,
+  cooling and CO₂, louvres, baffles and other shading devices with sun-tracking control, atriums with smoke and
   stack-ventilation checks, HVAC, energy and structural load modelling, residential forms, and
   building-code rule sets for the US, UK, Canada, EU, Australia and New Zealand. Specified (phase
   1). **Built so far:** the Glazed Enclosure tool (Architecture › Build) with the gable,
@@ -1709,7 +1709,10 @@ area by area (reviewed against the spec on 2026-10-15).
   flat panels on their surface (`roof.set_glazing`); side vents and each vent's free and effective area
   in `Reviera_Vent` (`enclosure.set_vents`), and the enclosure's design values in
   `Reviera_EnclosureDesign`; roll-up sides and gable vents; a headhouse across one end
-  (`enclosure.*`); the `greenhouses` sample. Curtain walls' tops attach to one or more roofs
+  (`enclosure.*`); a growing climate from crop presets (`Reviera_GrowingClimate`,
+  `enclosure.set_climate`), the crop's daily light integral month by month through the glazing
+  from the weather file or the latitude (`enclosure.crop_light`), and grow lights laid out to make
+  up the darkest month (`growing.lights`, `Reviera_GrowLight`); the `greenhouses` sample. Curtain walls' tops attach to one or more roofs
   (`wall.attach`).
 - **Digital twins, operational data and smart-city features** (`design_documents/DIGITAL_TWIN_PLAN.md`):
   sensor and controls design with points schedules, bindings from model elements to live BACnet,

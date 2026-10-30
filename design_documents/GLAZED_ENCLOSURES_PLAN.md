@@ -288,7 +288,8 @@ and the defaults recorded for expert review.
 2. **Hothouse climate and growing.** Heating (pipe rail, under-bench), energy and shade screens,
    pad-and-fan cooling, supplemental lighting laid out for a target daily light integral, CO₂
    enrichment, climate setpoints by crop; crop light (DLI) through the glazing, screens and
-   lamps; growing-area schedules.
+   lamps; growing-area schedules. *Started 2026-10-29: crop presets and the growing climate
+   (ARC-GLZ-008), crop light month by month and grow lights for the darkest month (ARC-GLZ-009).*
 3. **Sunlight management.** Shading devices on any face (louvres, fins, brise-soleil, baffles,
    light shelves, screens), with the sun-path design aid; their effect in daylight, solar studies
    and loads; operable devices and their control.

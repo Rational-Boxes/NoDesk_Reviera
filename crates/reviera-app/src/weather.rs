@@ -105,7 +105,7 @@ impl HostCommand for WeatherImport {
         };
         let out = app.execute(
             "weather.apply",
-            json!({ "file": kept, "epw": { "station": epw.station, "period": epw.period, "design": epw.design }, "set_location": loc.latitude.is_none() }),
+            json!({ "file": kept, "epw": { "station": epw.station, "period": epw.period, "design": epw.design, "monthly_global": epw.monthly_global }, "set_location": loc.latitude.is_none() }),
             caller,
         )?;
         let weather = serde_json::from_value(out.result).map_err(|e| bad("weather.internal", e.to_string()))?;

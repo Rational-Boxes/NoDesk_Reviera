@@ -550,6 +550,7 @@ impl LocalProject {
                 || recipe_kind == Some(reviera_core::ramps::RAMP_RECIPE)
                 || recipe_kind == Some(reviera_core::skylights::SKYLIGHT_RECIPE)
                 || recipe_kind == Some(reviera_core::growing::PART_RECIPE)
+                || recipe_kind == Some(reviera_core::hothouse::LIGHT_RECIPE)
                 || recipe_kind == Some(reviera_core::geodesic::RECIPE)
                 || recipe_kind == Some(stairs::STAIR_RECIPE)
                 || recipe_kind == Some(railings::RAILING_RECIPE)
@@ -763,6 +764,7 @@ impl LocalProject {
             self.write_parts(doc)?;
             self.write_skylights(doc)?;
             self.write_growing(doc)?;
+            self.write_grow_lights(doc)?;
             self.write_geodesic(doc)?;
             let owner_history = self.new_owner_history()?;
             crate::mesh_objects::write_mesh_objects(
@@ -3895,6 +3897,32 @@ impl LocalProject {
                 .collect();
             geometry::write_breps(&mut self.ifc, step, geometry::BrepFrame::WORLD, &solids, self.length_scale, contexts)?;
             let storey = reviera_core::growing::part_recipe(store.get(*id).expect("listed"))
+                .and_then(|p| GlobalId::parse(&p.level))
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|l| self.steps.get(&l).copied());
+            if let Some(storey) = storey {
+                geometry::contain(&mut self.ifc, step, storey, owner_history)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Writes every grow light (ARC-GLZ-009): one faceted B-rep, contained in its level.
+    fn write_grow_lights(&mut self, doc: &Document) -> Result<()> {
+        let store = doc.store();
+        let all = reviera_core::hothouse::all(store);
+        if all.is_empty() {
+            return Ok(());
+        }
+        let contexts = geometry::Contexts::find(&self.ifc)?;
+        let owner_history = self.new_owner_history()?;
+        for (id, (points, idx)) in &all {
+            let Some(&step) = self.steps.get(id) else {
+                continue;
+            };
+            let solid = geometry::Polyhedron { points: points.clone(), faces: idx.chunks(3).map(|t| t.iter().map(|i| *i as usize).collect()).collect() };
+            geometry::write_breps(&mut self.ifc, step, geometry::BrepFrame::WORLD, &[solid], self.length_scale, contexts)?;
+            let storey = reviera_core::hothouse::light_recipe(store.get(*id).expect("listed"))
                 .and_then(|p| GlobalId::parse(&p.level))
                 .and_then(|g| store.find_by_guid(&g))
                 .and_then(|l| self.steps.get(&l).copied());

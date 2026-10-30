@@ -922,6 +922,15 @@ fn the_greenhouses_sample_keeps_its_enclosures() {
             assert!(sum["longest_run"].as_f64().unwrap() <= 12.0 + 1e-9, "{sum}");
         }
     }
+    // Lettuce in the Venlo and tomatoes in the sawtooth, each lit to its target in every month.
+    let lit: Vec<_> = enclosures.iter().filter(|(id, _)| s.get(*id).and_then(reviera_core::hothouse::climate).is_some()).collect();
+    assert_eq!(lit.len(), 2);
+    for (id, _) in lit {
+        let l = ok(&mut app, "enclosure.crop_light", json!({ "enclosure_id": id }));
+        assert_eq!(l["darkest_month"], 12, "{l}");
+        assert!(l["lamp_ppfd"].as_f64().unwrap() > 100.0 && l["months"].as_array().unwrap().iter().all(|m| m["meets_target"] == true), "{l}");
+    }
+    assert_eq!(s.iter().filter(|e| reviera_core::hothouse::lights_recipe(e).is_some()).count(), 2);
     // The geodesic dome: 3V at 5/8, three strut lengths.
     let dome = s.iter().find(|e| reviera_core::geodesic::recipe(e).is_some()).expect("a dome");
     let d = ok(&mut app, "roof.geodesic", json!({ "roof_id": dome.id() }));

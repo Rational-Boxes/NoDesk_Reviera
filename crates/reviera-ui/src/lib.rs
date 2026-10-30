@@ -2601,6 +2601,7 @@ impl Gui {
         self.dormer_rows(grid, id);
         self.enclosure_rows(grid, id);
         self.growing_rows(grid, id);
+        self.grow_light_rows(grid, id);
         if self.doc.and_then(|d| self.app.document(d)).and_then(|d| d.doc.store().get(id)).and_then(reviera_core::geodesic::recipe).is_some() {
             self.geodesic_rows(grid, id);
         }
@@ -2973,6 +2974,8 @@ impl Gui {
             || self.dormer_edit(property, text.clone())
             || self.enclosure_edit(property, text.clone())
             || self.growing_edit(property, text.clone())
+            || self.climate_edit(property, text.clone())
+            || self.grow_light_edit(property, text.clone())
             || self.geodesic_edit(property, text.clone())
             || self.curved_glazing_edit(property, text.clone())
             || self.curved_roof_edit(property, text.clone())
@@ -5071,6 +5074,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         }),
         "enclosure.create" => with(gui, Gui::enclosure_dialog),
         "growing.layout" => with(gui, Gui::growing_dialog),
+        "growing.lights" => with(gui, Gui::grow_lights),
         "dormer.create" => with(gui, |g| {
             g.start_dormer_tool();
             focus(g);

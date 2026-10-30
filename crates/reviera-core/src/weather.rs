@@ -79,6 +79,10 @@ pub struct Weather {
     pub derived: Design,
     /// Typed by the user; kept over the file's.
     pub overrides: Design,
+    /// Each month's mean daily global horizontal radiation (MJ/m², January first) from the file;
+    /// empty when the file was imported before it was kept.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub monthly_global: Vec<f64>,
     /// Bumped on every change, so results computed from the weather can tell they are stale.
     pub revision: u64,
 }
@@ -96,6 +100,8 @@ pub struct Epw {
     pub period: [i32; 2],
     pub records: usize,
     pub design: Design,
+    /// Each month's mean daily global horizontal radiation (MJ/m²).
+    pub monthly_global: Vec<f64>,
 }
 
 /// Saturation vapour pressure over water (Pa) at `t` °C (Magnus form).
@@ -225,7 +231,15 @@ pub fn parse_epw(text: &str) -> Result<Epw> {
         }
     }
     let round = |v: f64, k: f64| (v * k).round() / k;
+    // Each month's global radiation (Wh/m² an hour) over its days, in MJ/m² a day.
+    let mut monthly = [(0.0, 0usize); 13];
+    for h in &hours {
+        monthly[h.0].0 += h.4;
+        monthly[h.0].1 += 1;
+    }
+    let monthly_global = (1..=12).map(|m| round(monthly[m].0 * 0.0036 * 24.0 / monthly[m].1.max(1) as f64, 1000.0)).collect();
     Ok(Epw {
+        monthly_global,
         station,
         period: [years.0, years.1],
         records: hours.len(),
@@ -267,6 +281,8 @@ pub struct EpwIn {
     pub station: Station,
     pub period: [i32; 2],
     pub design: Design,
+    #[serde(default)]
+    pub monthly_global: Vec<f64>,
 }
 
 /// `weather.apply`: the imported file and its values; the user's overrides are kept.
@@ -277,6 +293,7 @@ pub(crate) fn apply(txn: &mut Transaction<'_>, p: ApplyParams) -> Result<Weather
     w.station = Some(p.epw.station.clone());
     w.period = Some(p.epw.period);
     w.derived = p.epw.design;
+    w.monthly_global = p.epw.monthly_global;
     w.revision += 1;
     if p.set_location {
         let s = &p.epw.station;

@@ -52,6 +52,12 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(GrowingLayout),
         registry.add(GrowingSetLayout),
         registry.add(GrowingSummary),
+        registry.add(GrowingCrops),
+        registry.add(EnclosureSetClimate),
+        registry.add(EnclosureCropLight),
+        registry.add(GrowingLights),
+        registry.add(GrowingSetLights),
+        registry.add(GrowingLightsSummary),
         registry.add(EnclosureCreate),
         registry.add(EnclosureSet),
         registry.add(EnclosureDetach),
@@ -4594,6 +4600,84 @@ read_command!(
     crate::growing::SummaryParams,
     crate::growing::Summary,
     crate::growing::summary
+);
+
+read_command!(
+    GrowingCrops,
+    "growing.crops",
+    "List the crop presets",
+    "The crop presets for a growing climate (ARC-GLZ-008), from public extension sources: the least and \
+     target daily light integral (mol·m⁻²·d⁻¹), day and night air temperature (°C), relative humidity \
+     (percent), CO₂ set point with the vents shut (ppm) and the longest day under lamps (hours). Provisional.",
+    crate::builtin::NoParams,
+    Vec<crate::hothouse::Crop>,
+    crate::hothouse::list_crops
+);
+
+edit_command!(
+    EnclosureSetClimate,
+    "enclosure.set_climate",
+    "Set a glazed enclosure's growing climate",
+    "Growing Climate (ARC-GLZ-008): a `crop` preset's values (growing.crops), or the enclosure's own, with \
+     any of `target_dli`, `day_temperature` and `night_temperature` (°C), `humidity` ([least, most] \
+     percent), `co2` (ppm) and `photoperiod` (hours) over them; written as Reviera_GrowingClimate. \
+     `clear` removes it.",
+    "Set Growing Climate",
+    crate::hothouse::SetClimateParams,
+    (),
+    crate::hothouse::set_climate
+);
+
+read_command!(
+    EnclosureCropLight,
+    "enclosure.crop_light",
+    "Report the crop's daily light month by month",
+    "Crop Light (ARC-GLZ-009): each month's outdoor daily light integral (from the weather file's global \
+     radiation, else the extraterrestrial radiation at the site's latitude × a `clearness` index, 0.5 by \
+     default, or `outdoor_dli` given), the light through the roof glazing and past its bars, the grow \
+     lights' addition over the photoperiod, and against the climate's target; the darkest month and the \
+     lamp PPFD it needs.",
+    crate::hothouse::CropLightParams,
+    crate::hothouse::CropLight,
+    crate::hothouse::crop_light
+);
+
+edit_command!(
+    GrowingLights,
+    "growing.lights",
+    "Lay out grow lights in a glazed enclosure",
+    "Grow Lights (ARC-GLZ-009): top-lights (IfcLightFixture) hung `height` above the floor on a grid \
+     across each span, enough that their photons (`photon_flux` µmol/s each, × `maintenance`) give a mean \
+     of `target_ppfd` over the floor; the target defaults to the climate's need in the darkest month \
+     (else 110 µmol·m⁻²·s⁻¹). Each fixture is its own element; the layout follows its enclosure. Returns \
+     the layout.",
+    "Grow Lights",
+    crate::hothouse::LightsParams,
+    crate::id::ElementId,
+    crate::hothouse::lights
+);
+
+edit_command!(
+    GrowingSetLights,
+    "growing.set_lights",
+    "Change a grow-light layout",
+    "Changes a grow-light layout's fixture, target, height or maintenance factor (as `growing.lights`); its \
+     fixtures are laid out again.",
+    "Edit Grow Lights",
+    crate::hothouse::SetLightsParams,
+    (),
+    crate::hothouse::set_lights
+);
+
+read_command!(
+    GrowingLightsSummary,
+    "growing.lights_summary",
+    "Summarise a grow-light layout",
+    "A grow-light layout's fixtures, target and mean PPFD, power and power density, photon efficacy, the \
+     DLI the lamps add over the photoperiod, and warnings (efficacy below 2.3 µmol/J).",
+    crate::hothouse::LightsSummaryParams,
+    crate::hothouse::LightsSummary,
+    crate::hothouse::lights_summary
 );
 
 edit_command!(

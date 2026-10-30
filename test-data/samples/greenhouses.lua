@@ -2,7 +2,7 @@
 -- Copyright (C) 2026 Reviera contributors
 
 -- title: Greenhouses
--- description: A Venlo glasshouse range on a knee wall, a three-span gutter-connected range turned to run north–south, a small gable greenhouse, a sawtooth range with vents in its vertical faces, a geodesic dome, and a hoop and a gothic film tunnel, each one Glazed Enclosure of glazed roofs, glazed walls, gutters, vents and a steel frame.
+-- description: A Venlo glasshouse range on a knee wall, a three-span gutter-connected range turned to run north–south, a small gable greenhouse, a sawtooth range with vents in its vertical faces, a geodesic dome, and a hoop and a gothic film tunnel, each one Glazed Enclosure of glazed roofs, glazed walls, gutters, vents and a steel frame; lettuce and tomatoes grown under grow lights sized for December.
 --
 -- Reviera sample model (test-data/samples): the Glazed Enclosure tool (ARC-GLZ-001/002). Each
 -- greenhouse is one element (`enclosure.create`) that lays out ordinary Reviera elements and
@@ -93,6 +93,22 @@ local layouts = {
 for _, l in ipairs(layouts) do
   local s = reviera.growing.summary{ layout_id = l }
   print(string.format("%s: %d pieces, %.0f m² growing (%.0f %% of the floor)", s.system, s.pieces, s.growing_area, s.share))
+end
+
+-- Growing climate and crop light (ARC-GLZ-008/009), at a site in the western Netherlands:
+-- lettuce in the Venlo range (17 mol/m²·d), tomatoes in the sawtooth (25 mol/m²·d). Each
+-- enclosure's December light through its glass falls far short, so grow lights are hung under
+-- the gutters, enough to make up the darkest month over the crop's photoperiod.
+reviera.location.set{ lat = 52.0, lon = 4.4, place = "Westland" }
+reviera.enclosure.set_climate{ enclosure_id = venlo, crop = "lettuce" }
+reviera.enclosure.set_climate{ enclosure_id = saw, crop = "tomato" }
+for _, e in ipairs({ venlo, saw }) do
+  local lights = reviera.growing.lights{ enclosure_id = e }
+  local s = reviera.growing.lights_summary{ lights_id = lights }
+  local l = reviera.enclosure.crop_light{ enclosure_id = e }
+  local dark = l.months[l.darkest_month]
+  print(string.format("grow lights: %d fixtures, %.0f µmol/m²·s, %.0f W/m²; month %d: %.1f natural + %.1f lamps mol/m²·d",
+    s.fixtures, s.average_ppfd, s.power_density, l.darkest_month, dark.natural, dark.lamps))
 end
 
 for _, e in ipairs({ venlo, range, hobby, saw, tunnel, gothic }) do

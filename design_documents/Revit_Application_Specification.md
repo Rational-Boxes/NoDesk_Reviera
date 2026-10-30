@@ -13069,11 +13069,52 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 - **Published definitions.** Each `Reviera_*` set is defined once, machine-readably (names, data types, units, descriptions, applicable classes), as `schemas/psets/reviera-psets-1.json` under the MIT licence (interop components are MIT), so other tools can read them; publishing them in the buildingSMART Data Dictionary under a Reviera domain is a later option.
 - A file stripped of RXD keeps the enclosure's parts and their `Reviera_*` property sets; a file stripped of those too is still a valid building (Chapter 2 principle 5).
 
-*Built (2026-10-28):* categories `cat.glazed_enclosures` and `cat.growing_systems`; `Reviera_GlazingUnit`, defined in `schemas/psets/reviera-psets-1.json` with its schema `reviera.psets-1.schema.json` (MIT). Published `Reviera_*` sets are read back from IFC as parameters like any property set; only the RXD carriers (`Reviera_Manifest`, `Reviera_Element`, `Reviera_Type`, `Reviera_Doc:*`) are not. *Since (2026-10-29):* `Reviera_FrameSystem` (ARC-GLZ-003), `Reviera_Vent` (ARC-GLZ-004), and `Reviera_EnclosureDesign` on the enclosure (form, length, width, span, spans, bay spacing, eave and ridge height, pitch, floor area, roof and side vent targets), all in the published file. Not yet: `Reviera_ShadingPerformance`, `Reviera_GrowingClimate`, a design life class, and *Reattach*.
+*Built (2026-10-28):* categories `cat.glazed_enclosures` and `cat.growing_systems`; `Reviera_GlazingUnit`, defined in `schemas/psets/reviera-psets-1.json` with its schema `reviera.psets-1.schema.json` (MIT). Published `Reviera_*` sets are read back from IFC as parameters like any property set; only the RXD carriers (`Reviera_Manifest`, `Reviera_Element`, `Reviera_Type`, `Reviera_Doc:*`) are not. *Since (2026-10-29):* `Reviera_FrameSystem` (ARC-GLZ-003), `Reviera_Vent` (ARC-GLZ-004), and `Reviera_EnclosureDesign` on the enclosure (form, length, width, span, spans, bay spacing, eave and ridge height, pitch, floor area, roof and side vent targets), all in the published file. *Since:* `Reviera_GrowingClimate` (ARC-GLZ-008) and `Reviera_GrowLight` (ARC-GLZ-009). Not yet: `Reviera_ShadingPerformance`, a design life class, and *Reattach*.
 
 **Acceptance criteria.**
 - [x] The published property-set definition file validates against its JSON Schema and lists every `Reviera_*` property the glazed enclosure tools write.
 - [ ] An enclosure exported, stripped of `Reviera_Element` RXD and reopened shows its parts and their `Reviera_GlazingUnit` values; *Reattach* rebuilds the enclosure from them where it can.
+
+### 3.6a.8 Growing climate by crop
+**ID:** ARC-GLZ-008 · **Priority:** P1 · **Ref:** owner requirement (2026-10-28, commercial grows); research/11 §B1, §B2, §B5, §B10
+
+**Purpose.** Give a commercial greenhouse the climate its crop is grown in, so the light, heating, cooling and CO₂ tools that follow size from it.
+
+**Behaviour & rules.**
+- A **crop library** of presets from public extension sources: the least and the target daily light integral (DLI), day and night air temperature, relative humidity, the CO₂ set point with the vents shut, and the longest day the crop takes under lamps (tomato needs 4–6 h of dark). A value the sources give none for stays empty rather than guessed. The presets are provisional (EXPERT_REVIEW E-57).
+- An enclosure's **growing climate** is a preset's values, or the designer's over them; it is kept on the enclosure, survives its regeneration, and goes with it to IFC.
+- Values are checked: target DLI 0.5–70 mol·m⁻²·d⁻¹, photoperiod 1–24 h, CO₂ 0–5,000 ppm (5,000 ppm harms people), air −10 to 50 °C, humidity least ≤ most.
+
+**Data (IFC mapping).** `Reviera_GrowingClimate` on the enclosure's `IfcElementAssembly` (Crop, TargetDailyLightIntegral, DayTemperature and NightTemperature in kelvin, RelativeHumidityMin/Max, CarbonDioxideSetpoint, Photoperiod); RXD element data `rxd:growing_climate`. Later phases put the same set on climate zones (`IfcZone`, `IfcSpace`).
+
+**Commands.** `growing.crops() -> [crop]`, `enclosure.set_climate(enclosure_id, crop?, target_dli?, day_temperature?, night_temperature?, humidity?, co2?, photoperiod?, clear?) -> ()`.
+
+**Acceptance criteria.**
+- [x] Setting tomato on a Venlo range writes its target DLI (25), set points and photoperiod (18 h) as `Reviera_GrowingClimate`, which comes back from IFC.
+- [x] An unknown crop, or a photoperiod over 24 h, is refused.
+
+*Built (2026-10-29):* `reviera_core::hothouse` with seven presets (tomato, cucumber, sweet pepper, head lettuce, strawberry, bedding and potted plants, propagation), Properties › Growing Climate on the enclosure (crop, target DLI, day and night temperature, CO₂, photoperiod). Not yet: temperature integration and day/night ramps, VPD and humidity-deficit set points, climate zones as `IfcZone`, the set points in the heating and cooling loads.
+
+### 3.6a.9 Crop light and grow lights
+**ID:** ARC-GLZ-009 · **Priority:** P1 · **Ref:** owner requirement (2026-10-28, commercial grows); research/09 §4.7, §6.2; research/11 §B1, §B10 item 5
+
+**Purpose.** Show the light a crop gets month by month through the enclosure's glazing, and lay out the grow lights that make up the shortfall.
+
+**Behaviour & rules.**
+- **Outdoor light.** Each month's mean daily global radiation from the weather file (kept when it is imported), else an estimate from the site's latitude: the month's mean daily extraterrestrial radiation on a horizontal surface, day by day, × a clearness index (0.5 unless given), else twelve values typed in. Global radiation becomes PAR photons at 1.96 mol per MJ (about 43 % of sunlight's energy is PAR).
+- **Through the roof.** × the roof glazing's PAR transmission (area-weighted over the enclosure's roofs; its visible transmission where a type gives no PAR value) × the share its bars leave unshaded.
+- **Grow lights.** Top-lights hung under the gutters on a grid across each span, each covering its fixture's photons × a maintenance factor (0.9) over the target PPFD, so the mean PPFD over the floor is at least the target. The target is the climate's shortfall in its darkest month over its photoperiod (else 110 µmol·m⁻²·s⁻¹, a current university standard for new LED installations). Fixtures default to 1,500 µmol/s at 600 W (2.5 µmol/J) and 1.1 × 0.12 × 0.08 m (E-58); one below 2.3 µmol/J (DLC's minimum since 2023) is flagged. The lights follow their enclosure.
+- **Report.** Each month's outdoor, natural (inside) and lamp DLI, the total against the target, the darkest month and the lamp PPFD it needs; the layout's fixtures, mean PPFD, power, power density, efficacy and the DLI the lamps add.
+
+**Data (IFC mapping).** Grow lights are `IfcLightFixture` (USERDEFINED, ObjectType `GrowLight`) with `Reviera_GrowLight` (PhotonFlux, ElectricalPower, PhotonEfficacy), owned by an `IfcElementAssembly` (ObjectType `GrowLightLayout`) carrying the layout's FixtureCount, TargetPPFD, AveragePPFD, PowerDensity and MaintenanceFactor; the layout's recipe is RXD element data.
+
+**Commands.** `enclosure.crop_light(enclosure_id, clearness?, outdoor_dli?) -> {source, transmission, months, darkest_month, required_ppfd, lamp_ppfd}`, `growing.lights(enclosure_id, photon_flux?, power?, target_ppfd?, height?, maintenance?) -> element_id`, `growing.set_lights(lights_id, …) -> ()`, `growing.lights_summary(lights_id) -> {fixtures, average_ppfd, power, power_density, efficacy, lamp_dli, warnings}`.
+
+**Acceptance criteria.**
+- [x] A Venlo range of tomatoes at 52° N under clear glass is darkest in December and short of its target; grow lights laid out for it bring every month to the target, and a longer range gets more fixtures.
+- [x] With a weather file imported, the outdoor light is the file's global radiation × 1.96.
+
+*Built (2026-10-29):* `reviera_core::hothouse`; `weather.import` keeps each month's mean daily global radiation (`monthly_global`, a file imported before has none and the estimate is used). Architecture › Build › Grow Lights lays them out in the selected enclosure; Properties › Growing Climate shows the darkest month, the roof's transmission, the lamp PPFD needed and laid out, and the months short of target; Properties › Grow Lights edits the fixture, target, height and maintenance factor. Sample: `greenhouses` (lettuce in the Venlo, tomatoes in the sawtooth, at a site in the western Netherlands). Not yet: energy and shade screens in the light path, the glazing's hemispherical (diffuse) transmission, lamps switched off in bright sun (450/400 µmol·m⁻²·s⁻¹ thresholds), a uniformity map from photometry, grow lights in rooms, the lamps' heat in the loads, and photoperiod blackout.
 
 ## 3.7 Stairs, railings and ramps
 
@@ -15144,6 +15185,12 @@ All commands below are registered once in the command registry and exposed autom
 | `growing.summary` | layout_id | {growing_area, floor_area, share, counts} | No (query) | ARC-GLZ-005 |
 | `roof.set_glazing` | roof_id, grid_u?, grid_v?, triangulate? | {panels, triangles, bars, max_warp} | Yes | ARC-GLZ-006 |
 | `roof.create_geodesic` | center, radius, frequency, truncation, level_id, glazing_type_id?, frame_type_id? | element_id | Yes | ARC-GLZ-006 |
+| `growing.crops` | — | [crop] | No (query) | ARC-GLZ-008 |
+| `enclosure.set_climate` | enclosure_id, crop?, target_dli?, day_temperature?, night_temperature?, humidity?, co2?, photoperiod?, clear? | — | Yes | ARC-GLZ-008 |
+| `enclosure.crop_light` | enclosure_id, clearness?, outdoor_dli? | {source, transmission, months, darkest_month, required_ppfd, lamp_ppfd} | No (query) | ARC-GLZ-009 |
+| `growing.lights` | enclosure_id, photon_flux?, power?, target_ppfd?, height?, maintenance? | element_id | Yes | ARC-GLZ-009 |
+| `growing.set_lights` | lights_id, photon_flux?, power?, target_ppfd?, height?, maintenance? | — | Yes | ARC-GLZ-009 |
+| `growing.lights_summary` | lights_id | {fixtures, average_ppfd, power, power_density, efficacy, lamp_dli, warnings} | No (query) | ARC-GLZ-009 |
 | `workplane.set` | view_id, by: Name(datum_id) \| Face(host_ref) \| Line(element_id) \| Plane(origin, normal, xdir) | plane | Yes | ARC-WP-001 |
 | `workplane.show` | view_id, on | — | No (session state) | ARC-WP-001 |
 | `workplane.viewer` | view_id? (default: the active view) | view_id | No (session state) | ARC-WP-001 |
@@ -27954,14 +28001,14 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 39 | 8 | 0 | 123 |
 | DM | 91 | 64 | 34 | 3 | 192 |
-| ARC | 77 | 67 | 10 | 1 | 155 |
+| ARC | 77 | 69 | 10 | 1 | 157 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 28 | 0 | 29 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
 | COL | 8 | 45 | 6 | 1 | 60 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **301** | **192** | **7** | **820** |
+| **Total** | **320** | **303** | **192** | **7** | **822** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -28142,7 +28189,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2189 unique commands** in 421 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2195 unique commands** in 421 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -28264,7 +28311,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `element` | 39 |
 | `elevationmarker` | 1 |
 | `embodied_carbon` | 5 |
-| `enclosure` | 6 |
+| `enclosure` | 8 |
 | `energy_location` | 1 |
 | `energy_model` | 4 |
 | `energy_settings` | 3 |
@@ -28314,7 +28361,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `graphics` | 2 |
 | `grid` | 3 |
 | `group` | 19 |
-| `growing` | 3 |
+| `growing` | 7 |
 | `guidegrid` | 1 |
 | `gutter` | 1 |
 | `hanger` | 3 |
@@ -29112,10 +29159,12 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `embodied_carbon.match` | 4 | material_id, factor_ref | — | Yes | ANA-CARB-001 |
 | `embodied_carbon.run` | 4 | scope?, options? | job_id | Results only | ANA-CARB-001 |
 | `enclosure.create` | 3 | form, footprint \ | host_wall_ids, level_id, params | element_id | Yes |
+| `enclosure.crop_light` | 3 | enclosure_id, clearness?, outdoor_dli? | {source, transmission, months, darkest_month, required_ppfd, lamp_ppfd} | No (query) | ARC-GLZ-009 |
 | `enclosure.detach` | 3 | part_ids | — | Yes | ARC-GLZ-001 |
 | `enclosure.forms` | 3 | — | [{form, schema, defaults}] | No (query) | ARC-GLZ-001, ARC-GLZ-002 |
 | `enclosure.get` | 3 | enclosure_id | {form, params, parts} | No (query) | ARC-GLZ-001 |
 | `enclosure.set` | 3 | enclosure_id, params | — | Yes | ARC-GLZ-001 |
+| `enclosure.set_climate` | 3 | enclosure_id, crop?, target_dli?, day_temperature?, night_temperature?, humidity?, co2?, photoperiod?, clear? | — | Yes | ARC-GLZ-008 |
 | `enclosure.set_vents` | 3 | enclosure_id, kind (roof\ | side\ | roll_up\ | gable), target_percent?, height?, opening_angle?, discharge?, actuator? |
 | `energy_location.set` | 4 | lat, lon, elevation?, weather_file? | — | Yes | ANA-EM-001 |
 | `energy_model.create` | 4 | options? | job_id | Yes | ANA-EM-003 |
@@ -29380,8 +29429,12 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `group.set_attached_detail_visible` | 3 | instance_id, view_id, attached_type_ids | — | Yes | ARC-GRP-001 |
 | `group.swap_type` | 3 | instance_ids, group_type_id | — | Yes | ARC-GRP-001 |
 | `group.ungroup` | 3 | instance_ids | [element_id] | Yes | ARC-GRP-001 |
+| `growing.crops` | 3 | — | [crop] | No (query) | ARC-GLZ-008 |
 | `growing.layout` | 3 | host_id, system, component_type_id?, aisle?, main_aisle?, direction?, clearance? | element_id | Yes | ARC-GLZ-005 |
+| `growing.lights` | 3 | enclosure_id, photon_flux?, power?, target_ppfd?, height?, maintenance? | element_id | Yes | ARC-GLZ-009 |
+| `growing.lights_summary` | 3 | lights_id | {fixtures, average_ppfd, power, power_density, efficacy, lamp_dli, warnings} | No (query) | ARC-GLZ-009 |
 | `growing.set_layout` | 3 | layout_id, params | — | Yes | ARC-GLZ-005 |
+| `growing.set_lights` | 3 | lights_id, photon_flux?, power?, target_ppfd?, height?, maintenance? | — | Yes | ARC-GLZ-009 |
 | `growing.summary` | 3 | layout_id | {growing_area, floor_area, share, counts} | No (query) | ARC-GLZ-005 |
 | `guidegrid.create` | 5 | name, spacing, extents | guide_grid_id | Yes | DOC-SHT-005 |
 | `gutter.create` | 3 | type_id, edge_refs | element_id | Yes | ARC-ROOF-004 |

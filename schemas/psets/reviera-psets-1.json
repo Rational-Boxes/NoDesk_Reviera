@@ -64,6 +64,36 @@
         { "name": "RoofVentTarget", "measure": "IfcPositiveRatioMeasure", "description": "Roof vents' target area over the floor area." },
         { "name": "SideVentTarget", "measure": "IfcPositiveRatioMeasure", "description": "Side vents' target area over the floor area." }
       ]
+    },
+    {
+      "name": "Reviera_GrowingClimate",
+      "description": "A glazed enclosure's growing climate (spec ARC-GLZ-008), on its IfcElementAssembly (ObjectType GlazedEnclosure): a crop preset's set points or the designer's.",
+      "applicable_classes": ["IfcElementAssembly", "IfcSpace", "IfcZone"],
+      "properties": [
+        { "name": "Crop", "measure": "IfcLabel", "description": "The crop the climate is for." },
+        { "name": "TargetDailyLightIntegral", "measure": "IfcReal", "unit": "mol/(m2·d)", "description": "The daily light integral the crop is grown to, natural light and lamps together." },
+        { "name": "DayTemperature", "measure": "IfcThermodynamicTemperatureMeasure", "unit": "K", "description": "The day air temperature set point." },
+        { "name": "NightTemperature", "measure": "IfcThermodynamicTemperatureMeasure", "unit": "K", "description": "The night air temperature set point." },
+        { "name": "RelativeHumidityMin", "measure": "IfcNormalisedRatioMeasure", "description": "The least relative humidity." },
+        { "name": "RelativeHumidityMax", "measure": "IfcNormalisedRatioMeasure", "description": "The most relative humidity." },
+        { "name": "CarbonDioxideSetpoint", "measure": "IfcReal", "unit": "ppm", "description": "The CO2 concentration held with the vents shut." },
+        { "name": "Photoperiod", "measure": "IfcReal", "unit": "h", "description": "Hours of light a day, lamps included." }
+      ]
+    },
+    {
+      "name": "Reviera_GrowLight",
+      "description": "Supplemental grow lighting (spec ARC-GLZ-009): on each grow light (IfcLightFixture, ObjectType GrowLight) its photon output and power; on a grow-light layout (IfcElementAssembly, ObjectType GrowLightLayout) its count and design values.",
+      "applicable_classes": ["IfcLightFixture", "IfcLightFixtureType", "IfcElementAssembly"],
+      "properties": [
+        { "name": "PhotonFlux", "measure": "IfcReal", "unit": "µmol/s", "description": "The fixture's photosynthetic photon flux, 400–700 nm." },
+        { "name": "ElectricalPower", "measure": "IfcPowerMeasure", "unit": "W", "description": "The fixture's input power." },
+        { "name": "PhotonEfficacy", "measure": "IfcReal", "unit": "µmol/J", "description": "Photon flux over input power (PPE)." },
+        { "name": "FixtureCount", "measure": "IfcCountMeasure", "description": "On a layout: how many fixtures." },
+        { "name": "TargetPPFD", "measure": "IfcReal", "unit": "µmol/(m2·s)", "description": "On a layout: the mean photosynthetic photon flux density laid out for." },
+        { "name": "AveragePPFD", "measure": "IfcReal", "unit": "µmol/(m2·s)", "description": "On a layout: the fixtures' maintained photons over the growing floor." },
+        { "name": "PowerDensity", "measure": "IfcReal", "unit": "W/m2", "description": "On a layout: the fixtures' power over the growing floor." },
+        { "name": "MaintenanceFactor", "measure": "IfcNormalisedRatioMeasure", "description": "On a layout: the output kept after lamp ageing and dirt." }
+      ]
     }
   ]
 }

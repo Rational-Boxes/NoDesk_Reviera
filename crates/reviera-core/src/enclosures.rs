@@ -358,7 +358,7 @@ impl EnclosureRecipe {
     }
 
     /// A point of the enclosure's frame in the project's plan.
-    fn at(&self, x: f64, y: f64) -> [f64; 2] {
+    pub fn at(&self, x: f64, y: f64) -> [f64; 2] {
         let (s, c) = self.rotation.sin_cos();
         [self.origin[0] + c * x - s * y, self.origin[1] + s * x + c * y]
     }
@@ -989,8 +989,9 @@ fn rebuild(txn: &mut Transaction<'_>, id: ElementId, mut r: EnclosureRecipe) -> 
     let parts = build(txn, &guid, &r)?;
     r.parts = parts.iter().map(|p| txn.store().get(*p).expect("made").guid().to_string()).collect();
     write_recipe(txn, id, &r)?;
-    // Its growing layouts are laid out again on the new floor.
-    crate::growing::follow(txn, &guid)
+    // Its growing layouts and grow lights are laid out again on the new floor.
+    crate::growing::follow(txn, &guid)?;
+    crate::hothouse::follow(txn, &guid)
 }
 
 // ---- Commands ----

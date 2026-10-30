@@ -524,6 +524,10 @@ pub fn all(store: &Store) -> Vec<Body> {
             push(id, &format!("{class}:{}", crate::mesh_objects::color_hex(color)), m, false);
         }
     }
+    // Grow lights (ARC-GLZ-009): dark housings.
+    for (id, m) in crate::hothouse::all(store) {
+        push(id, &format!("IfcLightFixture:{}", crate::mesh_objects::color_hex([0.22, 0.23, 0.25, 1.0])), m, false);
+    }
     // Custom objects (DM-IMP-015): one part per material slot, in its colour; members of MEP
     // systems in their system type's colour (MEP-SYS-001).
     let system_colors = crate::mep_systems::element_colors(store);

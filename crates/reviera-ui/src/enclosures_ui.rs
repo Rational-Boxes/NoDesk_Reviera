@@ -280,6 +280,103 @@ impl Gui {
                 grid.set_help_string("gh_warnings", &warnings.join("\n"));
             }
         }
+        if let Some((owner, _)) = self.enclosure_of_selection(id) {
+            self.climate_rows(grid, owner);
+        }
+    }
+
+    /// The enclosure's growing climate and crop light (ARC-GLZ-008, -009).
+    fn climate_rows(&mut self, grid: &PropertyGrid, owner: ElementId) {
+        let Some(store) = self.doc.and_then(|d| self.app.document(d)).map(|d| d.doc.store().clone()) else { return };
+        let c = store.get(owner).and_then(reviera_core::hothouse::climate);
+        grid.append(Property::category("Growing Climate", "c_climate"));
+        let crops = reviera_core::hothouse::crops();
+        let names: Vec<String> = std::iter::once("None".to_owned()).chain(crops.iter().map(|c| c.name.to_owned())).collect();
+        let at = c.as_ref().and_then(|c| c.crop.as_deref()).and_then(|id| crops.iter().position(|k| k.id == id)).map_or(0, |i| i + 1) as i32;
+        let at = if c.is_some() && at == 0 { names.len() as i32 } else { at };
+        let mut choices: Vec<(String, i32)> = names.iter().enumerate().map(|(i, n)| (n.clone(), i as i32)).collect();
+        if at == names.len() as i32 {
+            choices.push(("Custom".to_owned(), names.len() as i32));
+        }
+        grid.append(Property::enumeration("Crop", "gc_crop", choices, at));
+        grid.set_help_string("gc_crop", "A crop preset's light target and set points (growing.crops); None removes the climate");
+        let Some(c) = c else { return };
+        let temp = |t: Option<f64>| t.map_or(String::new(), |t| format!("{t} °C"));
+        let rows = [
+            ("Target DLI (mol/m²·d)", "gc_dli", format!("{}", c.target_dli)),
+            ("Day Temperature", "gc_day", temp(c.day_temperature)),
+            ("Night Temperature", "gc_night", temp(c.night_temperature)),
+            ("CO₂ Set Point (ppm)", "gc_co2", format!("{}", c.co2)),
+            ("Photoperiod (h)", "gc_photoperiod", format!("{}", c.photoperiod)),
+        ];
+        for (label, key, value) in rows {
+            grid.append(Property::string(label, key, value));
+        }
+        grid.set_help_string("gc_photoperiod", "Hours of light a day, lamps included (tomato needs 4–6 h of dark)");
+        match self.run("enclosure.crop_light", json!({ "enclosure_id": owner })) {
+            Ok(l) => {
+                let m = &l["months"][l["darkest_month"].as_u64().unwrap_or(1) as usize - 1];
+                const MONTHS: [&str; 12] = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+                let name = MONTHS.get(m["month"].as_u64().unwrap_or(1) as usize - 1).copied().unwrap_or("");
+                let text = format!("{name}: {:.1} natural + {:.1} lamps = {:.1} mol/m²·d", m["natural"].as_f64().unwrap_or(0.0), m["lamps"].as_f64().unwrap_or(0.0), m["total"].as_f64().unwrap_or(0.0));
+                grid.append(Property::string("Darkest Month", "gc_darkest", text));
+                grid.set_property_read_only("gc_darkest", true);
+                let t = l["transmission"]["total"].as_f64().unwrap_or(0.0);
+                grid.append(Property::string("Roof Transmission", "gc_transmission", format!("{:.0} % (glazing and bars)", t * 100.0)));
+                grid.set_property_read_only("gc_transmission", true);
+                let need = l["required_ppfd"].as_f64().unwrap_or(0.0);
+                let text = format!("{need:.0} µmol/m²·s needed, {:.0} laid out", l["lamp_ppfd"].as_f64().unwrap_or(0.0));
+                grid.append(Property::string("Lamp PPFD", "gc_ppfd", text));
+                grid.set_property_read_only("gc_ppfd", true);
+                let short = l["months"].as_array().map_or(0, |a| a.iter().filter(|m| m["meets_target"] == false).count());
+                grid.append(Property::string("Months Short of Target", "gc_short", short.to_string()));
+                grid.set_property_read_only("gc_short", true);
+                let src = if l["source"] == "weather" { "the weather file" } else { "an estimate from the latitude (clearness 0.5)" };
+                grid.set_help_string("gc_darkest", &format!("Outdoor light from {src}, through the roof glazing and past its bars"));
+            }
+            Err(e) => {
+                grid.append(Property::string("Crop Light", "gc_darkest", e.to_string()));
+                grid.set_property_read_only("gc_darkest", true);
+            }
+        }
+    }
+
+    /// An edit of a growing climate row; `false` if `property` is not one.
+    pub(crate) fn climate_edit(&mut self, property: &str, text: Option<String>) -> bool {
+        if !property.starts_with("gc_") {
+            return false;
+        }
+        let frame = self.frame;
+        let Some((owner, _)) = self.selection().first().and_then(|id| self.enclosure_of_selection(*id)) else { return true };
+        let text = text.unwrap_or_default();
+        let mut args = json!({ "enclosure_id": owner });
+        let number = |t: &str| t.trim().trim_end_matches("°C").trim().parse::<f64>().ok();
+        match property {
+            "gc_crop" if text == "None" => args["clear"] = json!(true),
+            "gc_crop" => match reviera_core::hothouse::crops().iter().find(|c| c.name == text) {
+                Some(c) => args["crop"] = json!(c.id),
+                None => return true,
+            },
+            "gc_dli" | "gc_day" | "gc_night" | "gc_co2" | "gc_photoperiod" => {
+                let key = match property {
+                    "gc_dli" => "target_dli",
+                    "gc_day" => "day_temperature",
+                    "gc_night" => "night_temperature",
+                    "gc_co2" => "co2",
+                    _ => "photoperiod",
+                };
+                match number(&text) {
+                    Some(v) => args[key] = json!(v),
+                    None => return true,
+                }
+            }
+            _ => return true,
+        }
+        if let Err(e) = self.run("enclosure.set_climate", args) {
+            error(&frame, &format!("The climate was not changed:\n{e}"));
+        }
+        self.selection_changed();
+        true
     }
 
     /// An edit of an enclosure row; `false` if `property` is not one.
@@ -502,6 +599,107 @@ impl Gui {
         }
         if let Err(e) = self.run("growing.set_layout", args) {
             error(&frame, &format!("The layout was not changed:\n{e}"));
+        }
+        let _ = self.run("selection.set", json!({ "ids": [owner] }));
+        self.selection_changed();
+        self.refresh_scene(&frame);
+        true
+    }
+}
+
+impl Gui {
+    /// Architecture › Grow Lights: top-lights in the selected enclosure, for its crop's darkest
+    /// month (ARC-GLZ-009).
+    pub(crate) fn grow_lights(&mut self) {
+        let frame = self.frame;
+        let Some(owner) = self.selection().first().and_then(|id| self.enclosure_of_selection(*id).map(|(o, _)| o)) else {
+            return frame.set_status_text("Grow Lights: select a glazed enclosure first", 0);
+        };
+        match self.run("growing.lights", json!({ "enclosure_id": owner })) {
+            Ok(v) => {
+                let s = self.run("growing.lights_summary", json!({ "lights_id": v })).unwrap_or_default();
+                frame.set_status_text(
+                    &format!("Grow lights: {} fixtures, {:.0} µmol/m²·s, {:.0} W/m²", s["fixtures"], s["average_ppfd"].as_f64().unwrap_or(0.0), s["power_density"].as_f64().unwrap_or(0.0)),
+                    0,
+                );
+            }
+            Err(e) => error(&frame, &format!("The grow lights were not laid out:\n{e}")),
+        }
+        self.refresh_scene(&frame);
+    }
+
+    /// The grow-light layout of a selected layout or fixture.
+    fn lights_of_selection(&self, id: ElementId) -> Option<(ElementId, reviera_core::hothouse::LightsRecipe)> {
+        let store = self.doc.and_then(|d| self.app.document(d))?.doc.store();
+        let e = store.get(id)?;
+        let owner = match e.param(reviera_core::hothouse::LIGHTS_KEY).and_then(|v| v.as_str()) {
+            Some(g) => store.find_by_guid(&reviera_core::GlobalId::parse(g)?)?,
+            None => id,
+        };
+        Some((owner, reviera_core::hothouse::lights_recipe(store.get(owner)?)?))
+    }
+
+    /// A grow-light layout's rows, for a selected layout or fixture.
+    pub(crate) fn grow_light_rows(&mut self, grid: &PropertyGrid, id: ElementId) {
+        let Some((owner, r)) = self.lights_of_selection(id) else { return };
+        grid.append(Property::category("Grow Lights", "c_grow_lights"));
+        let rows = [
+            ("Photon Flux (µmol/s)", "lt_flux", format!("{}", r.photon_flux)),
+            ("Power (W)", "lt_power", format!("{}", r.power)),
+            ("Target PPFD (µmol/m²·s)", "lt_target", format!("{:.0}", r.target_ppfd)),
+            ("Maintenance Factor", "lt_maintenance", format!("{}", r.maintenance)),
+        ];
+        for (label, key, value) in rows {
+            grid.append(Property::string(label, key, value));
+        }
+        let h = self.format_length(r.height);
+        grid.append(Property::string("Height", "lt_height", h));
+        grid.set_help_string("lt_height", "The fixtures' underside above the floor (kept under the gutters)");
+        if let Ok(s) = self.run("growing.lights_summary", json!({ "lights_id": owner })) {
+            let text = format!("{} fixtures, {:.0} µmol/m²·s, {:.1} mol/m²·d", s["fixtures"], s["average_ppfd"].as_f64().unwrap_or(0.0), s["lamp_dli"].as_f64().unwrap_or(0.0));
+            grid.append(Property::string("Layout", "lt_summary", text));
+            grid.set_property_read_only("lt_summary", true);
+            let text = format!("{:.1} kW, {:.0} W/m², {:.2} µmol/J", s["power"].as_f64().unwrap_or(0.0) / 1000.0, s["power_density"].as_f64().unwrap_or(0.0), s["efficacy"].as_f64().unwrap_or(0.0));
+            grid.append(Property::string("Power", "lt_load", text));
+            grid.set_property_read_only("lt_load", true);
+            let warnings: Vec<&str> = s["warnings"].as_array().map(|w| w.iter().filter_map(Value::as_str).collect()).unwrap_or_default();
+            if !warnings.is_empty() {
+                grid.append(Property::string("Warnings", "lt_warnings", warnings.join("; ")));
+                grid.set_property_read_only("lt_warnings", true);
+            }
+        }
+    }
+
+    /// An edit of a grow-light row; `false` if `property` is not one.
+    pub(crate) fn grow_light_edit(&mut self, property: &str, text: Option<String>) -> bool {
+        if !property.starts_with("lt_") {
+            return false;
+        }
+        let frame = self.frame;
+        let Some((owner, _)) = self.selection().first().and_then(|id| self.lights_of_selection(*id)) else { return true };
+        let text = text.unwrap_or_default();
+        let mut args = json!({ "lights_id": owner });
+        match property {
+            "lt_height" => match self.run("units.parse", json!({ "text": text, "data_type": "length" })) {
+                Ok(v) => args["height"] = v,
+                Err(_) => return true,
+            },
+            "lt_flux" | "lt_power" | "lt_target" | "lt_maintenance" => {
+                let key = match property {
+                    "lt_flux" => "photon_flux",
+                    "lt_power" => "power",
+                    "lt_target" => "target_ppfd",
+                    _ => "maintenance",
+                };
+                match text.trim().parse::<f64>() {
+                    Ok(v) => args[key] = json!(v),
+                    Err(_) => return true,
+                }
+            }
+            _ => return true,
+        }
+        if let Err(e) = self.run("growing.set_lights", args) {
+            error(&frame, &format!("The grow lights were not changed:\n{e}"));
         }
         let _ = self.run("selection.set", json!({ "ids": [owner] }));
         self.selection_changed();

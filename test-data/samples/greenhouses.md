@@ -57,7 +57,12 @@ Start with **File › New**. The model has Level 1 at 0. Open the Level 1 plan.
    gutters 1.25 m apart under crop wires at 3.25 m; Properties › Crop Wire). A layout can fill a
    room too: select the room, then Growing Layout. Properties › Growing Layout shows each one's growing area and
    share of the floor; change a size there, or the enclosure's, and the layout is laid out again.
-9. **Look at it.** In a 3D view the glass is translucent; select a roof to see its glazing grid,
+9. **Climate and grow lights.** Manage › Project Location: latitude 52°, longitude 4.4°. Select
+   the Venlo range and, in Properties › Growing Climate, set Crop *Head lettuce*; the sawtooth
+   range *Tomato (high-wire)*. The rows below show December as the darkest month, far short of
+   the target. With each selected, Architecture › **Grow Lights**: the fixtures hang under the
+   gutters and Months Short of Target drops to 0.
+10. **Look at it.** In a 3D view the glass is translucent; select a roof to see its glazing grid,
    or an end wall to see the glass clipped to the gables. Each part says which enclosure it
    belongs to; Modify › **Detach from Enclosure** **[gap]** (`enclosure.detach`) keeps a part
    when the enclosure changes.
@@ -65,7 +70,9 @@ Start with **File › New**. The model has Level 1 at 0. Open the Level 1 plan.
 Check: six enclosures (category *Glazed Enclosures*); the Venlo range has 4 roofs, 4 glass
 walls (a door in each end wall), 2 knee walls, 5 gutters, 21 steel posts and 3 gutter beams; the multispan 3 roofs and 4 gutters; the hobby house 1 roof
 and 2 gutters; the sawtooth 3 roofs, 6 glass walls (two of them inner vertical faces) and 3 gutters; the tunnels 1 roof by extrusion and 4 glass walls each. Saved, each is an `IfcElementAssembly` (ObjectType *GlazedEnclosure*) aggregating
-its parts.
+its parts. The lettuce and tomato ranges carry `Reviera_GrowingClimate`, and their grow lights
+are `IfcLightFixture`s (ObjectType *GrowLight*) with `Reviera_GrowLight`, every month at its
+target.
 
 ## Gaps
 
@@ -75,6 +82,9 @@ its parts.
   view), and there are no gutter vents; the doors are plain hinged curtain-wall doors (no sliding
   doors or door types yet).
 - Gutter-connected arch ranges (ARC-GLZ-002); the tunnels' arches are faceted.
+- **Crop light.** Screens are not yet in the light path, the glazing's transmission is its
+  value at normal incidence (not the lower diffuse one), and lamps are assumed on all
+  photoperiod, even in bright sun. Grow lights go in enclosures only, not rooms.
 - The headhouse has a flat roof only, and no floor slab or loading door.
 - **Keeping edits.** A change rebuilds every part, so hand edits to a part are lost unless the
   part is detached first.

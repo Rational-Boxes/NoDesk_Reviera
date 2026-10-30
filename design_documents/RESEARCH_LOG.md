@@ -126,6 +126,7 @@ Any source that fails this test is rejected. Rejections are noted in the session
 - **Methods used:** public web search and HTTP fetch of public pages and PDFs by three automated research agents (Claude Code subagents). No images were downloaded and no software was installed or run.
 - **For expert review:** the provisional defaults taken from this research are EXPERT_REVIEW E-44 … E-48 (forms, minimum glazed pitch, glazing values, vent areas, growing layouts); the plan lists more for later phases (design fires, smoke-vent discharge coefficients, the louvre cut-off formula's sign convention).
 - **Follow-up (2026-10-29), frame types (ARC-GLZ-003):** two public web searches for deflection limits of members carrying glass (G088–G091, search summaries and public maker charts). L/175 of the span is the common baseline (CWCT's standard for four-edge-supported double glazing, L/175 or 15 mm; AAMA TIR-A11 as quoted in a maker's public charts, L/175 to 13 ft 6 in and L/240 + 1/4 in beyond). EN 13031-1's own limits (clause 11) were not found in public text and were not sought in copies of the paid standard. Values recorded as E-52. Nothing copied.
+- **Follow-up (2026-10-29), crop light (ARC-GLZ-009):** two public web searches: the conversion of global solar radiation to PAR photons (G092 MSU Extension, ≈ 43 % of sunlight's energy, 1.96 µmol per J; G094 an ASHS abstract's 45 % alternative) and the monthly clearness-index method (G093, HOMER's public manual). The extraterrestrial radiation formula (solar constant, declination, sunset hour angle) is textbook solar geometry. Search summaries only; nothing copied. Values recorded as E-57.
 - **Follow-up (2026-10-29), geodesic domes (ARC-GLZ-006):** built from the spec, Reviera's own code (icosahedron subdivision and sphere projection are textbook geometry). The hub, panel and strut counts and strut factors of the 2V hemisphere and the 3V 5/8 dome were cross-checked against the dome-frequency figures already gathered (G060, low authority) and general knowledge of the published chord-factor tables; no calculator or code was used. Defaults recorded as E-53.
 
 ---
@@ -143,7 +144,7 @@ Any source that fails this test is rejected. Rejections are noted in the session
 
 ## 5. Source Register
 
-The full register is in **`SOURCE_REGISTER.md` §A**. It had 577 sources at first (1,247 after Session 4), each with an ID, area, type, URL, HTTP status and public-availability verdict. It was generated from the research files' Sources sections on 2026-10-12, and every URL was re-checked with an unauthenticated request.
+The full register is in **`SOURCE_REGISTER.md` §A**. It had 577 sources at first (1,250 after Session 4 and its follow-ups), each with an ID, area, type, URL, HTTP status and public-availability verdict. It was generated from the research files' Sources sections on 2026-10-12, and every URL was re-checked with an unauthenticated request.
 
 | Type | Count |
 |------|------:|
