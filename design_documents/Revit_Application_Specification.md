@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Reviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Reviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 808 numbered requirements (320 P0 · 293 P1 · 188 P2 · 7 P3), 2,125 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 833 numbered requirements (320 P0 · 312 P1 · 194 P2 · 7 P3), 2,225 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,125 commands; 808 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,225 commands; 833 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -26160,6 +26160,123 @@ The MCP tool for `bimserver.login` never accepts a password from an agent; it ca
 
 ---
 
+## 6.2a FileEngine models
+
+FileEngine (Proxima File Vault) is a versioned document store with a REST door. Reviera keeps models there as files: every save is a new version, and FileEngine decides who may read and write. This is phase 1 of `FILEENGINE_INTEGRATION.md` (§4–5): connections, browsing, open, save and versions. Publishing, BCF, Component Libraries, documentation folders and product data come in later phases. Reviera talks to FileEngine (AGPL-3.0) over HTTP only; its client `clients/fileengine` is MIT.
+
+### Connections and sign-in
+**ID:** COL-FE-001 · **Priority:** P1 · **Ref:** FILEENGINE_INTEGRATION §4, §8
+
+**Purpose.** Reach one or more FileEngine servers as the user, without passwords in files or agents handling credentials.
+
+**Behaviour & rules.**
+- A connection is a per-user setting (`fileengine.json`), never project data. It holds a name, the tenant's address (its REST door is under `/api/`), an optional tenant to work in (sent as `X-Tenant`), and who signed in last.
+- **Sign-in with a service credential.** FileEngine generates a key id and secret (`fesk_…`, `fesks_…`) with the `api` scope for this app. `POST /api/v1/auth/token` with HTTP Basic exchanges it for a bearer token that lasts 900 s.
+  - The client renews the token at `/v1/auth/refresh` a minute before it runs out.
+  - It asks for a new token with the credential when the renewal is refused, or when a call is refused once (a server restart).
+- The credential is kept in the OS keychain under `org.bimreviera.fileengine` when *remember* is on, otherwise only for the session. No command returns it, and no settings file, model or log holds it.
+- Plain `http://` is allowed for localhost only, unless the connection is marked as a trusted local network.
+- MCP agents may use every `fileengine.*` command, acting as the signed-in user, except two things:
+  - giving a credential to `fileengine.sign_in`;
+  - `fileengine.remove`.
+
+**Commands.** `fileengine.connect(url, name?, tenant?, allow_http?) -> connection`; `fileengine.list_connections() -> connection[]`; `fileengine.sign_in(connection_id, key?, secret?, remember?) -> identity`; `fileengine.sign_out(connection_id, forget?) -> ()`; `fileengine.remove(connection_id) -> ()`; `fileengine.whoami(connection_id) -> identity`
+
+**Acceptance criteria.**
+- [x] A wrong secret is refused as not authorised; the right one returns the user, tenant and roles.
+- [x] The credential appears in no command's answer and not in `fileengine.json`.
+- [x] An agent's `fileengine.sign_in` with a credential, and its `fileengine.remove`, are refused; with the stored credential it signs in.
+- [x] A token past its renewal time is renewed, and a revoked one replaced, without the caller seeing an error.
+
+*Built (2026-10-30):*
+- `clients/fileengine/rust` (MIT): `Client` with sign-in, renewal and re-issue, folders, files, content streamed both ways with `Range`, versions, restore, metadata and permissions.
+- An in-memory FileEngine behind the `fake` feature, for tests.
+- Checked live against Proxima File Vault (arcdigital tenant).
+- Not yet: username and password (LDAP) sign-in, single sign-on, and the connection dialog in Options (connections are managed in the Open and Save dialogs).
+
+### Browse and open
+**ID:** COL-FE-002 · **Priority:** P1 · **Ref:** FILEENGINE_INTEGRATION §5
+
+**Purpose.** Find a model in FileEngine's folders and work on it as if it were a local file.
+
+**Behaviour & rules.**
+- *File › Open From FileEngine…* lists a connection's folders and models (`GET /v1/dirs/{uid}`), folders first. Each entry shows its size, version count, who changed it last, and whether this computer has a working copy. Double-click enters a folder; *Up* goes back.
+- **Open** streams the model into a working copy, `<data>/reviera/fileengine/<connection>/<uid>/<name>`, beside `fileengine.json`. That file records the connection, the uid, the folder, the version opened, who opened it, and the read-only, past-version and unsent states. The working copy is then opened like any local file, with the live store, recovery and undo.
+- A model the user may not write (`GET /v1/nodes/{uid}/permissions?permission=w`) opens read-only.
+- A working copy holding work not uploaded yet is opened as it is and never overwritten. The open reports whether the server has a newer version.
+- A past version opens read-only from `<uid>@<version>/`.
+- `file.open` accepts `fileengine://<connection>/<uid>`, and `?version=<v>` for a past version.
+- The title bar names the model with *(FileEngine)*, *(FileEngine, not uploaded)* or *(FileEngine, version of …)*.
+- `.ifc` models open; `.ifczip` is listed but not opened yet.
+
+**Commands.** `fileengine.browse(connection_id, folder_uid?|path?, models_only?) -> {folder, entries[], writable}`; `fileengine.make_folder(connection_id, parent_uid, name) -> uid`; `fileengine.open(connection_id, uid, version?, read_only?) -> {document_id, working_copy, link, existing, newer_on_server}`; `fileengine.status(document_id?) -> {linked, link?, connected}`
+
+**Acceptance criteria.**
+- [x] A model in a folder the user may not write opens read-only, and saving it is refused.
+- [x] Opening a model again while its working copy holds unsent work keeps that work.
+- [x] `file.open` of `fileengine://<connection>/<uid>?version=<v>` opens that version read-only.
+
+### Save with the version check
+**ID:** COL-FE-003 · **Priority:** P1 · **Ref:** FILEENGINE_INTEGRATION §5
+
+**Purpose.** Save a FileEngine model with Ctrl+S, never over someone else's newer save without asking.
+
+**Behaviour & rules.**
+- `file.save` of a FileEngine model first writes the working copy on this computer (atomic), then uploads it (`PUT /v1/files/{uid}/content`) as a new version.
+- **The version check.** Just before uploading, Reviera reads the file's newest version (`GET /v1/nodes/{uid}`). If it is not the one opened or last uploaded, someone else has saved.
+  - The save stays on this computer, marked *unsent*.
+  - The error `fileengine.conflict` names who saved and when.
+  - The window offers *Save as a Copy Beside It*, *Overwrite* (their version stays in the history) or *Open Theirs Read-Only*. It never merges silently.
+  - FileEngine's REST door has no conditional upload or lock, so a save landing between the check and the upload is not caught (FILEENGINE_INTEGRATION §10, Q2).
+- **A copy** is a new file `<name> (<user>'s copy).ifc` in the same folder. The document becomes that file, and the original's working copy stays as it was opened.
+- An upload that fails (offline, server error) keeps the save *unsent*; the next save sends it, with the same check.
+- **Save As to FileEngine** (*File › Save to FileEngine…* for a local project, `fileengine.save_as`, or `file.save_as` to `fileengine://<connection>/<folder uid>/<name>.ifc`) creates the file (`POST /v1/dirs/{uid}/files`) and uploads its first version. A name already in the folder is refused unless `replace` adds a new version to it. The document then is that model.
+- *Save to FileEngine…* on a FileEngine model asks for a comment, kept with the version.
+
+**Commands.** `fileengine.save(document_id?, on_conflict?: refuse|overwrite|copy, comment?) -> uploaded`; `fileengine.save_as(document_id?, connection_id, folder_uid, name, replace?, comment?) -> uploaded`; `file.save` and `file.save_as` as above, whose answer gains `uploaded`.
+
+**Acceptance criteria.**
+- [x] When another user saved since the model was opened, Ctrl+S leaves their version untouched and reports them by name.
+- [x] *Copy* makes `<name> (<user>'s copy).ifc` beside the original, and the document becomes it; *Overwrite* keeps their version in the history.
+- [x] A model saved to a folder, edited and saved again has two versions, and reopens from the server with both edits.
+
+### Version history and restore
+**ID:** COL-FE-004 · **Priority:** P1 · **Ref:** FILEENGINE_INTEGRATION §5
+
+**Purpose.** See every saved version of a model, look at one, and bring one back without losing any.
+
+**Behaviour & rules.**
+- *File › FileEngine Version History…* lists the open model's versions, newest first (`GET /v1/files/{uid}/versions`). Each row shows when it was saved (UTC), who saved it, its save comment, and which version is open.
+- *Open Read-Only* opens a version beside the model (COL-FE-002).
+- *Restore…* makes the chosen version the newest again (`POST /v1/files/{uid}/restore`). FileEngine saves it as a new version, so nothing is lost.
+  - The open model is then reopened at the new version.
+  - Restoring is refused while the model has unsaved or unsent changes.
+
+**Commands.** `fileengine.versions(document_id?|connection_id+uid) -> version[]`; `fileengine.restore_version(document_id?|connection_id+uid, version) -> {restored, version, document_id?}`
+
+**Acceptance criteria.**
+- [x] After three saves, the history lists three versions newest first, with the comment of the one saved with a comment.
+- [x] Restoring the first version adds a fourth, and the model reopens with the first version's content.
+
+### Model metadata
+**ID:** COL-FE-005 · **Priority:** P2 · **Ref:** FILEENGINE_INTEGRATION §5
+
+**Purpose.** Let FileEngine list and search models by what they are, and let a BCF topic name its model.
+
+**Behaviour & rules.**
+- Each upload sets string metadata on the model's file (`PUT /v1/nodes/{uid}/metadata/{key}`):
+  - `ifc.schema`;
+  - `ifc.project_guid` (the IfcProject's GlobalId);
+  - `reviera.version`;
+  - `reviera.levels` (a JSON array of the level names);
+  - with a comment, `reviera.comment` and `reviera.comment.<version>`, which the version history reads.
+- The metadata is best effort: a refused metadata write does not undo the upload.
+
+**Acceptance criteria.**
+- [x] After a save, the file's metadata holds the schema, the 22-character project GlobalId and the level names.
+
+*Not yet (later phases):* a thumbnail with each save; the Documents pane; publishing exports to FileEngine; BCF over BCF-API; Component Libraries; product data from documents (§7c); live updates through the discussion service.
+
 ## 6.3 Merging
 
 ### Three-way merge by GlobalId and RXD id
@@ -27545,6 +27662,20 @@ Every command below is registered once and is available from the UI, Lua and MCP
 | `model.mode` | — | {mode, server?, poid?, base_roid?, connected?} | No | COL-MODE-001 |
 | `bimserver.publish_local` | project: {poid}\|{new_name, parent_poid?}, comment, replace? | {poid, roid} | No | COL-MODE-002 |
 | `model.export_local_copy` | path, keep_worksets? | () | No | COL-MODE-002 |
+| `fileengine.connect` | url, name?, tenant?, allow_http? | connection | No | COL-FE-001 |
+| `fileengine.list_connections` | — | connection[] | No (query) | COL-FE-001 |
+| `fileengine.sign_in` | connection_id, key?, secret?, remember? | identity | No | COL-FE-001 |
+| `fileengine.sign_out` | connection_id, forget? | () | No | COL-FE-001 |
+| `fileengine.remove` | connection_id | () | No | COL-FE-001 |
+| `fileengine.whoami` | connection_id | identity | No (query) | COL-FE-001 |
+| `fileengine.browse` | connection_id, folder_uid?, path?, models_only? | {folder_uid, folder_name, parent_uid, writable, entries[]} | No (query) | COL-FE-002 |
+| `fileengine.make_folder` | connection_id, parent_uid, name | uid | No | COL-FE-002 |
+| `fileengine.open` | connection_id, uid, version?, read_only? | {document_id, working_copy, link, existing, newer_on_server} | No | COL-FE-002 |
+| `fileengine.status` | document_id? | {linked, link?, connected} | No (query) | COL-FE-002 |
+| `fileengine.save` | document_id?, on_conflict?, comment? | uploaded | No | COL-FE-003 |
+| `fileengine.save_as` | document_id?, connection_id, folder_uid, name, replace?, comment? | uploaded | No | COL-FE-003 |
+| `fileengine.versions` | document_id? \| connection_id + uid | version[] | No (query) | COL-FE-004 |
+| `fileengine.restore_version` | document_id? \| connection_id + uid, version | {restored, version, document_id?} | No | COL-FE-004 |
 | `bimserver.add_server` | name, url, allow_http?, ownership? | server | No | COL-BIM-001 |
 | `bimserver.remove_server` | server_id | () | No | COL-BIM-001 |
 | `bimserver.login` | server_id, username?, password?, user_token?, remember? | session_info | No | COL-BIM-001 |
@@ -28194,9 +28325,9 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 28 | 0 | 29 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
-| COL | 8 | 45 | 6 | 1 | 60 |
+| COL | 8 | 49 | 7 | 1 | 65 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **308** | **193** | **7** | **828** |
+| **Total** | **320** | **312** | **194** | **7** | **833** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -28251,7 +28382,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.2a Reviera-originated features
 
-120 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
+125 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
 
 | Requirement | Ch | Feature |
 |-------------|----|---------|
@@ -28368,6 +28499,11 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | COL-BIM-002 | 6 | Project and revision browser |
 | COL-BIM-003 | 6 | Open and download |
 | COL-BIM-004 | 6 | Check in |
+| COL-FE-001 | 6 | Connections and sign-in |
+| COL-FE-002 | 6 | Browse and open |
+| COL-FE-003 | 6 | Save with the version check |
+| COL-FE-004 | 6 | Version history and restore |
+| COL-FE-005 | 6 | Model metadata |
 | COL-MRG-001 | 6 | Three-way merge by GlobalId and RXD id |
 | COL-OWN-002 | 6 | Live ownership document and sync lock |
 | COL-OWN-004 | 6 | Enforced ownership through a server plugin (optional) |
@@ -28378,7 +28514,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2211 unique commands** in 422 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2225 unique commands** in 423 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -28526,6 +28662,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `fascia` | 1 |
 | `fastener_pattern` | 2 |
 | `file` | 15 |
+| `fileengine` | 14 |
 | `fill_pattern` | 5 |
 | `fillpattern` | 4 |
 | `filter` | 7 |
@@ -29532,6 +29669,20 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `file.save` | 2 | document_id? (default: active) | status | No | DM-FILE-002 |
 | `file.save_as` | 2 | document_id? (default: active), path, kind?, format?: ifc\ | ifczip, carrier?: embedded\ | external_file\ | external_dir\ |
 | `file.save_previous_version` | 2 | document_id, path | report | No | DM-MIG-001 |
+| `fileengine.browse` | 6 | connection_id, folder_uid?, path?, models_only? | {folder_uid, folder_name, parent_uid, writable, entries[]} | No (query) | COL-FE-002 |
+| `fileengine.connect` | 6 | url, name?, tenant?, allow_http? | connection | No | COL-FE-001 |
+| `fileengine.list_connections` | 6 | — | connection[] | No (query) | COL-FE-001 |
+| `fileengine.make_folder` | 6 | connection_id, parent_uid, name | uid | No | COL-FE-002 |
+| `fileengine.open` | 6 | connection_id, uid, version?, read_only? | {document_id, working_copy, link, existing, newer_on_server} | No | COL-FE-002 |
+| `fileengine.remove` | 6 | connection_id | () | No | COL-FE-001 |
+| `fileengine.restore_version` | 6 | document_id? \ | connection_id + uid, version | {restored, version, document_id?} | No |
+| `fileengine.save` | 6 | document_id?, on_conflict?, comment? | uploaded | No | COL-FE-003 |
+| `fileengine.save_as` | 6 | document_id?, connection_id, folder_uid, name, replace?, comment? | uploaded | No | COL-FE-003 |
+| `fileengine.sign_in` | 6 | connection_id, key?, secret?, remember? | identity | No | COL-FE-001 |
+| `fileengine.sign_out` | 6 | connection_id, forget? | () | No | COL-FE-001 |
+| `fileengine.status` | 6 | document_id? | {linked, link?, connected} | No (query) | COL-FE-002 |
+| `fileengine.versions` | 6 | document_id? \ | connection_id + uid | version[] | No (query) |
+| `fileengine.whoami` | 6 | connection_id | identity | No (query) | COL-FE-001 |
 | `fill_pattern.create` | 2 | name, kind: "drafting"\ | "model", definition | id | Yes |
 | `fill_pattern.delete` | 2 | id, replace_with? | — | Yes | DM-LINE-001 |
 | `fill_pattern.edit` | 2 | id, definition | — | Yes | DM-LINE-001 |

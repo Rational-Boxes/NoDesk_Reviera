@@ -2533,6 +2533,24 @@ icon = "remote_analysis"
 help = "BIMserver projects: add a server and log in, open a project as a working copy, publish the open project to one, or check the working copy in (COL-BIM-001)"
 
 [[action]]
+id = "ui.fileengine_open"
+label = "Open From FileEngine..."
+icon = "remote_analysis"
+help = "Open a model kept on FileEngine: add a connection and sign in, browse its folders, and open a model as a working copy that Ctrl+S saves back as a new version (COL-FE-002)"
+
+[[action]]
+id = "ui.fileengine_save"
+label = "Save to FileEngine..."
+icon = "remote_analysis"
+help = "Save the open project into a FileEngine folder, or a FileEngine model as a new version with a comment; never over someone else's newer save without asking (COL-FE-003)"
+
+[[action]]
+id = "ui.fileengine_versions"
+label = "FileEngine Version History..."
+icon = "remote_analysis"
+help = "The open FileEngine model's versions, who saved them and why: open one read-only, or restore it as the newest (COL-FE-004)"
+
+[[action]]
 id = "ui.profiler"
 label = "Performance Profiler"
 icon = "daylight_results"
@@ -4521,7 +4539,7 @@ panels = [{ label = "Window", tools = [{ action = "insert.flip_facing", size = "
 
 [[menu]]
 label = "&File"
-items = ["file.new", "file.open", "file.save", "file.save_as", "file.close", "-", "ui.bimserver", "-", "ui.model_properties", "ui.remote_analysis", "ui.profiler", "-", "export.pdf", "export.cobie", "gbxml.export", "gbxml.import_loads", "hbjson.export", "bcf.import", "bcf.export", "bcf.export_viewpoint", "bcf.import_viewpoint", "-", "app.exit"]
+items = ["file.new", "file.open", "file.save", "file.save_as", "file.close", "-", "ui.fileengine_open", "ui.fileengine_save", "ui.fileengine_versions", "-", "ui.bimserver", "-", "ui.model_properties", "ui.remote_analysis", "ui.profiler", "-", "export.pdf", "export.cobie", "gbxml.export", "gbxml.import_loads", "hbjson.export", "bcf.import", "bcf.export", "bcf.export_viewpoint", "bcf.import_viewpoint", "-", "app.exit"]
 
 [[menu]]
 label = "&Edit"

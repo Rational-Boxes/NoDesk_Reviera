@@ -9,6 +9,7 @@
 
 pub mod bcf_files;
 pub mod bimserver;
+pub mod fileengine;
 pub mod profiling;
 pub mod bcf_topics;
 pub mod spots;
@@ -277,6 +278,8 @@ pub struct App {
     subscriptions: subscriptions::Subscriptions,
     /// BIMserver profiles, secrets and sessions (`bimserver.*`).
     bimserver: bimserver::Servers,
+    /// FileEngine connections, credentials and sessions (`fileengine.*`).
+    fileengine: fileengine::Connections,
     /// A window is there to capture views (DM-MCP-004).
     window: bool,
     /// View captures asked of the window.
@@ -317,6 +320,7 @@ impl App {
             compute: None,
             subscriptions: subscriptions::Subscriptions::default(),
             bimserver: bimserver::Servers::default(),
+            fileengine: fileengine::Connections::default(),
             window: false,
             image_requests: Vec::new(),
         }

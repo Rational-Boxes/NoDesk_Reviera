@@ -3191,6 +3191,7 @@ dependencies = [
  "reviera-compute-proto",
  "reviera-core",
  "reviera-dstv",
+ "reviera-fileengine",
  "reviera-geom",
  "reviera-ifc",
  "reviera-livestore",
@@ -3289,6 +3290,19 @@ dependencies = [
 [[package]]
 name = "reviera-dstv"
 version = "0.1.0"
+
+[[package]]
+name = "reviera-fileengine"
+version = "0.1.0"
+dependencies = [
+ "reqwest",
+ "reviera-fileengine",
+ "rustls",
+ "rustls-platform-verifier 0.6.2",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
 
 [[package]]
 name = "reviera-geom"

@@ -56,6 +56,7 @@ mod radial;
 mod mep_ui;
 mod remote_analysis_ui;
 mod bimserver_ui;
+mod fileengine_ui;
 mod profiler_ui;
 mod terminal_ui;
 mod mep_electrical_ui;
@@ -1259,11 +1260,26 @@ impl Gui {
     }
 
     fn save(&mut self, frame: &Frame) {
-        match self.run("file.save", json!({})) {
+        match self.app.execute("file.save", json!({}), &user()).map(|o| o.result) {
+            // A FileEngine model: uploaded as a new version (COL-FE-003).
+            Ok(v) if v["uploaded"].is_object() => {
+                self.update_title(frame);
+                frame.set_status_text(
+                    &format!(
+                        "Saved {} to FileEngine (version {})",
+                        v["uploaded"]["name"].as_str().unwrap_or_default(),
+                        fileengine_ui::stamp(v["uploaded"]["version"].as_str().unwrap_or_default())
+                    ),
+                    0,
+                );
+            }
             Ok(v) => frame.set_status_text(
                 &format!("Saved {}", v["path"].as_str().unwrap_or_default()),
                 0,
             ),
+            Err(e) if e.code == "fileengine.conflict" => {
+                self.fileengine_conflict(&e.details, None)
+            }
             Err(e) => error(frame, &format!("Could not save:\n{e}")),
         }
     }
@@ -1289,6 +1305,16 @@ impl Gui {
         // A BIMserver working copy: its project and base revision (COL-MODE-001).
         if let Some(st) = self.app.document(id).and_then(|d| reviera_app::bimserver::state_of(d.project.path())) {
             title = format!("{} (BIMserver, revision {})", st.project, st.base_revision);
+        }
+        // A FileEngine model: its name, and a past version's date (COL-FE-002).
+        if let Some(l) = self.app.document(id).and_then(|d| reviera_app::fileengine::link_of(d.project.path())) {
+            title = if l.historic {
+                format!("{} (FileEngine, version of {})", l.name, fileengine_ui::stamp(&l.version))
+            } else if l.unsent {
+                format!("{} (FileEngine, not uploaded)", l.name)
+            } else {
+                format!("{} (FileEngine)", l.name)
+            };
         }
         let read_only = info.is_some_and(|d| d.read_only);
         frame.set_title(&format!(
@@ -4737,6 +4763,9 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "ui.pane.sizing_calculator" => Gui::toggle_sizing_calculator(gui),
         "ui.remote_analysis" => with(gui, Gui::remote_analysis),
         "ui.bimserver" => with(gui, Gui::bimserver_dialog),
+        "ui.fileengine_open" => with(gui, Gui::fileengine_open),
+        "ui.fileengine_save" => with(gui, Gui::fileengine_save),
+        "ui.fileengine_versions" => with(gui, Gui::fileengine_versions),
         "ui.profiler" => with(gui, Gui::profiler_window),
         "mep_type.load_starters" => with(gui, Gui::load_mep_types),
         "mep.place_component" => with(gui, Gui::place_mep_component),

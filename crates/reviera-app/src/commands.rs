@@ -77,6 +77,20 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add_host(crate::profiling::ProfilerReset),
         registry.add_host(crate::profiling::ProfilerExportReport),
         registry.add_host(crate::profiling::ProfilerExportTrace),
+        registry.add_host(crate::fileengine::FeConnect),
+        registry.add_host(crate::fileengine::FeList),
+        registry.add_host(crate::fileengine::FeRemove),
+        registry.add_host(crate::fileengine::FeSignIn),
+        registry.add_host(crate::fileengine::FeSignOut),
+        registry.add_host(crate::fileengine::FeWhoami),
+        registry.add_host(crate::fileengine::FeBrowse),
+        registry.add_host(crate::fileengine::FeMakeFolder),
+        registry.add_host(crate::fileengine::FeOpen),
+        registry.add_host(crate::fileengine::FeSave),
+        registry.add_host(crate::fileengine::FeSaveAs),
+        registry.add_host(crate::fileengine::FeStatus),
+        registry.add_host(crate::fileengine::FeVersions),
+        registry.add_host(crate::fileengine::FeRestore),
         registry.add_host(crate::bimserver::BimAddServer),
         registry.add_host(crate::bimserver::BimRemoveServer),
         registry.add_host(crate::bimserver::BimListServers),
@@ -297,6 +311,14 @@ impl HostCommand for FileOpen {
                 "partial open is not supported yet",
             ));
         }
+        // fileengine://<connection>/<uid>[?version=…] (COL-FE-002).
+        if let Some(a) = crate::fileengine::parse_address(&p.path) {
+            let a = a?;
+            if a.name.is_some() {
+                return Err(Error::new("fileengine.bad_address", "open a FileEngine model by its uid: fileengine://<connection>/<uid>"));
+            }
+            return Ok(crate::fileengine::open(app, &a.connection_id, &a.uid, a.version.as_deref(), p.read_only)?.document_id);
+        }
         app.open(&p.path, p.read_only)
     }
 }
@@ -308,6 +330,9 @@ pub struct SaveStatus {
     pub created: usize,
     pub updated: usize,
     pub removed: usize,
+    /// For a FileEngine model: the version the save uploaded (COL-FE-003).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub uploaded: Option<crate::fileengine::Uploaded>,
 }
 
 fn save_status(app: &App, id: DocumentId, r: reviera_store::SaveReport) -> Result<SaveStatus> {
@@ -317,6 +342,7 @@ fn save_status(app: &App, id: DocumentId, r: reviera_store::SaveReport) -> Resul
         created: r.created,
         updated: r.updated,
         removed: r.removed,
+        uploaded: None,
     })
 }
 
@@ -337,7 +363,9 @@ impl HostCommand for FileSave {
     fn run(&self, app: &mut App, _: &Caller, p: SaveParams) -> Result<SaveStatus> {
         let id = app.resolve(p.document_id)?;
         let report = app.save(id, None)?;
-        save_status(app, id, report)
+        let mut status = save_status(app, id, report)?;
+        status.uploaded = crate::fileengine::after_save(app, id)?;
+        Ok(status)
     }
 }
 
@@ -402,6 +430,14 @@ impl HostCommand for FileSaveAs {
             ));
         }
         let id = app.resolve(p.document_id)?;
+        // fileengine://<connection>/<folder uid>/<name> (COL-FE-003).
+        if let Some(a) = crate::fileengine::parse_address(&p.path) {
+            let a = a?;
+            let name = a.name.ok_or_else(|| Error::new("fileengine.bad_address", "save to fileengine://<connection>/<folder uid>/<name>.ifc"))?;
+            let up = crate::fileengine::save_as(app, id, &a.connection_id, &a.uid, &name, false, None)?;
+            let path = app.get(id)?.project.path().to_owned();
+            return Ok(SaveStatus { path, data_revision: 0, created: 0, updated: 0, removed: 0, uploaded: Some(up) });
+        }
         let report = app.save(id, Some(&p.path))?;
         save_status(app, id, report)
     }

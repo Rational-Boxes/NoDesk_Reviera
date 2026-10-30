@@ -1731,7 +1731,16 @@ area by area (reviewed against the spec on 2026-10-15).
   version models on the owner's FileEngine server through its REST API; BCF issues through its
   BCF and discussion services; publishing reports and exports to it, with share links made in
   Reviera; Component Libraries hosted on it; product documentation folders linked to types and
-  materials. Designed, not built: deferred until the FileEngine improvements it asks for land.
+  materials. **Phase 1 built** (spec Ch 6 §6.2a, COL-FE-001 … 005):
+  - connections signed in with a FileEngine service credential, kept in the OS keychain, with tokens that renew themselves;
+  - File › Open From FileEngine..., to browse folders and open a model as a working copy (`<data>/reviera/fileengine/<connection>/<uid>/`);
+  - Ctrl+S uploads a new version, but never over someone else's newer save without asking (save a copy beside it, overwrite, or open theirs read-only);
+  - Save to FileEngine... into a folder, with a comment;
+  - FileEngine Version History... to open a past version read-only or restore one;
+  - the model's schema, project GlobalId and levels written as file metadata;
+  - `file.open` and `file.save_as` take `fileengine://` addresses (`fileengine.*`; the client is `clients/fileengine`, MIT).
+
+  Checked against the live Proxima File Vault server. **Not yet:** publishing, BCF, Component Libraries, documentation folders and product data (the later phases), thumbnails, single sign-on, and transfers off the UI thread.
 
 - **Coordination**: clash tests (COL-CLASH), automatic pipe and duct penetrations (MEP-PEN-001),
   bathroom fixture clear floor spaces and turning spaces, ISO 21542. For BCF issues: the docked
@@ -1875,7 +1884,7 @@ Permission levels are `read_only` (the default), `model_edit` and `full_scriptin
 | `crates/reviera-compute` | Remote computation: the client, distillations, the local compute host (`reviera-compute-host`) and the built-in runner (`reviera-analysis-builtin`) |
 | `crates/reviera-godot`, `reviera-net`, `reviera-opencde` | Placeholders for the Godot viewer, networking and OpenCDE |
 | `design_documents/` | The specification (`spec/`), technology stack, research log and source register |
-| `schemas/`, `clients/` | Open data formats, protocols and their clients (MIT): RXD, the Reviera Scene Protocol, the remote computation contract (`schemas/compute`, `clients/compute`), the DSTV NC1 writer (`clients/dstv`) and the BIMserver JSON API client (`clients/bimserver`) |
+| `schemas/`, `clients/` | Open data formats, protocols and their clients (MIT): RXD, the Reviera Scene Protocol, the remote computation contract (`schemas/compute`, `clients/compute`), the DSTV NC1 writer (`clients/dstv`), the BIMserver JSON API client (`clients/bimserver`) and the FileEngine REST client (`clients/fileengine`) |
 | `test-data/ifc/` | Third-party IFC models for tests (see their README for provenance) |
 | `test-data/samples/` | Reviera's own sample models, their Lua scripts and walkthroughs |
 | `test-data/library/` | The sample Component Library (a public-domain Doric column; see its README) |

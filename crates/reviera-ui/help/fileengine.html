@@ -1,0 +1,111 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Models on FileEngine</h1>
+<p class="lead">FileEngine (Proxima File Vault) keeps your organisation's files in folders, with
+every saved version kept. Reviera can open a model from FileEngine, save it back as a new version
+with Ctrl+S, and show or restore any earlier version. FileEngine decides who may read and write
+each folder.</p>
+<nav class="toc">
+  <a href="#connect">Connecting and signing in</a>
+  <a href="#open">Opening a model</a>
+  <a href="#save">Saving</a>
+  <a href="#conflict">When someone else saved first</a>
+  <a href="#versions">Version history</a>
+  <a href="#readonly">Read-only models</a>
+  <a href="#security">How the credential is kept</a>
+  <a href="#scripts">Scripts and agents</a>
+  <a href="#later">Coming later</a>
+</nav>
+
+<h2 id="connect">Connecting and signing in</h2>
+<p>Open <a href="reviera:action/ui.fileengine_open">File › Open From FileEngine…</a> and choose
+<b>Add Connection…</b>. Give your organisation's FileEngine address, for example
+<code>https://acme.proximafilevault.com</code>, and a name if you like.</p>
+<p>Reviera then asks you to <b>Sign In</b> with a <b>credential</b>: a key (<code>fesk_…</code>)
+and its secret (<code>fesks_…</code>). Generate one with the <i>api</i> scope in FileEngine's
+account settings and paste both in. You can also paste the whole <code>key:secret</code> into
+the Key box. Tick <b>Remember</b> to keep it in the system keychain, and you won't be asked
+again.</p>
+<p><b>Sign Out</b> ends the session and can also forget the credential. <b>Remove</b> deletes
+the connection and its credential; the models on this computer stay.</p>
+
+<h2 id="open">Opening a model</h2>
+<p>Choose a connection to see its folders. Double-click a folder to go into it, and use
+<b>Up</b> to go back. Choose a model (<code>.ifc</code>) and <b>Open</b>.</p>
+<p>Reviera downloads the model into a <b>working copy</b> on this computer and opens it like any
+file, with undo and crash recovery. The title bar shows the model's name and <i>(FileEngine)</i>.
+The <b>Here</b> column marks the models you already have a working copy of.</p>
+<p>If your working copy holds work that hasn't been uploaded yet, opening the model again opens
+that work. It is never overwritten, and Reviera tells you when someone has saved a newer
+version.</p>
+
+<h2 id="save">Saving</h2>
+<p><b>Save (Ctrl+S)</b> saves the model on this computer, then uploads it to FileEngine as a new
+version. To add a comment to the version, use
+<a href="reviera:action/ui.fileengine_save">File › Save to FileEngine…</a>. The comment is shown
+in the version history.</p>
+<p>To put a project that is a file on this computer into FileEngine, use <b>Save to
+FileEngine…</b>. Choose the folder (<b>New Folder…</b> makes one), give the model a name and
+choose <b>Save Here</b>. From then on, Ctrl+S saves new versions of it.</p>
+<p>Each save also records the model's IFC schema, its project GlobalId and its level names on the
+file, so FileEngine can list and search models by them.</p>
+<p>If the server can't be reached, the save is kept on this computer and the title bar says
+<i>not uploaded</i>. The next save sends it.</p>
+
+<h2 id="conflict">When someone else saved first</h2>
+<p>Before uploading, Reviera checks that the newest version on FileEngine is still the one you
+opened. If a colleague has saved since then, nothing is uploaded: your work stays saved on this
+computer, and Reviera tells you who saved and when. You can then choose one of these:</p>
+<ul>
+  <li><b>Save as a Copy Beside It</b>: your work becomes a new model in the same folder, named
+  after you (<i>hall (ann's copy).ifc</i> for ann@acme.com saving <i>hall.ifc</i>). Their model
+  stays as it is.</li>
+  <li><b>Overwrite</b>: your work becomes the newest version. Theirs stays in the version
+  history.</li>
+  <li><b>Open Theirs Read-Only</b>: their version opens beside yours, so you can compare them.</li>
+</ul>
+<p>Reviera never merges the two silently.</p>
+
+<h2 id="versions">Version history</h2>
+<p><a href="reviera:action/ui.fileengine_versions">File › FileEngine Version History…</a> lists
+every version of the open model, newest first: when it was saved (UTC), who saved it, its
+comment, and which one is open.</p>
+<ul>
+  <li><b>Open Read-Only</b> opens a version beside the model, to look at or compare.</li>
+  <li><b>Restore…</b> makes a version the newest again. FileEngine saves it as a new version, so
+  nothing is lost, and the model reopens at it. Save or discard your changes first.</li>
+</ul>
+
+<h2 id="readonly">Read-only models</h2>
+<p>A model in a folder you may not write opens read-only. So does a past version. To keep your
+changes to one, use Save to FileEngine… into a folder you can write, or File › Save As to a file
+on this computer.</p>
+
+<h2 id="security">How the credential is kept</h2>
+<p>The credential is kept in the system keychain, or until Reviera closes if you didn't tick
+<b>Remember</b>. It is never written in a model, a settings file or a log, and nothing in Reviera
+shows it again. Reviera exchanges it for a sign-in token that lasts a few minutes and renews
+itself.</p>
+<p>You can revoke the credential in FileEngine at any time. Reviera then asks you to sign in
+again.</p>
+
+<h2 id="scripts">Scripts and agents</h2>
+<p>Everything above is a command in the <code>fileengine</code> domain, such as
+<code>fileengine.browse</code>, <code>fileengine.open</code>, <code>fileengine.save</code> and
+<code>fileengine.versions</code>. Lua scripts and AI agents (MCP) can use them, acting as you.
+<code>file.open</code> accepts <code>fileengine://&lt;connection&gt;/&lt;uid&gt;</code>, and
+<code>file.save_as</code> accepts
+<code>fileengine://&lt;connection&gt;/&lt;folder uid&gt;/&lt;name&gt;.ifc</code>.</p>
+<p>Agents can't give a credential or remove a connection. They can only use one you have
+stored.</p>
+
+<h2 id="later">Coming later</h2>
+<p>Later phases will add:</p>
+<ul>
+  <li>publishing reports and exports to FileEngine folders, with share links;</li>
+  <li>BCF issues kept on FileEngine;</li>
+  <li>Component Libraries hosted on FileEngine;</li>
+  <li>product documentation folders linked to types and materials, with product data read from
+  those documents;</li>
+  <li>thumbnails of each model, single sign-on, and <code>.ifczip</code> models.</li>
+</ul>

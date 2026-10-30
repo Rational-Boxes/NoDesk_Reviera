@@ -150,6 +150,23 @@ Any source that fails this test is rejected. Rejections are noted in the session
 
 ---
 
+### 2026-10-30 — FileEngine client: API verification (no new research)
+
+- **Purpose:** confirm the FileEngine REST door's routes and answers before building the phase 1 client (spec Ch 6 §6.2a, `FILEENGINE_INTEGRATION.md` §4–5).
+- **Method:**
+  - Read the owner's own REST contract, `http_bridge/openapi.yaml` in the owner's FileEngine checkout, for the interface only, and the nginx snippet that mounts the door under `/api/`.
+  - Sent calls to the owner's live Proxima File Vault server (the arcdigital demonstration tenant, for a hypothetical company), signed in with a service credential the owner provided. All writes stayed inside *Engineering › Reviera test*, the folder the owner named.
+  - Calls: `POST /v1/auth/token` (Basic key:secret), `/v1/auth/refresh`, `whoami`, `dirs` (list, `?deleted=true`, create), `dirs/{uid}/files`, `nodes/{uid}` (stat), `rename`, `content` (`PUT` and `GET`, with `Range`), `versions`, `versions/{ts}`, `restore`, `renditions`, `metadata`, `permissions`, and `DELETE files/{uid}`.
+- **Findings:**
+  - Tokens last 900 s.
+  - Versions are named `YYYYMMDD_HHMMSS.mmm`, and a stat's `version` is the newest; every `PUT` and every restore makes a new version.
+  - The versions answer also carries `entries` with `revised_by`.
+  - The server makes PDF, preview and thumbnail renditions itself.
+  - There is no ETag or conditional upload, so the save check is read-then-write.
+- **Clean-room:** no FileEngine implementation code was read or copied. `clients/fileengine` (MIT) talks to the AGPL server over HTTP only. No new sources; the contract is the owner's own project.
+
+---
+
 ## 5. Source Register
 
 The full register is in **`SOURCE_REGISTER.md` §A**. It had 577 sources at first (1,250 after Session 4 and its follow-ups), each with an ID, area, type, URL, HTTP status and public-availability verdict. It was generated from the research files' Sources sections on 2026-10-12, and every URL was re-checked with an unauthenticated request.

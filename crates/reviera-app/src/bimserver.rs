@@ -149,7 +149,7 @@ impl std::fmt::Debug for Servers {
 
 /// The per-user data folder: `%LOCALAPPDATA%\Reviera`, else `$XDG_DATA_HOME/reviera` (or
 /// `~/.local/share/reviera`).
-fn data_dir() -> Option<PathBuf> {
+pub(crate) fn data_dir() -> Option<PathBuf> {
     if let Some(a) = std::env::var_os("LOCALAPPDATA") {
         return Some(Path::new(&a).join("Reviera"));
     }

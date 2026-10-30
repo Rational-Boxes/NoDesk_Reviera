@@ -610,7 +610,14 @@ Commands:
   `live`-marked tests skipped when no stack is configured. The client is also tested against
   the OpenAPI contract with a mock server.
 - **Phases:**
-  1. connections, browse, open, save and versions;
+  1. connections, browse, open, save and versions. **Built 2026-10-30** (spec Ch 6 §6.2a,
+     COL-FE-001…005). Differences from this plan:
+     - service-credential sign-in only (no LDAP password or SSO yet);
+     - connections are managed in the Open and Save dialogs, not in Options;
+     - no thumbnails yet;
+     - the save comment is also kept per version as `reviera.comment.<version>`;
+     - the client is tested against an in-memory fake (feature `fake`) and live, not against a local stack;
+     - it does not use `reviera-net`, because it has its own rustls set-up, as `clients/bimserver` does;
   2. publishing: FileEngine destinations for every export, publish sets, and public share links
      made in the window (once FileEngine's share door is live);
   3. BCF issues over BCF-API, once FileEngine's persistent BCF store lands;
