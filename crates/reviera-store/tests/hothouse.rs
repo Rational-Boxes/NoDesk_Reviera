@@ -319,3 +319,37 @@ fn heating_pipes_can_be_taken_away() {
     assert!(run(&r, &mut doc, "enclosure.heating_pipes", json!({ "enclosure_id": gh, "system": "under_bench" })).is_err());
     run(&r, &mut doc, "enclosure.heating_pipes", json!({ "enclosure_id": gh, "system": "under_bench", "remove": true })).unwrap();
 }
+
+#[test]
+fn pad_and_fans_are_laid_in_the_end_walls_and_follow_the_house() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("cool.ifc");
+    let (mut project, mut doc) = LocalProject::new(Schema::Ifc4, &path).unwrap();
+    let r = registry();
+    let level = doc.store().iter().find(|e| e.class == "IfcBuildingStorey").unwrap().id();
+    let gh = run(&r, &mut doc, "enclosure.create", json!({ "form": "gable", "level_id": level.0, "length": 40.0, "span": 9.6, "bay": 4.0 })).unwrap();
+    let v = run(&r, &mut doc, "enclosure.ventilation", json!({ "enclosure_id": gh, "pads": "100" })).unwrap();
+    let c = run(&r, &mut doc, "enclosure.pad_and_fan", json!({ "enclosure_id": gh })).unwrap();
+    // As many fans as the ventilation sizing, and its pad area.
+    assert_eq!(c["fans"], v["fans"], "{c} {v}");
+    assert!((num(&c["pad_area"]) - num(&v["pad_area"])).abs() < 1e-9 && num(&c["pad_length"]) > 0.0);
+    let count = |doc: &reviera_core::Document, class: &str| doc.store().iter().filter(|e| e.class == class && reviera_core::hothouse::cooling_part(e).is_some()).count();
+    assert_eq!(count(&doc, "IfcFan") as u64, c["fans"].as_u64().unwrap());
+    assert_eq!(count(&doc, "IfcEvaporativeCooler"), 1);
+    // The fans at the far end (x near 40 m), the pad at the near end.
+    let parts: Vec<reviera_core::hothouse::CoolingPart> = doc.store().iter().filter_map(reviera_core::hothouse::cooling_part).collect();
+    assert!(parts.iter().filter(|p| p.role == "fan").all(|p| p.at[0] > 39.0) && parts.iter().any(|p| p.role == "pad" && p.at[0] < 1.0), "{parts:?}");
+    // Longer house: they follow; laid again they replace, removed they go.
+    run(&r, &mut doc, "enclosure.set", json!({ "enclosure_id": gh, "length": 48.0 })).unwrap();
+    let parts: Vec<reviera_core::hothouse::CoolingPart> = doc.store().iter().filter_map(reviera_core::hothouse::cooling_part).collect();
+    assert!(parts.iter().filter(|p| p.role == "fan").all(|p| p.at[0] > 47.0), "{parts:?}");
+    let again = run(&r, &mut doc, "enclosure.pad_and_fan", json!({ "enclosure_id": gh, "pads": "150", "reversed": true })).unwrap();
+    assert_eq!(doc.store().iter().filter(|e| reviera_core::hothouse::cooling_recipe(e).is_some()).count(), 1);
+    assert!(num(&again["pad_area"]) < num(&c["pad_area"]), "150 mm pads need less area: {again}");
+    assert!(run(&r, &mut doc, "enclosure.pad_and_fan", json!({ "enclosure_id": gh, "pads": "none" })).is_err());
+    project.save(&mut doc).unwrap();
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert!(text.contains("IFCFAN(") && text.contains("IFCEVAPORATIVECOOLER("), "saved as fans and an evaporative cooler");
+    run(&r, &mut doc, "enclosure.pad_and_fan", json!({ "enclosure_id": gh, "remove": true })).unwrap();
+    assert!(doc.store().iter().all(|e| reviera_core::hothouse::cooling_part(e).is_none() && reviera_core::hothouse::cooling_recipe(e).is_none()));
+}

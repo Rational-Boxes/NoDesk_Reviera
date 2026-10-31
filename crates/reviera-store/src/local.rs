@@ -3924,9 +3924,15 @@ impl LocalProject {
     /// B-rep each, contained in its level.
     fn write_grow_lights(&mut self, doc: &Document) -> Result<()> {
         let store = doc.store();
-        let level_of = |e: &reviera_core::Element| reviera_core::hothouse::light_recipe(e).map(|p| p.level).or_else(|| reviera_core::hothouse::screen_recipe(e).map(|p| p.level));
+        let level_of = |e: &reviera_core::Element| {
+            reviera_core::hothouse::light_recipe(e)
+                .map(|p| p.level)
+                .or_else(|| reviera_core::hothouse::screen_recipe(e).map(|p| p.level))
+                .or_else(|| reviera_core::hothouse::cooling_part(e).map(|p| p.level))
+        };
         let mut all = reviera_core::hothouse::all(store);
         all.extend(reviera_core::hothouse::all_screens(store));
+        all.extend(reviera_core::hothouse::all_cooling(store));
         if all.is_empty() {
             return Ok(());
         }

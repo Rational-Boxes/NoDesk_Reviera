@@ -1721,7 +1721,9 @@ area by area (reviewed against the spec on 2026-10-15).
   growing area, pieces, crop, set points, target DLI, design heat loss) and of growing layouts and
   their pieces (ARC-GLZ-015); heating fin pipe laid round the perimeter in the loops the sizing
   needs and under the benches, in the hydronic supply system (`enclosure.heating_pipes`,
-  ARC-GLZ-016); the `greenhouses` sample. Curtain walls' tops attach to one or more roofs
+  ARC-GLZ-016); exhaust fans and the evaporative pad laid in the end walls from the ventilation
+  sizing, following the house (`enclosure.pad_and_fan`, `IfcFan`, `IfcEvaporativeCooler`,
+  ARC-GLZ-017); the `greenhouses` sample. Curtain walls' tops attach to one or more roofs
   (`wall.attach`).
 - **Digital twins, operational data and smart-city features** (`design_documents/DIGITAL_TWIN_PLAN.md`):
   sensor and controls design with points schedules, bindings from model elements to live BACnet,

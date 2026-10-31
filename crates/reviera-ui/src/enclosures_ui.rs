@@ -25,6 +25,9 @@ const FORMS: [(Form, &str); 6] = [
 /// The Heating Pipes choices (ARC-GLZ-016).
 const PIPE_CHOICES: [&str; 4] = ["None", "Perimeter", "Under benches", "Perimeter and under benches"];
 
+/// The Pad and Fans choices (ARC-GLZ-017).
+const COOLING_CHOICES: [&str; 3] = ["None", "Pad at the near end", "Pad at the far end"];
+
 /// The screen sets offered in Properties.
 const SCREEN_SETS: [(&str, &[&str]); 5] = [
     ("None", &[]),
@@ -365,6 +368,15 @@ impl Gui {
         };
         grid.append(Property::enumeration("Heating Pipes", "gc_pipes", PIPE_CHOICES.iter().enumerate().map(|(i, s)| ((*s).to_owned(), i as i32)).collect::<Vec<_>>(), at));
         grid.set_help_string("gc_pipes", "Fin pipe laid in the model: loops round the inside of the walls (as many as the heating sizing needs), and runs under the benches (enclosure.heating_pipes)");
+        // Pad-and-fan cooling laid in the model (ARC-GLZ-017).
+        let cooling = store.get(owner).and_then(|e| store.iter().find_map(|x| reviera_core::hothouse::cooling_recipe(x).filter(|r| r.enclosure == e.guid().as_str())));
+        let at = match &cooling {
+            None => 0,
+            Some(r) if !r.reversed => 1,
+            Some(_) => 2,
+        };
+        grid.append(Property::enumeration("Pad and Fans", "gc_cooling", COOLING_CHOICES.iter().enumerate().map(|(i, s)| ((*s).to_owned(), i as i32)).collect::<Vec<_>>(), at));
+        grid.set_help_string("gc_cooling", "Exhaust fans in one end wall and the evaporative pad in the other, as many and as large as the fan ventilation sizing gives (enclosure.pad_and_fan)");
         // Ventilation (ARC-GLZ-012) and CO₂ (ARC-GLZ-013) sizing.
         if let Ok(v) = self.run("enclosure.ventilation", json!({ "enclosure_id": owner })) {
             let text = format!("{:.1} m³/s: {} fan(s) of {:.0} m³/s, {:.1} m² of inlets", v["airflow"].as_f64().unwrap_or(0.0), v["fans"], v["fan_airflow"].as_f64().unwrap_or(0.0), v["inlet_area"].as_f64().unwrap_or(0.0));
@@ -437,6 +449,21 @@ impl Gui {
                         error(&frame, &format!("The heating pipes were not laid:\n{e}"));
                         break;
                     }
+                }
+                self.selection_changed();
+                self.refresh_scene(&frame);
+                return true;
+            }
+            "gc_cooling" => {
+                let Some(k) = COOLING_CHOICES.iter().position(|c| *c == text) else { return true };
+                let args = if k == 0 { json!({ "enclosure_id": owner, "remove": true }) } else { json!({ "enclosure_id": owner, "reversed": k == 2 }) };
+                match self.run("enclosure.pad_and_fan", args) {
+                    Ok(c) => {
+                        if let Some(n) = c["notes"].as_array().and_then(|n| n.first()).and_then(Value::as_str) {
+                            frame.set_status_text(n, 0);
+                        }
+                    }
+                    Err(e) => error(&frame, &format!("The pad and fans were not laid:\n{e}")),
                 }
                 self.selection_changed();
                 self.refresh_scene(&frame);

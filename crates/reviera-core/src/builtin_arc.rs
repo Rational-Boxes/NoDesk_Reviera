@@ -65,6 +65,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(EnclosureCo2),
         registry.add(EnclosureHeating),
         registry.add(EnclosureHeatingPipes),
+        registry.add(EnclosurePadAndFan),
         registry.add(EnclosureCreate),
         registry.add(EnclosureSet),
         registry.add(EnclosureDetach),
@@ -4783,6 +4784,22 @@ edit_command!(
     crate::hothouse::HeatingPipesParams,
     crate::hothouse::HeatingPipes,
     crate::hothouse::heating_pipes
+);
+
+edit_command!(
+    EnclosurePadAndFan,
+    "enclosure.pad_and_fan",
+    "Lay a glazed enclosure's pad-and-fan cooling",
+    "Pad-and-fan cooling laid out (ARC-GLZ-017) from the ventilation sizing (enclosure.ventilation: `climate`, \
+     `fan_airflow`, `fan_size` 1.22 m, `pads` 100 or 150 mm): exhaust fans (IfcFan) spread across the far end \
+     wall and the evaporative pad (IfcEvaporativeCooler) centred on the near one, `pad_height` high (1.5 m), its \
+     length the pad area over its height (`reversed` swaps the ends). They follow the enclosure, replace its \
+     earlier pad and fans, and `remove` takes them away. Returns the layout, fans, airflow, pad area and \
+     length, with notes (a pad longer than the end wall, a house over 61 m long).",
+    "Pad and Fan Cooling",
+    crate::hothouse::CoolingParams,
+    crate::hothouse::Cooling,
+    crate::hothouse::pad_and_fan
 );
 
 edit_command!(

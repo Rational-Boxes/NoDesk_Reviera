@@ -1638,3 +1638,270 @@ pub(crate) fn heating_pipes(txn: &mut Transaction<'_>, p: HeatingPipesParams) ->
     }
     Ok(out)
 }
+
+// ---- Pad-and-fan cooling laid in the model (ARC-GLZ-017) ----
+
+pub const COOLING_RECIPE: &str = "recipe.pad_and_fan";
+pub const COOLING_PART_RECIPE: &str = "recipe.pad_and_fan_part";
+pub const COOLING_OBJECT_TYPE: &str = "PadAndFanCooling";
+/// The key on each part naming its layout (GlobalId).
+pub const COOLING_KEY: &str = "rxd:pad_and_fan";
+pub const COOLING_PSET: &str = "Reviera_PadAndFan";
+
+/// A fan's housing depth (E-64).
+const FAN_DEPTH: f64 = 0.45;
+
+/// A pad-and-fan layout: exhaust fans in one end wall, the evaporative pad in the other, so the
+/// air is drawn the length of the house through the pad.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct CoolingRecipe {
+    pub kind: String,
+    /// The enclosure (GlobalId).
+    pub enclosure: String,
+    pub fans: u32,
+    /// One fan's airflow (m³/s) and its square housing's side (m).
+    pub fan_airflow: f64,
+    pub fan_size: f64,
+    /// The pad's area (m²) and height (m); its length is the area over the height.
+    pub pad_area: f64,
+    pub pad_height: f64,
+    /// The pad's thickness (m): 0.1 or 0.15.
+    #[serde(default = "pad_thickness")]
+    pub pad_thickness: f64,
+    /// The fans at the far end (x = length), the pad at the near end (x = 0); `reversed` swaps them.
+    #[serde(default)]
+    pub reversed: bool,
+    #[serde(default)]
+    pub parts: Vec<String>,
+}
+
+/// A fan or the pad: a box in plan at `at`, `size` [along the wall, through it, high], its
+/// underside `z` above the level.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct CoolingPart {
+    pub kind: String,
+    pub level: String,
+    /// `fan` or `pad`.
+    pub role: String,
+    pub at: [f64; 2],
+    pub rotation: f64,
+    pub size: [f64; 3],
+    pub z: f64,
+}
+
+fn pad_thickness() -> f64 {
+    0.1
+}
+
+pub fn cooling_recipe(e: &Element) -> Option<CoolingRecipe> {
+    let v = e.param(RECIPE_KEY)?;
+    (v.get("kind")?.as_str()? == COOLING_RECIPE).then(|| serde_json::from_value(v.clone()).ok())?
+}
+
+pub fn cooling_part(e: &Element) -> Option<CoolingPart> {
+    let v = e.param(RECIPE_KEY)?;
+    (v.get("kind")?.as_str()? == COOLING_PART_RECIPE).then(|| serde_json::from_value(v.clone()).ok())?
+}
+
+/// A box: `size[0]` along `rotation`, `size[1]` across it, `size[2]` up from `z0`.
+fn box_mesh(at: [f64; 2], rotation: f64, size: [f64; 3], z0: f64) -> Mesh {
+    let (s, c) = rotation.sin_cos();
+    let [l, w, d] = size;
+    let corner = |i: f64, j: f64| [at[0] + c * i * l / 2.0 - s * j * w / 2.0, at[1] + s * i * l / 2.0 + c * j * w / 2.0];
+    let ring = [corner(-1.0, -1.0), corner(1.0, -1.0), corner(1.0, 1.0), corner(-1.0, 1.0)];
+    let mut pts = Vec::with_capacity(8);
+    for z in [z0, z0 + d] {
+        for q in ring {
+            pts.push([q[0], q[1], z]);
+        }
+    }
+    let idx: Vec<u32> = vec![0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5, 2, 3, 7, 2, 7, 6, 3, 0, 4, 3, 4, 7];
+    (pts, idx)
+}
+
+/// Every fan and pad with its body.
+pub fn all_cooling(store: &Store) -> Vec<(ElementId, Mesh)> {
+    store
+        .iter()
+        .filter_map(|e| {
+            let p = cooling_part(e)?;
+            let z = crate::levels::elevation_of(store, &p.level).unwrap_or(0.0);
+            Some((e.id(), box_mesh(p.at, p.rotation, p.size, z + p.z)))
+        })
+        .collect()
+}
+
+/// The fans spread across the fan end wall, the pad centred on the other, inside the walls.
+pub fn cooling_plan(r: &CoolingRecipe, e: &EnclosureRecipe) -> Vec<CoolingPart> {
+    let (l, w) = (e.length, e.width());
+    let t = r.pad_thickness;
+    let (fan_x, pad_x) = if r.reversed { (FAN_DEPTH / 2.0, l - t / 2.0) } else { (l - FAN_DEPTH / 2.0, t / 2.0) };
+    // Across the end wall: the wall runs along y, so the parts turn a quarter.
+    let across = e.rotation + std::f64::consts::FRAC_PI_2;
+    let mut out = Vec::new();
+    let n = r.fans.max(1);
+    for k in 0..n {
+        let y = w * (f64::from(k) + 0.5) / f64::from(n);
+        out.push(CoolingPart { kind: COOLING_PART_RECIPE.into(), level: e.level.clone(), role: "fan".into(), at: e.at(fan_x, y), rotation: across, size: [r.fan_size, FAN_DEPTH, r.fan_size], z: 0.6 });
+    }
+    let pad_len = (r.pad_area / r.pad_height).min(w - 0.4).max(0.5);
+    out.push(CoolingPart { kind: COOLING_PART_RECIPE.into(), level: e.level.clone(), role: "pad".into(), at: e.at(pad_x, w / 2.0), rotation: across, size: [pad_len, t, r.pad_height], z: 0.3 });
+    out
+}
+
+fn cooling_build(txn: &mut Transaction<'_>, guid: &str, r: &CoolingRecipe) -> Result<Vec<ElementId>> {
+    let store = txn.store().clone();
+    let e = GlobalId::parse(&r.enclosure)
+        .and_then(|g| store.find_by_guid(&g))
+        .and_then(|id| store.get(id))
+        .and_then(enclosures::recipe)
+        .ok_or_else(|| bad("growing.no_enclosure", "the pad and fans' enclosure no longer exists"))?;
+    let mut ids = Vec::new();
+    for p in cooling_plan(r, &e) {
+        let k = |q: &str| format!("{COOLING_PSET}.{q}");
+        let n = if p.role == "fan" {
+            NewElement::new("IfcFan")
+                .name("Exhaust Fan")
+                .param("@PredefinedType", "PROPELLORAXIAL")
+                .param(&k("Airflow"), typed("IfcVolumetricFlowRateMeasure", json!(r.fan_airflow)))
+        } else {
+            NewElement::new("IfcEvaporativeCooler")
+                .name("Evaporative Pad")
+                .param("@PredefinedType", "DIRECTEVAPORATIVERIGIDMEDIAAIRCOOLER")
+                .param(&k("PadArea"), typed("IfcAreaMeasure", json!(p.size[0] * p.size[2])))
+        };
+        ids.push(txn.create(n.param(COOLING_KEY, json!(guid)).param(RECIPE_KEY, serde_json::to_value(&p).expect("serialises")))?);
+    }
+    Ok(ids)
+}
+
+fn cooling_rebuild(txn: &mut Transaction<'_>, id: ElementId, mut r: CoolingRecipe) -> Result<()> {
+    let store = txn.store().clone();
+    for g in &r.parts {
+        if let Some(part) = GlobalId::parse(g).and_then(|g| store.find_by_guid(&g))
+            && txn.store().contains(part)
+        {
+            txn.delete(part)?;
+        }
+    }
+    let guid = store.get(id).expect("exists").guid().to_string();
+    let parts = cooling_build(txn, &guid, &r)?;
+    r.parts = parts.iter().map(|p| txn.store().get(*p).expect("made").guid().to_string()).collect();
+    let k = |q: &str| format!("{COOLING_PSET}.{q}");
+    let values = vec![
+        (k("FanCount"), typed("IfcCountMeasure", json!(r.fans))),
+        (k("TotalAirflow"), typed("IfcVolumetricFlowRateMeasure", json!(f64::from(r.fans) * r.fan_airflow))),
+        (k("PadArea"), typed("IfcAreaMeasure", json!(r.pad_area))),
+    ];
+    let v = serde_json::to_value(&r).expect("serialises");
+    txn.modify(id, |e| {
+        e.params.retain(|k, _| !k.starts_with(&format!("{COOLING_PSET}.")));
+        e.params.insert(RECIPE_KEY.into(), v);
+        for (k, v) in values {
+            e.params.insert(k, v);
+        }
+    })
+}
+
+/// Lays out again the pad and fans on the enclosure `guid` (after the enclosure changed).
+pub(crate) fn cooling_follow(txn: &mut Transaction<'_>, guid: &str) -> Result<()> {
+    let layouts: Vec<(ElementId, CoolingRecipe)> = txn.store().iter().filter_map(|e| cooling_recipe(e).filter(|r| r.enclosure == guid).map(|r| (e.id(), r))).collect();
+    for (id, r) in layouts {
+        cooling_rebuild(txn, id, r)?;
+    }
+    Ok(())
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct CoolingParams {
+    pub enclosure_id: ElementRef,
+    /// As enclosure.ventilation: the climate, one fan's airflow and size (default 10 m³/s,
+    /// 1.22 m), the pads.
+    #[serde(default)]
+    pub climate: VentClimate,
+    pub fan_airflow: Option<f64>,
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub fan_size: Option<f64>,
+    /// The pad: `100` or `150` mm cellulose (default 100).
+    pub pads: Option<Pads>,
+    /// The pad's height (default 1.5 m).
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub pad_height: Option<f64>,
+    /// Fans at the near end, the pad at the far end.
+    #[serde(default)]
+    pub reversed: bool,
+    /// Take the pad and fans away.
+    #[serde(default)]
+    pub remove: bool,
+}
+
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct Cooling {
+    /// The layout (absent when removed).
+    pub layout: Option<ElementId>,
+    pub fans: u32,
+    pub fan_airflow: f64,
+    pub airflow: f64,
+    pub pad_area: f64,
+    pub pad_length: f64,
+    pub notes: Vec<String>,
+}
+
+/// `enclosure.pad_and_fan`: exhaust fans and an evaporative pad laid in the end walls from the
+/// ventilation sizing, replacing the house's earlier ones.
+pub(crate) fn pad_and_fan(txn: &mut Transaction<'_>, p: CoolingParams) -> Result<Cooling> {
+    let store = txn.store().clone();
+    let (eid, e) = enclosure(&store, &p.enclosure_id)?;
+    let guid = store.get(eid).expect("resolved").guid().to_string();
+    // The house's earlier layout and its parts, replaced.
+    let old: Vec<(ElementId, CoolingRecipe)> = store.iter().filter_map(|x| cooling_recipe(x).filter(|r| r.enclosure == guid).map(|r| (x.id(), r))).collect();
+    for (id, r) in &old {
+        for g in &r.parts {
+            if let Some(part) = GlobalId::parse(g).and_then(|g| store.find_by_guid(&g))
+                && txn.store().contains(part)
+            {
+                txn.delete(part)?;
+            }
+        }
+        txn.delete(*id)?;
+    }
+    if p.remove {
+        return Ok(Cooling { layout: None, fans: 0, fan_airflow: 0.0, airflow: 0.0, pad_area: 0.0, pad_length: 0.0, notes: vec![] });
+    }
+    let fan_size = p.fan_size.unwrap_or(1.22);
+    let pads = p.pads.unwrap_or(Pads::Mm100);
+    let pad_thickness = match pads {
+        Pads::None => return Err(bad("growing.bad_value", "pad-and-fan cooling needs pads: 100 or 150 (mm)")),
+        Pads::Mm100 => 0.1,
+        Pads::Mm150 => 0.15,
+    };
+    let v = ventilation(&store, VentilationParams { enclosure_id: ElementRef::Id(eid), climate: p.climate, summer: Some(true), pads, fan_airflow: p.fan_airflow, fan_diameter: Some(fan_size), elevation: None })?;
+    let pad_height = p.pad_height.unwrap_or(1.5);
+    if !(0.5..=e.eave.max(1.0)).contains(&pad_height) {
+        return Err(bad("growing.bad_value", format!("the pad is 0.5 m to {:.2} m high (the eave)", e.eave.max(1.0))));
+    }
+    let w = e.width();
+    if f64::from(v.fans) * fan_size > w - 0.2 {
+        return Err(bad("growing.bad_value", format!("{} fans of {fan_size:.2} m do not fit across the {w:.1} m end wall: give larger fans (fan_airflow, fan_size)", v.fans)));
+    }
+    let pad_area = v.pad_area.unwrap_or(0.0);
+    let mut notes = v.notes.clone();
+    let pad_length = (pad_area / pad_height).max(0.5);
+    if pad_length > w - 0.4 {
+        notes.push(format!("the pad needs {pad_length:.1} m at {pad_height:.1} m high, more than the {:.1} m end wall: it is laid {:.1} m long; make it higher or add pad in the side walls", w, w - 0.4));
+    }
+    if e.length > 61.0 {
+        notes.push(format!("{:.0} m from pad to fans: houses longer than about 61 m (200 ft) warm too much along the airflow", e.length));
+    }
+    let r = CoolingRecipe { kind: COOLING_RECIPE.into(), enclosure: guid, fans: v.fans, fan_airflow: v.fan_airflow, fan_size, pad_area, pad_height, pad_thickness, reversed: p.reversed, parts: Vec::new() };
+    let id = txn.create(
+        NewElement::new("IfcElementAssembly")
+            .name("Pad and Fan Cooling")
+            .param("@PredefinedType", "USERDEFINED")
+            .param("@ObjectType", COOLING_OBJECT_TYPE)
+            .param(RECIPE_KEY, serde_json::to_value(&r).expect("serialises")),
+    )?;
+    cooling_rebuild(txn, id, r)?;
+    Ok(Cooling { layout: Some(id), fans: v.fans, fan_airflow: v.fan_airflow, airflow: v.airflow, pad_area, pad_length: pad_length.min(w - 0.4), notes })
+}

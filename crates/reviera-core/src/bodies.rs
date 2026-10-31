@@ -530,6 +530,12 @@ pub fn all(store: &Store) -> Vec<Body> {
     for (id, m) in crate::hothouse::all(store) {
         push(id, &format!("IfcLightFixture:{}", crate::mesh_objects::color_hex([0.22, 0.23, 0.25, 1.0])), m, false);
     }
+    // Pad-and-fan cooling (ARC-GLZ-017): grey fan housings, the pad's buff cellulose.
+    for (id, m) in crate::hothouse::all_cooling(store) {
+        let fan = store.get(id).is_some_and(|e| e.class == "IfcFan");
+        let (class, color) = if fan { ("IfcFan", [0.48, 0.50, 0.52, 1.0]) } else { ("IfcEvaporativeCooler", [0.80, 0.70, 0.50, 1.0]) };
+        push(id, &format!("{class}:{}", crate::mesh_objects::color_hex(color)), m, false);
+    }
     // Greenhouse screens (ARC-GLZ-010): light fabric, hidden in plan.
     for (id, m) in crate::hothouse::all_screens(store) {
         push(id, &format!("IfcShadingDevice:{}", crate::mesh_objects::color_hex([0.86, 0.87, 0.84, 0.55])), m, true);

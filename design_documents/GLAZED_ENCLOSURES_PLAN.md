@@ -294,8 +294,9 @@ and the defaults recorded for expert review.
    item), ventilation sizing with pads (ARC-GLZ-012, a phase-1 item), CO₂ enrichment sizing
    (ARC-GLZ-013), heating sizing (ARC-GLZ-014) and growing-area schedules (ARC-GLZ-015, built
    2026-10-31). Heating pipes laid round the perimeter and under the benches
-   (ARC-GLZ-016, built 2026-10-31). Still to do: pad-and-fan equipment in the model, pipe-rail
-   heating, and flow and return headers.*
+   (ARC-GLZ-016) and pad-and-fan cooling (ARC-GLZ-017), both laid in the model (built
+   2026-10-31). Still to do: pipe-rail heating, flow and return headers, and pad in the side
+   walls.*
 3. **Sunlight management.** Shading devices on any face (louvres, fins, brise-soleil, baffles,
    light shelves, screens), with the sun-path design aid; their effect in daylight, solar studies
    and loads; operable devices and their control.

@@ -201,6 +201,21 @@ pipe, in the hydronic supply system:</p>
 fin-pipe outputs assume, and is drawn, scheduled and exported like any other pipe
 (<code>enclosure.heating_pipes</code>).</p>
 
+<h2 id="cooling">Pad-and-fan cooling</h2>
+<p>Properties › Growing Climate › <b>Pad and Fans</b> lays the cooling the fan ventilation sizing
+gives:</p>
+<ul>
+  <li>the exhaust fans, spread across one end wall;</li>
+  <li>the evaporative pad (100 mm cellulose, 1.5 m high), centred on the other.</li>
+</ul>
+<p>Air is drawn the length of the house, through the pad. <i>Pad at the near end</i> or <i>at the
+far end</i> chooses which way. The fans and pad move with the house when it is made longer or
+wider, and <b>None</b> takes them away.</p>
+<p>The status bar says when the pad needs more length than the end wall has (make it higher, or
+add pad in the side walls), or when the house is over 61 m long, so the air warms too much on its
+way to the fans. They are saved as fans and an evaporative cooler
+(<code>enclosure.pad_and_fan</code>).</p>
+
 <h2 id="schedules">Schedules</h2>
 <p>A schedule of <b>Glazed Enclosures</b> lists the houses, one row each. Its fields:</p>
 <ul>
@@ -219,6 +234,6 @@ table, with its own run and area.</p>
 
 <h2 id="later">Coming later</h2>
 <p>Gutter-connected arch ranges; rafters, purlins and Venlo trusses; opening and closing vents in
-the view, and gutter vents; screens in tunnels, pipe-rail heating and headers, pad-and-fan cooling
+the view, and gutter vents; screens in tunnels, pipe-rail heating and headers, pad in the side walls
 and CO₂ enrichment; shading devices; atriums; heating, cooling and energy analysis of the
 enclosure; residential conservatories and orangeries; and building-code checks.</p>

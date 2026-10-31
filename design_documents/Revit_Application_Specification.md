@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Reviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Reviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 839 numbered requirements (320 P0 · 313 P1 · 199 P2 · 7 P3), 2,245 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 840 numbered requirements (320 P0 · 313 P1 · 200 P2 · 7 P3), 2,246 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,245 commands; 839 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,246 commands; 840 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -13291,7 +13291,26 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 - [x] A 9.6 × 40 m gable house losing about 128 kW (15 °C inside, −10 °C outside) gets 2 perimeter loops, each 0.6 m short of the 98.6 m round 0.15 m in, covering the load at the fin rating. Its 8 benches get 4 runs each, then 2 each when laid again, replacing the first. The perimeter loops stay, and all are saved as `IfcPipeSegment`s.
 - [x] `remove` takes a system's pipes away, and under-bench pipe in a house with no benches is refused.
 
-*Not yet:* pipe-rail (grow-pipe) heating, which has no published output figure gathered; flow and return headers and the boiler connection; pad-and-fan equipment in the model.
+*Not yet:* pipe-rail (grow-pipe) heating, which has no published output figure gathered; flow and return headers and the boiler connection.
+
+### Pad-and-fan cooling laid in the greenhouse
+**ID:** ARC-GLZ-017 · **Priority:** P2 · **Ref:** GLAZED_ENCLOSURES_PLAN §4 (*climate equipment as components*), §9 (phase 2); ARC-GLZ-012
+
+**Purpose.** Put the fan ventilation and evaporative pads that ARC-GLZ-012 sizes into the model.
+
+**Behaviour & rules.**
+- `enclosure.pad_and_fan` sizes as `enclosure.ventilation` does: `climate`, `fan_airflow`, `fan_size` (1.22 m), and `pads` of `100` or `150` mm (default 100; none is refused).
+- It lays a **Pad and Fan Cooling** layout (`IfcElementAssembly`, ObjectType *PadAndFanCooling*, `Reviera_PadAndFan` FanCount, TotalAirflow, PadArea) whose parts are:
+  - the sized number of **exhaust fans** (`IfcFan` PROPELLORAXIAL, `Reviera_PadAndFan.Airflow`), square housings of the fan's size, 0.45 m deep and 0.6 m up, spread across the far end wall;
+  - the **evaporative pad** (`IfcEvaporativeCooler` DIRECTEVAPORATIVERIGIDMEDIAAIRCOOLER, PadArea), `pad_height` high (1.5 m) from 0.3 m up, as thick as the pad and centred on the near end wall. Its length is the pad area over its height, at most the end wall less 0.4 m.
+- `reversed` swaps the ends. Laying again replaces the house's earlier pad and fans; `remove` takes them away. They are laid again when the enclosure changes (its length or span).
+- Refused when the fans do not fit across the end wall. Noted when the pad would be longer than the end wall (make it higher, or add pad in the side walls), or when the pad and fans are more than 61 m apart (the air warms too much along the house).
+- Properties › Growing Climate › **Pad and Fans**: None, Pad at the near end, Pad at the far end. Layout values: EXPERT_REVIEW E-64.
+
+**Acceptance criteria.**
+- [x] A 9.6 × 40 m gable house gets as many fans as its ventilation sizing, all at the far end, and one pad of its pad area at the near end. Lengthened to 48 m, the fans follow the end wall. Laid again with 150 mm pads and reversed, there is still one layout, and the pad is smaller. It saves as `IfcFan`s and an `IfcEvaporativeCooler`, and `remove` takes them all away.
+
+*Not yet:* pad in the side walls, the pad's water tank and pump, inlet louvres and fan shutters, and fans and pads as Component Library types.
 
 ### Growing-area schedules
 **ID:** ARC-GLZ-015 · **Priority:** P2 · **Ref:** GLAZED_ENCLOSURES_PLAN §9 (phase 2, *growing-area schedules*); DOC-SCHED (schedules)
@@ -15392,6 +15411,7 @@ All commands below are registered once in the command registry and exposed autom
 | `enclosure.co2` | enclosure_id, setpoint?, glazing? | co2_report | No (query) | ARC-GLZ-013 |
 | `enclosure.heating` | enclosure_id, inside?, outside?, wind?, heater_kw? | heating_report | No (query) | ARC-GLZ-014 |
 | `enclosure.heating_pipes` | enclosure_id, system, runs?, height?, offset?, diameter?, outside?, remove? | {runs, segments, fittings, length, output_kw, replaced} | Yes | ARC-GLZ-016 |
+| `enclosure.pad_and_fan` | enclosure_id, climate?, fan_airflow?, fan_size?, pads?, pad_height?, reversed?, remove? | {layout, fans, fan_airflow, airflow, pad_area, pad_length, notes} | Yes | ARC-GLZ-017 |
 | `growing.crops` | — | [crop] | No (query) | ARC-GLZ-008 |
 | `enclosure.set_climate` | enclosure_id, crop?, target_dli?, day_temperature?, night_temperature?, humidity?, co2?, photoperiod?, clear? | — | Yes | ARC-GLZ-008 |
 | `enclosure.crop_light` | enclosure_id, clearness?, outdoor_dli? | {source, transmission, months, darkest_month, required_ppfd, lamp_ppfd} | No (query) | ARC-GLZ-009 |
@@ -28466,14 +28486,14 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 39 | 8 | 0 | 123 |
 | DM | 91 | 65 | 34 | 3 | 193 |
-| ARC | 77 | 73 | 13 | 1 | 164 |
+| ARC | 77 | 73 | 14 | 1 | 165 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 28 | 0 | 29 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
 | COL | 8 | 50 | 10 | 1 | 69 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **313** | **199** | **7** | **839** |
+| **Total** | **320** | **313** | **200** | **7** | **840** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -28528,7 +28548,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.2a Reviera-originated features
 
-131 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
+132 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
 
 | Requirement | Ch | Feature |
 |-------------|----|---------|
@@ -28626,6 +28646,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | ARC-ROOF-009 | 3 | 3.6.8c Dome roofs |
 | ARC-GLZ-007 | 3 | 3.6a.7 Reviera types and property sets for glazed enclosures |
 | ARC-GLZ-016 | 3 | Heating pipes laid in the greenhouse |
+| ARC-GLZ-017 | 3 | Pad-and-fan cooling laid in the greenhouse |
 | ARC-GLZ-015 | 3 | Growing-area schedules |
 | ARC-STAIR-007 | 3 | 3.7.6a Stairs through floors: completing to the level above, openings and railings |
 | ARC-RAIL-003 | 3 | 3.7.8b Railing openings and gates |
@@ -28666,7 +28687,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2245 unique commands** in 424 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2246 unique commands** in 424 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -28789,7 +28810,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `element` | 39 |
 | `elevationmarker` | 1 |
 | `embodied_carbon` | 5 |
-| `enclosure` | 15 |
+| `enclosure` | 16 |
 | `energy_location` | 1 |
 | `energy_model` | 4 |
 | `energy_settings` | 3 |
@@ -29661,6 +29682,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `enclosure.heat_loss` | 3 | enclosure_id, inside?, outside?, wind?, air_changes? | heat_loss | No (query) | ARC-GLZ-011 |
 | `enclosure.heating` | 3 | enclosure_id, inside?, outside?, wind?, heater_kw? | heating_report | No (query) | ARC-GLZ-014 |
 | `enclosure.heating_pipes` | 3 | enclosure_id, system, runs?, height?, offset?, diameter?, outside?, remove? | {runs, segments, fittings, length, output_kw, replaced} | Yes | ARC-GLZ-016 |
+| `enclosure.pad_and_fan` | 3 | enclosure_id, climate?, fan_airflow?, fan_size?, pads?, pad_height?, reversed?, remove? | {layout, fans, fan_airflow, airflow, pad_area, pad_length, notes} | Yes | ARC-GLZ-017 |
 | `enclosure.screen_library` | 3 | — | [entry] | No (query) | ARC-GLZ-010 |
 | `enclosure.set` | 3 | enclosure_id, params | — | Yes | ARC-GLZ-001 |
 | `enclosure.set_climate` | 3 | enclosure_id, crop?, target_dli?, day_temperature?, night_temperature?, humidity?, co2?, photoperiod?, clear? | — | Yes | ARC-GLZ-008 |

@@ -1005,9 +1005,10 @@ fn rebuild(txn: &mut Transaction<'_>, id: ElementId, mut r: EnclosureRecipe) -> 
     let parts = build(txn, &guid, &r)?;
     r.parts = parts.iter().map(|p| txn.store().get(*p).expect("made").guid().to_string()).collect();
     write_recipe(txn, id, &r)?;
-    // Its growing layouts and grow lights are laid out again on the new floor.
+    // Its growing layouts, grow lights and pad and fans are laid out again on the new floor.
     crate::growing::follow(txn, &guid)?;
-    crate::hothouse::follow(txn, &guid)
+    crate::hothouse::follow(txn, &guid)?;
+    crate::hothouse::cooling_follow(txn, &guid)
 }
 
 // ---- Commands ----

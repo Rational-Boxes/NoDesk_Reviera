@@ -3069,7 +3069,26 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 - [x] A 9.6 × 40 m gable house losing about 128 kW (15 °C inside, −10 °C outside) gets 2 perimeter loops, each 0.6 m short of the 98.6 m round 0.15 m in, covering the load at the fin rating. Its 8 benches get 4 runs each, then 2 each when laid again, replacing the first. The perimeter loops stay, and all are saved as `IfcPipeSegment`s.
 - [x] `remove` takes a system's pipes away, and under-bench pipe in a house with no benches is refused.
 
-*Not yet:* pipe-rail (grow-pipe) heating, which has no published output figure gathered; flow and return headers and the boiler connection; pad-and-fan equipment in the model.
+*Not yet:* pipe-rail (grow-pipe) heating, which has no published output figure gathered; flow and return headers and the boiler connection.
+
+### Pad-and-fan cooling laid in the greenhouse
+**ID:** ARC-GLZ-017 · **Priority:** P2 · **Ref:** GLAZED_ENCLOSURES_PLAN §4 (*climate equipment as components*), §9 (phase 2); ARC-GLZ-012
+
+**Purpose.** Put the fan ventilation and evaporative pads that ARC-GLZ-012 sizes into the model.
+
+**Behaviour & rules.**
+- `enclosure.pad_and_fan` sizes as `enclosure.ventilation` does: `climate`, `fan_airflow`, `fan_size` (1.22 m), and `pads` of `100` or `150` mm (default 100; none is refused).
+- It lays a **Pad and Fan Cooling** layout (`IfcElementAssembly`, ObjectType *PadAndFanCooling*, `Reviera_PadAndFan` FanCount, TotalAirflow, PadArea) whose parts are:
+  - the sized number of **exhaust fans** (`IfcFan` PROPELLORAXIAL, `Reviera_PadAndFan.Airflow`), square housings of the fan's size, 0.45 m deep and 0.6 m up, spread across the far end wall;
+  - the **evaporative pad** (`IfcEvaporativeCooler` DIRECTEVAPORATIVERIGIDMEDIAAIRCOOLER, PadArea), `pad_height` high (1.5 m) from 0.3 m up, as thick as the pad and centred on the near end wall. Its length is the pad area over its height, at most the end wall less 0.4 m.
+- `reversed` swaps the ends. Laying again replaces the house's earlier pad and fans; `remove` takes them away. They are laid again when the enclosure changes (its length or span).
+- Refused when the fans do not fit across the end wall. Noted when the pad would be longer than the end wall (make it higher, or add pad in the side walls), or when the pad and fans are more than 61 m apart (the air warms too much along the house).
+- Properties › Growing Climate › **Pad and Fans**: None, Pad at the near end, Pad at the far end. Layout values: EXPERT_REVIEW E-64.
+
+**Acceptance criteria.**
+- [x] A 9.6 × 40 m gable house gets as many fans as its ventilation sizing, all at the far end, and one pad of its pad area at the near end. Lengthened to 48 m, the fans follow the end wall. Laid again with 150 mm pads and reversed, there is still one layout, and the pad is smaller. It saves as `IfcFan`s and an `IfcEvaporativeCooler`, and `remove` takes them all away.
+
+*Not yet:* pad in the side walls, the pad's water tank and pump, inlet louvres and fan shutters, and fans and pads as Component Library types.
 
 ### Growing-area schedules
 **ID:** ARC-GLZ-015 · **Priority:** P2 · **Ref:** GLAZED_ENCLOSURES_PLAN §9 (phase 2, *growing-area schedules*); DOC-SCHED (schedules)
@@ -5170,6 +5189,7 @@ All commands below are registered once in the command registry and exposed autom
 | `enclosure.co2` | enclosure_id, setpoint?, glazing? | co2_report | No (query) | ARC-GLZ-013 |
 | `enclosure.heating` | enclosure_id, inside?, outside?, wind?, heater_kw? | heating_report | No (query) | ARC-GLZ-014 |
 | `enclosure.heating_pipes` | enclosure_id, system, runs?, height?, offset?, diameter?, outside?, remove? | {runs, segments, fittings, length, output_kw, replaced} | Yes | ARC-GLZ-016 |
+| `enclosure.pad_and_fan` | enclosure_id, climate?, fan_airflow?, fan_size?, pads?, pad_height?, reversed?, remove? | {layout, fans, fan_airflow, airflow, pad_area, pad_length, notes} | Yes | ARC-GLZ-017 |
 | `growing.crops` | — | [crop] | No (query) | ARC-GLZ-008 |
 | `enclosure.set_climate` | enclosure_id, crop?, target_dli?, day_temperature?, night_temperature?, humidity?, co2?, photoperiod?, clear? | — | Yes | ARC-GLZ-008 |
 | `enclosure.crop_light` | enclosure_id, clearness?, outdoor_dli? | {source, transmission, months, darkest_month, required_ppfd, lamp_ppfd} | No (query) | ARC-GLZ-009 |
