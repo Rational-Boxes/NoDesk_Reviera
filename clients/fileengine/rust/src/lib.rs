@@ -587,6 +587,44 @@ impl Client {
         r.json().map_err(|_| Error::new(ErrorKind::Protocol, "the usage: the answer is not JSON"))
     }
 
+    // ---- The discussion service (`/discuss/`, beside the REST door): comments and issues ----
+
+    fn discuss(&self, path: &str) -> Url {
+        self.base.join("../discuss/").and_then(|b| b.join(path.trim_start_matches('/'))).expect("a relative path")
+    }
+
+    fn discuss_json(&self, what: &str, build: impl Fn() -> RequestBuilder) -> Result<Value> {
+        let r = self.send(what, build)?;
+        r.json().map_err(|_| Error::new(ErrorKind::Protocol, format!("{what}: the answer is not JSON")))
+    }
+
+    /// A file's discussion threads (`GET /discuss/files/{uid}/threads`), each with its comments
+    /// and, for an issue on a model, its `anchor` (`kind: model-viewpoint`, a BCF-shaped
+    /// `viewpoint`, `object_refs`, `measurements`).
+    pub fn threads(&self, file_uid: &str) -> Result<Vec<Value>> {
+        let v = self.discuss_json("the file's threads", || self.http.get(self.discuss(&format!("files/{}/threads", percent(file_uid)))))?;
+        Ok(v["threads"].as_array().cloned().unwrap_or_default())
+    }
+
+    /// Opens a thread on a file: `title`, the opening comment's `body`, the `version` it was
+    /// raised on, and an `anchor` (a model viewpoint). Returns the thread.
+    pub fn open_thread(&self, file_uid: &str, body: &Value) -> Result<Value> {
+        self.discuss_json("opening the thread", || self.http.post(self.discuss(&format!("files/{}/threads", percent(file_uid)))).json(body))
+    }
+
+    /// Adds a comment to a thread. Returns the comment.
+    pub fn add_comment(&self, thread_id: &str, text: &str) -> Result<Value> {
+        let body = json!({ "body": text });
+        self.discuss_json("commenting", || self.http.post(self.discuss(&format!("threads/{}/comments", percent(thread_id)))).json(&body))
+    }
+
+    /// Resolves a thread (`resolved`, with the version it was resolved on) or opens it again
+    /// (`open`). Returns the thread.
+    pub fn set_thread_status(&self, thread_id: &str, status: &str, version: Option<&str>) -> Result<Value> {
+        let body = json!({ "status": status, "resolved_version": version });
+        self.discuss_json("setting the thread's status", || self.http.patch(self.discuss(&format!("threads/{}", percent(thread_id)))).json(&body))
+    }
+
 
     pub fn metadata(&self, uid: &str) -> Result<BTreeMap<String, String>> {
         let v = self.get_json(&format!("v1/nodes/{}/metadata", percent(uid)), "the metadata")?;

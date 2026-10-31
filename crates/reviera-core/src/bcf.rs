@@ -434,3 +434,110 @@ mod tests {
         assert!(from_xml("<Markup/>").is_err());
     }
 }
+
+// ---- BCF-API JSON (2.1 and 3.0) ----
+
+fn xyz_of(v: &serde_json::Value) -> Option<[f64; 3]> {
+    Some([v["x"].as_f64()?, v["y"].as_f64()?, v["z"].as_f64()?])
+}
+
+fn xyz_json(v: [f64; 3]) -> serde_json::Value {
+    serde_json::json!({ "x": v[0], "y": v[1], "z": v[2] })
+}
+
+/// A viewpoint in BCF-API's JSON form (`perspective_camera` or `orthogonal_camera`,
+/// `clipping_planes`, `components` with `selection` and `visibility`), as FileEngine's model
+/// comments and BCF servers give it. Components are read by `ifc_guid`; what cannot be read is
+/// left out rather than refused.
+pub fn from_json(v: &serde_json::Value) -> Viewpoint {
+    let camera = if let Some(c) = v.get("perspective_camera").filter(|c| c.is_object()) {
+        match (xyz_of(&c["camera_view_point"]), xyz_of(&c["camera_direction"]), xyz_of(&c["camera_up_vector"])) {
+            (Some(eye), Some(direction), Some(up)) => Some(Camera::Perspective {
+                eye,
+                direction,
+                up,
+                field_of_view: c["field_of_view"].as_f64().filter(|f| *f > 0.0 && *f < 180.0).unwrap_or(60.0),
+                aspect_ratio: c["aspect_ratio"].as_f64().filter(|a| *a > 0.0).unwrap_or(ASPECT),
+            }),
+            _ => None,
+        }
+    } else if let Some(c) = v.get("orthogonal_camera").filter(|c| c.is_object()) {
+        match (xyz_of(&c["camera_view_point"]), xyz_of(&c["camera_direction"]), xyz_of(&c["camera_up_vector"])) {
+            (Some(eye), Some(direction), Some(up)) => Some(Camera::Orthogonal {
+                eye,
+                direction,
+                up,
+                view_to_world_scale: c["view_to_world_scale"].as_f64().filter(|s| *s > 0.0).unwrap_or(10.0),
+                aspect_ratio: c["aspect_ratio"].as_f64().filter(|a| *a > 0.0).unwrap_or(ASPECT),
+            }),
+            _ => None,
+        }
+    } else {
+        None
+    };
+    let guids = |list: &serde_json::Value| -> Vec<String> { list.as_array().into_iter().flatten().filter_map(|c| c["ifc_guid"].as_str()).filter(|g| !g.is_empty()).map(str::to_owned).collect() };
+    let clipping_planes = v["clipping_planes"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|p| Some(ClippingPlane { location: xyz_of(&p["location"])?, direction: xyz_of(&p["direction"])? }))
+        .collect();
+    let vis = &v["components"]["visibility"];
+    Viewpoint {
+        guid: v["guid"].as_str().map(str::to_owned),
+        camera,
+        clipping_planes,
+        selection: guids(&v["components"]["selection"]),
+        visibility: Visibility { default_visibility: vis["default_visibility"].as_bool().unwrap_or(true), exceptions: guids(&vis["exceptions"]) },
+    }
+}
+
+/// A viewpoint in BCF-API's JSON form (the inverse of [`from_json`]), `originating_system`
+/// naming Reviera.
+pub fn to_json(v: &Viewpoint) -> serde_json::Value {
+    let comp = |g: &String| serde_json::json!({ "ifc_guid": g, "originating_system": "BIM Reviera" });
+    let mut out = serde_json::json!({
+        "clipping_planes": v.clipping_planes.iter().map(|p| serde_json::json!({ "location": xyz_json(p.location), "direction": xyz_json(p.direction) })).collect::<Vec<_>>(),
+        "components": {
+            "selection": v.selection.iter().map(comp).collect::<Vec<_>>(),
+            "visibility": { "default_visibility": v.visibility.default_visibility, "exceptions": v.visibility.exceptions.iter().map(comp).collect::<Vec<_>>() },
+            "coloring": [],
+        },
+    });
+    if let Some(g) = &v.guid {
+        out["guid"] = serde_json::json!(g);
+    }
+    match &v.camera {
+        Some(Camera::Perspective { eye, direction, up, field_of_view, aspect_ratio }) => {
+            out["perspective_camera"] = serde_json::json!({ "camera_view_point": xyz_json(*eye), "camera_direction": xyz_json(*direction), "camera_up_vector": xyz_json(*up), "field_of_view": field_of_view, "aspect_ratio": aspect_ratio });
+        }
+        Some(Camera::Orthogonal { eye, direction, up, view_to_world_scale, aspect_ratio }) => {
+            out["orthogonal_camera"] = serde_json::json!({ "camera_view_point": xyz_json(*eye), "camera_direction": xyz_json(*direction), "camera_up_vector": xyz_json(*up), "view_to_world_scale": view_to_world_scale, "aspect_ratio": aspect_ratio });
+        }
+        None => {}
+    }
+    out
+}
+
+#[cfg(test)]
+mod json_tests {
+    use super::*;
+
+    #[test]
+    fn a_bcf_api_viewpoint_round_trips() {
+        let v = serde_json::json!({
+            "perspective_camera": { "field_of_view": 60, "camera_direction": { "x": -0.1198, "y": 0.7522, "z": -0.6479 },
+                "camera_up_vector": { "x": -0.1019, "y": 0.6399, "z": 0.7617 }, "camera_view_point": { "x": 8.063, "y": -0.138, "z": 4.558 } },
+            "clipping_planes": [{ "location": { "x": 6, "y": 5, "z": 3.24 }, "direction": { "x": 0, "y": -0.0092, "z": -0.99996 } }],
+            "components": { "selection": [{ "ifc_guid": "38a9vdh9bF5Qg28GWyHhlr" }], "visibility": { "default_visibility": true,
+                "exceptions": [{ "ifc_guid": "347jFE2yX7IhCEIALmupEH", "originating_system": "xeokit.io" }] } }
+        });
+        let vp = from_json(&v);
+        let Some(Camera::Perspective { eye, field_of_view, aspect_ratio, .. }) = &vp.camera else { panic!("{vp:?}") };
+        assert_eq!((*eye, *field_of_view, *aspect_ratio), ([8.063, -0.138, 4.558], 60.0, ASPECT));
+        assert_eq!(vp.clipping_planes, vec![ClippingPlane { location: [6.0, 5.0, 3.24], direction: [0.0, -0.0092, -0.99996] }]);
+        assert_eq!((vp.selection.as_slice(), vp.visibility.exceptions.as_slice()), (&["38a9vdh9bF5Qg28GWyHhlr".to_owned()][..], &["347jFE2yX7IhCEIALmupEH".to_owned()][..]));
+        assert_eq!(from_json(&to_json(&vp)), vp);
+        assert_eq!(from_json(&serde_json::json!({})), Viewpoint::default());
+    }
+}

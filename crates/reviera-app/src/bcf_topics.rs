@@ -28,6 +28,29 @@ fn store(app: &App) -> Result<&reviera_core::Store> {
     Ok(app.get(doc)?.doc.store())
 }
 
+/// A 3D view's viewpoint for an issue: the view named, else the active 3D view, else the model's
+/// first 3D view (none is made, so the model is not changed).
+pub(crate) fn capture_view(app: &App, view: &Option<ElementRef>) -> Result<(ElementId, reviera_core::bcf::Viewpoint)> {
+    let id = match view_to_capture(app, view)? {
+        Some(v) => v,
+        None => {
+            let doc = app.active().ok_or_else(|| bad("document.none", "no document is open"))?;
+            let store = app.get(doc)?.doc.store();
+            store
+                .iter()
+                .find(|e| reviera_core::views::view_data(e).is_some_and(|d| d.kind == reviera_core::views::KIND_3D))
+                .map(reviera_core::Element::id)
+                .ok_or_else(|| bad("bcf.not_3d", "the model has no 3D view to take the issue's viewpoint from"))?
+        }
+    };
+    Ok((id, capture(app, id)?))
+}
+
+/// A 3D view's snapshot (base64 PNG), when it can be rendered.
+pub(crate) fn snapshot_png(app: &App, view: ElementId) -> Option<String> {
+    snapshot_of(app, view)
+}
+
 /// A snapshot of a 3D view as it shows now (base64 PNG), when there is a graphics adapter to
 /// render it with.
 fn snapshot_of(app: &App, view: ElementId) -> Option<String> {

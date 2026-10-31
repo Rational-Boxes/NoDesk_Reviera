@@ -11,6 +11,7 @@ each folder.</p>
   <a href="#save">Saving</a>
   <a href="#conflict">When someone else saved first</a>
   <a href="#versions">Version history</a>
+  <a href="#issues">Issues on the model</a>
   <a href="#readonly">Read-only models</a>
   <a href="#security">How the credential is kept</a>
   <a href="#scripts">Scripts and agents</a>
@@ -76,6 +77,27 @@ comment, and which one is open.</p>
   nothing is lost, and the model reopens at it. Save or discard your changes first.</li>
 </ul>
 
+<h2 id="issues">Issues on the model</h2>
+<p>People raise issues on a model in FileEngine's 3D viewer: a comment anchored to a viewpoint,
+with a snapshot, the elements it is about and any measurements. When you open the model, Reviera
+reads its issues, and the <a href="reviera:action/ui.pane.issues">Issues pane</a> opens at the
+bottom of the window if there are any. Window › Issues shows or hides it.</p>
+<ul>
+  <li>Choose an issue to see its snapshot, its comments and what it is about.</li>
+  <li><b>Show</b> (or double-click) opens its viewpoint in the 3D view: the camera, the cut, the
+  elements hidden, and the elements it is about selected.</li>
+  <li><b>Reply…</b> adds a comment; <code>@name@example.com</code> tells that person in
+  FileEngine.</li>
+  <li><b>Resolve</b> resolves it on the version you have open (<b>Reopen</b> opens it again).</li>
+  <li><b>New Issue…</b> raises one from the 3D view as it is now: its camera, section box and
+  slices, hidden elements, the selection and a snapshot. People see it in FileEngine's
+  viewer.</li>
+</ul>
+<p>The issues stay on FileEngine, with the people discussing them. Reading them does not change
+the model, and they are not uploaded inside it. The last ones read are kept with the working
+copy, so you can read them offline. A model that is not on FileEngine shows its own BCF issues in
+the pane instead.</p>
+
 <h2 id="readonly">Read-only models</h2>
 <p>A model in a folder you may not write opens read-only. So does a past version. To keep your
 changes to one, use Save to FileEngine… into a folder you can write, or File › Save As to a file
@@ -103,7 +125,7 @@ stored.</p>
 <p>Later phases will add:</p>
 <ul>
   <li>publishing reports and exports to FileEngine folders, with share links;</li>
-  <li>BCF issues kept on FileEngine;</li>
+  <li>live updates of issues while the model is open, and BCF-API for other tools;</li>
   <li>Component Libraries hosted on FileEngine;</li>
   <li>product documentation folders linked to types and materials, with product data read from
   those documents;</li>

@@ -58,6 +58,7 @@ mod remote_analysis_ui;
 mod bimserver_ui;
 mod fileengine_ui;
 mod material_docs_ui;
+mod issues_pane;
 mod profiler_ui;
 mod terminal_ui;
 mod mep_electrical_ui;
@@ -383,6 +384,7 @@ struct Gui {
     library_pane: Option<components::LibraryPane>,
     /// The Clash Detection pane, once opened.
     clash_pane: Option<clash::ClashPane>,
+    issues_pane: Option<issues_pane::IssuesPane>,
     /// Manage › Performance Profiler's live window, while open (DM-PERF-001).
     profiler: Option<profiler_ui::ProfilerWindow>,
     checks_pane: Option<analytical_checks::ChecksPane>,
@@ -1049,6 +1051,7 @@ impl Gui {
             self.update_title(&frame);
             self.properties_stale = true;
             self.update_ribbon_context();
+            self.issues_follow_document();
         }
         if let Some(i) = self
             .view(id)
@@ -3908,6 +3911,7 @@ pub fn run(file: Option<PathBuf>) -> Result<(), String> {
                 array_tool: None,
                 library_pane: None,
                 clash_pane: None,
+                issues_pane: None,
                 profiler: None,
                 checks_pane: None,
                 results_pane: None,
@@ -4759,6 +4763,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "railing.create_on_stair" => with(gui, Gui::rail_stairs),
         "overlap.find" => with(gui, Gui::check_overlaps),
         "ui.pane.clash" => Gui::toggle_clash_pane(gui),
+        "ui.pane.issues" => with(gui, Gui::toggle_issues_pane),
         "ui.pane.system_browser" => Gui::toggle_system_browser(gui),
         "ui.pane.terminal" => Gui::toggle_terminal(gui),
         "ui.pane.sizing_calculator" => Gui::toggle_sizing_calculator(gui),

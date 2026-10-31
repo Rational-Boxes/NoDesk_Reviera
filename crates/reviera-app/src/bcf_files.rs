@@ -48,6 +48,9 @@ pub(crate) fn capture(app: &App, view: ElementId) -> Result<bcf::Viewpoint> {
     let open = app.get(doc)?;
     let store = open.doc.store();
     let (_, mut vp) = bcf::capture(store, &ElementRef::Id(view))?;
+    // The camera the view shows: as navigated, else as saved, else fitted to the model, as its
+    // snapshot is drawn.
+    vp.camera = Some(bcf::camera_of(&app.view_camera(doc, view).unwrap_or_else(|| app.fitting_camera(doc))));
     let guid = |id: &ElementId| store.get(*id).map(|e| e.guid().to_string());
     vp.guid = Some(uuid::Uuid::new_v4().to_string());
     vp.selection = open.selection.iter().filter_map(guid).collect();

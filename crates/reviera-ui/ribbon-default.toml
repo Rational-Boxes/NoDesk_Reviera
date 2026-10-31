@@ -775,6 +775,13 @@ icon = "bcf_import"
 help = "Open a BCF viewpoint (.bcfv) in the 3D view: its camera, cut, hidden or isolated elements and selection (COL-BCF-003)"
 
 [[action]]
+id = "ui.pane.issues"
+toggle = true
+label = "Issues"
+icon = "clash"
+help = "The model's issues, docked: for a model on FileEngine, the ones people raised on it there (in its 3D viewer or here), read when it opens; otherwise its BCF issues. See the snapshot and comments, Show the viewpoint, reply, resolve, or raise a new issue from the 3D view (COL-BCF-004, COL-FE-009)"
+
+[[action]]
 id = "ui.pane.clash"
 toggle = true
 label = "Clash Detection"
@@ -4020,6 +4027,7 @@ tools = [
   { action = "geometry.remove_boolean", size = "small" },
   { action = "view.set_virtual_volumes", size = "large" },
   { action = "clearance.set_rule_set" },
+  { action = "ui.pane.issues", size = "large" },
   { action = "bcf.create_topic", size = "large" },
   { action = "bcf.list", size = "large" },
   { action = "bcf.import", size = "small" },
@@ -4603,7 +4611,7 @@ items = ["script.run", "script.import", "ui.scripts.manage", "-"]
 label = "&Window"
 items = [
   "view.create_3d", "window.close", "-", "window.next", "window.previous", "-",
-  "window.tile", "window.tab_all", "-", "view.toggle_3d_annotations", "view.annotations_3d", "-", "ui.pane.properties", "ui.pane.browser", "ui.pane.model_tree", "ui.pane.components", "ui.pane.system_browser", "ui.pane.sizing_calculator", "ui.pane.terminal", "-",
+  "window.tile", "window.tab_all", "-", "view.toggle_3d_annotations", "view.annotations_3d", "-", "ui.pane.properties", "ui.pane.browser", "ui.pane.model_tree", "ui.pane.components", "ui.pane.issues", "ui.pane.system_browser", "ui.pane.sizing_calculator", "ui.pane.terminal", "-",
   "ui.fullscreen.toggle", "ui.focus_mode.toggle", "ui.radial.toggle",
 ]
 

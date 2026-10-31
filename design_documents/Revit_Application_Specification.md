@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Reviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Reviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 836 numbered requirements (320 P0 · 312 P1 · 197 P2 · 7 P3), 2,238 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 837 numbered requirements (320 P0 · 313 P1 · 197 P2 · 7 P3), 2,244 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,238 commands; 836 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,244 commands; 837 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -26162,7 +26162,7 @@ The MCP tool for `bimserver.login` never accepts a password from an agent; it ca
 
 ## 6.2a FileEngine models
 
-FileEngine (Proxima File Vault) is a versioned document store with a REST door. Reviera keeps models there as files: every save is a new version, and FileEngine decides who may read and write. COL-FE-001…005 are phase 1 of `FILEENGINE_INTEGRATION.md` (§4–5): connections, browsing, open, save and versions. COL-FE-006…008 add material documentation folders, product data read from their documents by FileEngine's headless extraction (§7, §7c), and publishing reports (§7a, in part). Publish sets, share links, BCF and Component Libraries come in later phases. Reviera talks to FileEngine (AGPL-3.0) over HTTP only; its client `clients/fileengine` is MIT.
+FileEngine (Proxima File Vault) is a versioned document store with a REST door. Reviera keeps models there as files: every save is a new version, and FileEngine decides who may read and write. COL-FE-001…005 are phase 1 of `FILEENGINE_INTEGRATION.md` (§4–5): connections, browsing, open, save and versions. COL-FE-006…009 add material documentation folders, product data read from their documents by FileEngine's headless extraction (§7, §7c), publishing reports (§7a, in part), and the model's issues from FileEngine's discussion service (§6, its second door). Publish sets, share links, BCF-API and Component Libraries come in later phases. Reviera talks to FileEngine (AGPL-3.0) over HTTP only; its client `clients/fileengine` is MIT.
 
 ### Connections and sign-in
 **ID:** COL-FE-001 · **Priority:** P1 · **Ref:** FILEENGINE_INTEGRATION §4, §8
@@ -26312,6 +26312,27 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 - [x] Against the fake server, an EPD and an HPD extraction applied to a material give it its EPD number, GWP, HPD identifier and expiry dates with their sources, in one undo step; undo removes them.
 - [x] An EPD declared per 1,000 ft² becomes a carbon factor per m² (126 kg CO₂e per 1,000 ft² → 1.356 kg CO₂e/m²).
 - [x] Live (when the environment names a server): the EPD and HPD of a public example product, uploaded to the test folder, give the values printed in them.
+
+### Issues on a FileEngine model
+**ID:** COL-FE-009 · **Priority:** P1 · **Ref:** FILEENGINE_INTEGRATION §6
+
+**Purpose.** Opening a model from FileEngine brings its coordination with it: the issues people raised on it in FileEngine's 3D viewer, or in Reviera, shown at once and answered from Reviera.
+
+**Behaviour & rules.**
+- **Reading.** `fileengine.open` reads the model's discussion threads (`GET /discuss/files/{uid}/threads`) and returns its open issue count; `fileengine.issues` lists them, open first. Each issue has its title (the thread's, else its first comment's first line without leading @mentions), status, who opened and resolved it, the version it was raised on, its comments, its viewpoint, the elements it is about (`object_refs` and the selection), its measurements and whether it has a snapshot (`fileengine.issue_snapshot`).
+- **Viewpoints.** A `model-viewpoint` anchor holds a BCF-API-shaped viewpoint (`bcf::from_json`, `to_json`). FileEngine's viewer writes `fileengine.anchor.v1` planes with the direction pointing to the side kept, the reverse of BCF. Reviera turns them round on reading and writing, so a cut looks the same in both.
+- **Not in the model.** The issues stay on the server. The last answer is kept beside the working copy (`issues.json`) for reading offline (`offline: true`). Reading them never changes the model, and they are never uploaded inside it.
+- **Answering.**
+  - `fileengine.show_issue` shows an issue's viewpoint in a 3D view, as `bcf.apply_viewpoint` does, with the elements it is about selected.
+  - `fileengine.comment_issue` adds a comment.
+  - `fileengine.resolve_issue` resolves the issue on the version open (or reopens it).
+  - `fileengine.new_issue` raises an issue from a 3D view: its camera (as navigated, else saved, else fitted to the model), cut, hidden or isolated elements, selection and snapshot, on the version open.
+- **The Issues pane** (COL-BCF-004), docked at the bottom, opens when a FileEngine model with issues opens. It lists the issues, with the chosen one's snapshot and comments, and offers Show, Reply…, Resolve/Reopen, New Issue… and Refresh. For a model not on FileEngine, it shows the model's own BCF topics. It follows the active model.
+- **Crash recovery.** Opening a model whose working copy holds unsaved work from a session that ended unexpectedly offers to restore it, or to discard it and open the model from the server. Nothing is downloaded over it first.
+
+**Acceptance criteria.**
+- [x] Against the fake server, an issue raised in the viewer is read on open (the model unchanged), shown with its element selected, replied to, resolved on the open version and reopened. One raised from a 3D view reaches the server with a camera, its turned planes and its element. The issues read offline from the copy.
+- [x] Live (read-only): AC20-FZK-Haus's two issues are read, and showing one applies its camera, slice and hidden elements with all its elements found.
 
 ### Publishing files and the material documentation report
 **ID:** COL-FE-008 · **Priority:** P2 · **Ref:** FILEENGINE_INTEGRATION §7a
@@ -27297,6 +27318,8 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 
 *Built (2026-10-26), topics and archives:* topics are kept with the model as RXD objects (`rxd:coordination/issues/<topic guid>`, one per topic; a topic's comments and viewpoints inside it), so they save, reopen and undo with the model. `bcf.create_topic` (from the active 3D view's viewpoint and the selection or `element_ids`; type Issue and status Open unless given), `bcf.update_topic` (recording the modification date and author), `bcf.add_comment` (optionally on one of its viewpoints), `bcf.add_viewpoint`, `bcf.apply_viewpoint` (COL-BCF-003), `bcf.delete_topic`, `bcf.list` (filters: status, type, priority, assignee, label, text) and `bcf.get`; beneath them `bcf.put_topic`, `bcf.put_viewpoint` and `bcf.merge_topics`. `bcf.export` writes a `.bcf` archive in BCF 3.0 (bcf.version, extensions.xml with the project's lists, per topic markup.bcf and `<guid>.bcfv`) or 2.1 (comments and viewpoints beside the topic, no aspect ratio); `bcf.import` reads either and merges by topic GUID: the fields of whichever changed last, comments and viewpoints joined by GUID (a comment changed later is taken). Exports validate against buildingSMART's BCF 3.0 and 2.1 XSDs. Authors are given or the system's user name (no user identity yet, UI-IDENT-001); the lists (`bcf.lists`) are Reviera's defaults and every value in use. View › Coordination › New Issue, Issues (a dialog: Show, Edit, Comment, Add View, Delete), Import BCF and Export BCF, also in the File menu. *(Owner, 2026-10-26: "commit and push work, continue feature development".)* *Built (2026-10-26), snapshots:* New Issue and Add View render the 3D view as it shows (camera, section box and slices, temporary hide and isolate; 1024 × 768 PNG, offscreen) and keep the picture with the model as its own RXD object per viewpoint (`rxd:coordination/snapshots/<viewpoint guid>`, at most 4 MB), in the same step as the topic or viewpoint; deleting a topic deletes its snapshots. Exports write each beside its viewpoint (`<guid>.png`, the markup's `Snapshot`); imports keep a file's PNG or JPEG snapshots for viewpoints that have none. `bcf.snapshot(viewpoint_id)` returns one (base64). Not yet: issues from clash results and review items, document references and project.bcfp, the lists as edited extensions, the docked Issues pane with filters (COL-BCF-004), BIMserver merge (third criterion), BCF API (COL-BCF-002).
 
+*Built (2026-10-31), the docked Issues pane (COL-BCF-004, in part):* Window › Issues and View › Coordination › Issues show a pane docked at the bottom: the issues with status, author, date and replies; the chosen one's snapshot and comments; Show, Reply…, Resolve/Reopen, New Issue… and Refresh. A FileEngine model's issues come from the server (COL-FE-009), and other models show their BCF topics. Not yet: the filters, editing fields in the pane, several viewpoints per issue.
+
 *Built (2026-10-26), topics and archives:* topics are kept with the model as RXD objects (`rxd:coordination/issues/<topic guid>`, one per topic; a topic's comments and viewpoints inside it), so they save, reopen and undo with the model. `bcf.create_topic` (from the active 3D view's viewpoint and the selection or `element_ids`; type Issue and status Open unless given), `bcf.update_topic` (recording the modification date and author), `bcf.add_comment` (optionally on one of its viewpoints), `bcf.add_viewpoint`, `bcf.apply_viewpoint` (COL-BCF-003), `bcf.delete_topic`, `bcf.list` (filters: status, type, priority, assignee, label, text) and `bcf.get`; beneath them `bcf.put_topic`, `bcf.put_viewpoint` and `bcf.merge_topics`. `bcf.export` writes a `.bcf` archive in BCF 3.0 (bcf.version, extensions.xml with the project's lists, per topic markup.bcf and `<guid>.bcfv`) or 2.1 (comments and viewpoints beside the topic, no aspect ratio); `bcf.import` reads either and merges by topic GUID: the fields of whichever changed last, comments and viewpoints joined by GUID (a comment changed later is taken). Exports validate against buildingSMART's BCF 3.0 and 2.1 XSDs. The authors are given or the system's user name (no user identity yet, UI-IDENT-001); the lists (`bcf.lists`) are Reviera's defaults and every value in use. View › Coordination › New Issue, Issues (a dialog: Show, Edit, Comment, Add View, Delete), Import BCF and Export BCF, also in the File menu. *(Owner, 2026-10-26: \"commit and push work, continue feature development\".)* Not yet: snapshots (named on import, not kept), issues from clash results and review items, document references and project.bcfp, the lists as edited extensions, the docked Issues pane with filters (COL-BCF-004), BIMserver merge (third criterion), BCF API (COL-BCF-002).
 
 ### BCF issues pane
@@ -27732,6 +27755,12 @@ Every command below is registered once and is available from the UI, Lua and MCP
 | `fileengine.save_as` | document_id?, connection_id, folder_uid, name, replace?, comment? | uploaded | No | COL-FE-003 |
 | `fileengine.versions` | document_id? \| connection_id + uid | version[] | No (query) | COL-FE-004 |
 | `fileengine.restore_version` | document_id? \| connection_id + uid, version | {restored, version, document_id?} | No | COL-FE-004 |
+| `fileengine.issues` | document_id?, refresh? | {issues[], open, offline, version} | No (query) | COL-FE-009 |
+| `fileengine.issue_snapshot` | document_id?, thread_id | png? | No (query) | COL-FE-009 |
+| `fileengine.show_issue` | document_id?, thread_id, target_view_id? | applied | Yes | COL-FE-009 |
+| `fileengine.comment_issue` | document_id?, thread_id, text | issue | No | COL-FE-009 |
+| `fileengine.resolve_issue` | document_id?, thread_id, resolved | issue | No | COL-FE-009 |
+| `fileengine.new_issue` | document_id?, text, title?, view_id? | issue | No | COL-FE-009 |
 | `docs.link` | material, connection_id, folder_uid | link | Yes | COL-FE-006 |
 | `docs.unlink` | material, forget_values? | () | Yes | COL-FE-006 |
 | `docs.set_link` | material, link? | () | Yes | COL-FE-006 |
@@ -28394,9 +28423,9 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 28 | 0 | 29 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
-| COL | 8 | 49 | 10 | 1 | 68 |
+| COL | 8 | 50 | 10 | 1 | 69 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **312** | **197** | **7** | **836** |
+| **Total** | **320** | **313** | **197** | **7** | **837** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -28451,7 +28480,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.2a Reviera-originated features
 
-128 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
+129 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
 
 | Requirement | Ch | Feature |
 |-------------|----|---------|
@@ -28575,6 +28604,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | COL-FE-005 | 6 | Model metadata |
 | COL-FE-006 | 6 | Material documentation folders |
 | COL-FE-007 | 6 | Product data from documents |
+| COL-FE-009 | 6 | Issues on a FileEngine model |
 | COL-FE-008 | 6 | Publishing files and the material documentation report |
 | COL-MRG-001 | 6 | Three-way merge by GlobalId and RXD id |
 | COL-OWN-002 | 6 | Live ownership document and sync lock |
@@ -28586,7 +28616,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2238 unique commands** in 424 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2244 unique commands** in 424 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -28735,7 +28765,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `fascia` | 1 |
 | `fastener_pattern` | 2 |
 | `file` | 15 |
-| `fileengine` | 15 |
+| `fileengine` | 21 |
 | `fill_pattern` | 5 |
 | `fillpattern` | 4 |
 | `filter` | 7 |
@@ -29755,15 +29785,21 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `file.save_as` | 2 | document_id? (default: active), path, kind?, format?: ifc\ | ifczip, carrier?: embedded\ | external_file\ | external_dir\ |
 | `file.save_previous_version` | 2 | document_id, path | report | No | DM-MIG-001 |
 | `fileengine.browse` | 6 | connection_id, folder_uid?, path?, models_only? | {folder_uid, folder_name, parent_uid, writable, entries[]} | No (query) | COL-FE-002 |
+| `fileengine.comment_issue` | 6 | document_id?, thread_id, text | issue | No | COL-FE-009 |
 | `fileengine.connect` | 6 | url, name?, tenant?, allow_http? | connection | No | COL-FE-001 |
+| `fileengine.issue_snapshot` | 6 | document_id?, thread_id | png? | No (query) | COL-FE-009 |
+| `fileengine.issues` | 6 | document_id?, refresh? | {issues[], open, offline, version} | No (query) | COL-FE-009 |
 | `fileengine.list_connections` | 6 | — | connection[] | No (query) | COL-FE-001 |
 | `fileengine.make_folder` | 6 | connection_id, parent_uid, name | uid | No | COL-FE-002 |
+| `fileengine.new_issue` | 6 | document_id?, text, title?, view_id? | issue | No | COL-FE-009 |
 | `fileengine.open` | 6 | connection_id, uid, version?, read_only? | {document_id, working_copy, link, existing, newer_on_server} | No | COL-FE-002 |
 | `fileengine.publish` | 6 | connection_id, folder_uid, path, name?, replace?, metadata? | {uid, name, version, replaced} | No | COL-FE-008 |
 | `fileengine.remove` | 6 | connection_id | () | No | COL-FE-001 |
+| `fileengine.resolve_issue` | 6 | document_id?, thread_id, resolved | issue | No | COL-FE-009 |
 | `fileengine.restore_version` | 6 | document_id? \ | connection_id + uid, version | {restored, version, document_id?} | No |
 | `fileengine.save` | 6 | document_id?, on_conflict?, comment? | uploaded | No | COL-FE-003 |
 | `fileengine.save_as` | 6 | document_id?, connection_id, folder_uid, name, replace?, comment? | uploaded | No | COL-FE-003 |
+| `fileengine.show_issue` | 6 | document_id?, thread_id, target_view_id? | applied | Yes | COL-FE-009 |
 | `fileengine.sign_in` | 6 | connection_id, key?, secret?, remember? | identity | No | COL-FE-001 |
 | `fileengine.sign_out` | 6 | connection_id, forget? | () | No | COL-FE-001 |
 | `fileengine.status` | 6 | document_id? | {linked, link?, connected} | No (query) | COL-FE-002 |

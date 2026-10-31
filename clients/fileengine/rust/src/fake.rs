@@ -44,6 +44,8 @@ struct State {
     log: Vec<String>,
     /// Extractions answered, by file, version and schema (the "cache").
     extractions: BTreeSet<String>,
+    /// Discussion threads on files.
+    threads: Vec<Value>,
 }
 
 impl State {
@@ -301,10 +303,65 @@ fn answer_csai(st: &mut State, method: &str, seg: &[&str], body: &Value) -> Answ
     }
 }
 
+/// The discussion service's threads, faked: listing a file's threads, opening one, commenting,
+/// and resolving or reopening.
+fn answer_discuss(st: &mut State, method: &str, seg: &[&str], body: &Value, user: &str) -> Answer {
+    st.clock += 1;
+    let now = format!("2026-10-30T12:{:02}:{:02}+00:00", (st.clock / 60) % 60, st.clock % 60);
+    match (method, seg) {
+        ("GET", ["files", uid, "threads"]) => {
+            if st.live(uid).is_none() {
+                return err(404, "File does not exist");
+            }
+            ok(json!({ "threads": st.threads.iter().filter(|t| t["file_uid"] == *uid).collect::<Vec<_>>() }))
+        }
+        ("POST", ["files", uid, "threads"]) => {
+            if st.live(uid).is_none() {
+                return err(404, "File does not exist");
+            }
+            let text = body["body"].as_str().unwrap_or_default();
+            if text.trim().is_empty() {
+                return err(422, "body is required");
+            }
+            st.next += 1;
+            let id = format!("{:032x}", st.next);
+            st.next += 1;
+            let comment = json!({ "id": format!("{:032x}", st.next), "thread_id": id, "author": user, "body": text, "created_at": now, "deleted": false, "redacted": false });
+            let t = json!({ "id": id, "file_uid": uid, "version": body["version"], "title": body["title"].as_str().unwrap_or_default(), "status": "open",
+                "resolved_by": null, "opened_by": user, "created_at": now, "updated_at": now, "anchor_stale": false, "anchor": body["anchor"], "comments": [comment] });
+            st.threads.push(t.clone());
+            ok(t)
+        }
+        ("POST", ["threads", id, "comments"]) => {
+            st.next += 1;
+            let cid = format!("{:032x}", st.next);
+            let Some(t) = st.threads.iter_mut().find(|t| t["id"] == *id) else { return err(404, "thread not found") };
+            let c = json!({ "id": cid, "thread_id": id, "author": user, "body": body["body"], "created_at": now, "deleted": false, "redacted": false });
+            t["comments"].as_array_mut().expect("comments").push(c.clone());
+            t["updated_at"] = json!(now);
+            ok(c)
+        }
+        ("PATCH", ["threads", id]) => {
+            let status = body["status"].as_str().unwrap_or_default();
+            if !matches!(status, "open" | "resolved") {
+                return err(422, "status must be 'open' or 'resolved'");
+            }
+            let Some(t) = st.threads.iter_mut().find(|t| t["id"] == *id) else { return err(404, "thread not found") };
+            t["status"] = json!(status);
+            t["resolved_by"] = if status == "resolved" { json!(user) } else { Value::Null };
+            t["resolved_version"] = if status == "resolved" { body["resolved_version"].clone() } else { Value::Null };
+            t["updated_at"] = json!(now);
+            ok(t.clone())
+        }
+        _ => err(404, "Not Found"),
+    }
+}
+
 fn answer(st: &mut State, req: &Request) -> Answer {
-    let (csai, route) = match (req.path.strip_prefix("/api/v1/"), req.path.strip_prefix("/csai/v1/")) {
-        (Some(r), _) => (false, r),
-        (None, Some(r)) => (true, r),
+    let (door, route) = match (req.path.strip_prefix("/api/v1/"), req.path.strip_prefix("/csai/v1/"), req.path.strip_prefix("/discuss/")) {
+        (Some(r), _, _) => ("api", r),
+        (None, Some(r), _) => ("csai", r),
+        (None, None, Some(r)) => ("discuss", r),
         _ => return err(404, "not found"),
     };
     let seg: Vec<String> = route.split('/').map(unpercent).collect();
@@ -337,10 +394,12 @@ fn answer(st: &mut State, req: &Request) -> Answer {
     {
         return err(403, "no access to that tenant");
     }
-    if csai {
-        return answer_csai(st, &req.method, &seg, &body);
-    }
     let user = st.user.clone();
+    match door {
+        "csai" => return answer_csai(st, &req.method, &seg, &body),
+        "discuss" => return answer_discuss(st, &req.method, &seg, &body, &user),
+        _ => {}
+    }
     let result = |r: Result<(), (u16, String)>| r.map_or_else(|(s, m)| err(s, &m), |()| done());
     match (req.method.as_str(), seg.as_slice()) {
         ("DELETE", ["auth", "token"]) => {
@@ -552,6 +611,16 @@ impl Fake {
     /// A node's metadata.
     pub fn metadata(&self, uid: &str) -> BTreeMap<String, String> {
         self.state.lock().unwrap().nodes.get(uid).map(|e| e.metadata.clone()).unwrap_or_default()
+    }
+
+    /// Someone raises a thread (an issue) on a file, as FileEngine's viewer does.
+    pub fn add_thread(&self, thread: Value) {
+        self.state.lock().unwrap().threads.push(thread);
+    }
+
+    /// The discussion threads, as the server holds them.
+    pub fn threads(&self) -> Vec<Value> {
+        self.state.lock().unwrap().threads.clone()
     }
 
     /// The requests answered so far (`GET /v1/whoami` …), and forgets them.

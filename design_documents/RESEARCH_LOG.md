@@ -181,6 +181,23 @@ Any source that fails this test is rejected. Rejections are noted in the session
 
 ---
 
+### 2026-10-31 — FileEngine model issues: API verification (no new research)
+
+- **Purpose:** read the issues people raise on a model in FileEngine's 3D viewer, and answer them from Reviera (COL-FE-009).
+- **Method:**
+  - Read, for the interface only, the owner's discussion service routes (threads, comments, status) and the BCF-API subservice README, and found where the owner's web viewer reads and writes its viewpoint anchors.
+  - Live calls with the owner's credential:
+    - read-only on AC20-FZK-Haus (*Engineering › Projects › Westburough Neighborhood*): `GET /discuss/files/{uid}/threads` and `/discuss/whoami`;
+    - `GET /bcf/versions` and `/bcf/2.1/projects` (BCF-API 2.1 is deployed, with no projects yet);
+    - writes only on a model saved in *Engineering › Reviera test*: a new thread with an anchor, a comment, resolve.
+- **Findings:**
+  - Model issues are discussion threads with a `model-viewpoint` anchor (`fileengine.anchor.v1`). Its `viewpoint` follows BCF-API's JSON shape, with a PNG snapshot as a data URL, plus `object_refs` and `measurements`.
+  - The viewer writes a clipping plane's direction pointing to the side kept, the reverse of BCF's convention, where it points to the side clipped away. This was confirmed against the issue's snapshot and BCF's documentation.
+  - BCF's rule was confirmed by web search (the BCF viewpoint documentation of ThatOpen and of xeokit); no text was copied.
+- **Clean-room:** no FileEngine implementation code was copied; Reviera talks to the services over HTTP only. No new sources.
+
+---
+
 ## 5. Source Register
 
 The full register is in **`SOURCE_REGISTER.md` §A**. It had 577 sources at first (1,250 after Session 4 and its follow-ups), each with an ID, area, type, URL, HTTP status and public-availability verdict. It was generated from the research files' Sources sections on 2026-10-12, and every URL was re-checked with an unauthenticated request.

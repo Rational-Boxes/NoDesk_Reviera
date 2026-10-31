@@ -360,7 +360,7 @@ fn about_picture() -> Option<Bitmap> {
 }
 
 /// A PNG's pixels as RGBA, with its width and height.
-fn decode_png(bytes: &[u8]) -> Option<(Vec<u8>, u32, u32)> {
+pub(crate) fn decode_png(bytes: &[u8]) -> Option<(Vec<u8>, u32, u32)> {
     let mut decoder = png::Decoder::new(std::io::Cursor::new(bytes));
     decoder.set_transformations(png::Transformations::normalize_to_color8());
     let mut reader = decoder.read_info().ok()?;

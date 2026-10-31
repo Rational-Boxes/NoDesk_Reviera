@@ -661,6 +661,9 @@ pub struct OpenOut {
     pub existing: bool,
     /// The server has a newer version than the working copy's.
     pub newer_on_server: bool,
+    /// The model's open issues on FileEngine (COL-FE-009; `fileengine.issues` lists them), when
+    /// they could be read.
+    pub issues: Option<usize>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -697,7 +700,16 @@ pub(crate) fn open(app: &mut App, conn: &str, uid: &str, version: Option<&str>, 
             None => app.open(&working, false)?,
         };
         let newer = node.version != l.version;
-        return Ok(OpenOut { document_id: id, working_copy: working, link: l, existing: true, newer_on_server: newer });
+        let issues = crate::model_issues::list(app, Some(id), true).ok().map(|i| i.open);
+        return Ok(OpenOut { document_id: id, working_copy: working, link: l, existing: true, newer_on_server: newer, issues });
+    }
+    // Work left by a session that ended unexpectedly is offered back before anything is
+    // downloaded over it (`recovery.restore` or `recovery.discard`, then open again).
+    if working.is_file() && app.document_at(&working).is_none() {
+        let key = reviera_livestore::store_key(&working);
+        if app.recoverable().unwrap_or_default().iter().any(|r| r.key == key) {
+            return Err(bad("recovery.pending", format!("{} has unsaved work from a session that ended unexpectedly", node.name)).with_details(serde_json::json!({ "store_key": key, "working_copy": working })));
+        }
     }
     if let Some(id) = app.document_at(&working) {
         if app.get(id)?.is_dirty() {
@@ -728,7 +740,9 @@ pub(crate) fn open(app: &mut App, conn: &str, uid: &str, version: Option<&str>, 
     };
     write_link(&folder, &link)?;
     let id = app.open(&working, read_only || link.read_only)?;
-    Ok(OpenOut { document_id: id, working_copy: working, existing: false, newer_on_server: historic && version != Some(node.version.as_str()), link })
+    // The issues people raised on it, read now so they show at once and can be read offline.
+    let issues = crate::model_issues::list(app, Some(id), true).ok().map(|i| i.open);
+    Ok(OpenOut { document_id: id, working_copy: working, existing: false, newer_on_server: historic && version != Some(node.version.as_str()), link, issues })
 }
 
 host!(FeOpen, "fileengine.open", "Open a model from FileEngine",

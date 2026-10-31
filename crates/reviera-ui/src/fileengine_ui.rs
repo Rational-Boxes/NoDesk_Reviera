@@ -440,7 +440,30 @@ impl Gui {
     fn fileengine_open_model(&mut self, args: Value, name: &str) -> bool {
         let frame = self.frame;
         frame.set_status_text("Downloading from FileEngine…", 0);
-        let r = self.run("fileengine.open", args);
+        let mut r = self.run("fileengine.open", args.clone());
+        // Unsaved work from a session that ended unexpectedly: restore it, or discard it and
+        // download the model again.
+        if r.as_ref().is_err_and(|e| e.starts_with("recovery.pending")) {
+            let key = match self.app.execute("fileengine.open", args.clone(), &super::user()) {
+                Err(e) => e.details["store_key"].as_str().unwrap_or_default().to_owned(),
+                Ok(_) => String::new(),
+            };
+            let restore = MessageDialog::builder(&frame, &format!("{name} has unsaved work from a session that ended unexpectedly.\n\nRestore it? (No discards it and opens the model from FileEngine.)"), "Open From FileEngine")
+                .with_style(MessageDialogStyle::YesNo | MessageDialogStyle::IconQuestion)
+                .build()
+                .show_modal()
+                == ID_YES;
+            r = if restore {
+                self.run("recovery.restore", json!({ "store_key": key })).and_then(|o| {
+                    let doc = o["model_id"].clone();
+                    let issues = self.run("fileengine.issues", json!({ "document_id": doc })).ok().map(|i| i["open"].clone());
+                    Ok(json!({ "document_id": doc, "existing": true, "link": {}, "issues": issues }))
+                })
+            } else {
+                let _ = self.run("recovery.discard", json!({ "store_key": key }));
+                self.run("fileengine.open", args)
+            };
+        }
         frame.set_status_text("", 0);
         self.drop_closed_tabs();
         match r {
@@ -459,6 +482,11 @@ impl Gui {
                     (false, false) => format!("Opened {name} (version {}).", stamp(o["link"]["version"].as_str().unwrap_or(""))),
                 };
                 frame.set_status_text(&msg, 0);
+                // Its issues on FileEngine: the pane opens when there are any.
+                match o["issues"].as_u64() {
+                    Some(n) if n > 0 => self.show_issues_pane(),
+                    _ => self.refresh_issues(false),
+                }
                 true
             }
             Err(e) => {
