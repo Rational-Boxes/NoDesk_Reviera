@@ -97,6 +97,10 @@ ribbon's tools, the command shell, Lua and MCP alike.
   (containment, voids and fills, path connections, interferences), so other tools see them.
   Reviera's own data (recipes, sketches, views, settings) is embedded as standard `Reviera_*`
   property sets (RXD), and Reviera reopens its elements as editable.
+- **Colours other viewers show.** Saving gives geometry that has no style the colour Reviera
+  draws its class in (walls off-white, floors grey, roofs terracotta, doors wood, glass
+  translucent, pipes blue, …), as shared `IfcSurfaceStyle`s, so xeokit and other viewers no
+  longer show a model white on white. Styles from other tools or materials are kept as they are.
 - **Element identity** (GlobalIds and stable internal IDs) survives save and reopen.
 - **Transactions, undo and redo** through one command registry: every change is a transaction,
   undo groups bundle multi-step tools and scripts, and the history lists who did what (user,

@@ -4660,12 +4660,14 @@ This chapter is the backbone of the Reviera specification. It defines what a Rev
 - **Plan-symbolic geometry** of types (door swings, plan-only symbols) shall be written in the `Plan` context `Annotation` sub-context as `IfcAnnotationFillArea`/`IfcPolyline`/`IfcIndexedPolyCurve` on the type's `RepresentationMaps`. This is building content that IFC can express, so it stays in IFC. The visibility rules that choose *which* symbolic geometry to show are in the family definition (RXD).
 - **Detail-level variants** (Coarse/Medium/Fine) are a Reviera concept. The **Fine** body is written to the `Body` sub-context. Coarse and Medium bodies, where they differ, are written as additional `IfcShapeRepresentation`s with `RepresentationIdentifier = 'Body'` in **additional sub-contexts** named `Body-Coarse` / `Body-Medium` (target view `MODEL_VIEW`). This keeps all geometry in IFC. Reviera reads them back by sub-context name.
 - **Styling.** Surface styles come from materials (§2.10.5) through the material's `IfcMaterialDefinitionRepresentation`, or through `IfcStyledItem` on body items.
+- **Default styles** (owner request, 2026-10-31: viewers such as xeokit show unstyled geometry white on white). On save, every body item of a product or type that has no `IfcStyledItem` gets one. Its colour and transparency are the ones Reviera's own views give its class (`reviera_core::display_colors`): walls warm off-white, slabs grey, roofs terracotta, doors wood, structure steel grey, spaces translucent green, pipes blue, ducts galvanised, sanitary ware white. A window's frame is solid and its glass translucent, and a door's glass and metal parts have their own colours. One shared `IfcSurfaceStyle` (`IfcSurfaceStyleShading`, with `Transparency` below full opacity) is written per colour, named `Reviera default: <class>`. The styled items are named `Reviera default`, so a later save recognises its own and removes them when their item is gone. Styles written by other tools or from materials are never changed, and openings get none.
 - **Precision.** `IfcGeometricRepresentationContext.Precision` = 1e-5 m. OCCT tolerances are set from it (§2.6.5).
 
 **Acceptance criteria.**
 - [ ] A straight wall without cuts is written as `IfcExtrudedAreaSolid`, not as a B-rep.
 - [ ] A family with Coarse/Fine variants round-trips both variants.
 - [ ] A third-party viewer that does not understand the extra sub-contexts displays the Fine body only.
+- [x] Saved, a wall, a floor and a window each have a default style: the window's frame opaque and its glass translucent. Saving again adds no styles or styled items, and the file validates with IfcOpenShell.
 
 ### 2.3.11 Phases, design options and worksets (storage)
 **ID:** DM-IFC-011 · **Priority:** P1 · **Ref:** research/05 §2.4; TECH_STACK §3.1, §3.7.2

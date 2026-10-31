@@ -25,6 +25,7 @@ mod system_zones;
 mod location;
 mod spatial;
 mod stacked_walls;
+mod styles;
 
 pub use local::{LocalProject, OpenReport, SaveReport};
 

@@ -834,6 +834,8 @@ impl LocalProject {
         // Booleans last: they reshape bodies the writers above made.
         if !touched.is_empty() {
             self.write_csg(doc)?;
+            // Last: colours for whatever the writers above left unstyled.
+            crate::styles::write_default_styles(&mut self.ifc)?;
         }
 
         for id in dirty {
@@ -1222,10 +1224,19 @@ impl LocalProject {
                 x_dir: [1.0, 0.0],
             };
             let solids = p.solids();
+            // Each item's colour: a door's body or a window's frame, or its glass or metal
+            // (`IfcWindow:glass`).
+            let class = if p.kind == inserts::Kind::Door { "IfcDoor" } else { "IfcWindow" };
+            let suffix = |m: inserts::Material| match (p.kind, m) {
+                (inserts::Kind::Window, inserts::Material::Body) => ":frame",
+                _ => m.suffix(),
+            };
             if solids.is_empty() {
-                let boxes: Vec<geometry::LocalBox> =
-                    p.boxes().into_iter().map(|(b, _)| b).collect();
+                let tagged = p.tagged_boxes();
+                let boxes: Vec<geometry::LocalBox> = tagged.iter().map(|(b, _, _)| *b).collect();
                 geometry::write_boxes(&mut self.ifc, step, &frame, &boxes, scale, contexts)?;
+                let classes: Vec<String> = tagged.iter().map(|(_, _, m)| format!("{class}{}", suffix(*m))).collect();
+                crate::styles::style_items(&mut self.ifc, step, &classes)?;
             } else {
                 let profiles: Vec<geometry::ProfileSolid<'_>> = solids
                     .iter()
@@ -1239,6 +1250,8 @@ impl LocalProject {
                     })
                     .collect();
                 geometry::write_profiles(&mut self.ifc, step, &frame, &profiles, scale, contexts)?;
+                let classes: Vec<String> = solids.iter().map(|s| format!("{class}{}", suffix(s.material))).collect();
+                crate::styles::style_items(&mut self.ifc, step, &classes)?;
             }
             geometry::relate_one(
                 &mut self.ifc,

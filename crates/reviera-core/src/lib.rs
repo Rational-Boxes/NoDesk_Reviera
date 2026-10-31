@@ -38,6 +38,7 @@ pub mod csg;
 pub mod curtain;
 pub mod datum_extents;
 pub mod decks;
+pub mod display_colors;
 pub mod document;
 pub mod dormers;
 pub mod enclosures;
