@@ -198,6 +198,20 @@ Any source that fails this test is rejected. Rejections are noted in the session
 
 ---
 
+### 2026-10-31 — Greenhouse pipe-rail heating output (parked)
+
+- **Purpose:** an output figure for 51 mm pipe-rail heating (GLAZED_ENCLOSURES_PLAN phase 2), which ARC-GLZ-014 had none for.
+- **Method:** web search; two bare-steel-pipe heat-loss tables read in place (S0866, S0867); a first-principles check, natural convection from a horizontal cylinder (h ≈ 1.32·(ΔT/D)^0.25 W/m²K) plus grey-body radiation (ε 0.9), which is textbook heat transfer.
+- **Findings:**
+  - The formula reproduces the stated-basis table (S0867: still air, 20 °C, ε 0.9) within 3 % for 48.3 mm pipe at 50 °C and 100 °C.
+  - For a 51 mm rail at a 50 K mean-water excess, it gives about 112 W/m.
+  - The other table (S0866) gives about half as much and states no basis, so it was set aside.
+  - No greenhouse-specific rail rating was found; the manufacturer brochures found (S0868) gave charts that were unreadable in their extracted text.
+- **Status:** parked when the owner moved to bathrooms (2026-10-31). Nothing was built; the formula-based approach is the plan when it resumes.
+- **Clean-room:** reference values only; nothing copied.
+
+---
+
 ## 5. Source Register
 
 The full register is in **`SOURCE_REGISTER.md` §A**. It had 577 sources at first (1,250 after Session 4 and its follow-ups), each with an ID, area, type, URL, HTTP status and public-availability verdict. It was generated from the research files' Sources sections on 2026-10-12, and every URL was re-checked with an unauthenticated request.

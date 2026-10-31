@@ -295,8 +295,9 @@ and the defaults recorded for expert review.
    (ARC-GLZ-013), heating sizing (ARC-GLZ-014) and growing-area schedules (ARC-GLZ-015, built
    2026-10-31). Heating pipes laid round the perimeter and under the benches
    (ARC-GLZ-016) and pad-and-fan cooling (ARC-GLZ-017), both laid in the model (built
-   2026-10-31). Still to do: pipe-rail heating, flow and return headers, and pad in the side
-   walls.*
+   2026-10-31). Still to do: pipe-rail heating (output by convection and radiation from the
+   pipe, about 112 W/m for 51 mm at 50 K; RESEARCH_LOG 2026-10-31), flow and return headers, and
+   pad in the side walls. Set aside by the owner on 2026-10-31 for bathrooms.*
 3. **Sunlight management.** Shading devices on any face (louvres, fins, brise-soleil, baffles,
    light shelves, screens), with the sun-path design aid; their effect in daylight, solar studies
    and loads; operable devices and their control.
