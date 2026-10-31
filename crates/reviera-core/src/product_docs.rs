@@ -2,8 +2,9 @@
 // Copyright (C) 2026 Reviera contributors
 
 //! Product documentation of materials (COL-FE-006, COL-FE-007): each project material may link to
-//! one FileEngine folder of its documents (EPD, HPD, datasheets), and carry values read from
-//! them, each with its source (file, version, extraction run, field). The application reads the
+//! one folder of its documents (EPD, HPD, datasheets), on this computer or on FileEngine, and
+//! carry values read from them or entered by hand, each with its source (file, version,
+//! extraction run, field). The application reads the
 //! documents and runs the extraction; this module keeps what the user accepted, in RXD on the
 //! project (`rxd:product_docs`), and turns an EPD's GWP into an embodied-carbon factor.
 
@@ -28,17 +29,35 @@ fn bad(code: &'static str, msg: impl Into<String>) -> Error {
     Error::new(code, msg)
 }
 
-/// A material's documentation folder on FileEngine.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+/// A material's documentation folder: a folder on this computer (`path`), or one on FileEngine
+/// (`connection_id`, `folder_uid`).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Link {
-    /// The FileEngine connection it was linked through (`fileengine.list_connections`).
+    /// The FileEngine connection it was linked through (`fileengine.list_connections`); empty for
+    /// a local folder.
+    #[serde(default)]
     pub connection_id: String,
     /// The server's address, for other tools and the IFC reference.
     #[serde(default)]
     pub url: String,
+    #[serde(default)]
     pub folder_uid: String,
     #[serde(default)]
     pub folder_name: String,
+    /// A local folder: its path.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    /// A local folder's documents' types (EPD, HPD, …) by file name; FileEngine keeps them as
+    /// each file's `doc.type` metadata.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub types: BTreeMap<String, String>,
+}
+
+impl Link {
+    /// The folder is on this computer.
+    pub fn is_local(&self) -> bool {
+        self.path.as_deref().is_some_and(|p| !p.trim().is_empty())
+    }
 }
 
 /// Where a value came from.
@@ -177,9 +196,10 @@ pub(crate) fn set_link(txn: &mut Transaction<'_>, p: SetLinkParams) -> Result<()
     let m = material_name(&p.material)?;
     let mut d = data(txn.store());
     if let Some(l) = &p.link
+        && !l.is_local()
         && (l.folder_uid.trim().is_empty() || l.connection_id.trim().is_empty())
     {
-        return Err(bad("docs.invalid_input", "a link needs a connection and a folder uid"));
+        return Err(bad("docs.invalid_input", "a link needs a local folder's path, or a FileEngine connection and folder uid"));
     }
     d.materials.entry(m).or_default().link = p.link;
     put(txn, d)
@@ -379,4 +399,26 @@ mod tests {
         assert_eq!(declared_unit("1 MSF").unwrap().0, Unit::M2);
         assert!(declared_unit("1 linear metre").is_err());
     }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ReplaceAllParams {
+    /// The project's whole product documentation (docs.materials' links and values).
+    pub data: ProductDocs,
+}
+
+/// `docs.replace_all`: the project's product documentation replaced in one step (used when local
+/// folders are published to FileEngine and the model is relinked).
+pub(crate) fn replace_all(txn: &mut Transaction<'_>, p: ReplaceAllParams) -> Result<()> {
+    for (name, m) in &p.data.materials {
+        material_name(name)?;
+        if let Some(l) = &m.link
+            && !l.is_local()
+            && (l.folder_uid.trim().is_empty() || l.connection_id.trim().is_empty())
+        {
+            return Err(bad("docs.invalid_input", format!("{name}: a link needs a local folder's path, or a FileEngine connection and folder uid")));
+        }
+    }
+    put(txn, p.data)
 }

@@ -17,6 +17,7 @@ mod crypto;
 pub mod lock;
 mod schema;
 mod time;
+pub use time::iso8601;
 mod writer;
 
 use std::collections::HashMap;

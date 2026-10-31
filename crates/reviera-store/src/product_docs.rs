@@ -72,9 +72,14 @@ pub(crate) fn write_product_docs(ifc: &mut IfcModel, doc: &Document) -> Result<(
         };
         if let Some(l) = &md.link {
             let r = ifc.create("IfcDocumentReference")?;
-            let location = if l.url.is_empty() { format!("fileengine://{}/{}", l.connection_id, l.folder_uid) } else { format!("{}#folder={}", l.url.trim_end_matches('/'), l.folder_uid) };
+            let (location, identification) = match &l.path {
+                // A local folder: a file URI, identified by its path.
+                Some(p) if l.is_local() => (format!("file://{}", p.replace('\\', "/").trim_start_matches('/').split('/').fold(String::new(), |a, c| a + "/" + c)), p.clone()),
+                _ if l.url.is_empty() => (format!("fileengine://{}/{}", l.connection_id, l.folder_uid), l.folder_uid.clone()),
+                _ => (format!("{}#folder={}", l.url.trim_end_matches('/'), l.folder_uid), l.folder_uid.clone()),
+            };
             ifc.set_attribute(r, "Location", &s(&location))?;
-            ifc.set_attribute(r, "Identification", &s(&l.folder_uid))?;
+            ifc.set_attribute(r, "Identification", &s(&identification))?;
             if !l.folder_name.is_empty() {
                 ifc.set_attribute(r, "Name", &s(&l.folder_name))?;
             }

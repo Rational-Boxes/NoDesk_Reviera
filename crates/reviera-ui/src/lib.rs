@@ -2334,6 +2334,11 @@ impl Gui {
         for action in ["view.set_projection", "view.walk"] {
             self.ribbon.enable(action, three_d);
         }
+        // Offered when the project has local-only document collections and FileEngine is set up
+        // (FileEngine is optional: everything works locally without it).
+        let local = self.app.active().is_some() && self.run("docs.local_collections", serde_json::json!({})).ok().and_then(|v| v.as_array().map(|a| !a.is_empty())).unwrap_or(false);
+        let connected = local && self.run("fileengine.list_connections", serde_json::json!({})).ok().and_then(|v| v.as_array().map(|a| !a.is_empty())).unwrap_or(false);
+        self.ribbon.enable("ui.publish_local_documents", local && connected);
     }
 
     fn update_ribbon_context(&mut self) {
@@ -4773,6 +4778,9 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "ui.fileengine_save" => with(gui, Gui::fileengine_save),
         "ui.fileengine_versions" => with(gui, Gui::fileengine_versions),
         "ui.material_documents" => with(gui, Gui::material_documents),
+        "ui.publish_local_documents" => with(gui, |g| {
+            g.publish_local_documents();
+        }),
         "ui.profiler" => with(gui, Gui::profiler_window),
         "mep_type.load_starters" => with(gui, Gui::load_mep_types),
         "mep.place_component" => with(gui, Gui::place_mep_component),

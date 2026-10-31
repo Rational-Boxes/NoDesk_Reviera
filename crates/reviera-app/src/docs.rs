@@ -139,22 +139,40 @@ fn link_of(app: &App, material: &str) -> Result<Link> {
 pub struct LinkParams {
     /// The material, as its layers name it (docs.materials lists them).
     pub material: String,
-    pub connection_id: String,
-    pub folder_uid: String,
+    /// A folder on this computer…
+    pub path: Option<std::path::PathBuf>,
+    /// …or a FileEngine folder.
+    pub connection_id: Option<String>,
+    pub folder_uid: Option<String>,
 }
 
 host!(DocsLink, "docs.link", "Link a material to its documentation folder",
-    "Links a project material to one FileEngine folder of its product documents (COL-FE-006), by the folder's \
-     uid, which survives renames and moves. The model keeps the connection, the server's address and the \
-     folder's name too, and exports the link as an IfcDocumentReference on the IfcMaterial. One undo step. \
-     Returns the link.",
+    "Links a project material to one folder of its product documents (COL-FE-006): a folder on this computer \
+     (`path`), or a FileEngine folder (`connection_id`, `folder_uid`, kept by its uid, which survives renames \
+     and moves). The model keeps the folder's name and where it is, and exports the link as an \
+     IfcDocumentReference on the IfcMaterial (a file:// address for a local folder). A local folder's \
+     document types are kept in the model. One undo step. Returns the link.",
     [Network, Edit], LinkParams, Link, |app, caller, p| {
-    let url = app.fileengine.profile_url(&p.connection_id)?;
-    let folder = app.fileengine.with(&p.connection_id, |c| c.stat(&p.folder_uid))?;
-    if !folder.is_dir() {
-        return Err(bad("docs.invalid_input", format!("{} is a file, not a folder", folder.name)));
-    }
-    let link = Link { connection_id: p.connection_id, url, folder_uid: folder.uid, folder_name: folder.name };
+    let link = match (&p.path, &p.connection_id, &p.folder_uid) {
+        (Some(path), None, None) => {
+            let dir = std::fs::canonicalize(path).map_err(|e| bad("docs.no_folder", format!("{}: {e}", path.display())))?;
+            if !dir.is_dir() {
+                return Err(bad("docs.no_folder", format!("{} is not a folder", dir.display())));
+            }
+            // The types already set, kept when linking the same folder again.
+            let types = link_of(app, &p.material).ok().filter(|l| l.path.as_deref() == Some(&*dir.to_string_lossy())).map(|l| l.types).unwrap_or_default();
+            Link { folder_name: dir.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(), path: Some(dir.to_string_lossy().into_owned()), types, ..Link::default() }
+        }
+        (None, Some(conn), Some(uid)) => {
+            let url = app.fileengine.profile_url(conn)?;
+            let folder = app.fileengine.with(conn, |c| c.stat(uid))?;
+            if !folder.is_dir() {
+                return Err(bad("docs.invalid_input", format!("{} is a file, not a folder", folder.name)));
+            }
+            Link { connection_id: conn.clone(), url, folder_uid: folder.uid, folder_name: folder.name, ..Link::default() }
+        }
+        _ => return Err(bad("docs.invalid_input", "give a local folder's path, or a FileEngine connection_id and folder_uid")),
+    };
     app.execute("docs.set_link", json!({ "material": p.material, "link": link }), caller)?;
     Ok(link)
 });
@@ -182,12 +200,41 @@ pub struct ListParams {
     pub folder_uid: Option<String>,
 }
 
-fn folder_of(app: &App, material: Option<&str>, connection_id: Option<&str>, folder_uid: Option<&str>) -> Result<(String, String)> {
+fn folder_of(app: &App, material: Option<&str>, connection_id: Option<&str>, folder_uid: Option<&str>) -> Result<Link> {
     match (material, connection_id, folder_uid) {
-        (Some(m), None, None) => link_of(app, m).map(|l| (l.connection_id, l.folder_uid)),
-        (None, Some(c), Some(f)) => Ok((c.to_owned(), f.to_owned())),
+        (Some(m), None, None) => link_of(app, m),
+        (None, Some(c), Some(f)) => Ok(Link { connection_id: c.to_owned(), folder_uid: f.to_owned(), ..Link::default() }),
         _ => Err(bad("docs.invalid_input", "give a linked material, or a connection_id and a folder_uid")),
     }
+}
+
+/// A local folder's documents: its files (not hidden ones, not subfolders), their types as the
+/// link keeps them, the time they changed as their version.
+fn local_documents(link: &Link) -> Result<Vec<DocumentOut>> {
+    let dir = link.path.clone().unwrap_or_default();
+    let mut out = Vec::new();
+    for e in std::fs::read_dir(&dir).map_err(|e| bad("docs.no_folder", format!("{dir}: {e}")))?.flatten() {
+        let name = e.file_name().to_string_lossy().into_owned();
+        let Ok(meta) = e.metadata() else { continue };
+        if name.starts_with('.') || !meta.is_file() {
+            continue;
+        }
+        let mtime = meta.modified().unwrap_or(std::time::UNIX_EPOCH);
+        let modified = mtime.duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs() as i64);
+        // The file's modified time in FileEngine's version form, 20261031_142233.000.
+        let version: String = reviera_livestore::iso8601(mtime).chars().filter_map(|c| match c {
+            '-' | ':' | 'Z' => None,
+            'T' => Some('_'),
+            c => Some(c),
+        }).collect();
+        out.push(DocumentOut { doc_type: link.types.get(&name).cloned(), version, uid: name.clone(), name, size: meta.len(), modified_by: String::new(), modified_at: modified });
+    }
+    out.sort_by(|a, b| a.doc_type.cmp(&b.doc_type).then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase())));
+    Ok(out)
+}
+
+fn documents_of(app: &mut App, link: &Link) -> Result<Vec<DocumentOut>> {
+    if link.is_local() { local_documents(link) } else { documents(app, &link.connection_id, &link.folder_uid) }
 }
 
 fn documents(app: &mut App, conn: &str, folder: &str) -> Result<Vec<DocumentOut>> {
@@ -205,32 +252,157 @@ fn documents(app: &mut App, conn: &str, folder: &str) -> Result<Vec<DocumentOut>
 }
 
 host!(DocsList, "docs.list", "List a material's documents",
-    "The documents in a linked material's folder, or in any folder (`connection_id`, `folder_uid`) (COL-FE-006): \
-     each with its doc.type metadata (EPD, HPD, specification, certification, installation, O&M, warranty, \
-     SDS, drawing, other), its newest version, size and who changed it last.",
+    "The documents in a linked material's folder (on this computer or on FileEngine), or in any FileEngine \
+     folder (`connection_id`, `folder_uid`) (COL-FE-006): each with its type (EPD, HPD, specification, \
+     certification, installation, O&M, warranty, SDS, drawing, other), its version (a local file: the time it \
+     changed), size and who changed it last. A local document's uid is its file name.",
     [Network, Read], ListParams, Vec<DocumentOut>, |app, caller, p| {
-    let (conn, folder) = folder_of(app, p.material.as_deref(), p.connection_id.as_deref(), p.folder_uid.as_deref())?;
-    documents(app, &conn, &folder)
+    let link = folder_of(app, p.material.as_deref(), p.connection_id.as_deref(), p.folder_uid.as_deref())?;
+    documents_of(app, &link)
 });
 
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SetDocTypeParams {
-    pub connection_id: String,
+    /// A linked material whose folder is on this computer (the type is kept in the model)…
+    pub material: Option<String>,
+    /// …or the FileEngine connection the document is on (its doc.type metadata).
+    pub connection_id: Option<String>,
+    /// The document: its uid, or a local document's file name.
     pub file_uid: String,
     /// EPD, HPD, specification, certification, installation, O&M, warranty, SDS, drawing or other.
     pub doc_type: String,
 }
 
 host!(DocsSetDocType, "docs.set_doc_type", "Set a document's type",
-    "Sets a FileEngine document's doc.type metadata (COL-FE-006), which docs.extract uses to choose the \
-     documents a field set reads (an EPD's for `epd`, an HPD's for `hpd`).",
-    [Network], SetDocTypeParams, (), |app, caller, p| {
+    "Sets a document's type (COL-FE-006): a FileEngine document's doc.type metadata (`connection_id`), or, for a \
+     material linked to a folder on this computer (`material`), the type the model keeps for that file (one \
+     undo step). docs.extract uses it to choose the documents a field set reads (an EPD's for `epd`).",
+    [Network, Edit], SetDocTypeParams, (), |app, caller, p| {
     let t = p.doc_type.trim();
     if t.is_empty() {
         return Err(bad("docs.invalid_input", "name the document's type (EPD, HPD, specification, …)"));
     }
-    app.fileengine.with(&p.connection_id, |c| c.set_metadata(&p.file_uid, "doc.type", t))
+    match (&p.material, &p.connection_id) {
+        (Some(m), None) => {
+            let mut link = link_of(app, m)?;
+            if !link.is_local() {
+                return Err(bad("docs.invalid_input", "this material's folder is on FileEngine: give its connection_id"));
+            }
+            if !local_documents(&link)?.iter().any(|d| d.uid == p.file_uid) {
+                return Err(bad("docs.no_document", format!("{:?} is not in {}", p.file_uid, link.path.clone().unwrap_or_default())));
+            }
+            link.types.insert(p.file_uid.clone(), t.to_owned());
+            app.execute("docs.set_link", json!({ "material": m, "link": link }), caller).map(drop)
+        }
+        (None, Some(conn)) => app.fileengine.with(conn, |c| c.set_metadata(&p.file_uid, "doc.type", t)),
+        _ => Err(bad("docs.invalid_input", "give the material (a local folder) or the FileEngine connection_id")),
+    }
+});
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct EnterValuesParams {
+    pub material: String,
+    /// The field set (docs.field_sets: `epd`, `hpd`).
+    pub set: String,
+    /// Field → value as the document gives it (a number for number fields; text for the rest).
+    pub values: BTreeMap<String, Value>,
+    /// Field → the unit the document prints, where it has one.
+    #[serde(default)]
+    pub units: BTreeMap<String, String>,
+    /// The document they were read from: a local file name or a FileEngine uid (default: the
+    /// linked folder's only document of the set's type, if there is one).
+    pub document: Option<String>,
+    /// For an EPD: make its GWP A1-A3 the material's embodied-carbon factor, as docs.apply_extracted.
+    #[serde(default)]
+    pub carbon: bool,
+}
+
+host!(DocsEnterValues, "docs.enter_values", "Enter product data by hand",
+    "Writes a field set's values (docs.field_sets) onto a material as read from a document by a person \
+     (COL-FE-007): the same values, IFC properties and sources as docs.apply_extracted, and with `carbon` an \
+     EPD's GWP A1-A3 as the material's embodied-carbon factor. Numbers are checked for number fields. Works \
+     with or without FileEngine. One undo step.",
+    [Edit], EnterValuesParams, Applied, |app, caller, p| {
+    let set = field_set(&p.set)?;
+    let material = p.material.trim().to_owned();
+    // The source document, and its version when it can be read.
+    let docs = link_of(app, &material).ok().and_then(|l| documents_of(app, &l).ok()).unwrap_or_default();
+    let of_type: Vec<&DocumentOut> = docs.iter().filter(|d| d.doc_type.as_deref().is_some_and(|t| t.eq_ignore_ascii_case(&set.doc_type))).collect();
+    let doc = match &p.document {
+        Some(d) => docs.iter().find(|x| x.uid == *d || x.name == *d),
+        None if of_type.len() == 1 => Some(of_type[0]),
+        None => None,
+    };
+    let (file_uid, file_name, version) = match (doc, &p.document) {
+        (Some(d), _) => (d.uid.clone(), d.name.clone(), d.version.clone()),
+        (None, Some(d)) => (d.clone(), d.clone(), String::new()),
+        (None, None) => (String::new(), String::new(), String::new()),
+    };
+    let mut values: BTreeMap<String, Option<Taken>> = BTreeMap::new();
+    let mut plain: HashMap<String, Value> = HashMap::new();
+    for (field, v) in &p.values {
+        let f = set.fields.iter().find(|f| &f.field == field).ok_or_else(|| bad("docs.invalid_input", format!("{field:?} is not a field of {}", set.id)))?;
+        let v = match (f.kind.as_str(), v) {
+            (_, Value::Null) => continue,
+            (_, Value::String(t)) if t.trim().is_empty() => continue,
+            ("number", Value::Number(_)) => v.clone(),
+            ("number", Value::String(t)) => json!(t.trim().replace(',', "").parse::<f64>().map_err(|_| bad("docs.invalid_input", format!("{} must be a number, not {t:?}", f.label)))?),
+            ("number", _) => return Err(bad("docs.invalid_input", format!("{} must be a number", f.label))),
+            (_, Value::String(t)) => json!(t.trim()),
+            _ => json!(v.to_string()),
+        };
+        plain.insert(field.clone(), v.clone());
+        values.insert(field.clone(), Some(Taken { value: v, unit: p.units.get(field).cloned().filter(|u| !u.trim().is_empty()), label: f.label.clone(), property: f.property.clone(), source: DocSource { file_uid: file_uid.clone(), file_name: file_name.clone(), version: version.clone(), run_id: String::new(), cached: false } }));
+    }
+    if values.is_empty() {
+        return Err(bad("docs.invalid_input", "enter at least one value"));
+    }
+    let carbon = if p.carbon { Some(carbon_args(&set, &plain)?) } else { None };
+    let out = app.execute("docs.set_values", json!({ "material": material, "set": set.id, "pset": set.pset, "values": values, "carbon": carbon }), caller)?;
+    let o = &out.result;
+    Ok(Applied { material, written: serde_json::from_value(o["written"].clone()).unwrap_or_default(), factor_ref: o["factor_ref"].as_str().map(str::to_owned), factor_per_unit: o["factor_per_unit"].as_f64(), factor_unit: serde_json::from_value(o["factor_unit"].clone()).ok(), folder_keys: Vec::new() })
+});
+
+/// The carbon factor's inputs from an EPD's values.
+fn carbon_args(set: &FieldSet, plain: &HashMap<String, Value>) -> Result<Value> {
+    if set.id != "epd" {
+        return Err(bad("docs.invalid_input", "only an EPD's values make a carbon factor"));
+    }
+    let get = |k: &str| plain.get(k).cloned().ok_or_else(|| bad("docs.invalid_input", format!("a carbon factor needs the EPD's {k} among the values")));
+    let gwp = get("gwp_a1a3")?.as_f64().ok_or_else(|| bad("docs.invalid_input", "the GWP is not a number"))?;
+    let s = |v: Option<Value>| v.and_then(|v| v.as_str().map(str::to_owned)).unwrap_or_default();
+    Ok(json!({ "gwp_a1a3": gwp, "declared_unit": s(Some(get("declared_unit")?)), "epd_number": s(Some(get("epd_number")?)), "program_operator": s(plain.get("program_operator").cloned()), "product": s(plain.get("product").cloned()), "valid_until": plain.get("valid_until").and_then(Value::as_str) }))
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct OpenDocumentParams {
+    pub material: String,
+    /// The document: a local file name or a FileEngine uid (docs.list).
+    pub file_uid: String,
+}
+
+host!(DocsOpenPath, "docs.document_path", "Where a material's document is",
+    "The file on this computer for one of a material's documents (COL-FE-006): in its local folder, or a \
+     FileEngine document downloaded to a temporary copy. The window opens it in the system's viewer.",
+    [Network, Read, FileWrite], OpenDocumentParams, std::path::PathBuf, |app, caller, p| {
+    let link = link_of(app, &p.material)?;
+    if link.is_local() {
+        let path = std::path::Path::new(link.path.as_deref().unwrap_or_default()).join(&p.file_uid);
+        if !path.is_file() || p.file_uid.contains(['/', '\\']) {
+            return Err(bad("docs.no_document", format!("{:?} is not in the material's folder", p.file_uid)));
+        }
+        return Ok(path);
+    }
+    let (name, bytes) = app.fileengine.with(&link.connection_id, |c| Ok((c.stat(&p.file_uid)?.name, c.read(&p.file_uid)?)))?;
+    let dir = std::env::temp_dir().join(format!("reviera-docs-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).map_err(|e| bad("docs.write", e.to_string()))?;
+    let safe: String = name.chars().map(|c| if c == '/' || c == '\\' { '_' } else { c }).collect();
+    let path = dir.join(safe);
+    std::fs::write(&path, bytes).map_err(|e| bad("docs.write", e.to_string()))?;
+    Ok(path)
 });
 
 // ---- Extraction (COL-FE-007) ----
@@ -349,6 +521,9 @@ host!(DocsExtract, "docs.extract", "Read product data from documents",
     let (conn, files, material) = match (&p.material, &p.connection_id, p.files.is_empty()) {
         (Some(m), None, true) => {
             let link = link_of(app, m)?;
+            if link.is_local() {
+                return Err(bad("docs.local_folder", "reading values from documents uses FileEngine's AI extraction, so it needs the documents on FileEngine; enter the values instead (docs.enter_values, Enter Values…)"));
+            }
             let docs = documents(app, &link.connection_id, &link.folder_uid)?;
             let files: Vec<String> = docs.iter().filter(|d| d.doc_type.as_deref().is_some_and(|t| t.eq_ignore_ascii_case(&set.doc_type))).map(|d| d.uid.clone()).collect();
             if files.is_empty() {
@@ -446,7 +621,7 @@ host!(DocsApplyExtracted, "docs.apply_extracted", "Write extracted product data 
     let out = app.execute("docs.set_values", json!({ "material": material, "set": set.id, "pset": set.pset, "values": values, "carbon": carbon }), caller)?;
     let o = &out.result;
     let mut folder_keys = Vec::new();
-    if p.to_folder {
+    if p.to_folder && link_of(app, &material).is_ok_and(|l| !l.is_local()) {
         let link = link_of(app, &material)?;
         let pairs: Vec<(String, String)> = wanted
             .iter()
@@ -708,4 +883,139 @@ host!(DocsReport, "docs.report", "Write the material documentation report",
     let (html, materials, documented, warnings) = report_html(app, caller, p.carbon_run_id.as_deref())?;
     std::fs::write(&p.path, html).map_err(|e| bad("docs.write", format!("{}: {e}", p.path.display())))?;
     Ok(ReportOut { path: p.path, materials, documented, warnings })
+});
+
+// ---- Publishing local collections to FileEngine (COL-FE-006) ----
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct LocalCollection {
+    /// The folder on this computer, and the materials linked to it.
+    pub path: String,
+    pub folder_name: String,
+    pub materials: Vec<String>,
+    pub documents: usize,
+}
+
+/// The project's local-only document collections: each local folder materials link to.
+pub(crate) fn local_collections(store: &reviera_core::Store) -> Vec<LocalCollection> {
+    let d = reviera_core::product_docs::data(store);
+    let mut out: Vec<LocalCollection> = Vec::new();
+    for (name, m) in &d.materials {
+        let Some(l) = m.link.as_ref().filter(|l| l.is_local()) else { continue };
+        let path = l.path.clone().unwrap_or_default();
+        match out.iter_mut().find(|c| c.path == path) {
+            Some(c) => c.materials.push(name.clone()),
+            None => out.push(LocalCollection { documents: local_documents(l).map_or(0, |d| d.len()), folder_name: l.folder_name.clone(), path, materials: vec![name.clone()] }),
+        }
+    }
+    out
+}
+
+host!(DocsLocalCollections, "docs.local_collections", "The project's local document folders",
+    "The folders on this computer that the project's materials link their documents to (COL-FE-006), each with \
+     its materials and number of documents: the collections docs.publish_local can put on FileEngine.",
+    [Read], reviera_core::embodied_carbon::Empty, Vec<LocalCollection>, |app, caller, p| {
+    let id = app.active().ok_or_else(|| bad("document.none", "no document is open"))?;
+    Ok(local_collections(app.get(id)?.doc.store()))
+});
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PublishLocalParams {
+    pub connection_id: String,
+    /// The FileEngine folder to publish into: each local folder becomes a folder of its name in it.
+    pub parent_uid: String,
+    /// The local folders to publish (default: every local collection).
+    #[serde(default)]
+    pub paths: Vec<String>,
+    /// Also point the model's links (and the values' sources) at the published folders (default false:
+    /// the model keeps referring to the local files).
+    #[serde(default)]
+    pub relink: bool,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct PublishedCollection {
+    pub path: String,
+    pub folder_uid: String,
+    pub folder_name: String,
+    /// Files uploaded as new, and as new versions of files of the same name already there.
+    pub uploaded: usize,
+    pub updated: usize,
+    pub relinked: Vec<String>,
+}
+
+host!(DocsPublishLocal, "docs.publish_local", "Publish local document folders to FileEngine",
+    "Puts the project's local document collections (docs.local_collections) on FileEngine (COL-FE-006): each \
+     local folder becomes a folder of its name in `parent_uid` (made if missing), every file uploaded (a new \
+     version of one of the same name already there) with its type as doc.type. With `relink`, the materials \
+     linked to it are linked to the FileEngine folder instead and their values' sources point at the uploaded \
+     files, in one undo step; otherwise the model is unchanged. FileEngine stays optional: without it, local \
+     folders work as they are.",
+    [Network, FileRead, Edit], PublishLocalParams, Vec<PublishedCollection>, |app, caller, p| {
+    let id = app.active().ok_or_else(|| bad("document.none", "no document is open"))?;
+    let store = app.get(id)?.doc.store().clone();
+    let data = reviera_core::product_docs::data(&store);
+    let mut collections = local_collections(&store);
+    if !p.paths.is_empty() {
+        collections.retain(|c| p.paths.contains(&c.path));
+    }
+    if collections.is_empty() {
+        return Err(bad("docs.nothing_local", "no material links to a folder on this computer"));
+    }
+    let url = app.fileengine.profile_url(&p.connection_id)?;
+    let mut out = Vec::new();
+    let mut new_data = data.clone();
+    for c in collections {
+        let link = data.materials.get(&c.materials[0]).and_then(|m| m.link.clone()).expect("a local collection's material is linked");
+        let docs = local_documents(&link)?;
+        let dir = std::path::PathBuf::from(&c.path);
+        // Upload: file name → (uid, version).
+        let (folder_uid, uploaded, updated, map) = app.fileengine.with(&p.connection_id, |cl| {
+            let folder = cl.ensure_dir(&p.parent_uid, &c.folder_name)?;
+            let there: HashMap<String, String> = cl.list(&folder, false)?.into_iter().filter(|e| !e.deleted && !e.is_dir()).map(|e| (e.name, e.uid)).collect();
+            let (mut uploaded, mut updated) = (0, 0);
+            let mut map: HashMap<String, (String, String)> = HashMap::new();
+            for d in &docs {
+                let uid = match there.get(&d.name) {
+                    Some(u) => {
+                        updated += 1;
+                        u.clone()
+                    }
+                    None => {
+                        uploaded += 1;
+                        cl.create_file(&folder, &d.name)?
+                    }
+                };
+                cl.write_file(&uid, &dir.join(&d.name))?;
+                if let Some(t) = &d.doc_type {
+                    cl.set_metadata(&uid, "doc.type", t)?;
+                }
+                let version = cl.stat(&uid)?.version;
+                map.insert(d.name.clone(), (uid, version));
+            }
+            Ok((folder, uploaded, updated, map))
+        })?;
+        let mut relinked = Vec::new();
+        if p.relink {
+            for name in &c.materials {
+                let Some(m) = new_data.materials.get_mut(name) else { continue };
+                m.link = Some(Link { connection_id: p.connection_id.clone(), url: url.clone(), folder_uid: folder_uid.clone(), folder_name: c.folder_name.clone(), ..Link::default() });
+                for fields in m.values.values_mut() {
+                    for t in fields.values_mut() {
+                        if let Some((uid, version)) = map.get(&t.source.file_uid).or_else(|| map.get(&t.source.file_name)) {
+                            t.source.file_uid = uid.clone();
+                            t.source.version = version.clone();
+                        }
+                    }
+                }
+                relinked.push(name.clone());
+            }
+        }
+        out.push(PublishedCollection { path: c.path, folder_uid, folder_name: c.folder_name, uploaded, updated, relinked });
+    }
+    if p.relink {
+        app.execute("docs.replace_all", json!({ "data": new_data }), caller)?;
+    }
+    Ok(out)
 });

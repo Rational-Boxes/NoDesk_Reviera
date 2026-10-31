@@ -40,6 +40,7 @@ pub const UI_ACTIONS: &[&str] = &[
     "ui.fileengine_save",
     "ui.fileengine_versions",
     "ui.material_documents",
+    "ui.publish_local_documents",
     "ui.profiler",
     "load_classification.manage",
     "demand_factor.manage",

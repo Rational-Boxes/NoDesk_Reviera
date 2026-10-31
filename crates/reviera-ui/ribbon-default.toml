@@ -2558,6 +2558,12 @@ icon = "remote_analysis"
 help = "The open FileEngine model's versions, who saved them and why: open one read-only, or restore it as the newest (COL-FE-004)"
 
 [[action]]
+id = "ui.publish_local_documents"
+label = "Publish Local Documents to FileEngine..."
+icon = "remote_analysis"
+help = "Put the project's local material document folders on FileEngine, each as a folder with its documents and their types, and optionally point the model at them; offered when there are local-only collections and a FileEngine connection (COL-FE-006)"
+
+[[action]]
 id = "ui.material_documents"
 label = "Material Documents..."
 icon = "remote_analysis"
@@ -4553,7 +4559,7 @@ panels = [{ label = "Window", tools = [{ action = "insert.flip_facing", size = "
 
 [[menu]]
 label = "&File"
-items = ["file.new", "file.open", "file.save", "file.save_as", "file.close", "-", "ui.fileengine_open", "ui.fileengine_save", "ui.fileengine_versions", "ui.material_documents", "-", "ui.bimserver", "-", "ui.model_properties", "ui.remote_analysis", "ui.profiler", "-", "export.pdf", "export.cobie", "gbxml.export", "gbxml.import_loads", "hbjson.export", "bcf.import", "bcf.export", "bcf.export_viewpoint", "bcf.import_viewpoint", "-", "app.exit"]
+items = ["file.new", "file.open", "file.save", "file.save_as", "file.close", "-", "ui.fileengine_open", "ui.fileengine_save", "ui.fileengine_versions", "ui.material_documents", "ui.publish_local_documents", "-", "ui.bimserver", "-", "ui.model_properties", "ui.remote_analysis", "ui.profiler", "-", "export.pdf", "export.cobie", "gbxml.export", "gbxml.import_loads", "hbjson.export", "bcf.import", "bcf.export", "bcf.export_viewpoint", "bcf.import_viewpoint", "-", "app.exit"]
 
 [[menu]]
 label = "&Edit"

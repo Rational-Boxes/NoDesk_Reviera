@@ -242,3 +242,95 @@ fn a_real_product_folder() {
     assert!(text.contains("IFCMATERIALPROPERTIES('Reviera_EPD'"));
     eprintln!("{}", text.lines().filter(|l| l.contains("rxd:product_docs") || l.contains("IFCMATERIALPROPERTIES")).collect::<Vec<_>>().join("\n"));
 }
+
+/// Without FileEngine: a material documented from a folder on this computer, its documents typed,
+/// its values entered by hand (with the EPD's carbon factor), in IFC as a file:// reference; then,
+/// with a connection, the local folder published to FileEngine and the model relinked to it.
+#[test]
+fn a_material_documented_locally_then_published() {
+    let dir = tempfile::tempdir().unwrap();
+    let docs = dir.path().join("Type X board");
+    std::fs::create_dir(&docs).unwrap();
+    std::fs::write(docs.join("epd.pdf"), b"%PDF- an EPD").unwrap();
+    std::fs::write(docs.join("hpd.pdf"), b"%PDF- an HPD").unwrap();
+    std::fs::write(docs.join(".hidden"), b"x").unwrap();
+    let mut app = new_app(dir.path());
+    let path = dir.path().join("local.ifc");
+    run(&mut app, "file.new", json!({})).unwrap();
+    add_wall(&mut app);
+    let material = run(&mut app, "docs.materials", json!({})).unwrap().as_array().unwrap().iter().find(|m| m["in_use"] == true).unwrap()["material"].as_str().unwrap().to_owned();
+
+    let link = run(&mut app, "docs.link", json!({ "material": material, "path": docs })).unwrap();
+    assert_eq!(link["folder_name"], "Type X board");
+    let listed = run(&mut app, "docs.list", json!({ "material": material })).unwrap();
+    assert_eq!(listed.as_array().unwrap().iter().map(|d| d["name"].as_str().unwrap()).collect::<Vec<_>>(), ["epd.pdf", "hpd.pdf"], "hidden files left out");
+    let version = listed[0]["version"].as_str().unwrap();
+    assert!(version.len() == 19 && version.char_indices().all(|(i, c)| match i { 8 => c == '_', 15 => c == '.', _ => c.is_ascii_digit() }), "a FileEngine-style version: {version}");
+    run(&mut app, "docs.set_doc_type", json!({ "material": material, "file_uid": "epd.pdf", "doc_type": "EPD" })).unwrap();
+    assert_eq!(run(&mut app, "docs.set_doc_type", json!({ "material": material, "file_uid": "nope.pdf", "doc_type": "EPD" })).unwrap_err().code, "docs.no_document");
+    // Reading by AI is FileEngine's; entering by hand is not.
+    assert_eq!(run(&mut app, "docs.extract", json!({ "material": material, "set": "epd" })).unwrap_err().code, "docs.local_folder");
+    let entered = run(&mut app, "docs.enter_values", json!({ "material": material, "set": "epd", "carbon": true,
+        "values": { "epd_number": "EPD-LOCAL-1", "declared_unit": "1,000 ft2", "gwp_a1a3": "126", "valid_until": "2030-12-15" }, "units": { "gwp_a1a3": "kg CO2 eq" } })).unwrap();
+    assert_eq!(entered["written"].as_array().unwrap().len(), 4);
+    assert!((entered["factor_per_unit"].as_f64().unwrap() - 126.0 / 92.903_04).abs() < 1e-9);
+    assert_eq!(run(&mut app, "docs.enter_values", json!({ "material": material, "set": "epd", "values": { "gwp_a1a3": "lots" } })).unwrap_err().code, "docs.invalid_input");
+    let m = |app: &mut App| run(app, "docs.materials", json!({})).unwrap().as_array().unwrap().iter().find(|m| m["material"] == material.as_str()).unwrap().clone();
+    let v = m(&mut app);
+    assert_eq!(v["values"]["epd"]["gwp_a1a3"]["value"], 126.0);
+    assert_eq!(v["values"]["epd"]["gwp_a1a3"]["source"]["file_name"], "epd.pdf", "the only EPD in the folder");
+    assert_eq!(run(&mut app, "docs.document_path", json!({ "material": material, "file_uid": "epd.pdf" })).unwrap().as_str().unwrap(), docs.canonicalize().unwrap().join("epd.pdf").to_str().unwrap());
+    run(&mut app, "file.save_as", json!({ "path": path })).unwrap();
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert!(text.contains("IFCDOCUMENTREFERENCE('file:///") && text.contains("Type X board"), "a file:// reference");
+    assert_eq!(run(&mut app, "docs.local_collections", json!({})).unwrap()[0]["documents"], 2);
+
+    // A FileEngine connection: publish the local collection and relink the model to it.
+    let fake = Fake::start("fesk_test", "fesks_secret", "ann@acme.test");
+    let conn = run(&mut app, "fileengine.connect", json!({ "url": fake.url })).unwrap()["id"].as_str().unwrap().to_owned();
+    run(&mut app, "fileengine.sign_in", json!({ "connection_id": conn, "key": "fesk_test", "secret": "fesks_secret" })).unwrap();
+    let eng = fake.uid_of("Engineering").unwrap();
+    let kept = run(&mut app, "docs.publish_local", json!({ "connection_id": conn, "parent_uid": eng })).unwrap();
+    assert_eq!((kept[0]["uploaded"].as_u64(), kept[0]["relinked"].as_array().unwrap().len()), (Some(2), 0));
+    assert!(m(&mut app)["link"]["path"].is_string(), "without relink the model still refers to the local folder");
+    let folder = fake.uid_of("Engineering/Type X board").unwrap();
+    let epd = fake.uid_of("Engineering/Type X board/epd.pdf").unwrap();
+    assert_eq!(fake.metadata(&epd)["doc.type"], "EPD");
+    let again = run(&mut app, "docs.publish_local", json!({ "connection_id": conn, "parent_uid": eng, "relink": true })).unwrap();
+    assert_eq!((again[0]["uploaded"].as_u64(), again[0]["updated"].as_u64()), (Some(0), Some(2)), "new versions of the same files");
+    let v = m(&mut app);
+    assert_eq!((v["link"]["folder_uid"].as_str(), v["link"]["path"].as_str()), (Some(folder.as_str()), None));
+    assert_eq!(v["values"]["epd"]["gwp_a1a3"]["source"]["file_uid"], epd.as_str(), "the values' sources point at the uploaded file");
+    assert!(run(&mut app, "docs.local_collections", json!({})).unwrap().as_array().unwrap().is_empty());
+    run(&mut app, "edit.undo", json!({})).unwrap();
+    assert!(m(&mut app)["link"]["path"].is_string(), "one undo step");
+}
+
+/// Against a real FileEngine: publish a local documents folder into `REVIERA_FILEENGINE_FOLDER`
+/// (e.g. `Engineering/Reviera test`) and relink the model to it. Later runs add new versions.
+#[test]
+fn a_local_folder_published_to_a_real_fileengine() {
+    let var = |k: &str| std::env::var(k).ok().filter(|v| !v.trim().is_empty());
+    let (Some(url), Some(key), Some(secret), Some(target)) = (var("REVIERA_FILEENGINE_URL"), var("REVIERA_FILEENGINE_KEY"), var("REVIERA_FILEENGINE_SECRET"), var("REVIERA_FILEENGINE_FOLDER")) else {
+        eprintln!("REVIERA_FILEENGINE_URL, _KEY, _SECRET and _FOLDER are not all set: skipped");
+        return;
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let docs = dir.path().join("Local publish check");
+    std::fs::create_dir(&docs).unwrap();
+    std::fs::write(docs.join("epd.txt"), b"An EPD stand-in published by Reviera's tests.").unwrap();
+    let mut app = new_app(dir.path());
+    run(&mut app, "file.new", json!({})).unwrap();
+    add_wall(&mut app);
+    let material = run(&mut app, "docs.materials", json!({})).unwrap().as_array().unwrap().iter().find(|m| m["in_use"] == true).unwrap()["material"].as_str().unwrap().to_owned();
+    run(&mut app, "docs.link", json!({ "material": material, "path": docs })).unwrap();
+    run(&mut app, "docs.set_doc_type", json!({ "material": material, "file_uid": "epd.txt", "doc_type": "EPD" })).unwrap();
+    let conn = run(&mut app, "fileengine.connect", json!({ "url": url })).unwrap()["id"].as_str().unwrap().to_owned();
+    run(&mut app, "fileengine.sign_in", json!({ "connection_id": conn, "key": key, "secret": secret })).unwrap();
+    let parent = run(&mut app, "fileengine.browse", json!({ "connection_id": conn, "path": target })).unwrap()["folder_uid"].as_str().unwrap().to_owned();
+    let out = run(&mut app, "docs.publish_local", json!({ "connection_id": conn, "parent_uid": parent, "relink": true })).unwrap();
+    eprintln!("{}", serde_json::to_string_pretty(&out).unwrap());
+    assert_eq!(out[0]["uploaded"].as_u64().unwrap() + out[0]["updated"].as_u64().unwrap(), 1);
+    let listed = run(&mut app, "docs.list", json!({ "material": material })).unwrap();
+    assert_eq!((listed[0]["name"].as_str(), listed[0]["doc_type"].as_str()), (Some("epd.txt"), Some("EPD")), "listed from FileEngine now");
+}

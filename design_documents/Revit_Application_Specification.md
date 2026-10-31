@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Reviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Reviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 840 numbered requirements (320 P0 · 313 P1 · 200 P2 · 7 P3), 2,246 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 841 numbered requirements (320 P0 · 313 P1 · 201 P2 · 7 P3), 2,251 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,246 commands; 840 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,251 commands; 841 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -26229,7 +26229,7 @@ The MCP tool for `bimserver.login` never accepts a password from an agent; it ca
 
 ## 6.2a FileEngine models
 
-FileEngine (Proxima File Vault) is a versioned document store with a REST door. Reviera keeps models there as files: every save is a new version, and FileEngine decides who may read and write. COL-FE-001…005 are phase 1 of `FILEENGINE_INTEGRATION.md` (§4–5): connections, browsing, open, save and versions. COL-FE-006…009 add material documentation folders, product data read from their documents by FileEngine's headless extraction (§7, §7c), publishing reports (§7a, in part), and the model's issues from FileEngine's discussion service (§6, its second door). Publish sets, share links, BCF-API and Component Libraries come in later phases. Reviera talks to FileEngine (AGPL-3.0) over HTTP only; its client `clients/fileengine` is MIT.
+FileEngine (Proxima File Vault) is a versioned document store with a REST door. Reviera keeps models there as files: every save is a new version, and FileEngine decides who may read and write. COL-FE-001…005 are phase 1 of `FILEENGINE_INTEGRATION.md` (§4–5): connections, browsing, open, save and versions. COL-FE-006…010 add material documentation folders (on this computer or in FileEngine, and publishing local ones), product data read from their documents by FileEngine's headless extraction (§7, §7c), publishing reports (§7a, in part), and the model's issues from FileEngine's discussion service (§6, its second door). Publish sets, share links, BCF-API and Component Libraries come in later phases. Reviera talks to FileEngine (AGPL-3.0) over HTTP only; its client `clients/fileengine` is MIT.
 
 ### Connections and sign-in
 **ID:** COL-FE-001 · **Priority:** P1 · **Ref:** FILEENGINE_INTEGRATION §4, §8
@@ -26345,14 +26345,19 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 ### Material documentation folders
 **ID:** COL-FE-006 · **Priority:** P2 · **Ref:** FILEENGINE_INTEGRATION §7
 
-**Purpose.** Keep a material's product documents (EPD, HPD, datasheets, certificates) in one FileEngine folder that the model points to, so that anyone opening the model can find them.
+**Purpose.** Keep a material's product documents (EPD, HPD, datasheets, certificates) in one folder that the model points to, so that anyone opening the model can find them. The folder may be on this computer or in FileEngine: everything here works without FileEngine, which adds sharing, AI extraction and reports for others (COL-FE-007, -008, -010).
 
 **Behaviour & rules.**
-- A project material, named as its layers name it, links to **one documentation folder**, identified by its uid. Its connection, address and folder name are kept too, to show and to export. The links live in RXD on the project (`rxd:product_docs`).
+- A project material, named as its layers name it, links to **one documentation folder**:
+  - **in FileEngine**, identified by its uid. Its connection, address and folder name are kept too, to show and to export;
+  - **on this computer**, identified by its path (`docs.link` with `path`). Its files are its documents, hidden files left out; each one's version is its modified time in FileEngine's form (`20261031_142233.000`, UTC). Types set with `docs.set_doc_type` are kept in the link, since a local file has no metadata.
+
+  The links live in RXD on the project (`rxd:product_docs`).
+- `docs.document_path` gives a document's path to open it: the local file, or a FileEngine document downloaded to a temporary file.
 - `docs.link` and `docs.unlink` are one undo step each. `docs.materials` lists the project's materials, each with its link and the values taken from its documents (COL-FE-007).
 - `docs.list` lists the folder's documents with their `doc.type` metadata (EPD, HPD, specification, certification, …), their version, size and dates.
 - On save, an IFC4 file gets, for each linked material:
-  - an `IfcDocumentReference` (`Location` = the folder's address, `Identification` = its uid, `Name` = its name), tied to the `IfcMaterial` by an `IfcExternalReferenceRelationship`;
+  - an `IfcDocumentReference` (`Location` = the folder's address, or `file:///` and its path for a local folder; `Identification` = its uid or path; `Name` = its name), tied to the `IfcMaterial` by an `IfcExternalReferenceRelationship`;
   - the values taken from its documents as `IfcMaterialProperties`, one set per field set (`Reviera_EPD`, `Reviera_HPD`).
   
   All of these are marked `rxd:product_docs` and rewritten on every save. IFC2X3 files get none of it.
@@ -26361,6 +26366,7 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 **Acceptance criteria.**
 - [x] A material linked to a folder exports an `IfcDocumentReference` to that folder, related to its `IfcMaterial`, and its values as `IfcMaterialProperties`; the file opens again with the link and the values intact.
 - [x] `docs.list` lists the folder's EPD and HPD with their `doc.type`.
+- [x] A material linked to a local folder lists its files (hidden ones left out) with their types and versions, opens them, and exports a `file:///` reference.
 
 ### Product data from documents
 **ID:** COL-FE-007 · **Priority:** P2 · **Ref:** FILEENGINE_INTEGRATION §7c
@@ -26370,6 +26376,7 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 **Behaviour & rules.**
 - **Field sets** ship as JSON Schemas in `schemas/extract/` (MIT): `epd` and `hpd` to start with. Each field's `x-reviera` names its label, the IFC property it fills and the FileEngine folder metadata key it may fill. `docs.field_sets` lists them.
 - `docs.extract` sends the linked folder's documents of the matching `doc.type`, or the files named, to the conversion service's headless extraction (`POST /csai/v1/extract`). It sends the field set's schema without the `x-reviera` annotations, with `tools` denied. The run is kept for the session and returned: for each document and field, the value, its unit, the evidence quote and offset, the version it was read from, and whether it came from the cache. Fields with no supporting quote are listed as not found; nothing is guessed. `cache: "refresh"` asks again.
+- A **local folder** cannot be read by extraction (`docs.local_folder`); its values are typed in. `docs.enter_values` takes a field set's values as text, checks them against the field set (numbers, dates), and writes them as `docs.apply_extracted` does, with the document they were read from as their source. *Enter Values…* in the Material Documents dialog shows the set's fields.
 - Nothing is written until the user accepts. `docs.apply_extracted` writes the accepted fields onto the material in one undo step. Each value records its source: file uid and name, version, run id, field set and field. With `to_folder`, the values are also written to the folder's metadata under the field's key. The quote is not copied into the model.
 - An EPD's GWP A1–A3, applied with `carbon: true`, also becomes the material's embodied-carbon factor (ANA-CARB-001). It goes in a library named *Product EPDs* and is matched to the material, per m², m³, kg or piece. A declared unit in ft², ft³, lb or a multiple (`1,000 ft2`) is converted, and one Reviera cannot read is refused with the reason.
 - `docs.usage` shows the service's usage state for the connection's key.
@@ -26377,6 +26384,7 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 
 **Acceptance criteria.**
 - [x] Against the fake server, an EPD and an HPD extraction applied to a material give it its EPD number, GWP, HPD identifier and expiry dates with their sources, in one undo step; undo removes them.
+- [x] Values typed in for a local EPD are written with that file as their source; a number that is not one is refused (`docs.invalid_input`).
 - [x] An EPD declared per 1,000 ft² becomes a carbon factor per m² (126 kg CO₂e per 1,000 ft² → 1.356 kg CO₂e/m²).
 - [x] Live (when the environment names a server): the EPD and HPD of a public example product, uploaded to the test folder, give the values printed in them.
 
@@ -26401,6 +26409,21 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 - [x] Against the fake server, an issue raised in the viewer is read on open (the model unchanged), shown with its element selected, replied to, resolved on the open version and reopened. One raised from a 3D view reaches the server with a camera, its turned planes and its element. The issues read offline from the copy.
 - [x] Live: a reply and a reopen made outside Reviera show in the pane within a minute, with the status bar saying so.
 - [x] Live (read-only): AC20-FZK-Haus's two issues are read, and showing one applies its camera, slice and hidden elements with all its elements found.
+
+### Publishing local documentation folders to FileEngine
+**ID:** COL-FE-010 · **Priority:** P2 · **Ref:** FILEENGINE_INTEGRATION §7
+
+**Purpose.** A project documented locally can move to FileEngine when one is set up, so that others can read the documents and the model can point to them there.
+
+**Behaviour & rules.**
+- `docs.local_collections` lists the project's local documentation folders, with the materials linked to each and their document counts.
+- **File › Publish Local Documents to FileEngine…** is offered (enabled) only while the active project has a local folder and a FileEngine connection exists. The Material Documents dialog offers *Publish to FileEngine…* for a material's local folder. Both ask for the FileEngine folder to publish into, and whether to update the model's references.
+- `docs.publish_local` makes a folder of the same name under the chosen one (or uses the one there), uploads each file (a new version of a file of that name already there), and sets each typed file's `doc.type`. With `relink`, the materials' links and their values' sources move to the uploaded folder and files in one undo step (`docs.replace_all`); without it the model keeps pointing at the local folder.
+- It returns, for each folder, the FileEngine folder, the files uploaded and updated, and the materials relinked.
+
+**Acceptance criteria.**
+- [x] Against the fake server: a local folder publishes with its types; publishing again adds versions; with relink, the model points at the uploaded folder and files, no local folder is left, and one undo restores it.
+- [x] Live: a local folder publishes into the test folder and the material's documents are then listed from FileEngine.
 
 ### Publishing files and the material documentation report
 **ID:** COL-FE-008 · **Priority:** P2 · **Ref:** FILEENGINE_INTEGRATION §7a
@@ -27829,19 +27852,24 @@ Every command below is registered once and is available from the UI, Lua and MCP
 | `fileengine.comment_issue` | document_id?, thread_id, text | issue | No | COL-FE-009 |
 | `fileengine.resolve_issue` | document_id?, thread_id, resolved | issue | No | COL-FE-009 |
 | `fileengine.new_issue` | document_id?, text, title?, view_id? | issue | No | COL-FE-009 |
-| `docs.link` | material, connection_id, folder_uid | link | Yes | COL-FE-006 |
+| `docs.link` | material, path? \| connection_id + folder_uid | link | Yes | COL-FE-006 |
 | `docs.unlink` | material, forget_values? | () | Yes | COL-FE-006 |
 | `docs.set_link` | material, link? | () | Yes | COL-FE-006 |
 | `docs.set_values` | material, set, pset?, values, carbon? | {written, factor_ref?, factor_per_unit?, factor_unit?} | Yes | COL-FE-007 |
 | `docs.materials` | — | {material, link?, values}[] | No (query) | COL-FE-006 |
 | `docs.list` | material \| connection_id + folder_uid | document[] | No (query) | COL-FE-006 |
+| `docs.set_doc_type` | material? \| connection_id, file_uid, doc_type | () | Local folder: Yes | COL-FE-006 |
+| `docs.document_path` | material, file_uid | path | No | COL-FE-006 |
 | `docs.field_sets` | — | field_set[] | No (query) | COL-FE-007 |
 | `docs.extract` | material? \| connection_id + files, set, cache? | run | No | COL-FE-007 |
 | `docs.apply_extracted` | run_id, material, fields?, file_uid?, to_folder?, carbon? | applied | Yes | COL-FE-007 |
+| `docs.enter_values` | material, set, values, units?, document?, carbon? | applied | Yes | COL-FE-007 |
 | `docs.usage` | connection_id | usage | No (query) | COL-FE-007 |
+| `docs.local_collections` | — | {path, folder_name, materials, documents}[] | No (query) | COL-FE-010 |
+| `docs.publish_local` | connection_id, parent_uid, paths?, relink? | {path, folder_uid, folder_name, uploaded, updated, relinked}[] | With relink: Yes | COL-FE-010 |
+| `docs.replace_all` | data | () | Yes | COL-FE-010 |
 | `docs.report` | path, carbon_run_id? | {path, materials, documented, warnings} | No | COL-FE-008 |
 | `fileengine.publish` | connection_id, folder_uid, path, name?, replace?, metadata? | {uid, name, version, replaced} | No | COL-FE-008 |
-| `docs.set_doc_type` | connection_id, file_uid, doc_type | () | No | COL-FE-006 |
 | `bimserver.add_server` | name, url, allow_http?, ownership? | server | No | COL-BIM-001 |
 | `bimserver.remove_server` | server_id | () | No | COL-BIM-001 |
 | `bimserver.login` | server_id, username?, password?, user_token?, remember? | session_info | No | COL-BIM-001 |
@@ -28491,9 +28519,9 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 28 | 0 | 29 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
-| COL | 8 | 50 | 10 | 1 | 69 |
+| COL | 8 | 50 | 11 | 1 | 70 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **313** | **200** | **7** | **840** |
+| **Total** | **320** | **313** | **201** | **7** | **841** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -28548,7 +28576,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.2a Reviera-originated features
 
-132 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
+133 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
 
 | Requirement | Ch | Feature |
 |-------------|----|---------|
@@ -28676,6 +28704,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | COL-FE-006 | 6 | Material documentation folders |
 | COL-FE-007 | 6 | Product data from documents |
 | COL-FE-009 | 6 | Issues on a FileEngine model |
+| COL-FE-010 | 6 | Publishing local documentation folders to FileEngine |
 | COL-FE-008 | 6 | Publishing files and the material documentation report |
 | COL-MRG-001 | 6 | Three-way merge by GlobalId and RXD id |
 | COL-OWN-002 | 6 | Live ownership document and sync lock |
@@ -28687,7 +28716,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2246 unique commands** in 424 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2251 unique commands** in 424 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -28791,7 +28820,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `discipline` | 1 |
 | `displacement` | 5 |
 | `distribution_system` | 1 |
-| `docs` | 12 |
+| `docs` | 17 |
 | `door` | 1 |
 | `dormer` | 3 |
 | `duct` | 4 |
@@ -29585,13 +29614,18 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `displacement.set_path_style` | 5 | annotation_ids[], style: straight\ | jogged, line_style_id? | () | Yes |
 | `distribution_system.create` | 4 | name, phase, config, wires, v_ll, v_lg | id | Yes | MEP-SET-002 |
 | `docs.apply_extracted` | 6 | run_id, material, fields?, file_uid?, to_folder?, carbon? | applied | Yes | COL-FE-007 |
+| `docs.document_path` | 6 | material, file_uid | path | No | COL-FE-006 |
+| `docs.enter_values` | 6 | material, set, values, units?, document?, carbon? | applied | Yes | COL-FE-007 |
 | `docs.extract` | 6 | material? \ | connection_id + files, set, cache? | run | No |
 | `docs.field_sets` | 6 | — | field_set[] | No (query) | COL-FE-007 |
-| `docs.link` | 6 | material, connection_id, folder_uid | link | Yes | COL-FE-006 |
+| `docs.link` | 6 | material, path? \ | connection_id + folder_uid | link | Yes |
 | `docs.list` | 6 | material \ | connection_id + folder_uid | document[] | No (query) |
+| `docs.local_collections` | 6 | — | {path, folder_name, materials, documents}[] | No (query) | COL-FE-010 |
 | `docs.materials` | 6 | — | {material, link?, values}[] | No (query) | COL-FE-006 |
+| `docs.publish_local` | 6 | connection_id, parent_uid, paths?, relink? | {path, folder_uid, folder_name, uploaded, updated, relinked}[] | With relink: Yes | COL-FE-010 |
+| `docs.replace_all` | 6 | data | () | Yes | COL-FE-010 |
 | `docs.report` | 6 | path, carbon_run_id? | {path, materials, documented, warnings} | No | COL-FE-008 |
-| `docs.set_doc_type` | 6 | connection_id, file_uid, doc_type | () | No | COL-FE-006 |
+| `docs.set_doc_type` | 6 | material? \ | connection_id, file_uid, doc_type | () | Local folder: Yes |
 | `docs.set_link` | 6 | material, link? | () | Yes | COL-FE-006 |
 | `docs.set_values` | 6 | material, set, pset?, values, carbon? | {written, factor_ref?, factor_per_unit?, factor_unit?} | Yes | COL-FE-007 |
 | `docs.unlink` | 6 | material, forget_values? | () | Yes | COL-FE-006 |

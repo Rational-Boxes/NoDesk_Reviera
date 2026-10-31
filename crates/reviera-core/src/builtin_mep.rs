@@ -229,6 +229,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(DocsUnlink),
         registry.add(DocsSetValues),
         registry.add(DocsMaterials),
+        registry.add(DocsReplaceAll),
         registry.add(CarbonRecord),
         registry.add(SolarRecord),
         registry.add(EnergyModelGet),
@@ -2834,4 +2835,15 @@ read_command!(
     crate::embodied_carbon::Empty,
     Vec<crate::product_docs::MaterialOut>,
     crate::product_docs::materials
+);
+
+edit_command!(
+    DocsReplaceAll,
+    "docs.replace_all",
+    "Replace the product documentation",
+    "Replaces the project's whole product documentation (COL-FE-006): every material's folder link and values, as docs.materials gives them, in one undo step. docs.publish_local uses it to relink published folders.",
+    "Product Documentation",
+    crate::product_docs::ReplaceAllParams,
+    (),
+    crate::product_docs::replace_all
 );
