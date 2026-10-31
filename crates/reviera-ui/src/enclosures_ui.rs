@@ -22,6 +22,9 @@ const FORMS: [(Form, &str); 6] = [
     (Form::Gothic, "Gothic tunnel"),
 ];
 
+/// The Heating Pipes choices (ARC-GLZ-016).
+const PIPE_CHOICES: [&str; 4] = ["None", "Perimeter", "Under benches", "Perimeter and under benches"];
+
 /// The screen sets offered in Properties.
 const SCREEN_SETS: [(&str, &[&str]); 5] = [
     ("None", &[]),
@@ -351,6 +354,17 @@ impl Gui {
             grid.set_property_read_only("gc_heating", true);
             grid.set_help_string("gc_heating", "Sized on the heat loss: unit heaters (one per 18 m of length at least), perimeter fin pipe at 1.15 kW/m; enclosure.heating also gives under-bench and root-zone heat");
         }
+        // Heating pipes laid in the model (ARC-GLZ-016).
+        let laid: Vec<String> = store.get(owner).map(|e| reviera_core::hothouse::heating_pipes_of(&store, e.guid().as_str())).unwrap_or_default().into_iter().map(|(_, s)| format!("{s:?}")).collect();
+        let (perimeter, bench) = (laid.iter().any(|s| s == "Perimeter"), laid.iter().any(|s| s == "UnderBench"));
+        let at = match (perimeter, bench) {
+            (false, false) => 0,
+            (true, false) => 1,
+            (false, true) => 2,
+            (true, true) => 3,
+        };
+        grid.append(Property::enumeration("Heating Pipes", "gc_pipes", PIPE_CHOICES.iter().enumerate().map(|(i, s)| ((*s).to_owned(), i as i32)).collect::<Vec<_>>(), at));
+        grid.set_help_string("gc_pipes", "Fin pipe laid in the model: loops round the inside of the walls (as many as the heating sizing needs), and runs under the benches (enclosure.heating_pipes)");
         // Ventilation (ARC-GLZ-012) and CO₂ (ARC-GLZ-013) sizing.
         if let Ok(v) = self.run("enclosure.ventilation", json!({ "enclosure_id": owner })) {
             let text = format!("{:.1} m³/s: {} fan(s) of {:.0} m³/s, {:.1} m² of inlets", v["airflow"].as_f64().unwrap_or(0.0), v["fans"], v["fan_airflow"].as_f64().unwrap_or(0.0), v["inlet_area"].as_f64().unwrap_or(0.0));
@@ -410,6 +424,24 @@ impl Gui {
         let mut args = json!({ "enclosure_id": owner });
         let number = |t: &str| t.trim().trim_end_matches("°C").trim().parse::<f64>().ok();
         match property {
+            "gc_pipes" => {
+                let Some(k) = PIPE_CHOICES.iter().position(|c| *c == text) else { return true };
+                for (system, want) in [("perimeter", k == 1 || k == 3), ("under_bench", k == 2 || k == 3)] {
+                    let mut r = self.run("enclosure.heating_pipes", json!({ "enclosure_id": owner, "system": system, "remove": !want }));
+                    // No design temperature to size the loops by: ask how many.
+                    if r.as_ref().is_err_and(|e| e.starts_with("growing.no_design")) {
+                        let Some(n) = super::notes::ask_text(&frame, "Loops round the perimeter (the heating sizing needs a weather file)", "2").and_then(|t| t.trim().parse::<u32>().ok()) else { break };
+                        r = self.run("enclosure.heating_pipes", json!({ "enclosure_id": owner, "system": system, "runs": n }));
+                    }
+                    if let Err(e) = r {
+                        error(&frame, &format!("The heating pipes were not laid:\n{e}"));
+                        break;
+                    }
+                }
+                self.selection_changed();
+                self.refresh_scene(&frame);
+                return true;
+            }
             "gc_screens" => {
                 let Some((_, kinds)) = SCREEN_SETS.iter().find(|s| s.0 == text) else { return true };
                 let screens: Vec<_> = kinds.iter().map(|k| json!({ "kind": k })).collect();

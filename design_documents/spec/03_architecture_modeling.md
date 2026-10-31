@@ -3047,6 +3047,30 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 
 *Built (2026-10-30):* `enclosure.heating` (`reviera_core::hothouse`): load (and with the energy screen closed), unit heaters and their size, perimeter fin pipe and its runs, under-bench fin pipe for the whole load and the runs the benches take, growing area, root-zone heat and its share, notes. Properties › Growing Climate › *Heating*.
 
+### Heating pipes laid in the greenhouse
+**ID:** ARC-GLZ-016 · **Priority:** P2 · **Ref:** GLAZED_ENCLOSURES_PLAN §9 (phase 2, *heating pipes laid out in the model*); ARC-GLZ-014; MEP-PIPE-001
+
+**Purpose.** Put the heating that ARC-GLZ-014 sizes into the model as pipe, so that it is drawn, scheduled, clash-checked and exported with the rest.
+
+**Behaviour & rules.**
+- `enclosure.heating_pipes` with `system`:
+  - **`perimeter`** lays fin pipe in loops round the inside of the walls:
+    - `offset` in from them (0.15 m);
+    - the lowest `height` above the floor (0.3 m), and each further loop 0.15 m above the last;
+    - each loop starts by a corner and ends 0.3 m short of it, for the flow and return;
+    - the loops (`runs`) default to the heating sizing's perimeter runs, rounded up, for the given `outside` temperature (or the weather's). With no design temperature, the loops must be given.
+  - **`under_bench`** lays straight runs along each bench and table of the house's growing layouts, `runs` per bench (4 under one 1.5 m wide or more, else 2, as the sizing assumes), spread across its width and 0.3 m below its top. NFT and high-wire gutters are not benches; a house with no benches is refused.
+- The pipe is drawn with `pipe.create`, `diameter` 1¼ in steel (42.2 mm outside), in the hydronic supply system. Each segment and fitting is marked `rxd:heating_pipes` {enclosure, system}.
+- Laying a system again replaces what it laid before; `remove` takes it away. One undo step.
+- It returns the runs, segments and fittings, the length, and the output at the fin-pipe rating (1.15 kW/m round the perimeter, 0.15 kW/m under benches; EXPERT_REVIEW E-63).
+- Properties › Growing Climate › **Heating Pipes**: None, Perimeter, Under benches, or both. When the loops cannot be sized for want of a weather file, it asks how many.
+
+**Acceptance criteria.**
+- [x] A 9.6 × 40 m gable house losing about 128 kW (15 °C inside, −10 °C outside) gets 2 perimeter loops, each 0.6 m short of the 98.6 m round 0.15 m in, covering the load at the fin rating. Its 8 benches get 4 runs each, then 2 each when laid again, replacing the first. The perimeter loops stay, and all are saved as `IfcPipeSegment`s.
+- [x] `remove` takes a system's pipes away, and under-bench pipe in a house with no benches is refused.
+
+*Not yet:* pipe-rail (grow-pipe) heating, which has no published output figure gathered; flow and return headers and the boiler connection; pad-and-fan equipment in the model.
+
 ### Growing-area schedules
 **ID:** ARC-GLZ-015 · **Priority:** P2 · **Ref:** GLAZED_ENCLOSURES_PLAN §9 (phase 2, *growing-area schedules*); DOC-SCHED (schedules)
 
@@ -5145,6 +5169,7 @@ All commands below are registered once in the command registry and exposed autom
 | `enclosure.ventilation` | enclosure_id, climate?, summer?, pads?, fan_airflow?, fan_diameter?, elevation? | ventilation_report | No (query) | ARC-GLZ-012 |
 | `enclosure.co2` | enclosure_id, setpoint?, glazing? | co2_report | No (query) | ARC-GLZ-013 |
 | `enclosure.heating` | enclosure_id, inside?, outside?, wind?, heater_kw? | heating_report | No (query) | ARC-GLZ-014 |
+| `enclosure.heating_pipes` | enclosure_id, system, runs?, height?, offset?, diameter?, outside?, remove? | {runs, segments, fittings, length, output_kw, replaced} | Yes | ARC-GLZ-016 |
 | `growing.crops` | — | [crop] | No (query) | ARC-GLZ-008 |
 | `enclosure.set_climate` | enclosure_id, crop?, target_dli?, day_temperature?, night_temperature?, humidity?, co2?, photoperiod?, clear? | — | Yes | ARC-GLZ-008 |
 | `enclosure.crop_light` | enclosure_id, clearness?, outdoor_dli? | {source, transmission, months, darkest_month, required_ppfd, lamp_ppfd} | No (query) | ARC-GLZ-009 |

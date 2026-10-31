@@ -1465,3 +1465,176 @@ pub(crate) fn heating(store: &Store, p: HeatingParams) -> Result<Heating> {
         notes,
     })
 }
+
+// ---- Heating pipes laid out (ARC-GLZ-016) ----
+
+/// The key marking a pipe run made by `enclosure.heating_pipes`: {enclosure, system}.
+pub const HEATING_PIPES_KEY: &str = "rxd:heating_pipes";
+
+/// Heating pipe: 1¼ in steel (42.2 mm outside), as the fin-pipe outputs are given for.
+const HEATING_PIPE_OD: f64 = 0.0422;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum PipeSystem {
+    /// Fin pipe round the inside of the walls, in loops one above another.
+    Perimeter,
+    /// Fin pipe under the growing layouts' benches, along their runs.
+    UnderBench,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct HeatingPipesParams {
+    pub enclosure_id: ElementRef,
+    pub system: PipeSystem,
+    /// Perimeter: the loops (default the heating sizing's runs, rounded up); under-bench: the runs
+    /// under each bench (default 4 under a bench 1.5 m wide or more, else 2).
+    pub runs: Option<u32>,
+    /// The lowest run's height above the floor (default 0.3 m round the perimeter, 0.3 m below the
+    /// bench top under benches).
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub height: Option<f64>,
+    /// Perimeter: the pipe's distance in from the walls (default 0.15 m).
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub offset: Option<f64>,
+    /// The pipe's outside diameter (default 1¼ in steel, 42.2 mm).
+    #[schemars(extend("x-reviera-data-type" = "length"))]
+    pub diameter: Option<f64>,
+    /// For the default perimeter loops: the outside design temperature (°C), as enclosure.heating.
+    pub outside: Option<f64>,
+    /// Take this system's pipes away instead of laying them.
+    #[serde(default)]
+    pub remove: bool,
+}
+
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct HeatingPipes {
+    pub system: PipeSystem,
+    pub runs: u32,
+    /// The pipe segments and fittings made (the earlier ones of this system replaced).
+    pub segments: Vec<ElementId>,
+    pub fittings: Vec<ElementId>,
+    /// Pipe laid (m) and its output at the fin-pipe rating (kW).
+    pub length: f64,
+    pub output_kw: f64,
+    pub replaced: usize,
+}
+
+fn tag(e: &Element) -> Option<(String, PipeSystem)> {
+    let v = e.param(HEATING_PIPES_KEY)?;
+    Some((v["enclosure"].as_str()?.to_owned(), serde_json::from_value(v["system"].clone()).ok()?))
+}
+
+/// The heating pipes laid for an enclosure (its GlobalId), by system.
+pub fn heating_pipes_of(store: &Store, enclosure: &str) -> Vec<(ElementId, PipeSystem)> {
+    store.iter().filter_map(|e| tag(e).filter(|(g, _)| g.eq_ignore_ascii_case(enclosure)).map(|(_, s)| (e.id(), s))).collect()
+}
+
+/// `enclosure.heating_pipes`: fin pipe laid round the perimeter or under the benches, in the
+/// hydronic supply system, replacing what this system laid before.
+pub(crate) fn heating_pipes(txn: &mut Transaction<'_>, p: HeatingPipesParams) -> Result<HeatingPipes> {
+    let store = txn.store();
+    let id = store.resolve(&p.enclosure_id).ok_or_else(|| bad("element.not_found", "no such enclosure"))?;
+    let host = store.get(id).expect("resolved");
+    let r = enclosures::recipe(host).ok_or_else(|| bad("enclosure.not_found", format!("element {id} is not a glazed enclosure")))?;
+    let guid = host.guid().to_string();
+    let level = GlobalId::parse(&r.level).and_then(|g| store.find_by_guid(&g)).ok_or_else(|| bad("enclosure.no_level", "the enclosure's level is gone"))?;
+    let diameter = p.diameter.unwrap_or(HEATING_PIPE_OD);
+    if !(0.01..=0.2).contains(&diameter) {
+        return Err(bad("growing.bad_value", "the pipe's diameter is between 10 and 200 mm"));
+    }
+    let (s, c) = r.rotation.sin_cos();
+    let at = |x: f64, y: f64, z: f64| vec![r.origin[0] + c * x - s * y, r.origin[1] + s * x + c * y, z];
+    // Each run as its points in plan with heights above the level.
+    let mut lines: Vec<Vec<Vec<f64>>> = Vec::new();
+    let runs;
+    match p.system {
+        _ if p.remove => runs = 0,
+        PipeSystem::Perimeter => {
+            runs = match p.runs {
+                Some(n) => n,
+                None => {
+                    let h = heating(store, HeatingParams { enclosure_id: ElementRef::Id(id), inside: None, outside: p.outside, wind: None, heater_kw: None })
+                        .map_err(|e| bad("growing.no_design", format!("give the number of loops (runs), or what the heating is sized for: {}", e.message)))?;
+                    (h.perimeter_runs - 1e-6).ceil().max(1.0) as u32
+                }
+            };
+            if !(1..=8).contains(&runs) {
+                return Err(bad("growing.bad_value", "1 to 8 loops round the perimeter"));
+            }
+            let o = p.offset.unwrap_or(0.15);
+            let (l, w) = (r.length, r.width());
+            if !(0.05..w / 2.0).contains(&o) {
+                return Err(bad("growing.bad_value", "the pipe's distance from the walls is between 0.05 m and half the width"));
+            }
+            let z0 = p.height.unwrap_or(0.3);
+            for k in 0..runs {
+                let z = z0 + f64::from(k) * 0.15;
+                // A loop starting by a corner, ending short of it for the flow and return.
+                lines.push(vec![at(o + 0.3, o, z), at(l - o, o, z), at(l - o, w - o, z), at(o, w - o, z), at(o, o + 0.3, z)]);
+            }
+        }
+        PipeSystem::UnderBench => {
+            let benches: Vec<crate::growing::PartRecipe> = store
+                .iter()
+                .filter(|e| crate::growing::recipe(e).is_some_and(|l| l.enclosure.eq_ignore_ascii_case(&guid)))
+                .flat_map(|e| crate::growing::recipe(e).map(|l| l.parts).unwrap_or_default())
+                .filter_map(|g| store.get(store.find_by_guid(&GlobalId::parse(&g)?)?))
+                .filter_map(crate::growing::part_recipe)
+                .filter(|q| !matches!(q.system, crate::growing::System::Nft | crate::growing::System::HighWire))
+                .collect();
+            if benches.is_empty() {
+                return Err(bad("growing.no_benches", "the enclosure has no benches or tables to lay pipe under (Growing Layout)"));
+            }
+            runs = p.runs.unwrap_or(0);
+            if p.runs.is_some_and(|n| !(1..=8).contains(&n)) {
+                return Err(bad("growing.bad_value", "1 to 8 runs under each bench"));
+            }
+            for b in &benches {
+                let n = if runs > 0 { runs } else if b.width >= 1.5 { 4 } else { 2 };
+                let (dx, dy) = (b.end[0] - b.start[0], b.end[1] - b.start[1]);
+                let len = dx.hypot(dy).max(1e-9);
+                let (nx, ny) = (-dy / len, dx / len);
+                let top = b.top[0].min(b.top[1]);
+                let z = p.height.unwrap_or((top - 0.3).max(0.1));
+                for k in 0..n {
+                    let across = b.width * ((f64::from(k) + 0.5) / f64::from(n) - 0.5);
+                    lines.push(vec![vec![b.start[0] + nx * across, b.start[1] + ny * across, z], vec![b.end[0] + nx * across, b.end[1] + ny * across, z]]);
+                }
+            }
+        }
+    }
+    // The earlier pipes of this system, replaced.
+    let old: Vec<ElementId> = heating_pipes_of(txn.store(), &guid).into_iter().filter(|(_, s)| *s == p.system).map(|(e, _)| e).collect();
+    for e in &old {
+        txn.delete(*e)?;
+    }
+    let mark = json!({ "enclosure": guid, "system": p.system });
+    let mut out = HeatingPipes { system: p.system, runs: 0, segments: vec![], fittings: vec![], length: 0.0, output_kw: 0.0, replaced: old.len() };
+    for pts in lines {
+        out.length += pts.windows(2).map(|w| (w[1][0] - w[0][0]).hypot(w[1][1] - w[0][1])).sum::<f64>();
+        let made = crate::mep_runs::create_pipe(
+            txn,
+            crate::mep_runs::CreateParams { type_id: None, points: pts, level: ElementRef::Id(level), middle_elevation: None, shape: None, diameter: Some(diameter), width: None, height: None, system_type_id: Some("hydronic_supply".into()), slope: 0.0, bend_radius: None },
+        )?;
+        for e in made.segments.iter().chain(&made.fittings) {
+            let m = mark.clone();
+            txn.modify(*e, |el| {
+                el.params.insert(HEATING_PIPES_KEY.into(), m);
+            })?;
+        }
+        out.segments.extend(made.segments);
+        out.fittings.extend(made.fittings);
+        out.runs += 1;
+    }
+    let rating = match p.system {
+        PipeSystem::Perimeter => PERIMETER_FIN,
+        PipeSystem::UnderBench => UNDER_BENCH_FIN,
+    };
+    out.output_kw = out.length * rating / 1000.0;
+    if p.system == PipeSystem::Perimeter {
+        out.runs = runs;
+    }
+    Ok(out)
+}

@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Reviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Reviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 838 numbered requirements (320 P0 · 313 P1 · 198 P2 · 7 P3), 2,244 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 839 numbered requirements (320 P0 · 313 P1 · 199 P2 · 7 P3), 2,245 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,244 commands; 838 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,245 commands; 839 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -13269,6 +13269,30 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 
 *Built (2026-10-30):* `enclosure.heating` (`reviera_core::hothouse`): load (and with the energy screen closed), unit heaters and their size, perimeter fin pipe and its runs, under-bench fin pipe for the whole load and the runs the benches take, growing area, root-zone heat and its share, notes. Properties › Growing Climate › *Heating*.
 
+### Heating pipes laid in the greenhouse
+**ID:** ARC-GLZ-016 · **Priority:** P2 · **Ref:** GLAZED_ENCLOSURES_PLAN §9 (phase 2, *heating pipes laid out in the model*); ARC-GLZ-014; MEP-PIPE-001
+
+**Purpose.** Put the heating that ARC-GLZ-014 sizes into the model as pipe, so that it is drawn, scheduled, clash-checked and exported with the rest.
+
+**Behaviour & rules.**
+- `enclosure.heating_pipes` with `system`:
+  - **`perimeter`** lays fin pipe in loops round the inside of the walls:
+    - `offset` in from them (0.15 m);
+    - the lowest `height` above the floor (0.3 m), and each further loop 0.15 m above the last;
+    - each loop starts by a corner and ends 0.3 m short of it, for the flow and return;
+    - the loops (`runs`) default to the heating sizing's perimeter runs, rounded up, for the given `outside` temperature (or the weather's). With no design temperature, the loops must be given.
+  - **`under_bench`** lays straight runs along each bench and table of the house's growing layouts, `runs` per bench (4 under one 1.5 m wide or more, else 2, as the sizing assumes), spread across its width and 0.3 m below its top. NFT and high-wire gutters are not benches; a house with no benches is refused.
+- The pipe is drawn with `pipe.create`, `diameter` 1¼ in steel (42.2 mm outside), in the hydronic supply system. Each segment and fitting is marked `rxd:heating_pipes` {enclosure, system}.
+- Laying a system again replaces what it laid before; `remove` takes it away. One undo step.
+- It returns the runs, segments and fittings, the length, and the output at the fin-pipe rating (1.15 kW/m round the perimeter, 0.15 kW/m under benches; EXPERT_REVIEW E-63).
+- Properties › Growing Climate › **Heating Pipes**: None, Perimeter, Under benches, or both. When the loops cannot be sized for want of a weather file, it asks how many.
+
+**Acceptance criteria.**
+- [x] A 9.6 × 40 m gable house losing about 128 kW (15 °C inside, −10 °C outside) gets 2 perimeter loops, each 0.6 m short of the 98.6 m round 0.15 m in, covering the load at the fin rating. Its 8 benches get 4 runs each, then 2 each when laid again, replacing the first. The perimeter loops stay, and all are saved as `IfcPipeSegment`s.
+- [x] `remove` takes a system's pipes away, and under-bench pipe in a house with no benches is refused.
+
+*Not yet:* pipe-rail (grow-pipe) heating, which has no published output figure gathered; flow and return headers and the boiler connection; pad-and-fan equipment in the model.
+
 ### Growing-area schedules
 **ID:** ARC-GLZ-015 · **Priority:** P2 · **Ref:** GLAZED_ENCLOSURES_PLAN §9 (phase 2, *growing-area schedules*); DOC-SCHED (schedules)
 
@@ -15367,6 +15391,7 @@ All commands below are registered once in the command registry and exposed autom
 | `enclosure.ventilation` | enclosure_id, climate?, summer?, pads?, fan_airflow?, fan_diameter?, elevation? | ventilation_report | No (query) | ARC-GLZ-012 |
 | `enclosure.co2` | enclosure_id, setpoint?, glazing? | co2_report | No (query) | ARC-GLZ-013 |
 | `enclosure.heating` | enclosure_id, inside?, outside?, wind?, heater_kw? | heating_report | No (query) | ARC-GLZ-014 |
+| `enclosure.heating_pipes` | enclosure_id, system, runs?, height?, offset?, diameter?, outside?, remove? | {runs, segments, fittings, length, output_kw, replaced} | Yes | ARC-GLZ-016 |
 | `growing.crops` | — | [crop] | No (query) | ARC-GLZ-008 |
 | `enclosure.set_climate` | enclosure_id, crop?, target_dli?, day_temperature?, night_temperature?, humidity?, co2?, photoperiod?, clear? | — | Yes | ARC-GLZ-008 |
 | `enclosure.crop_light` | enclosure_id, clearness?, outdoor_dli? | {source, transmission, months, darkest_month, required_ppfd, lamp_ppfd} | No (query) | ARC-GLZ-009 |
@@ -28441,14 +28466,14 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 39 | 8 | 0 | 123 |
 | DM | 91 | 65 | 34 | 3 | 193 |
-| ARC | 77 | 73 | 12 | 1 | 163 |
+| ARC | 77 | 73 | 13 | 1 | 164 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 28 | 0 | 29 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
 | COL | 8 | 50 | 10 | 1 | 69 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **313** | **198** | **7** | **838** |
+| **Total** | **320** | **313** | **199** | **7** | **839** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -28503,7 +28528,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.2a Reviera-originated features
 
-130 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
+131 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
 
 | Requirement | Ch | Feature |
 |-------------|----|---------|
@@ -28600,6 +28625,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | ARC-ROOF-008 | 3 | 3.6.8b Arched and vaulted roofs |
 | ARC-ROOF-009 | 3 | 3.6.8c Dome roofs |
 | ARC-GLZ-007 | 3 | 3.6a.7 Reviera types and property sets for glazed enclosures |
+| ARC-GLZ-016 | 3 | Heating pipes laid in the greenhouse |
 | ARC-GLZ-015 | 3 | Growing-area schedules |
 | ARC-STAIR-007 | 3 | 3.7.6a Stairs through floors: completing to the level above, openings and railings |
 | ARC-RAIL-003 | 3 | 3.7.8b Railing openings and gates |
@@ -28640,7 +28666,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2244 unique commands** in 424 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2245 unique commands** in 424 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -28763,7 +28789,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `element` | 39 |
 | `elevationmarker` | 1 |
 | `embodied_carbon` | 5 |
-| `enclosure` | 14 |
+| `enclosure` | 15 |
 | `energy_location` | 1 |
 | `energy_model` | 4 |
 | `energy_settings` | 3 |
@@ -29634,6 +29660,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `enclosure.get` | 3 | enclosure_id | {form, params, parts} | No (query) | ARC-GLZ-001 |
 | `enclosure.heat_loss` | 3 | enclosure_id, inside?, outside?, wind?, air_changes? | heat_loss | No (query) | ARC-GLZ-011 |
 | `enclosure.heating` | 3 | enclosure_id, inside?, outside?, wind?, heater_kw? | heating_report | No (query) | ARC-GLZ-014 |
+| `enclosure.heating_pipes` | 3 | enclosure_id, system, runs?, height?, offset?, diameter?, outside?, remove? | {runs, segments, fittings, length, output_kw, replaced} | Yes | ARC-GLZ-016 |
 | `enclosure.screen_library` | 3 | — | [entry] | No (query) | ARC-GLZ-010 |
 | `enclosure.set` | 3 | enclosure_id, params | — | Yes | ARC-GLZ-001 |
 | `enclosure.set_climate` | 3 | enclosure_id, crop?, target_dli?, day_temperature?, night_temperature?, humidity?, co2?, photoperiod?, clear? | — | Yes | ARC-GLZ-008 |

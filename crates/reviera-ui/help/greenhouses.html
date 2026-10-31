@@ -186,6 +186,21 @@ winter airflow, for a hot climate and the site's altitude. <b>CO₂ Supply</b> g
 hold the crop's set point with the vents shut and the burner capacity, with the safety limits
 (<code>enclosure.co2</code>).</p>
 
+<h2 id="pipes">Heating pipes</h2>
+<p>Properties › Growing Climate › <b>Heating Pipes</b> lays the house's heating in the model as
+pipe, in the hydronic supply system:</p>
+<ul>
+  <li><b>Perimeter</b>: fin pipe in loops round the inside of the walls, 0.15 m in, the lowest
+  0.3 m above the floor and each further loop 0.15 m above the last. There are as many loops as
+  the heating sizing needs; without a weather file to size them, Reviera asks how many.</li>
+  <li><b>Under benches</b>: runs along every bench and table of the growing layouts, four under a
+  bench 1.5 m wide or more and two under a narrower one, 0.3 m below its top. Gutter systems (NFT,
+  high-wire) have no benches to lay pipe under.</li>
+</ul>
+<p>Choosing again replaces the pipes; <b>None</b> takes them away. The pipe is 1¼ in steel, as the
+fin-pipe outputs assume, and is drawn, scheduled and exported like any other pipe
+(<code>enclosure.heating_pipes</code>).</p>
+
 <h2 id="schedules">Schedules</h2>
 <p>A schedule of <b>Glazed Enclosures</b> lists the houses, one row each. Its fields:</p>
 <ul>
@@ -204,6 +219,6 @@ table, with its own run and area.</p>
 
 <h2 id="later">Coming later</h2>
 <p>Gutter-connected arch ranges; rafters, purlins and Venlo trusses; opening and closing vents in
-the view, and gutter vents; screens in tunnels, heating pipes, pad-and-fan cooling
+the view, and gutter vents; screens in tunnels, pipe-rail heating and headers, pad-and-fan cooling
 and CO₂ enrichment; shading devices; atriums; heating, cooling and energy analysis of the
 enclosure; residential conservatories and orangeries; and building-code checks.</p>

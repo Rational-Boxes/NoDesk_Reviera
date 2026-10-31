@@ -44,7 +44,11 @@ fn greenhouses_and_their_growing_in_schedules() {
     assert!(column(&t, "Target DLI")[gable].ends_with("mol/m²/d"));
     // No weather yet: no outside design temperature, so no heat loss; with one, there is.
     assert_eq!(column(&t, "Design Heat Loss")[gable], "");
+    // Totals read as their cells: pieces as a count.
+    let k = t["headings"].as_array().unwrap().iter().position(|h| h == "Growing Pieces").unwrap();
+    assert_eq!(t["totals"][k], "8", "{}", t["totals"]);
     let venlo = 1 - gable;
+    assert_eq!(column(&t, "Growing Share")[venlo], "0 %", "not -0");
     assert_eq!((column(&t, "Growing Area")[venlo].starts_with('0'), column(&t, "Crop")[venlo].as_str()), (true, ""));
 
     // The growing layouts, and their pieces.

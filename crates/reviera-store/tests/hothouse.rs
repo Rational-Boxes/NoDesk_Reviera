@@ -268,3 +268,54 @@ fn heating_is_sized_from_the_heat_loss() {
     assert!(h["notes"].as_array().unwrap().iter().any(|n| n.as_str().unwrap().contains("wide")));
     assert!(run(&r, &mut doc, "enclosure.heating", json!({ "enclosure_id": gh, "outside": -10.0, "heater_kw": 500 })).is_err());
 }
+
+#[test]
+fn heating_pipes_are_laid_round_the_walls_and_under_the_benches() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("pipes.ifc");
+    let (mut project, mut doc) = LocalProject::new(Schema::Ifc4, &path).unwrap();
+    let r = registry();
+    let level = doc.store().iter().find(|e| e.class == "IfcBuildingStorey").unwrap().id();
+    let gh = run(&r, &mut doc, "enclosure.create", json!({ "form": "gable", "level_id": level.0, "length": 40.0, "span": 9.6, "bay": 4.0 })).unwrap();
+    // Without a design temperature the loops must be given.
+    assert!(run(&r, &mut doc, "enclosure.heating_pipes", json!({ "enclosure_id": gh, "system": "perimeter" })).is_err());
+    let sized = run(&r, &mut doc, "enclosure.heating", json!({ "enclosure_id": gh, "inside": 15.0, "outside": -10.0 })).unwrap();
+    let p = run(&r, &mut doc, "enclosure.heating_pipes", json!({ "enclosure_id": gh, "system": "perimeter", "outside": -10.0 })).unwrap();
+    // The sizing's 1.1 runs round: two loops, each just short of the 98.6 m perimeter 0.15 m in.
+    assert_eq!(p["runs"], (num(&sized["perimeter_runs"]) - 1e-6).ceil() as u64, "{p}");
+    let per_loop = 2.0 * (40.0 - 0.3 + 9.6 - 0.3) - 0.6;
+    assert!((num(&p["length"]) - per_loop * num(&p["runs"])).abs() < 1e-6, "{p}");
+    assert!(num(&p["output_kw"]) >= num(&sized["load_kw"]), "two loops cover the load: {p} {sized}");
+    // Pipe segments marked as this house's heating (its gutters' downspouts are pipe too).
+    let heating = |doc: &reviera_core::Document| doc.store().iter().filter(|e| e.class == "IfcPipeSegment" && e.param(reviera_core::hothouse::HEATING_PIPES_KEY).is_some()).count();
+    assert_eq!(heating(&doc), p["segments"].as_array().unwrap().len());
+    // Under the benches: runs along each bench; laying it again replaces it.
+    run(&r, &mut doc, "growing.layout", json!({ "host_id": gh, "system": "benches", "direction": "along" })).unwrap();
+    let u = run(&r, &mut doc, "enclosure.heating_pipes", json!({ "enclosure_id": gh, "system": "under_bench" })).unwrap();
+    assert_eq!(u["runs"], 8 * 4, "four runs under each of the 8 1.8 m benches: {u}");
+    let again = run(&r, &mut doc, "enclosure.heating_pipes", json!({ "enclosure_id": gh, "system": "under_bench", "runs": 2 })).unwrap();
+    assert_eq!((again["runs"].as_u64(), again["replaced"].as_u64()), (Some(16), Some(u["segments"].as_array().unwrap().len() as u64 + u["fittings"].as_array().unwrap().len() as u64)));
+    assert!((num(&again["length"]) - num(&u["length"]) / 2.0).abs() < 1e-6);
+    // The perimeter pipes stay; saved as pipe segments.
+    let left = heating(&doc);
+    assert_eq!(left, p["segments"].as_array().unwrap().len() + again["segments"].as_array().unwrap().len());
+    project.save(&mut doc).unwrap();
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert!(text.matches("IFCPIPESEGMENT(").count() >= left);
+}
+
+#[test]
+fn heating_pipes_can_be_taken_away() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_project, mut doc) = LocalProject::new(Schema::Ifc4, &dir.path().join("rm.ifc")).unwrap();
+    let r = registry();
+    let level = doc.store().iter().find(|e| e.class == "IfcBuildingStorey").unwrap().id();
+    let gh = run(&r, &mut doc, "enclosure.create", json!({ "form": "gable", "level_id": level.0, "length": 20.0, "span": 6.4, "bay": 4.0 })).unwrap();
+    run(&r, &mut doc, "enclosure.heating_pipes", json!({ "enclosure_id": gh, "system": "perimeter", "runs": 2 })).unwrap();
+    let gone = run(&r, &mut doc, "enclosure.heating_pipes", json!({ "enclosure_id": gh, "system": "perimeter", "remove": true })).unwrap();
+    assert!(gone["replaced"].as_u64().unwrap() >= 8 && gone["segments"].as_array().unwrap().is_empty(), "{gone}");
+    assert!(doc.store().iter().all(|e| e.param(reviera_core::hothouse::HEATING_PIPES_KEY).is_none()));
+    // Under benches with none: refused, unless taking them away.
+    assert!(run(&r, &mut doc, "enclosure.heating_pipes", json!({ "enclosure_id": gh, "system": "under_bench" })).is_err());
+    run(&r, &mut doc, "enclosure.heating_pipes", json!({ "enclosure_id": gh, "system": "under_bench", "remove": true })).unwrap();
+}

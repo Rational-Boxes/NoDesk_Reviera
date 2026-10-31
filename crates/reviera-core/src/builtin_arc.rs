@@ -64,6 +64,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(EnclosureVentilation),
         registry.add(EnclosureCo2),
         registry.add(EnclosureHeating),
+        registry.add(EnclosureHeatingPipes),
         registry.add(EnclosureCreate),
         registry.add(EnclosureSet),
         registry.add(EnclosureDetach),
@@ -4765,6 +4766,23 @@ read_command!(
     crate::hothouse::HeatingParams,
     crate::hothouse::Heating,
     crate::hothouse::heating
+);
+
+edit_command!(
+    EnclosureHeatingPipes,
+    "enclosure.heating_pipes",
+    "Lay a glazed enclosure's heating pipes",
+    "Heating pipes laid out (ARC-GLZ-016): `system` `perimeter` lays fin pipe in `runs` loops (default the \
+     heating sizing's, rounded up, for `outside`) round the inside of the walls, `offset` in (0.15 m), the \
+     lowest `height` above the floor (0.3 m) and the rest 0.15 m above one another; `under_bench` lays \
+     `runs` (4 under a bench 1.5 m wide or more, else 2) along each bench of the growing layouts, 0.3 m \
+     below their tops. Pipe runs of `diameter` (1¼ in steel, 42.2 mm) in the hydronic supply system, \
+     replacing the ones this system laid before (`remove` takes them away). Returns the runs, segments, fittings, length and output \
+     at the fin-pipe rating.",
+    "Heating Pipes",
+    crate::hothouse::HeatingPipesParams,
+    crate::hothouse::HeatingPipes,
+    crate::hothouse::heating_pipes
 );
 
 edit_command!(

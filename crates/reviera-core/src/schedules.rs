@@ -470,7 +470,8 @@ impl Context<'_> {
     /// climate, vents and design heat loss.
     fn glazed(&self, e: &Element, key: &str) -> Cell {
         let Some(r) = crate::enclosures::recipe(e) else { return Context::text("") };
-        let number = |v: f64, unit: &str, places: usize| Cell { text: format!("{v:.places$} {unit}").trim_end().to_owned(), value: Some(v), editable: false };
+        // + 0.0: an empty sum is -0.0, shown as "-0".
+        let number = |v: f64, unit: &str, places: usize| Cell { text: format!("{:.places$} {unit}", v + 0.0).trim_end().to_owned(), value: Some(v + 0.0), editable: false };
         let floor = r.width() * r.length;
         let growing = || crate::growing::on_host(self.store, e.guid().as_str());
         let climate = crate::hothouse::climate(e);
@@ -497,7 +498,8 @@ impl Context<'_> {
 
     /// A growing layout's fields, or one piece's (its own run and area).
     fn growing(&self, e: &Element, key: &str) -> Cell {
-        let number = |v: f64, unit: &str, places: usize| Cell { text: format!("{v:.places$} {unit}").trim_end().to_owned(), value: Some(v), editable: false };
+        // + 0.0: an empty sum is -0.0, shown as "-0".
+        let number = |v: f64, unit: &str, places: usize| Cell { text: format!("{:.places$} {unit}", v + 0.0).trim_end().to_owned(), value: Some(v + 0.0), editable: false };
         if let Some(p) = crate::growing::part_recipe(e) {
             let run = (p.end[0] - p.start[0]).hypot(p.end[1] - p.start[1]);
             return match key {
@@ -913,6 +915,9 @@ pub fn table_on_sheet(
                 match def.fields[i].key.as_str() {
                     "count" => format!("{n}"),
                     k if k.starts_with("rebar.") => crate::rebar_docs::total_text(k, sum),
+                    // Greenhouses (ARC-GLZ-015): counts and kilowatts, as their cells.
+                    "glz.pieces" | "grow.pieces" => format!("{sum:.0}"),
+                    "glz.heat_loss" => format!("{sum:.1} kW"),
                     k if k.ends_with("area") => cx.fmt(sum, "area").text,
                     k if k.ends_with("volume") => cx.fmt(sum, "volume").text,
                     _ => cx.fmt(sum, "length").text,
