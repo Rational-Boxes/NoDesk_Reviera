@@ -26,6 +26,7 @@ pub mod csg;
 pub mod inspect;
 pub mod notes;
 pub mod output;
+pub mod bathrooms;
 pub mod overlaps;
 pub mod schedules;
 pub mod scripts;
@@ -492,6 +493,7 @@ impl App {
         for c in reviera_core::clearances::all(store) {
             let color = match c.kind {
                 reviera_core::clearances::ClearanceKind::DoorSwing => [1.0, 0.62, 0.08, 0.3],
+                reviera_core::clearances::ClearanceKind::FixtureSpace => [0.2, 0.75, 0.35, 0.22],
                 _ => [0.1, 0.62, 1.0, 0.22],
             };
             meshes.push(reviera_render::SceneMesh {

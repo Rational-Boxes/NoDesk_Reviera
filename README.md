@@ -602,6 +602,18 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
   them hidden, translucent or solid in each view; they are never exported as physical
   elements (`clearance.set_rule_set`, `clearance.list`, `clearance.check`,
   `view.set_virtual_volumes`).
+- **Bathroom rule packs and fixture clear spaces** (ARC-BATH-001/002; the first part of the
+  bathroom toolset in `design_documents/BATHROOMS_PLAN.md`). WCs, urinals, lavatories, bidets,
+  baths and showers carry their clear spaces as virtual volumes, from rule packs that ship as
+  JSON (MIT schema `schemas/bath/`): the US plumbing codes (IPC 405.3.1, IRC R307), NKBA
+  guidance, the 2010 ADA Standards and England's Approved Document M, each rule with its
+  clause, source and confidence. Packs are chosen in Model Properties, or from the building
+  code and accessibility rule set; a project can add or replace packs. View › Coordination ›
+  Check Bathrooms lists what stands in a clear space, doors swinging into one, and a WC's
+  distance from its side wall, as errors or notes (`bath.rule_packs`, `bath.set_rule_packs`,
+  `bath.add_rule_pack`, `bath.remove_rule_pack`, `bath.set_hand`, `bath.check`). **Not yet**
+  (planned): grab bars by rule, room layouts, toilet cores and partitions, fixture counts,
+  locker rooms, wet areas, spas, the generic bathroom component library and product swaps.
 
 ### Structure (in development)
 

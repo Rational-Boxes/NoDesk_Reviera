@@ -1,0 +1,74 @@
+{
+  "$id": "https://reviera.org/schemas/bath/reviera.bath-rules-1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Reviera bathroom rule pack",
+  "description": "Clearance zones and distance rules for bathroom fixtures, from one code, standard or guide (ARC-BATH-001). Lengths are metres. MIT licensed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "id", "title", "jurisdiction", "edition", "layer"],
+  "properties": {
+    "format": { "const": "reviera.bath-rules-1" },
+    "id": { "type": "string", "pattern": "^[a-z0-9_]+$", "description": "Unique among the packs a project can use; a project pack with a shipped pack's id replaces it." },
+    "title": { "type": "string", "minLength": 1 },
+    "jurisdiction": { "type": "string", "minLength": 1, "description": "Where it applies: US, England, …" },
+    "edition": { "type": "string", "minLength": 1, "description": "The editions and clauses its values come from." },
+    "layer": { "enum": ["minimum", "accessible", "recommended"], "description": "A code minimum, an accessibility standard, or guidance (findings are notes)." },
+    "notes": { "type": "string" },
+    "zones": { "type": "array", "items": { "$ref": "#/$defs/zone" } },
+    "distances": { "type": "array", "items": { "$ref": "#/$defs/distance" } }
+  },
+  "$defs": {
+    "fixture": { "enum": ["water_closet", "urinal", "lavatory", "bidet", "bath", "shower"] },
+    "rule": {
+      "type": "object",
+      "required": ["id", "description", "fixtures", "source", "confidence"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "description": "The clause it comes from, e.g. `ADA 2010 604.3.1`." },
+        "description": { "type": "string", "minLength": 1 },
+        "fixtures": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/fixture" } },
+        "occupancy": { "enum": ["any", "dwelling", "other"], "description": "Where it applies, as the building code settings name occupancies (default any)." },
+        "source": { "type": "string", "pattern": "^S[0-9]{4}( S[0-9]{4})*$", "description": "Source IDs in SOURCE_REGISTER.md." },
+        "confidence": { "enum": ["verified", "secondary", "advisory"] }
+      }
+    },
+    "across": {
+      "type": "array",
+      "prefixItems": [{ "enum": ["centre", "near_edge", "far_edge", "side_wall"] }, { "type": "number" }],
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "A position across the fixture: from its centreline, an edge, or its side wall, positive toward the open side (away from the side wall)."
+    },
+    "out": {
+      "type": "array",
+      "prefixItems": [{ "enum": ["wall", "front"] }, { "type": "number" }],
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "A position out from the wall behind the fixture, or from the fixture's front, positive into the room."
+    },
+    "zone": {
+      "allOf": [{ "$ref": "#/$defs/rule" }],
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["across", "out"],
+      "properties": {
+        "id": true, "description": true, "fixtures": true, "occupancy": true, "source": true, "confidence": true,
+        "across": { "type": "array", "items": { "$ref": "#/$defs/across" }, "minItems": 2, "maxItems": 2 },
+        "out": { "type": "array", "items": { "$ref": "#/$defs/out" }, "minItems": 2, "maxItems": 2 },
+        "height": { "type": "number", "exclusiveMinimum": 0, "description": "How high above the floor it is kept clear (default 1.0 m)." },
+        "door_swing": { "enum": ["allowed", "forbidden"], "description": "Whether a door may swing into it (default allowed)." }
+      }
+    },
+    "distance": {
+      "allOf": [{ "$ref": "#/$defs/rule" }],
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["measure"],
+      "properties": {
+        "id": true, "description": true, "fixtures": true, "occupancy": true, "source": true, "confidence": true,
+        "measure": { "enum": ["centreline_to_side_wall"] },
+        "min": { "type": "number", "minimum": 0 },
+        "max": { "type": "number", "minimum": 0 }
+      }
+    }
+  }
+}

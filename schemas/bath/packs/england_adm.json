@@ -1,0 +1,44 @@
+{
+  "format": "reviera.bath-rules-1",
+  "id": "england_adm",
+  "title": "England, Approved Document M",
+  "jurisdiction": "England",
+  "edition": "Approved Document M Vol 1 (2015 incorporating 2016 amendments), M4(1); Vol 2 (2015 with 2020 and 2024 amendments), Diagram 18",
+  "layer": "accessible",
+  "notes": "Vol 2 values are read from Diagram 18 (the unisex wheelchair-accessible toilet). Ambulant cubicles (Diagram 21, 920 × 1465 mm since 2024) are not yet in this pack.",
+  "zones": [
+    {
+      "id": "AD M Vol 1 M4(1) WC access zone",
+      "description": "WC access zone 750 mm deep in front of the pan, 450 mm either side of the centreline for a frontal transfer; a basin must not project into it so as to impede access",
+      "fixtures": ["water_closet"],
+      "occupancy": "dwelling",
+      "across": [["centre", -0.45], ["centre", 0.45]],
+      "out": [["front", 0.0], ["front", 0.75]],
+      "source": "S0904",
+      "confidence": "verified"
+    },
+    {
+      "id": "AD M Vol 2 Diagram 18 transfer space",
+      "description": "At least 1000 mm clear from the WC centreline to the transfer-side wall, beside the pan (front of the pan 750 mm from the rear wall)",
+      "fixtures": ["water_closet"],
+      "occupancy": "other",
+      "across": [["centre", 0.0], ["centre", 1.0]],
+      "out": [["wall", 0.0], ["wall", 0.75]],
+      "source": "S0905",
+      "confidence": "secondary"
+    }
+  ],
+  "distances": [
+    {
+      "id": "AD M Vol 2 Diagram 18 centreline",
+      "description": "WC centreline 500 mm from the side wall",
+      "fixtures": ["water_closet"],
+      "occupancy": "other",
+      "measure": "centreline_to_side_wall",
+      "min": 0.5,
+      "max": 0.5,
+      "source": "S0905",
+      "confidence": "secondary"
+    }
+  ]
+}

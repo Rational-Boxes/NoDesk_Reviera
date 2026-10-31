@@ -1,0 +1,73 @@
+{
+  "format": "reviera.bath-rules-1",
+  "id": "ada_2010",
+  "title": "2010 ADA Standards for Accessible Design",
+  "jurisdiction": "US",
+  "edition": "2010 ADA Standards §§305, 603–608",
+  "layer": "accessible",
+  "notes": "Clear floor spaces may overlap each other and the turning space (305.2, 603.2.1); doors may not swing into any fixture's clear floor space or clearance (603.2.3), with exceptions for single-user rooms that this pack does not apply. Showers are taken as standard roll-in showers; a transfer shower's 36 × 48 in clearance differs.",
+  "zones": [
+    {
+      "id": "ADA 2010 604.3.1",
+      "description": "WC clearance 60 in (1525 mm) from the side wall by 56 in (1420 mm) from the rear wall; grab bars, dispensers and other fixtures' clear floor spaces may overlap it",
+      "fixtures": ["water_closet"],
+      "across": [["side_wall", 0.0], ["side_wall", 1.525]],
+      "out": [["wall", 0.0], ["wall", 1.42]],
+      "door_swing": "forbidden",
+      "source": "S0869",
+      "confidence": "verified"
+    },
+    {
+      "id": "ADA 2010 606.2",
+      "description": "30 × 48 in (760 × 1220 mm) clear floor space for a forward approach to a lavatory, 17 in of it in the knee and toe space under the lavatory",
+      "fixtures": ["lavatory"],
+      "across": [["centre", -0.38], ["centre", 0.38]],
+      "out": [["front", -0.43], ["front", 0.79]],
+      "door_swing": "forbidden",
+      "source": "S0869",
+      "confidence": "verified"
+    },
+    {
+      "id": "ADA 2010 605.3",
+      "description": "30 × 48 in (760 × 1220 mm) clear floor space for a forward approach to a urinal",
+      "fixtures": ["urinal"],
+      "across": [["centre", -0.38], ["centre", 0.38]],
+      "out": [["front", 0.0], ["front", 1.22]],
+      "door_swing": "forbidden",
+      "source": "S0869",
+      "confidence": "verified"
+    },
+    {
+      "id": "ADA 2010 607.2",
+      "description": "Clearance 30 in (760 mm) wide along the whole length of a bathtub",
+      "fixtures": ["bath"],
+      "across": [["near_edge", 0.0], ["far_edge", 0.0]],
+      "out": [["front", 0.0], ["front", 0.76]],
+      "door_swing": "forbidden",
+      "source": "S0869",
+      "confidence": "verified"
+    },
+    {
+      "id": "ADA 2010 608.2.2.1",
+      "description": "Clearance 30 in (760 mm) wide along the open face of a standard roll-in shower",
+      "fixtures": ["shower"],
+      "across": [["near_edge", 0.0], ["far_edge", 0.0]],
+      "out": [["front", 0.0], ["front", 0.76]],
+      "door_swing": "forbidden",
+      "source": "S0869",
+      "confidence": "verified"
+    }
+  ],
+  "distances": [
+    {
+      "id": "ADA 2010 604.2",
+      "description": "WC centreline 16–18 in (405–455 mm) from the side wall or partition",
+      "fixtures": ["water_closet"],
+      "measure": "centreline_to_side_wall",
+      "min": 0.405,
+      "max": 0.455,
+      "source": "S0869",
+      "confidence": "verified"
+    }
+  ]
+}

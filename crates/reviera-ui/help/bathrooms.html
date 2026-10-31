@@ -1,0 +1,95 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Bathrooms and fixture clearances</h1>
+<p class="lead">Bathroom fixtures need space in front of and beside them: to sit, stand, wash
+and, for wheelchair users, to approach and transfer. Reviera keeps the rules for that space as
+<b>rule packs</b>, each from one code, standard or guide, and shows each fixture's clear space as
+it is placed. <b>Check Bathrooms</b> then lists what stands in that space, which doors swing into
+it, and whether a WC is the right distance from its side wall.</p>
+<nav class="toc">
+  <a href="#packs">Rule packs</a>
+  <a href="#zones">Clear spaces</a>
+  <a href="#check">Check Bathrooms</a>
+  <a href="#hand">The side wall</a>
+  <a href="#own">Your own packs</a>
+  <a href="#limits">Limits and what to check</a>
+  <a href="#scripts">Scripts and agents</a>
+</nav>
+
+<h2 id="packs">Rule packs</h2>
+<p>Four packs ship with Reviera. Each rule names its clause, its source and how sure the reading
+is: <i>verified</i> (read in the official text), <i>secondary</i> (from a reliable summary or an
+adopted code) or <i>advisory</i> (to be checked).</p>
+<table>
+  <tr><th>Pack</th><th>Kind</th><th>What it asks</th></tr>
+  <tr><td>US plumbing code clearances (IPC and IRC)</td><td>Code</td><td>15 in (381 mm) from the
+  centreline of a WC, urinal, lavatory or bidet to a side wall or another fixture; 21 in
+  (533 mm) clear in front; 24 in (610 mm) in front of a shower and 21 in in front of a bath in
+  homes.</td></tr>
+  <tr><td>NKBA bathroom planning recommendations</td><td>Guidance</td><td>18 in beside a WC,
+  20 in beside a lavatory, 30 in in front of each fixture, with no door swinging into it.</td></tr>
+  <tr><td>2010 ADA Standards for Accessible Design</td><td>Accessibility</td><td>A WC's clearance
+  60 × 56 in (1525 × 1420 mm) from its side and rear walls, its centreline 16–18 in
+  (405–455 mm) from the side wall; 30 × 48 in clear floor space at lavatories and urinals; 30 in
+  along a bath and a roll-in shower; no door swinging into any of them.</td></tr>
+  <tr><td>England, Approved Document M</td><td>Accessibility</td><td>In homes, a WC access zone
+  750 mm deep and 450 mm either side of the centreline; elsewhere, a unisex WC's centreline
+  500 mm from the side wall with 1000 mm clear on the transfer side.</td></tr>
+</table>
+<p>Choose them in <a href="reviera:action/ui.model_properties">Manage › Model Properties</a>,
+under <b>Bathroom rules</b>. Left to choose automatically, Reviera uses the US plumbing codes
+when the building code is the IBC or IRC, Approved Document M when it is England's, and the ADA
+when the accessibility rule set is the ADA. NKBA guidance is only used when you tick it.</p>
+
+<h2 id="zones">Clear spaces</h2>
+<p>Each WC, urinal, lavatory, bidet, bath and shower gets one clear space for each rule of the
+packs in use. They are <a href="reviera:help/coordination">virtual volumes</a>, like door swings:
+they move and turn with the fixture, are never built or scheduled, and show in green when a
+view shows virtual volumes (View › Coordination › Virtual Volumes). A space is measured across
+the fixture (from its centreline, an edge or its side wall) and out into the room (from the wall
+behind it or its front), and runs from the floor to 1.0 m, so that vanities and basins count and
+things mounted higher do not.</p>
+<p>The fixture itself, grab bars, rails and accessories may stand in its space; so may other
+fixtures' spaces, since clear floor spaces may overlap. Anything else is in the way.</p>
+
+<h2 id="check">Check Bathrooms</h2>
+<p><a href="reviera:action/bath.check">View › Coordination › Check Bathrooms</a> lists the
+findings, errors first. An <b>error</b> breaks a code or accessibility rule; a <b>note</b> comes
+from guidance, or from a rule whose reading still needs checking (its confidence is shown in
+brackets). Pick a finding to select the fixture and what is in its way, frame them, and read the
+rule, its edition and its source in the status bar. Check Overlaps lists the same intrusions with
+the other overlaps.</p>
+
+<h2 id="hand">The side wall</h2>
+<p>Some rules are measured from the wall beside the fixture: the ADA WC clearance runs 60 in from
+it, and its centreline must be 16–18 in from it. Reviera looks for the nearest wall within 1.2 m
+either side of the fixture. Where none is modelled yet, it assumes one on the left at the
+furthest distance the rules allow, and Check Bathrooms says so. To fix the side, select the
+fixtures and run <code>bath.set_hand</code> with <code>left</code> or <code>right</code> (as you
+face the fixture), or <code>auto</code> to look again.</p>
+
+<h2 id="own">Your own packs</h2>
+<p>A pack is a JSON file following <code>schemas/bath/reviera.bath-rules-1.schema.json</code>
+(MIT licensed). To use a local amendment or an office standard, copy a pack from
+<code>bath.rule_packs</code>, change its values and add it with <code>bath.add_rule_pack</code>.
+A pack with the id of a shipped one replaces it in this project; <code>bath.remove_rule_pack</code>
+brings the shipped one back. Project packs are saved with the model.</p>
+
+<h2 id="limits">Limits and what to check</h2>
+<ul>
+  <li>Showers are taken as standard roll-in showers under the ADA; a transfer shower's
+  36 × 48 in clearance is not yet in the pack.</li>
+  <li>The UPC (California) asks for 24 in, not 21 in, in front of a WC, lavatory or bidet: copy
+  the US pack and change it.</li>
+  <li>Approved Document M's Volume 2 values are read from its diagram; ambulant cubicles (920 ×
+  1465 mm since 2024) come with toilet cores.</li>
+  <li>Exceptions that depend on the room (single-user rooms where a door may swing over a clear
+  space, dwelling-unit allowances) are not applied: decide them, and accept the overlap if it is
+  intended.</li>
+</ul>
+
+<h2 id="scripts">Scripts and agents</h2>
+<p>Everything above is a command: <code>bath.rule_packs</code>, <code>bath.set_rule_packs</code>,
+<code>bath.add_rule_pack</code>, <code>bath.remove_rule_pack</code>, <code>bath.set_hand</code>
+and <code>bath.check</code>; <code>clearance.list</code> and <code>clearance.check</code> include
+fixture spaces. Lua scripts and AI agents (MCP, the <i>modeling</i> toolset) can use them.</p>

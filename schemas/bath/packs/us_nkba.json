@@ -1,0 +1,49 @@
+{
+  "format": "reviera.bath-rules-1",
+  "id": "us_nkba",
+  "title": "NKBA bathroom planning recommendations",
+  "jurisdiction": "US",
+  "edition": "NKBA Bath Planning recommendations (2008 excerpt); door swings from the 4th edition (2022) minimum guidelines",
+  "layer": "recommended",
+  "notes": "Guidance for comfort, not a code. Some summaries give 15 in, not 18 in, beside a WC.",
+  "zones": [
+    {
+      "id": "NKBA WC centreline",
+      "description": "18 in (457 mm) from a WC's centreline to a wall or obstacle",
+      "fixtures": ["water_closet"],
+      "across": [["centre", -0.457], ["centre", 0.457]],
+      "out": [["wall", 0.0], ["front", 0.0]],
+      "source": "S0886",
+      "confidence": "secondary"
+    },
+    {
+      "id": "NKBA lavatory centreline",
+      "description": "20 in (508 mm) from a lavatory's centreline to a wall",
+      "fixtures": ["lavatory"],
+      "across": [["centre", -0.508], ["centre", 0.508]],
+      "out": [["wall", 0.0], ["front", 0.0]],
+      "source": "S0886",
+      "confidence": "secondary"
+    },
+    {
+      "id": "NKBA clear space",
+      "description": "30 in (762 mm) clear in front of a WC, lavatory or bidet, 30 in wide, not blocked by a door swing",
+      "fixtures": ["water_closet", "lavatory", "bidet"],
+      "across": [["centre", -0.381], ["centre", 0.381]],
+      "out": [["front", 0.0], ["front", 0.762]],
+      "door_swing": "forbidden",
+      "source": "S0886 S0885",
+      "confidence": "secondary"
+    },
+    {
+      "id": "NKBA shower and tub",
+      "description": "30 in (762 mm) clear in front of a shower or tub, not blocked by a door swing",
+      "fixtures": ["shower", "bath"],
+      "across": [["near_edge", 0.0], ["far_edge", 0.0]],
+      "out": [["front", 0.0], ["front", 0.762]],
+      "door_swing": "forbidden",
+      "source": "S0886 S0885",
+      "confidence": "secondary"
+    }
+  ]
+}

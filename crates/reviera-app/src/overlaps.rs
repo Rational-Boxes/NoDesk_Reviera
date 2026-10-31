@@ -224,9 +224,11 @@ impl HostCommand for ClearanceCheck {
         name: "clearance.check",
         version: 1,
         summary: "Check virtual volumes for intrusions",
-        description: "Checks each virtual volume (ARC-MOD-031: door swings, and the accessibility rule set's \
-                      maneuvering clearances) against every element's body, and door swings against each \
-                      other. A door's own body and its wall are allowed. Returns each intrusion with its volume, \
+        description: "Checks each virtual volume (ARC-MOD-031: door swings, the accessibility rule set's \
+                      maneuvering clearances, and bathroom fixtures' clear spaces, ARC-BATH-002) against every \
+                      element's body, door swings against each other, and door swings against fixture spaces \
+                      whose rules forbid them. A door's own body and its wall are allowed, and so are a fixture, \
+                      grab bars, rails and accessories in a fixture's space. Returns each intrusion with its volume, \
                       depth, box and centroid, largest first.",
         effects: &[Effect::Read],
         transaction_name: "",
@@ -263,12 +265,15 @@ impl HostCommand for ClearanceCheck {
                 .get(id)
                 .map_or_else(|| format!("#{}", id.0), |e| format!("{} {}", e.class, id.0))
         };
-        let skip = |a: ElementId, b: ElementId| {
-            reviera_core::bodies::related(store, a, b)
-                || reviera_core::overlap_accept::is_accepted(store, a, b)
-        };
         let mut out = Vec::new();
         for c in &clearances {
+            // A fixture's own body, and the grab bars and accessories allowed in its space.
+            let skip = |a: ElementId, b: ElementId| {
+                let other = if a == c.element { b } else { a };
+                reviera_core::bodies::related(store, a, b)
+                    || reviera_core::overlap_accept::is_accepted(store, a, b)
+                    || reviera_core::clearances::may_share(store, c.kind, other)
+            };
             for ov in overlap::find(&[c.body()], Some(&bodies), &skip, &o) {
                 let other = if ov.a == c.element { ov.b } else { ov.a };
                 out.push(Intrusion {
@@ -286,11 +291,31 @@ impl HostCommand for ClearanceCheck {
                 });
             }
         }
-        // Doors that would hit each other.
+        // Doors swinging into fixture spaces whose rules forbid it (ARC-BATH-002).
         let swings: Vec<_> = reviera_core::clearances::all(store)
             .into_iter()
             .filter(|c| c.kind == reviera_core::clearances::ClearanceKind::DoorSwing)
             .collect();
+        for c in clearances.iter().filter(|c| c.door_swing_forbidden) {
+            for s in &swings {
+                if let Some(ov) = overlap::between(&c.body(), &s.body(), &o) {
+                    out.push(Intrusion {
+                        element: c.element,
+                        kind: c.kind,
+                        rule: c.rule.clone(),
+                        other: s.element,
+                        other_is_swing: true,
+                        label: format!("{}'s swing", label(s.element)),
+                        volume: ov.volume,
+                        depth: ov.depth,
+                        min: ov.min,
+                        max: ov.max,
+                        centroid: ov.centroid,
+                    });
+                }
+            }
+        }
+        // Doors that would hit each other.
         for (i, a) in swings.iter().enumerate() {
             for b in &swings[i + 1..] {
                 if only

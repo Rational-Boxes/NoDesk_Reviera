@@ -1,0 +1,49 @@
+{
+  "format": "reviera.bath-rules-1",
+  "id": "us_plumbing",
+  "title": "US plumbing code clearances (IPC and IRC)",
+  "jurisdiction": "US",
+  "edition": "IPC §405.3.1 (2015 text as adopted by Ohio; the 2018 edition's change notes); IRC R307.1 (2015, as adopted by Seattle; NC OSFM interpretation)",
+  "layer": "minimum",
+  "notes": "The UPC (California Plumbing Code 402.5) asks for 24 in in front of a WC, lavatory or bidet and 12 in from a urinal centreline; copy this pack to use it.",
+  "zones": [
+    {
+      "id": "IPC 405.3.1 side",
+      "description": "15 in (381 mm) from the centreline of a WC, urinal, lavatory or bidet to any side wall, partition, vanity or other fixture; 30 in between centrelines",
+      "fixtures": ["water_closet", "urinal", "lavatory", "bidet"],
+      "across": [["centre", -0.381], ["centre", 0.381]],
+      "out": [["wall", 0.0], ["front", 0.0]],
+      "source": "S0873 S0878",
+      "confidence": "verified"
+    },
+    {
+      "id": "IPC 405.3.1 front",
+      "description": "21 in (533 mm) clear in front of a WC, urinal, lavatory or bidet to any wall, fixture or door",
+      "fixtures": ["water_closet", "urinal", "lavatory", "bidet"],
+      "across": [["centre", -0.381], ["centre", 0.381]],
+      "out": [["front", 0.0], ["front", 0.533]],
+      "source": "S0873 S0878",
+      "confidence": "verified"
+    },
+    {
+      "id": "IRC R307.1 shower",
+      "description": "24 in (610 mm) clear in front of a shower opening",
+      "fixtures": ["shower"],
+      "occupancy": "dwelling",
+      "across": [["near_edge", 0.0], ["far_edge", 0.0]],
+      "out": [["front", 0.0], ["front", 0.61]],
+      "source": "S0883 S0884",
+      "confidence": "secondary"
+    },
+    {
+      "id": "IRC R307.1 bath",
+      "description": "21 in (533 mm) clear in front of a bathtub",
+      "fixtures": ["bath"],
+      "occupancy": "dwelling",
+      "across": [["near_edge", 0.0], ["far_edge", 0.0]],
+      "out": [["front", 0.0], ["front", 0.533]],
+      "source": "S0886",
+      "confidence": "secondary"
+    }
+  ]
+}

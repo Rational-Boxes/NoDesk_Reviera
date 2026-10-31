@@ -531,6 +531,11 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(WallSweepSet),
         registry.add(WallResetProfile),
         registry.add(WallGetProfile),
+        registry.add(BathRulePacks),
+        registry.add(BathSetRulePacks),
+        registry.add(BathAddRulePack),
+        registry.add(BathRemoveRulePack),
+        registry.add(BathSetHand),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -6716,4 +6721,68 @@ edit_command!(
     crate::walls::cross_section::SetParams,
     (),
     crate::walls::cross_section::set
+);
+
+read_command!(
+    BathRulePacks,
+    "bath.rule_packs",
+    "List the bathroom rule packs",
+    "Lists the bathroom rule packs the project can use (ARC-BATH-001): the four that ship (`us_plumbing`, \
+     `us_nkba`, `ada_2010`, `england_adm`), each replaced by a project pack of its id, then the project's \
+     own; each with its layer, jurisdiction, edition, zones and distance rules, whether it is in use, and \
+     whether it ships with Reviera.",
+    Option<crate::bath_rules::NoParams>,
+    Vec<crate::bath_rules::PackInfo>,
+    crate::bath_rules::list_rule_packs
+);
+
+edit_command!(
+    BathSetRulePacks,
+    "bath.set_rule_packs",
+    "Choose the bathroom rule packs",
+    "Chooses the bathroom rule packs in use, by id (ARC-BATH-001). With no `packs`, they are chosen from the \
+     building code and accessibility rule set: `us_plumbing` for the IBC or IRC, `england_adm` for England, \
+     and `ada_2010` with the ADA rule set.",
+    "Bathroom Rules",
+    crate::bath_rules::SetPacksParams,
+    (),
+    crate::bath_rules::set_rule_packs
+);
+
+edit_command!(
+    BathAddRulePack,
+    "bath.add_rule_pack",
+    "Add a bathroom rule pack to the project",
+    "Adds a rule pack following `schemas/bath/reviera.bath-rules-1.schema.json` to the project, kept with the \
+     model (ARC-BATH-001). A pack with the id of a shipped one, or of one the project has, replaces it. \
+     Returns its id.",
+    "Add Bathroom Rules",
+    crate::bath_rules::AddPackParams,
+    String,
+    crate::bath_rules::add_rule_pack
+);
+
+edit_command!(
+    BathRemoveRulePack,
+    "bath.remove_rule_pack",
+    "Remove a project's bathroom rule pack",
+    "Removes one of the project's own bathroom rule packs (ARC-BATH-001); a shipped pack it replaced comes \
+     back.",
+    "Remove Bathroom Rules",
+    crate::bath_rules::RemovePackParams,
+    (),
+    crate::bath_rules::remove_rule_pack
+);
+
+edit_command!(
+    BathSetHand,
+    "bath.set_hand",
+    "Set which side a fixture's side wall is on",
+    "Fixes which side bathroom fixtures' side walls are on, as you face them (ARC-BATH-002): `left` or \
+     `right`, or `auto` to take the nearer wall within 1.2 m. Clearances measured from the side wall (an ADA \
+     WC's 60 in) are laid out from it, for when the partition is not modelled yet.",
+    "Fixture Hand",
+    crate::bath_rules::SetHandParams,
+    (),
+    crate::bath_rules::set_hand
 );

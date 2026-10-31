@@ -20,9 +20,12 @@
 //!   automatic (powered) doors, sliding and revolving doors have none of their own (ADA 404.3
 //!   covers automatic doors; a revolving door needs an accessible door beside it, 404.1).
 //!
-//! The rule set is held on the project (`rxd:accessibility`). Fixture clear floor spaces,
-//! turning spaces and element-defined service clearances come with components and accessible
-//! rooms.
+//! - **Fixture spaces**: the clearance zones of bathroom fixtures under the bathroom rule packs
+//!   in use ([`crate::bath_rules`], ARC-BATH-002). The fixture itself, grab bars, rails and
+//!   accessories may stand in them ([`may_share`]).
+//!
+//! The rule set is held on the project (`rxd:accessibility`). Turning spaces and element-defined
+//! service clearances come with accessible rooms and components.
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -62,6 +65,8 @@ pub enum ClearanceKind {
     PushSide,
     /// The wall face a sliding door's leaves slide over.
     SlideSpace,
+    /// A bathroom fixture's clearance zone (ARC-BATH-002).
+    FixtureSpace,
 }
 
 impl ClearanceKind {
@@ -72,6 +77,7 @@ impl ClearanceKind {
             Self::PullSide => "Clearance:pull_side/3d",
             Self::PushSide => "Clearance:push_side/3d",
             Self::SlideSpace => "Clearance:slide_space/3d",
+            Self::FixtureSpace => "Clearance:fixture_space/3d",
         }
     }
 
@@ -81,6 +87,7 @@ impl ClearanceKind {
             Self::PullSide => "pull-side clearance",
             Self::PushSide => "push-side clearance",
             Self::SlideSpace => "slide space",
+            Self::FixtureSpace => "fixture clear space",
         }
     }
 }
@@ -92,8 +99,10 @@ pub struct Clearance {
     pub element: ElementId,
     pub kind: ClearanceKind,
     /// The rule it comes from (empty for a door swing).
-    pub rule: &'static str,
+    pub rule: String,
     pub mesh: Mesh,
+    /// No door may swing into it (ARC-BATH-002).
+    pub door_swing_forbidden: bool,
 }
 
 impl Clearance {
@@ -156,7 +165,8 @@ pub fn of_door(p: &Placed, rules: RuleSet) -> Vec<Clearance> {
         out.push(Clearance {
             element: p.id,
             kind: ClearanceKind::DoorSwing,
-            rule: "",
+            rule: String::new(),
+            door_swing_forbidden: false,
             mesh: local_prism(p, &swing, 0.0, leaf_top),
         });
     }
@@ -173,7 +183,8 @@ pub fn of_door(p: &Placed, rules: RuleSet) -> Vec<Clearance> {
             out.push(Clearance {
                 element: p.id,
                 kind: ClearanceKind::DoorSwing,
-                rule: "",
+                rule: String::new(),
+            door_swing_forbidden: false,
                 mesh: local_prism(p, &drum, 0.0, t.height - 0.2),
             });
         }
@@ -188,7 +199,8 @@ pub fn of_door(p: &Placed, rules: RuleSet) -> Vec<Clearance> {
                 out.push(Clearance {
                     element: p.id,
                     kind: ClearanceKind::SlideSpace,
-                    rule: "",
+                    rule: String::new(),
+            door_swing_forbidden: false,
                     mesh: local_prism(p, &space, 0.0, leaf_top),
                 });
             }
@@ -217,7 +229,8 @@ pub fn of_door(p: &Placed, rules: RuleSet) -> Vec<Clearance> {
         out.push(Clearance {
             element: p.id,
             kind: ClearanceKind::PullSide,
-            rule: "ADA 2010 404.2.4.1",
+            rule: "ADA 2010 404.2.4.1".into(),
+            door_swing_forbidden: false,
             mesh: local_prism(p, &pull, 0.0, height),
         });
         let push = [
@@ -229,7 +242,8 @@ pub fn of_door(p: &Placed, rules: RuleSet) -> Vec<Clearance> {
         out.push(Clearance {
             element: p.id,
             kind: ClearanceKind::PushSide,
-            rule: "ADA 2010 404.2.4.1",
+            rule: "ADA 2010 404.2.4.1".into(),
+            door_swing_forbidden: false,
             mesh: local_prism(p, &push, 0.0, height),
         });
     }
@@ -239,10 +253,21 @@ pub fn of_door(p: &Placed, rules: RuleSet) -> Vec<Clearance> {
 /// Every virtual volume in the model.
 pub fn all(store: &Store) -> Vec<Clearance> {
     let rules = rule_set(store);
-    crate::inserts::placed(store)
+    let mut out: Vec<Clearance> = crate::inserts::placed(store)
         .iter()
         .flat_map(|p| of_door(p, rules))
-        .collect()
+        .collect();
+    out.extend(crate::bath_rules::spaces(store).into_iter().map(|s| s.clearance));
+    out
+}
+
+/// Whether an element may stand in a virtual volume of this kind: grab bars, rails and
+/// accessories in a fixture's clear space (ADA 2010 604.3.2, UPC 402.5).
+pub fn may_share(store: &Store, kind: ClearanceKind, other: ElementId) -> bool {
+    kind == ClearanceKind::FixtureSpace
+        && store
+            .get(other)
+            .is_some_and(|e| matches!(e.class.as_str(), "IfcRailing" | "IfcDiscreteAccessory"))
 }
 
 /// How a view shows virtual volumes: `hidden`, `translucent` or `solid`.
@@ -349,7 +374,7 @@ pub fn list(store: &Store, p: ListParams) -> Result<Vec<ClearanceInfo>> {
             Some(ClearanceInfo {
                 element: c.element,
                 kind: c.kind,
-                rule: c.rule.to_owned(),
+                rule: c.rule.clone(),
                 min,
                 max,
             })

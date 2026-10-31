@@ -720,6 +720,12 @@ icon = "remove_boolean"
 help = "Remove the selected elements' cuts, joins and other booleans; their own shapes return"
 
 [[action]]
+id = "bath.check"
+label = "Check Bathrooms"
+icon = "bath_check"
+help = "Check bathroom fixtures' clear spaces and distances under the bathroom rule packs in use (Model Properties): what stands in them, doors swinging into them, a WC's distance from its side wall; pick a finding to select and frame it (ARC-BATH-002)"
+
+[[action]]
 id = "overlap.find"
 label = "Check Overlaps"
 icon = "overlaps"
@@ -4030,6 +4036,7 @@ label = "Coordination"
 tools = [
   { action = "ui.pane.clash", size = "large" },
   { action = "overlap.find", size = "large" },
+  { action = "bath.check", size = "large" },
   { action = "geometry.remove_boolean", size = "small" },
   { action = "view.set_virtual_volumes", size = "large" },
   { action = "clearance.set_rule_set" },
@@ -4579,7 +4586,7 @@ items = [
   "inspect.ghost_others", "inspect.translucent", "inspect.translucent_subtree", "inspect.reset", "inspect.apply_to_view", "-",
   "inspect.hide_in_view", "inspect.hide_category_in_view", "inspect.unhide_all_in_view",
   "inspect.override_in_view", "-",
-  "ui.pane.clash", "overlap.find", "view.set_virtual_volumes", "clearance.set_rule_set",
+  "ui.pane.clash", "overlap.find", "bath.check", "view.set_virtual_volumes", "clearance.set_rule_set",
 ]
 
 [[menu]]

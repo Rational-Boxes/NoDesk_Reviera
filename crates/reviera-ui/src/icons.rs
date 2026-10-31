@@ -1398,6 +1398,10 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "overlaps" => format!(
             r#"<rect x="4" y="9" width="15" height="15" fill="{f}" {s}/><rect x="13" y="4" width="15" height="15" fill="none" {sa}/><path d="M13 9h6v10h-6z" fill="{a}" {s}/>"#
         ),
+        // A WC in plan, its tank against the wall, and its clear space dashed in front.
+        "bath_check" => format!(
+            r#"<path d="M4 3h24" {s}/><rect x="11" y="4" width="10" height="4" fill="{f}" {s}/><ellipse cx="16" cy="13" rx="4.5" ry="5" fill="{f}" {s}/><rect x="6" y="19" width="20" height="9" fill="none" {sa} stroke-dasharray="3 2"/>"#
+        ),
         "eaves" => format!(
             r#"<path d="M2 16L16 5l14 11" fill="none" {sa}/><path d="M7 12v16h18V12" fill="{f}" {s}/><path d="M2 16v3h5M30 16v3h-5" {sa}/>"#
         ),

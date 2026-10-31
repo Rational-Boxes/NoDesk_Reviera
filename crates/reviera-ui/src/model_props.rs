@@ -3,9 +3,10 @@
 
 //! Manage › Model Properties (UN): the model-wide settings in one place (DM-CODE-001,
 //! DM-UNIT-001, ARC-MOD-031). Units (a preset, and the decimal and grouping symbols), the
-//! building code with its occupancy and the model's own stair headroom, and the accessibility
-//! rule set. OK applies what changed through `units.set_preset`, `units.set_number_format`,
-//! `code.set` and `clearance.set_rule_set`. Tools use these as their defaults; a tool may use
+//! building code with its occupancy and the model's own stair headroom, the accessibility
+//! rule set, and the bathroom rule packs (ARC-BATH-001). OK applies what changed through
+//! `units.set_preset`, `units.set_number_format`, `code.set`, `clearance.set_rule_set` and
+//! `bath.set_rule_packs`. Tools use these as their defaults; a tool may use
 //! another code for one operation (the stair opening offer).
 
 use reviera_core::codes::{self, Code, Occupancy};
@@ -46,6 +47,9 @@ impl Gui {
         let units = reviera_core::units::settings_of(&store);
         let code = codes::settings(&store);
         let rules = reviera_core::clearances::rule_set(&store);
+        let packs = reviera_core::bath_rules::available(&store);
+        let packs_chosen = reviera_core::bath_rules::chosen(&store);
+        let packs_now: Vec<String> = reviera_core::bath_rules::active(&store).into_iter().map(|p| p.id).collect();
         let preset_now = PRESETS.iter().position(|(_, p)| {
             UnitSettings::preset(*p).formats.get("length") == units.formats.get("length")
         });
@@ -159,6 +163,40 @@ impl Gui {
             "Clearances checked as virtual volumes (Check Overlaps)",
         );
 
+        heading("Bathroom rules");
+        let blank = StaticText::builder(&dialog).with_label("").build();
+        grid.add(&blank, 0, SizerFlag::AlignCenterVertical, 0);
+        let auto = CheckBox::builder(&dialog)
+            .with_label("Choose from the building code and accessibility rule set")
+            .build();
+        auto.set_value(packs_chosen.is_none());
+        auto.set_tooltip("The US plumbing codes for the IBC or IRC, Approved Document M for England, and the ADA with the ADA rule set");
+        grid.add(&auto, 1, SizerFlag::Expand, 0);
+        let pack_boxes: Vec<(String, CheckBox)> = packs
+            .iter()
+            .map(|p| {
+                let layer = match p.layer {
+                    reviera_core::bath_rules::Layer::Minimum => "Code",
+                    reviera_core::bath_rules::Layer::Accessible => "Accessibility",
+                    reviera_core::bath_rules::Layer::Recommended => "Guidance",
+                };
+                let l = StaticText::builder(&dialog).with_label(layer).build();
+                let b = CheckBox::builder(&dialog).with_label(&p.title).build();
+                b.set_value(packs_now.contains(&p.id));
+                b.set_tooltip(&p.edition);
+                grid.add(&l, 0, SizerFlag::AlignCenterVertical, 0);
+                grid.add(&b, 1, SizerFlag::Expand, 0);
+                (p.id.clone(), b)
+            })
+            .collect();
+        let blank = StaticText::builder(&dialog).with_label("").build();
+        grid.add(&blank, 0, SizerFlag::AlignCenterVertical, 0);
+        let note = StaticText::builder(&dialog)
+            .with_label("Ticking packs yourself unticks the automatic choice. Fixtures' clear spaces show as virtual volumes; Check Bathrooms reports what is in them.")
+            .build();
+        note.wrap(380);
+        grid.add(&note, 1, SizerFlag::Expand, 0);
+
         sizer.add_sizer(&grid, 1, SizerFlag::All | SizerFlag::Expand, 12);
         let ok = Button::builder(&dialog)
             .with_id(ID_OK)
@@ -193,6 +231,8 @@ impl Gui {
         let occupancy_pick = OCCUPANCIES[sel(&occupancy)].1;
         let headroom_text = headroom.get_value();
         let rule_pick = RULES[sel(&rule)].1;
+        let auto_pick = auto.is_checked();
+        let packs_pick: Vec<String> = pack_boxes.iter().filter(|(_, b)| b.is_checked()).map(|(id, _)| id.clone()).collect();
         dialog.destroy();
 
         let mut problems = Vec::new();
@@ -233,6 +273,13 @@ impl Gui {
         if rule_pick != rule_now
             && let Err(e) = self.run("clearance.set_rule_set", json!({ "standard": rule_pick }))
         {
+            problems.push(e);
+        }
+        // Packs ticked by hand, unless the ticks are just the automatic choice left alone.
+        let automatic = auto_pick && packs_pick == packs_now;
+        let packs_args = if automatic { json!({}) } else { json!({ "packs": packs_pick }) };
+        let packs_change = if automatic { packs_chosen.is_some() } else { packs_chosen.as_ref() != Some(&packs_pick) };
+        if packs_change && let Err(e) = self.run("bath.set_rule_packs", packs_args) {
             problems.push(e);
         }
         self.properties_stale = true;

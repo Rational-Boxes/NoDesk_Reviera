@@ -210,6 +210,7 @@ pub fn toolset_of(command: &str) -> String {
             | "glazing"
             | "frame"
             | "growing"
+            | "bath"
             | "vent"
             | "railing"
             | "deck"
@@ -312,6 +313,7 @@ mod tests {
         assert_eq!(toolset_of("edit.undo"), "core");
         assert_eq!(toolset_of("file.open"), "io");
         assert_eq!(toolset_of("compute.submit"), "analysis");
+        assert_eq!(toolset_of("bath.check"), "modeling");
         assert_eq!(toolset_of("compute_host.list"), "analysis");
         assert_eq!(toolset_of("family_doc.form.extrusion"), "families");
         assert_eq!(

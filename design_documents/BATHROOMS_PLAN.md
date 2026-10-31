@@ -1,7 +1,8 @@
 # Bathrooms, toilet rooms, locker rooms and spas
 
-**Status:** Draft 0.1 · 2026-10-31 · for the owner's review. Nothing here is built yet. The spec
-sections will follow from this plan once the owner has answered §11.
+**Status:** Draft 0.2 · 2026-10-31 · building started at the owner's request ("focus on implementing
+bathroom related features"), on the defaults proposed in §11 until the owner says otherwise.
+Built so far: rule packs and fixture clearance zones (ARC-BATH-001/002).
 **Owner's requests (2026-10-31):**
 - "deeper research into bathroom features, standards, and common components";
 - "review clearance rules, accessibility rules, rails, etc.";
@@ -329,9 +330,10 @@ registered command, exposed to Lua and MCP, and takes sketched or typed points (
 4. **IFC classes Reviera must invent:** lockers, benches, partitions, towel rails and sauna
    heaters have no good IFC class. Reviera-defined types in its own namespace, with an IFC
    fallback (proxy or furniture), as agreed for greenhouses (2026-10-28)?
-5. **The IFC4 BathType conflict.** The research disagrees on whether IFC4 lists
-   WHIRLPOOL/JACUZZI or SPA/POOL. May I settle it by reading the official IFC4 ADD2 TC1 schema
-   (a public download) before building?
+5. ~~The IFC4 BathType conflict.~~ *Settled 2026-10-31* from buildingSMART's official pages
+   (S1181): IFC4 ADD2 TC1 and IFC 4.3 both list DOMESTIC, FOOT, POOL, PLUNGE, SITZ, SPA
+   ("Whirlpool") and TREATMENT; neither has WHIRLPOOL or JACUZZI. WCSEAT is deprecated in both.
+   No per-schema mapping is needed: a hot tub or whirlpool bath is BATH with BathType SPA.
 6. **Spa depth:** stop at hot tubs, saunas and steam rooms? Or include pools in the bath context
    (plunge pools and hydrotherapy pools, with their barriers and entrapment rules)?
 7. **Manufacturer content:** should Reviera ship any real product examples? (Licensing usually

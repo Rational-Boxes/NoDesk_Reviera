@@ -3991,6 +3991,77 @@ These settings apply to the whole project. Walls that came from a non-parametric
 
 ---
 
+## 3.9a Bathrooms, toilet rooms, locker rooms and spas
+
+Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in `research/13_bathrooms.md` (sources S0869–S1180). The toolset covers home bathrooms, public and workplace toilets, locker rooms and spas (hot tubs, saunas, steam rooms). The rules that govern them (clearances, accessibility, rails, fixture counts) are **data in rule packs**, not constants, so that the same fixture can be checked against the US plumbing codes, the ADA, NKBA guidance or England's Approved Documents. This section starts with the rule packs and the fixtures' clearance zones. Grab bars, room layouts, toilet cores, locker rooms, wet areas and spas follow in later sections, in the order of the plan's §10.
+
+### 3.9a.1 Bathroom rule packs
+**ID:** ARC-BATH-001 · **Priority:** P1 · **Ref:** owner requirement (2026-10-31); `BATHROOMS_PLAN.md` §3; research/13 Part G; Reviera's own design (Appendix A.2a)
+
+**Purpose.** Keep every bathroom rule with its jurisdiction, edition, source and confidence, so that checks say exactly which rule a design breaks, and a user can adopt a local amendment or an office standard without changing Reviera.
+
+**Behaviour & rules.**
+- **A rule pack** is a JSON file following `schemas/bath/reviera.bath-rules-1.schema.json` (MIT). It has an `id`, a title, its jurisdiction and edition, and a **layer**: `minimum` (a code), `accessible` (an accessibility standard) or `recommended` (guidance such as NKBA). It holds:
+  - **zones**: clearances in front of, beside or around fixtures (ARC-BATH-002);
+  - **distances**: measured rules, such as a WC's centreline from its side wall, with a minimum and maximum.
+
+  Each rule has an ID (its clause, such as `ADA 2010 604.3.1`), the fixtures it applies to, optionally the occupancy it applies to (`dwelling` or `other`, as the building code settings name them, DM-CODE-001), a source ID from `SOURCE_REGISTER.md`, and a confidence: `verified` (read in the official text), `secondary` (from a reliable summary or an adoption's text) or `advisory` (a reading that needs checking).
+- **Fixtures** are named by kind: `water_closet`, `urinal`, `lavatory`, `bidet`, `bath` and `shower`, from the sanitary terminal's IFC predefined type (`TOILETPAN`, `URINAL`, `WASHHANDBASIN`, `BIDET`, `BATH`, `SHOWER`). Kitchen sinks are not bathroom fixtures.
+- **Packs that ship** (values in research/13 A1, A2, B1, B4):
+
+| Pack | Layer | Covers |
+|---|---|---|
+| `us_plumbing` | minimum | IPC §405.3.1 (2015 text as adopted by Ohio) and IRC R307.1: 15 in from a WC, urinal, lavatory or bidet centreline to the side, 21 in clear in front; 24 in in front of a shower; 21 in in front of a bath |
+| `us_nkba` | recommended | NKBA guidance: 18 in beside a WC, 20 in beside a lavatory, 30 in in front of each fixture, door swings kept out |
+| `ada_2010` | accessible | 2010 ADA Standards: WC clearance 60 × 56 in from the side and rear walls (604.3.1) and centreline 16–18 in from the side wall (604.2); 30 × 48 in clear floor space at lavatories (606.2, 305.3) and urinals (605.3); 30 in along a bath (607.2) and a roll-in shower's open face (608.2.2.1); no door swinging into any of them (603.2.3) |
+| `england_adm` | accessible | Approved Document M: in dwellings, a WC access zone 750 mm deep and 450 mm either side of the centreline (Vol 1, M4(1)); elsewhere, the unisex WC's centreline 500 mm from the side wall and 1000 mm clear to the transfer side (Vol 2, Diagram 18) |
+
+- **Choosing packs.** A project uses the packs it names (`bath.set_rule_packs`), or, by default, packs chosen automatically: `us_plumbing` when the building code (DM-CODE-001) is the IBC or IRC, `england_adm` when it is England's; and `ada_2010` when the accessibility rule set (ARC-MOD-031) is the ADA. `us_nkba` is only ever chosen by name.
+- **Project packs.** `bath.add_rule_pack` adds a pack to the project (checked against the schema; an `id` that ships replaces the shipped one for this project), `bath.remove_rule_pack` removes it. They are kept in RXD on the project (`rxd:bath_rule_packs`), so they travel with the model.
+- `bath.rule_packs` lists the packs available, shipped and the project's, with their rules and whether each is in use.
+
+**Data (IFC mapping).** RXD only: `rxd:bath_rules` (the packs chosen, absent for automatic) and `rxd:bath_rule_packs` (the project's own) on `IfcProject`.
+
+**Acceptance criteria.**
+- [x] Every shipped pack follows the published schema, and every rule names a source in `SOURCE_REGISTER.md`.
+- [x] A project on the IRC with the ADA rule set uses `us_plumbing` and `ada_2010` without being told; naming `us_nkba` uses only that.
+- [x] A project pack that changes the IPC's 21 in to 24 in is used instead of the shipped pack of that id, and is saved with the model.
+
+*Built (2026-10-31):* `reviera_core::bath_rules`, the schema and the four packs in `schemas/bath/`, and Manage › Model Properties › Bathroom rules (automatic, or one tick per pack). A pack that breaks the schema is refused (`bath.pack_schema`), and so is a distance whose minimum is above its maximum.
+
+### 3.9a.2 Fixture clearance zones and the bathroom check
+**ID:** ARC-BATH-002 · **Priority:** P1 · **Ref:** owner requirement (2026-10-31); ARC-MOD-031; `BATHROOMS_PLAN.md` §4; research/13 E4, Part G
+
+**Purpose.** Show the space each fixture needs, under the rules in use, and say as soon as something takes it, while the design is still easy to change.
+
+**Behaviour & rules.**
+- **Zones are virtual volumes** (ARC-MOD-031, kind *fixture space*). Each sanitary fixture gets one per zone rule of the packs in use that names its kind and its occupancy. They are regenerated with the fixture, so they move and turn with it; they never drive geometry.
+- **The fixture's frame.** A zone's position is given across the fixture and out from the wall it stands against:
+  - *across* from the fixture's **centre** line, its **near** or **far edge**, or the **side wall**. Positive is toward the **open side**, away from the side wall;
+  - *out* from the **wall** behind the fixture or the fixture's **front**. A zone never reaches behind the wall face.
+
+  Each zone runs from the floor to its rule's height (1.0 m unless the rule says otherwise), so that vanities and basins count but things mounted higher do not.
+- **The side wall** is the nearest wall within 1.2 m of the fixture's centreline on either side, found at the fixture's mid-depth. Where there is none, a zone measured from it assumes the largest distance the packs allow for that fixture (else 450 mm), and the distance check reports that no side wall was found. `bath.set_hand` fixes which side the wall is on (`left`, `right`, or `auto`), for when the partition is not modelled yet.
+- **What may be in a zone.** The fixture itself, grab bars and rails, and accessories (`IfcDiscreteAccessory`) may; so may the floor, and other fixtures' zones (clear floor spaces may overlap, ADA 305.2). Any other element's body in it is an intrusion. A rule marked `door_swing: forbidden` is also intruded on by any door's swing.
+- **Distances.** A distance rule measures from the fixture's centreline to its side wall and reports one outside its range.
+- **`bath.check`** checks every fixture (or those given) and returns findings, each with the fixture, the pack, its edition and layer, the rule ID, its confidence, what was found against what is required, and, for an intrusion, the other element and where. A finding from a `recommended` pack or an `advisory` rule is a **note**; any other is an **error**. `clearance.check` and `clearance.list` include fixture spaces as they do door clearances.
+- **Display.** Views show fixture spaces with the other virtual volumes (hidden, translucent or solid), in green.
+
+**Data (IFC mapping).** As ARC-MOD-031: not exported unless clearances are exported, then as `IfcSpatialZone` "Clearance". The hand is RXD element data (`rxd:fixture_hand`).
+
+**Commands.** See the catalog: `bath.rule_packs`, `bath.set_rule_packs`, `bath.add_rule_pack`, `bath.remove_rule_pack`, `bath.set_hand`, `bath.check`.
+
+**Acceptance criteria.**
+- [x] Under `us_plumbing`, a lavatory placed with its centreline 300 mm from a WC's is reported against IPC 405.3.1, and at 800 mm it is not.
+- [x] Under `ada_2010`, a WC 600 mm from its side wall is reported against 604.2, a door swinging into its clearance against 603.2.3, and a grab bar inside its clearance is not reported.
+- [x] A fixture's zones follow it when it is moved along its wall.
+- [ ] A fixture's zones turn when its wall is turned.
+- [x] With no side wall modelled, `bath.set_hand` puts the WC's ADA clearance on the chosen side.
+
+*Built (2026-10-31):* fixture spaces in `clearances::all` (so `clearance.list`, `clearance.check`, Check Overlaps and the views' virtual volumes include them, in green), `bath.check` in `reviera-app`, and View › Coordination › Check Bathrooms, which lists the findings and selects and frames the one picked. Defaults are recorded as E-65 in `EXPERT_REVIEW.md`. Not yet: grab bars by rule (ARC-BATH-003 to come), turning spaces, transfer showers, Approved Document M's ambulant cubicles, and the exceptions for single-user rooms.
+
+---
+
 ## 3.10 In-place models, model text and model lines
 
 ### 3.10.1 Model In-Place
@@ -5164,6 +5235,12 @@ All commands below are registered once in the command registry and exposed autom
 | `scopebox.set_extents` | id, min, max, rotation? | — | Yes | ARC-SCOPE-001 |
 | `datum.assign_scope_box` | datum_ids, scope_box_id \| null | — | Yes | ARC-SCOPE-001 |
 | `view.assign_scope_box` | view_ids, scope_box_id \| null | — | Yes | ARC-SCOPE-001 |
+| `bath.rule_packs` | — | [{id, title, layer, jurisdiction, edition, in_use, shipped, zones, distances}] | No (query) | ARC-BATH-001 |
+| `bath.set_rule_packs` | packs? (none for automatic) | — | Yes | ARC-BATH-001 |
+| `bath.add_rule_pack` | pack | — | Yes | ARC-BATH-001 |
+| `bath.remove_rule_pack` | id | — | Yes | ARC-BATH-001 |
+| `bath.set_hand` | element_ids, hand: auto\|left\|right | — | Yes | ARC-BATH-002 |
+| `bath.check` | element_ids? | finding[] | No (query) | ARC-BATH-002 |
 | `enclosure.create` | form, footprint \| host_wall_ids, level_id, params | element_id | Yes | ARC-GLZ-001 |
 | `enclosure.set` | enclosure_id, params | — | Yes | ARC-GLZ-001 |
 | `enclosure.get` | enclosure_id | {form, params, parts} | No (query) | ARC-GLZ-001 |

@@ -96,6 +96,7 @@ pub(crate) const PAGES: &[Page] = &[
     page!("ramps", "Ramps", ARCHITECTURE),
     page!("railings-decks", "Railings and decks", ARCHITECTURE),
     page!("rooms", "Rooms", ARCHITECTURE),
+    page!("bathrooms", "Bathrooms and fixture clearances", ARCHITECTURE),
     page!("massing", "Massing and model by face", ARCHITECTURE),
     page!("site", "Site: toposolids and property lines", ARCHITECTURE),
     page!("parts", "Parts", ARCHITECTURE),
