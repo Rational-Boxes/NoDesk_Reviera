@@ -564,6 +564,29 @@ impl Client {
     pub fn renditions(&self, uid: &str) -> Result<Vec<Node>> {
         Self::entries(self.get_json(&format!("v1/files/{}/renditions", percent(uid)), "the renditions")?, "the renditions")
     }
+    // ---- The conversion service's headless routes (`/csai/`, beside the REST door) ----
+
+    fn csai(&self, path: &str) -> Url {
+        // The service sits beside the door: `<server>/csai/…` for a door at `<server>/api/`.
+        self.base.join("../csai/").and_then(|b| b.join(path.trim_start_matches('/'))).expect("a relative path")
+    }
+
+    /// Reads values out of documents (`POST /csai/v1/extract`, answered as one JSON object):
+    /// `body` holds `files` or `folder_uid`, the JSON Schema of the values wanted, and optionally
+    /// `instructions` and `cache`. The answer has `run_id`, `plan`, `items` and `summary`. An
+    /// extraction reads each document whole, so it may take minutes: it waits up to `timeout`.
+    pub fn extract(&self, body: &Value, timeout: Duration) -> Result<Value> {
+        let r = self.send("extracting from the documents", || self.http.post(self.csai("v1/extract")).header("Accept", "application/json").timeout(timeout).json(body))?;
+        r.json().map_err(|_| Error::new(ErrorKind::Protocol, "extracting from the documents: the answer is not JSON"))
+    }
+
+    /// The key's usage of the conversion service (`GET /csai/v1/usage`): `state` (ok, warning,
+    /// limited), `limits` and a `message`.
+    pub fn usage(&self) -> Result<Value> {
+        let r = self.send("the usage", || self.http.get(self.csai("v1/usage")))?;
+        r.json().map_err(|_| Error::new(ErrorKind::Protocol, "the usage: the answer is not JSON"))
+    }
+
 
     pub fn metadata(&self, uid: &str) -> Result<BTreeMap<String, String>> {
         let v = self.get_json(&format!("v1/nodes/{}/metadata", percent(uid)), "the metadata")?;

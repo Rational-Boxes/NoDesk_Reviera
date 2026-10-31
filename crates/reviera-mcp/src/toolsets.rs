@@ -271,7 +271,7 @@ pub fn toolset_of(command: &str) -> String {
             | "external_props" => "project_setup",
             "file" | "import" | "export" | "live" | "recovery" | "validate" | "rxd" | "journal"
             | "history" | "snapshot" | "cobie" => "io",
-            "bimserver" | "fileengine" | "merge" | "stash" | "ownership" | "link" | "workset" | "bcf" | "cde" | "api" | "http" | "overlap"
+            "bimserver" | "fileengine" | "docs" | "merge" | "stash" | "ownership" | "link" | "workset" | "bcf" | "cde" | "api" | "http" | "overlap"
             | "clash" | "clearance" => "collaboration",
             "analysis"
             | "analysis_provider"

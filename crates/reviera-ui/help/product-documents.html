@@ -1,0 +1,97 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Material Documents</h1>
+<p class="lead">A material's product documents, such as its EPD (Environmental Product
+Declaration), HPD (Health Product Declaration), datasheets and certificates, can live in one
+FileEngine folder that the model points to. Reviera can read values out of those documents, each
+with the words it was read from. You decide which values go into the model.</p>
+<nav class="toc">
+  <a href="#link">Linking a material to its folder</a>
+  <a href="#types">Document types</a>
+  <a href="#extract">Reading values from the documents</a>
+  <a href="#accept">Accepting values</a>
+  <a href="#carbon">An EPD's carbon</a>
+  <a href="#ifc">In the model and in IFC</a>
+  <a href="#limits">Limits and what to check</a>
+  <a href="#scripts">Scripts and agents</a>
+</nav>
+
+<h2 id="link">Linking a material to its folder</h2>
+<p>Open <a href="reviera:action/ui.material_documents">File › Material Documents…</a>. The list
+shows the project's materials (the ones that walls, floors, ceilings and roofs use) and any that
+are already documented. Choose a material, then <b>Link Folder…</b>, and browse to the product's
+folder on FileEngine (see <a href="reviera:help/fileengine">Models on FileEngine</a> to connect
+and sign in).</p>
+<p>The model keeps the folder by its FileEngine identifier, so the link still works when the
+folder is renamed or moved. <b>Unlink</b> removes the link; the values read from the documents
+stay unless you also forget them.</p>
+
+<h2 id="types">Document types</h2>
+<p>Each document in the folder has a <i>type</i>: EPD, HPD, specification, certification,
+installation, O&amp;M, warranty, SDS, drawing or other. Reviera reads an EPD's values only from
+documents marked <b>EPD</b>, and an HPD's values only from documents marked <b>HPD</b>, so that a
+figure is never taken from the wrong kind of document. Choose a document and <b>Set Type…</b> to
+mark it; the type is kept on FileEngine, where other people and tools see it too.</p>
+
+<h2 id="extract">Reading values from the documents</h2>
+<p>Choose <b>Read EPD</b> or <b>Read HPD</b>. FileEngine's conversion service reads each document
+of that type whole, and gives back these values:</p>
+<ul>
+  <li><b>EPD:</b> manufacturer, product, EPD number, programme operator, declared unit, GWP for
+  modules A1–A3 including biogenic carbon and, where the EPD gives it, excluding it (kg CO₂e per
+  declared unit), and the date it is valid until.</li>
+  <li><b>HPD:</b> the HPD identifier, the HPD standard version, the MasterFormat classification,
+  the content threshold (ppm), the highest-concern hazard scores, the VOC emissions certificate,
+  and the dates it was published and is valid until.</li>
+</ul>
+<p>Each value is shown with the words it was read from (the <i>quote</i>) and the document's
+version. A value the service could not back with a quote is listed as <i>not found</i>: nothing
+is guessed. Reading takes about half a minute a document. Reading the same version again is
+answered at once from the service's cache.</p>
+
+<h2 id="accept">Accepting values</h2>
+<p>Nothing is written until you accept. Tick the values you want and choose <b>Apply</b>. They go
+onto the material in one step, which <b>Undo</b> takes back. Each value remembers the document,
+version and reading it came from.</p>
+<ul>
+  <li><b>Also write to the folder</b> puts the values in the folder's FileEngine metadata too
+  (<code>epd.number</code>, <code>epd.gwp_a1a3</code>, <code>hpd.valid_until</code>, …), so that
+  FileEngine can list and search products by them.</li>
+  <li>When two documents disagree on a value, Reviera asks which one to take.</li>
+</ul>
+
+<h2 id="carbon">An EPD's carbon</h2>
+<p>With <b>Use the GWP for embodied carbon</b> ticked, the EPD's GWP A1–A3 becomes the
+material's emission factor for <a href="reviera:help/sustainability#carbon">embodied carbon</a>, in a library
+named <i>Product EPDs</i>. Reviera converts the declared unit: an EPD declared per 1,000 ft² of
+board at 126 kg CO₂e gives 1.356 kg CO₂e per m². It reads m², ft², m³, ft³, yd³, kg, tonnes, lb
+and pieces; any other unit is refused with the reason.</p>
+
+<h2 id="ifc">In the model and in IFC</h2>
+<p>An IFC4 file carries, for each documented material:</p>
+<ul>
+  <li>the folder as an <code>IfcDocumentReference</code> (its address and identifier), tied to the
+  <code>IfcMaterial</code>;</li>
+  <li>the values as material properties, <code>Reviera_EPD</code> and <code>Reviera_HPD</code>,
+  each with the printed unit and the documents they came from.</li>
+</ul>
+<p>When the model itself is saved to FileEngine, its metadata lists the documented materials and
+their values (<code>reviera.products</code>).</p>
+
+<h2 id="limits">Limits and what to check</h2>
+<ul>
+  <li>The service reads the documents' text. A scanned page with no text layer is listed as
+  skipped (<i>no text</i>); check it by hand.</li>
+  <li>An EPD often gives several GWP figures (with or without biogenic carbon, by different
+  methods). Reviera asks for GWP-total including biogenic carbon (IPCC AR6, or EN 15804+A2); check
+  the quote to see which one was read.</li>
+  <li>Your FileEngine key has a usage allowance (requests a minute, tokens a day). The dialog
+  shows it, and warns before it runs out.</li>
+</ul>
+
+<h2 id="scripts">Scripts and agents</h2>
+<p>Everything above is a command in the <code>docs</code> domain: <code>docs.link</code>,
+<code>docs.list</code>, <code>docs.set_doc_type</code>, <code>docs.extract</code>,
+<code>docs.apply_extracted</code>, <code>docs.materials</code>, <code>docs.field_sets</code> and
+<code>docs.usage</code>. Lua scripts and AI agents (MCP) can use them, acting as you. The field
+sets are JSON Schemas in <code>schemas/extract/</code>.</p>

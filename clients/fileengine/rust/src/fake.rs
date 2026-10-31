@@ -42,6 +42,8 @@ struct State {
     next: u64,
     clock: u64,
     log: Vec<String>,
+    /// Extractions answered, by file, version and schema (the "cache").
+    extractions: BTreeSet<String>,
 }
 
 impl State {
@@ -227,8 +229,84 @@ fn done() -> Answer {
     (204, "application/json", Vec::new())
 }
 
+/// The conversion service's headless routes, faked: extraction reads a document's text for lines
+/// `<field> = <value>` (optionally `| <unit>`), each found line being the value's evidence. A
+/// field with no such line is not found. Asking the same question of the same version again is
+/// answered from the "cache".
+fn answer_csai(st: &mut State, method: &str, seg: &[&str], body: &Value) -> Answer {
+    match (method, seg) {
+        ("GET", ["usage"]) => ok(json!({ "state": "ok", "subject": "key", "limits": { "requests": { "used": st.extractions.len(), "limit": 60, "state": "ok" } }, "message": "" })),
+        ("POST", ["extract"]) => {
+            let files: Vec<String> = match (body["files"].as_array(), body["folder_uid"].as_str()) {
+                (Some(f), None) => f.iter().filter_map(Value::as_str).map(str::to_owned).collect(),
+                (None, Some(folder)) => st.nodes.iter().filter(|(_, e)| e.parent == folder && !e.dir && !e.deleted).map(|(u, _)| u.clone()).collect(),
+                _ => return err(400, "give exactly one of files or folder_uid"),
+            };
+            let Some(props) = body["schema"]["properties"].as_object() else { return err(400, "schema must be a JSON Schema of type object with properties") };
+            let schema_key = body["schema"].to_string();
+            st.next += 1;
+            let run_id = format!("run{:04}", st.next);
+            let (mut plan, mut skipped, mut items) = (Vec::new(), Vec::new(), Vec::new());
+            let (mut found_total, mut not_found_total, mut cached_total) = (0, 0, 0);
+            for uid in files {
+                let Some(e) = st.live(&uid) else {
+                    skipped.push(json!({ "file_uid": uid, "reason": "not found or not readable" }));
+                    continue;
+                };
+                let Some((version, _, bytes)) = e.versions.last().cloned() else {
+                    skipped.push(json!({ "file_uid": uid, "reason": "no text" }));
+                    continue;
+                };
+                let name = e.name.clone();
+                plan.push(json!({ "file_uid": uid, "name": name, "version": version }));
+                let text = String::from_utf8_lossy(&bytes).into_owned();
+                let mut data = serde_json::Map::new();
+                let (mut found, mut not_found) = (0, 0);
+                for (field, spec) in props {
+                    let hit = text.lines().enumerate().find_map(|(k, line)| {
+                        let rest = line.trim_start().strip_prefix(field.as_str())?.trim_start().strip_prefix('=')?;
+                        let (v, unit) = rest.split_once('|').map_or((rest.trim(), None), |(v, u)| (v.trim(), Some(u.trim().to_owned())));
+                        let offset: usize = text.lines().take(k).map(|l| l.len() + 1).sum();
+                        Some((v.to_owned(), unit, line.trim().to_owned(), offset))
+                    });
+                    let entry = match hit {
+                        Some((v, unit, quote, offset)) => {
+                            let value = match spec["type"].as_str() {
+                                Some("number") => v.replace(',', "").parse::<f64>().map_or(Value::Null, |n| json!(n)),
+                                Some("boolean") => json!(matches!(v.to_lowercase().as_str(), "yes" | "true")),
+                                _ => json!(v),
+                            };
+                            found += 1;
+                            json!({ "found": true, "value": value, "unit": unit, "evidence": { "quote": quote, "offset": offset } })
+                        }
+                        None => {
+                            not_found += 1;
+                            json!({ "found": false, "value": null, "unit": null, "evidence": null })
+                        }
+                    };
+                    data.insert(field.clone(), entry);
+                }
+                let key = format!("{uid}@{version}:{schema_key}");
+                let cached = body["cache"].as_str() != Some("refresh") && st.extractions.contains(&key);
+                st.extractions.insert(key);
+                cached_total += usize::from(cached);
+                found_total += found;
+                not_found_total += not_found;
+                items.push(json!({ "file_uid": uid, "name": name, "version": version, "data": data, "counts": { "found": found, "not_found": not_found, "dropped_no_evidence": 0 }, "valid": true, "cached": cached }));
+            }
+            let summary = json!({ "files": plan.len() + skipped.len(), "extracted": items.len(), "cached": cached_total, "skipped": skipped.len(), "failed": 0, "found": found_total, "not_found": not_found_total, "dropped_no_evidence": 0, "cancelled": false, "truncated": false });
+            ok(json!({ "run_id": run_id, "plan": { "files": plan, "skipped": skipped, "truncated": false }, "items": items, "summary": summary }))
+        }
+        _ => err(404, "not found"),
+    }
+}
+
 fn answer(st: &mut State, req: &Request) -> Answer {
-    let Some(route) = req.path.strip_prefix("/api/v1/") else { return err(404, "not found") };
+    let (csai, route) = match (req.path.strip_prefix("/api/v1/"), req.path.strip_prefix("/csai/v1/")) {
+        (Some(r), _) => (false, r),
+        (None, Some(r)) => (true, r),
+        _ => return err(404, "not found"),
+    };
     let seg: Vec<String> = route.split('/').map(unpercent).collect();
     let seg: Vec<&str> = seg.iter().map(String::as_str).collect();
     let body: Value = serde_json::from_slice(&req.body).unwrap_or(Value::Null);
@@ -258,6 +336,9 @@ fn answer(st: &mut State, req: &Request) -> Answer {
         && *t != st.tenant
     {
         return err(403, "no access to that tenant");
+    }
+    if csai {
+        return answer_csai(st, &req.method, &seg, &body);
     }
     let user = st.user.clone();
     let result = |r: Result<(), (u16, String)>| r.map_or_else(|(s, m)| err(s, &m), |()| done());

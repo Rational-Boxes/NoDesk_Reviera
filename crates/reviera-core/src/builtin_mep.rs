@@ -225,6 +225,10 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(CarbonMatch),
         registry.add(CarbonAutoMatch),
         registry.add(CarbonMaterials),
+        registry.add(DocsSetLink),
+        registry.add(DocsUnlink),
+        registry.add(DocsSetValues),
+        registry.add(DocsMaterials),
         registry.add(CarbonRecord),
         registry.add(SolarRecord),
         registry.add(EnergyModelGet),
@@ -2787,4 +2791,47 @@ edit_command!(
     crate::standards_transfer::ApplyParams,
     usize,
     crate::standards_transfer::apply
+);
+
+edit_command!(
+    DocsSetLink,
+    "docs.set_link",
+    "Set a material's documentation folder",
+    "Sets or clears (`link` null) the FileEngine folder a project material's product documents are in (COL-FE-006): `link` {connection_id, url, folder_uid, folder_name}. docs.link fills it in from the server; this is its model half. The values taken from documents stay.",
+    "Link Documentation",
+    crate::product_docs::SetLinkParams,
+    (),
+    crate::product_docs::set_link
+);
+
+edit_command!(
+    DocsUnlink,
+    "docs.unlink",
+    "Unlink a material's documentation folder",
+    "Forgets a material's documentation folder (COL-FE-006); with `forget_values`, also the values taken from its documents.",
+    "Unlink Documentation",
+    crate::product_docs::UnlinkParams,
+    (),
+    crate::product_docs::unlink
+);
+
+edit_command!(
+    DocsSetValues,
+    "docs.set_values",
+    "Write product data onto a material",
+    "Writes values taken from a material's documents (COL-FE-007), one undo step: `set` (epd, hpd), `pset` (its IFC property set, default Reviera_<SET>), `values` {field: {value, unit, label, property, source {file_uid, file_name, version, run_id, cached}} or null to remove}. With `carbon` {gwp_a1a3, declared_unit, epd_number, program_operator, product, valid_until}, the EPD's GWP A1-A3 becomes the material's embodied-carbon factor in the Product EPDs library, per m2, m3, kg or piece from the declared unit (1,000 ft2, 1 m2, 1 tonne, ...), and the material is matched to it. docs.apply_extracted calls it with what the user accepted.",
+    "Product Data",
+    crate::product_docs::SetValuesParams,
+    crate::product_docs::SetValuesOut,
+    crate::product_docs::set_values
+);
+
+read_command!(
+    DocsMaterials,
+    "docs.materials",
+    "Materials and their documentation",
+    "The project's materials (COL-FE-006): those its walls, floors, ceilings and roofs use (`in_use`) and any documented, each with its documentation folder and the values taken from its documents by field set, each value with its source (document, version, extraction run).",
+    crate::embodied_carbon::Empty,
+    Vec<crate::product_docs::MaterialOut>,
+    crate::product_docs::materials
 );

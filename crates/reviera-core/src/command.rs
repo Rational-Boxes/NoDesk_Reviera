@@ -59,6 +59,7 @@ pub const RESERVED_DOMAINS: &[&str] = &[
     "analysis",
     "bimserver",
     "fileengine",
+    "docs",
     "merge",
     "stash",
     "ownership",

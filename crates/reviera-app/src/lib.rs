@@ -10,6 +10,7 @@
 pub mod bcf_files;
 pub mod bimserver;
 pub mod fileengine;
+pub mod docs;
 pub mod profiling;
 pub mod bcf_topics;
 pub mod spots;

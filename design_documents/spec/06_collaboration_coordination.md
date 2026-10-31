@@ -318,7 +318,7 @@ The MCP tool for `bimserver.login` never accepts a password from an agent; it ca
 
 ## 6.2a FileEngine models
 
-FileEngine (Proxima File Vault) is a versioned document store with a REST door. Reviera keeps models there as files: every save is a new version, and FileEngine decides who may read and write. This is phase 1 of `FILEENGINE_INTEGRATION.md` (§4–5): connections, browsing, open, save and versions. Publishing, BCF, Component Libraries, documentation folders and product data come in later phases. Reviera talks to FileEngine (AGPL-3.0) over HTTP only; its client `clients/fileengine` is MIT.
+FileEngine (Proxima File Vault) is a versioned document store with a REST door. Reviera keeps models there as files: every save is a new version, and FileEngine decides who may read and write. COL-FE-001…005 are phase 1 of `FILEENGINE_INTEGRATION.md` (§4–5): connections, browsing, open, save and versions. COL-FE-006…008 add material documentation folders, product data read from their documents by FileEngine's headless extraction (§7, §7c), and publishing reports (§7a, in part). Publish sets, share links, BCF and Component Libraries come in later phases. Reviera talks to FileEngine (AGPL-3.0) over HTTP only; its client `clients/fileengine` is MIT.
 
 ### Connections and sign-in
 **ID:** COL-FE-001 · **Priority:** P1 · **Ref:** FILEENGINE_INTEGRATION §4, §8
@@ -431,7 +431,63 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 **Acceptance criteria.**
 - [x] After a save, the file's metadata holds the schema, the 22-character project GlobalId and the level names.
 
-*Not yet (later phases):* a thumbnail with each save; the Documents pane; publishing exports to FileEngine; BCF over BCF-API; Component Libraries; product data from documents (§7c); live updates through the discussion service.
+### Material documentation folders
+**ID:** COL-FE-006 · **Priority:** P2 · **Ref:** FILEENGINE_INTEGRATION §7
+
+**Purpose.** Keep a material's product documents (EPD, HPD, datasheets, certificates) in one FileEngine folder that the model points to, so that anyone opening the model can find them.
+
+**Behaviour & rules.**
+- A project material, named as its layers name it, links to **one documentation folder**, identified by its uid. Its connection, address and folder name are kept too, to show and to export. The links live in RXD on the project (`rxd:product_docs`).
+- `docs.link` and `docs.unlink` are one undo step each. `docs.materials` lists the project's materials, each with its link and the values taken from its documents (COL-FE-007).
+- `docs.list` lists the folder's documents with their `doc.type` metadata (EPD, HPD, specification, certification, …), their version, size and dates.
+- On save, an IFC4 file gets, for each linked material:
+  - an `IfcDocumentReference` (`Location` = the folder's address, `Identification` = its uid, `Name` = its name), tied to the `IfcMaterial` by an `IfcExternalReferenceRelationship`;
+  - the values taken from its documents as `IfcMaterialProperties`, one set per field set (`Reviera_EPD`, `Reviera_HPD`).
+  
+  All of these are marked `rxd:product_docs` and rewritten on every save. IFC2X3 files get none of it.
+- Uploading a model to FileEngine (COL-FE-005) adds `reviera.products`: a JSON array of the documented materials, with each one's folder and values.
+
+**Acceptance criteria.**
+- [x] A material linked to a folder exports an `IfcDocumentReference` to that folder, related to its `IfcMaterial`, and its values as `IfcMaterialProperties`; the file opens again with the link and the values intact.
+- [x] `docs.list` lists the folder's EPD and HPD with their `doc.type`.
+
+### Product data from documents
+**ID:** COL-FE-007 · **Priority:** P2 · **Ref:** FILEENGINE_INTEGRATION §7c
+
+**Purpose.** Read the values a material needs (EPD number, GWP, HPD identifier, expiry dates, …) from its documents, rather than typing them in. Each value keeps the quote it came from.
+
+**Behaviour & rules.**
+- **Field sets** ship as JSON Schemas in `schemas/extract/` (MIT): `epd` and `hpd` to start with. Each field's `x-reviera` names its label, the IFC property it fills and the FileEngine folder metadata key it may fill. `docs.field_sets` lists them.
+- `docs.extract` sends the linked folder's documents of the matching `doc.type`, or the files named, to the conversion service's headless extraction (`POST /csai/v1/extract`). It sends the field set's schema without the `x-reviera` annotations, with `tools` denied. The run is kept for the session and returned: for each document and field, the value, its unit, the evidence quote and offset, the version it was read from, and whether it came from the cache. Fields with no supporting quote are listed as not found; nothing is guessed. `cache: "refresh"` asks again.
+- Nothing is written until the user accepts. `docs.apply_extracted` writes the accepted fields onto the material in one undo step. Each value records its source: file uid and name, version, run id, field set and field. With `to_folder`, the values are also written to the folder's metadata under the field's key. The quote is not copied into the model.
+- An EPD's GWP A1–A3, applied with `carbon: true`, also becomes the material's embodied-carbon factor (ANA-CARB-001). It goes in a library named *Product EPDs* and is matched to the material, per m², m³, kg or piece. A declared unit in ft², ft³, lb or a multiple (`1,000 ft2`) is converted, and one Reviera cannot read is refused with the reason.
+- `docs.usage` shows the service's usage state for the connection's key.
+- Agents may run `docs.extract` and `docs.apply_extracted`; both act as the signed-in user.
+
+**Acceptance criteria.**
+- [x] Against the fake server, an EPD and an HPD extraction applied to a material give it its EPD number, GWP, HPD identifier and expiry dates with their sources, in one undo step; undo removes them.
+- [x] An EPD declared per 1,000 ft² becomes a carbon factor per m² (126 kg CO₂e per 1,000 ft² → 1.356 kg CO₂e/m²).
+- [x] Live (when the environment names a server): the EPD and HPD of a public example product, uploaded to the test folder, give the values printed in them.
+
+### Publishing files and the material documentation report
+**ID:** COL-FE-008 · **Priority:** P2 · **Ref:** FILEENGINE_INTEGRATION §7a
+
+**Purpose.** Put a report or an export straight into a FileEngine folder for others to read, and report on a project's product documentation and embodied carbon.
+
+**Behaviour & rules.**
+- `fileengine.publish` uploads a file from this computer into a folder. It adds a new file, or, with `replace`, a new version of the file of that name; a name already there is otherwise refused (`fileengine.exists`). It sets the metadata given, and `ifc.project_guid` of the open model.
+- `docs.report` writes an HTML report of the project's materials:
+  - each material with its folder, its EPD (number, validity, GWP A1–A3 per declared unit) and its HPD (identifier, validity);
+  - every value taken from documents, with the document, version and run it came from;
+  - the embodied carbon run (the latest, or the one named) by material, with its factors;
+  - **To check:** documents expired or expiring within a year, materials in use without documentation, and materials left out of the carbon run.
+- File › Material Documents… › *Report to FileEngine…* writes the report and publishes it to a chosen folder as `<model> material documentation.html`, with `doc.type` *report*. Publishing it again asks before adding a new version.
+
+**Acceptance criteria.**
+- [x] The report lists each documented material's EPD and HPD with their sources, the carbon run by material, and an expired EPD under *To check*.
+- [x] Publishing it puts it in the folder with its metadata; publishing again is refused without `replace` and adds a version with it.
+
+*Not yet (later phases):* a thumbnail with each save; the Documents pane (a dockable pane with document previews, uploads and expiry warnings); publishing exports to FileEngine; BCF over BCF-API; Component Libraries; field sets beyond EPD and HPD (§7c); live updates through the discussion service.
 
 ## 6.3 Merging
 
@@ -1832,6 +1888,19 @@ Every command below is registered once and is available from the UI, Lua and MCP
 | `fileengine.save_as` | document_id?, connection_id, folder_uid, name, replace?, comment? | uploaded | No | COL-FE-003 |
 | `fileengine.versions` | document_id? \| connection_id + uid | version[] | No (query) | COL-FE-004 |
 | `fileengine.restore_version` | document_id? \| connection_id + uid, version | {restored, version, document_id?} | No | COL-FE-004 |
+| `docs.link` | material, connection_id, folder_uid | link | Yes | COL-FE-006 |
+| `docs.unlink` | material, forget_values? | () | Yes | COL-FE-006 |
+| `docs.set_link` | material, link? | () | Yes | COL-FE-006 |
+| `docs.set_values` | material, set, pset?, values, carbon? | {written, factor_ref?, factor_per_unit?, factor_unit?} | Yes | COL-FE-007 |
+| `docs.materials` | — | {material, link?, values}[] | No (query) | COL-FE-006 |
+| `docs.list` | material \| connection_id + folder_uid | document[] | No (query) | COL-FE-006 |
+| `docs.field_sets` | — | field_set[] | No (query) | COL-FE-007 |
+| `docs.extract` | material? \| connection_id + files, set, cache? | run | No | COL-FE-007 |
+| `docs.apply_extracted` | run_id, material, fields?, file_uid?, to_folder?, carbon? | applied | Yes | COL-FE-007 |
+| `docs.usage` | connection_id | usage | No (query) | COL-FE-007 |
+| `docs.report` | path, carbon_run_id? | {path, materials, documented, warnings} | No | COL-FE-008 |
+| `fileengine.publish` | connection_id, folder_uid, path, name?, replace?, metadata? | {uid, name, version, replaced} | No | COL-FE-008 |
+| `docs.set_doc_type` | connection_id, file_uid, doc_type | () | No | COL-FE-006 |
 | `bimserver.add_server` | name, url, allow_http?, ownership? | server | No | COL-BIM-001 |
 | `bimserver.remove_server` | server_id | () | No | COL-BIM-001 |
 | `bimserver.login` | server_id, username?, password?, user_token?, remember? | session_info | No | COL-BIM-001 |

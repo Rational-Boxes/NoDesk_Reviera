@@ -6,6 +6,7 @@
 
 pub mod commands;
 mod classification;
+mod product_docs;
 mod curtains;
 mod curves;
 pub mod fragments;

@@ -28,6 +28,23 @@ const RESTORE: i32 = 7311;
 const COPY: i32 = 7312;
 const OVERWRITE: i32 = 7313;
 const THEIRS: i32 = 7314;
+const PICK: i32 = 7315;
+
+/// What the browser is for.
+#[derive(Clone, Copy, PartialEq)]
+enum Mode<'a> {
+    Open,
+    Save,
+    /// Choosing a folder, with the dialog's title.
+    Pick(&'a str),
+}
+
+/// A folder chosen with [`Gui::fileengine_pick_folder`].
+pub(crate) struct Pick {
+    pub(crate) connection_id: String,
+    pub(crate) folder_uid: String,
+    pub(crate) folder_name: String,
+}
 
 /// What the browser shows.
 struct Shown<'a> {
@@ -40,6 +57,7 @@ struct Shown<'a> {
     note: &'a str,
     /// Saving: the name field's value.
     save_name: Option<&'a str>,
+    mode: Mode<'a>,
 }
 
 struct Closed {
@@ -111,7 +129,11 @@ fn buttons(dialog: &Dialog, items: &[(i32, &str, &str, bool)]) -> BoxSizer {
 }
 
 fn browser(frame: &Frame, s: &Shown<'_>) -> Closed {
-    let title = if s.save_name.is_some() { "Save to FileEngine" } else { "Open From FileEngine" };
+    let title = match s.mode {
+        Mode::Save => "Save to FileEngine",
+        Mode::Open => "Open From FileEngine",
+        Mode::Pick(t) => t,
+    };
     let dialog = Dialog::builder(frame, title).with_style(DialogStyle::DefaultDialogStyle | DialogStyle::ResizeBorder).build();
     let top = BoxSizer::builder(Orientation::Horizontal).build();
     let label = StaticText::builder(&dialog).with_label("Connection").build();
@@ -176,6 +198,8 @@ fn browser(frame: &Frame, s: &Shown<'_>) -> Closed {
         last.add(&l, 0, SizerFlag::AlignCenterVertical | SizerFlag::Right, 6);
         last.add(t, 0, SizerFlag::Right, 8);
         last.add_sizer(&buttons(&dialog, &[(NEW_FOLDER, "New Folder…", "Make a folder here", connected && writable), (SAVE, "Save Here", "Save the project as this model in this folder", connected && writable)]), 0, SizerFlag::empty(), 0);
+    } else if let Mode::Pick(_) = s.mode {
+        last.add_sizer(&buttons(&dialog, &[(PICK, "Choose This Folder", "Choose the folder shown (double-click a folder to go into it)", connected && s.folder.is_some() && !s.path.is_empty())]), 0, SizerFlag::empty(), 0);
     } else {
         last.add_sizer(&buttons(&dialog, &[(OPEN, "Open", "Open the chosen model (a working copy is kept on this computer)", connected && !entries.is_empty())]), 0, SizerFlag::empty(), 0);
     }
@@ -206,7 +230,12 @@ fn browser(frame: &Frame, s: &Shown<'_>) -> Closed {
 impl Gui {
     /// File › Open From FileEngine…
     pub(crate) fn fileengine_open(&mut self) {
-        self.fileengine_browser(false);
+        self.fileengine_browser(Mode::Open);
+    }
+
+    /// A FileEngine folder, chosen by browsing (`title` names what it is for).
+    pub(crate) fn fileengine_pick_folder(&mut self, title: &str) -> Option<Pick> {
+        self.fileengine_browser(Mode::Pick(title))
     }
 
     /// File › Save to FileEngine…: a new version of the open FileEngine model (with a comment),
@@ -225,11 +254,14 @@ impl Gui {
                     self.fileengine_upload(json!({ "comment": c }));
                 }
             }
-            _ => self.fileengine_browser(true),
+            _ => {
+                self.fileengine_browser(Mode::Save);
+            }
         }
     }
 
-    fn fileengine_browser(&mut self, save: bool) {
+    fn fileengine_browser(&mut self, mode: Mode<'_>) -> Option<Pick> {
+        let save = mode == Mode::Save;
         let frame = self.frame;
         let mut conn: Option<usize> = Some(0);
         // The folders entered, top first: (uid, name).
@@ -239,7 +271,10 @@ impl Gui {
         loop {
             let connections = match self.run("fileengine.list_connections", Value::Null) {
                 Ok(v) => v.as_array().cloned().unwrap_or_default(),
-                Err(e) => return error(&frame, &format!("The connections could not be read:\n{e}")),
+                Err(e) => {
+                    error(&frame, &format!("The connections could not be read:\n{e}"));
+                    return None;
+                }
             };
             let chosen = conn.and_then(|k| connections.get(k)).cloned();
             let id = chosen.as_ref().and_then(|x| x["id"].as_str()).map(str::to_owned);
@@ -249,6 +284,9 @@ impl Gui {
                 let mut args = json!({ "connection_id": id });
                 if let Some((uid, _)) = stack.last() {
                     args["folder_uid"] = json!(uid);
+                }
+                if let Mode::Pick(_) = mode {
+                    args["models_only"] = json!(true);
                 }
                 match self.run("fileengine.browse", args) {
                     Ok(v) => folder = Some(v),
@@ -260,12 +298,14 @@ impl Gui {
             if note.is_empty() {
                 note = if save {
                     "The project is saved as a new model in this folder; Ctrl+S then saves new versions of it.".into()
+                } else if let Mode::Pick(_) = mode {
+                    "Double-click a folder to go into it, then Choose This Folder.".into()
                 } else {
                     "Double-click a folder to open it. Open downloads the chosen model and opens it; Ctrl+S saves it back as a new version.".into()
                 };
             }
             let path: Vec<String> = stack.iter().map(|(_, n)| n.clone()).collect();
-            let shown = Shown { connections: &connections, conn, folder: folder.as_ref(), path: &path, note: &note, save_name: save.then_some(name.as_str()) };
+            let shown = Shown { connections: &connections, conn, folder: folder.as_ref(), path: &path, note: &note, save_name: save.then_some(name.as_str()), mode };
             let closed = browser(&frame, &shown);
             note.clear();
             if save {
@@ -332,8 +372,11 @@ impl Gui {
                         name = e["name"].as_str().unwrap_or("").to_owned();
                         continue;
                     }
+                    if let Mode::Pick(_) = mode {
+                        continue;
+                    }
                     if self.fileengine_open_model(json!({ "connection_id": id, "uid": e["uid"] }), e["name"].as_str().unwrap_or("")) {
-                        return;
+                        return None;
                     }
                 }
                 NEW_FOLDER => {
@@ -367,13 +410,17 @@ impl Gui {
                         Ok(up) => {
                             self.update_title(&frame);
                             frame.set_status_text(&format!("Saved {} to FileEngine (version {})", up["name"].as_str().unwrap_or(""), stamp(up["version"].as_str().unwrap_or(""))), 0);
-                            return;
+                            return None;
                         }
                         Err(e) => note = format!("Not saved to FileEngine: {e}"),
                     }
                 }
+                PICK => {
+                    let (Some(id), Some(f)) = (id, folder.as_ref()) else { continue };
+                    return Some(Pick { connection_id: id, folder_uid: f["folder_uid"].as_str().unwrap_or("").to_owned(), folder_name: f["folder_name"].as_str().unwrap_or("").to_owned() });
+                }
                 RELOAD => {}
-                _ => return,
+                _ => return None,
             }
         }
     }

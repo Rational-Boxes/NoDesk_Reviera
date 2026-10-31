@@ -78,6 +78,7 @@ pub mod mep_renumber;
 pub mod location;
 pub mod weather;
 pub mod embodied_carbon;
+pub mod product_docs;
 pub mod path_of_travel;
 pub mod solar;
 pub mod energy_model;

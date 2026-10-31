@@ -1740,7 +1740,9 @@ area by area (reviewed against the spec on 2026-10-15).
   - the model's schema, project GlobalId and levels written as file metadata;
   - `file.open` and `file.save_as` take `fileengine://` addresses (`fileengine.*`; the client is `clients/fileengine`, MIT).
 
-  Checked against the live Proxima File Vault server. **Not yet:** publishing, BCF, Component Libraries, documentation folders and product data (the later phases), thumbnails, single sign-on, and transfers off the UI thread.
+  **Material documents built** (COL-FE-006 … 008): File › Material Documents... links each material to a FileEngine folder of its product documents (EPD, HPD, …, typed by `doc.type`); *Read EPD...* and *Read HPD...* ask FileEngine's headless AI extraction for the field sets in `schemas/extract/` (MIT), each value with the quote it was read from; the user ticks what to keep, written onto the material in one undo step with its source, exported as `IfcMaterialProperties` (`Reviera_EPD`, `Reviera_HPD`) and an `IfcDocumentReference`, optionally into the folder's metadata; an EPD's GWP A1–A3 becomes the material's embodied-carbon factor, its declared unit converted (`docs.*`). *Report to FileEngine...* writes the material documentation and embodied carbon report (expired and expiring documents, undocumented materials) and publishes it to a folder (`docs.report`, `fileengine.publish`).
+
+  Checked against the live Proxima File Vault server, with a public EPD and HPD of a real product. **Not yet:** publish sets and share links, BCF, Component Libraries (the later phases), field sets beyond EPD and HPD, the docked Documents pane, thumbnails, single sign-on, and transfers off the UI thread.
 
 - **Coordination**: clash tests (COL-CLASH), automatic pipe and duct penetrations (MEP-PEN-001),
   bathroom fixture clear floor spaces and turning spaces, ISO 21542. For BCF issues: the docked

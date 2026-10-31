@@ -37,8 +37,13 @@
     },
     "gwp_a1a3": {
       "type": "number",
-      "description": "GWP-total for modules A1-A3 combined, in kg CO2 eq per declared unit; where several are given, the IPCC AR6 (or EN 15804+A2) GWP-total including biogenic carbon",
+      "description": "GWP-total for modules A1-A3 combined, in kg CO2 eq per declared unit, INCLUDING biogenic carbon: the row named 'GWP-total' or 'GWP-total (incl biogenic)' (IPCC AR6 or EN 15804+A2 where several methods are given), never a row marked 'excl biogenic' or 'GWP-fossil'",
       "x-reviera": { "label": "GWP A1-A3", "property": "GWP_A1A3", "folder_key": "epd.gwp_a1a3", "unit": "kg CO2e per declared unit" }
+    },
+    "gwp_a1a3_excl_biogenic": {
+      "type": "number",
+      "description": "GWP for modules A1-A3 combined EXCLUDING biogenic carbon, in kg CO2 eq per declared unit: the row named 'GWP-total (excl biogenic)' or 'GWP-fossil', if the EPD gives one",
+      "x-reviera": { "label": "GWP A1-A3 excl. biogenic", "property": "GWP_A1A3_ExclBiogenic", "folder_key": "epd.gwp_a1a3_excl_biogenic", "unit": "kg CO2e per declared unit" }
     },
     "valid_until": {
       "type": "string",

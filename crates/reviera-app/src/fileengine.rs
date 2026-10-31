@@ -25,8 +25,11 @@
 //! - `file.open` takes `fileengine://<connection>/<uid>` (`?version=<v>` for a past one) and
 //!   `file.save_as` takes `fileengine://<connection>/<folder uid>/<name>.ifc`.
 //!
-//! Not yet: thumbnails, publishing, BCF, Component Libraries, documentation folders and product
-//! data (the later phases), single sign-on, and the transfers off the UI thread.
+//! - `fileengine.publish` puts any file (a report, an export) into a folder (COL-FE-008).
+//!
+//! Documentation folders and product data are `docs.*` (`crate::docs`). Not yet: thumbnails,
+//! publish sets and share links, BCF, Component Libraries (the later phases), single sign-on, and
+//! the transfers off the UI thread.
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
@@ -97,6 +100,8 @@ pub struct Connections {
     session_only: bool,
     session: HashMap<String, String>,
     clients: HashMap<String, Client>,
+    /// This session's product data extraction runs (`docs.extract`), by id.
+    runs: HashMap<String, crate::docs::Run>,
 }
 
 impl std::fmt::Debug for Connections {
@@ -192,7 +197,7 @@ impl Connections {
 
     /// Runs `f` on a signed-in client for connection `id`, signing in with the stored credential
     /// first if there is no session.
-    fn with<T>(&mut self, id: &str, f: impl FnOnce(&Client) -> reviera_fileengine::Result<T>) -> Result<T> {
+    pub(crate) fn with<T>(&mut self, id: &str, f: impl FnOnce(&Client) -> reviera_fileengine::Result<T>) -> Result<T> {
         let _p = reviera_core::profiler::scope("FileEngine call");
         let p = self.profile(id)?;
         let stored = self.secret(&p.id);
@@ -202,6 +207,19 @@ impl Connections {
             c.sign_in(key, secret).map_err(failed)?;
         }
         f(c).map_err(failed)
+    }
+
+    /// Connection `id`'s server address.
+    pub(crate) fn profile_url(&self, id: &str) -> Result<String> {
+        self.profile(id).map(|p| p.url)
+    }
+
+    pub(crate) fn keep_run(&mut self, run: crate::docs::Run) {
+        self.runs.insert(run.run_id.clone(), run);
+    }
+
+    pub(crate) fn run(&self, id: &str) -> Option<crate::docs::Run> {
+        self.runs.get(id).cloned()
     }
 
     /// The working-copy folder of file `uid` (at `version`, for a past one).
@@ -762,6 +780,9 @@ fn model_metadata(app: &App, id: DocumentId) -> Result<BTreeMap<String, String>>
     m.insert("reviera.version".into(), env!("CARGO_PKG_VERSION").into());
     let levels: Vec<String> = reviera_core::levels::list(store).into_iter().map(|l| l.name).collect();
     m.insert("reviera.levels".into(), serde_json::to_string(&levels).expect("serialises"));
+    if let Some(products) = crate::docs::products_metadata(store) {
+        m.insert("reviera.products".into(), products);
+    }
     Ok(m)
 }
 
@@ -1055,4 +1076,73 @@ host!(FeRestore, "fileengine.restore_version", "Restore a FileEngine version",
         None => None,
     };
     Ok(RestoreOut { restored, version, document_id })
+});
+
+// ---- Publishing files (COL-FE-008) ----
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PublishParams {
+    pub connection_id: String,
+    pub folder_uid: String,
+    /// The file on this computer: a report or an export.
+    pub path: PathBuf,
+    /// Its name on FileEngine (default: the file's own).
+    pub name: Option<String>,
+    /// When a file of that name is there already: a new version of it (true) or refused (default).
+    #[serde(default)]
+    pub replace: bool,
+    /// Metadata to set on the file (`doc.type`, `reviera.report`, …), besides the model's project
+    /// GlobalId when a model is open.
+    #[serde(default)]
+    pub metadata: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct Published {
+    pub uid: String,
+    pub name: String,
+    pub version: String,
+    /// Whether it was a new version of a file already there.
+    pub replaced: bool,
+}
+
+host!(FePublish, "fileengine.publish", "Publish a file to FileEngine",
+    "Uploads a file from this computer, such as a report or an export, into a FileEngine folder (COL-FE-008), \
+     for sharing: a new file, or with `replace` a new version of the one of that name (otherwise a name \
+     already there is refused). Sets the metadata given, and `ifc.project_guid` of the open model, so the \
+     file can be found by its project. Returns the file's uid, name and version.",
+    [Network, FileRead], PublishParams, Published, |app, caller, p| {
+    let name = p.name.clone().filter(|n| !n.trim().is_empty()).or_else(|| p.path.file_name().map(|n| n.to_string_lossy().into_owned())).ok_or_else(|| bad("fileengine.invalid_input", "the file needs a name"))?;
+    let name = name.trim().to_owned();
+    if name.contains('/') {
+        return Err(bad("fileengine.invalid_input", "a name cannot hold '/'"));
+    }
+    if !p.path.is_file() {
+        return Err(bad("fileengine.no_file", format!("{} is not a file", p.path.display())));
+    }
+    let mut metadata = p.metadata.clone();
+    if let Some(id) = app.active()
+        && let Ok(open) = app.get(id)
+        && let Some(project) = open.doc.store().iter().find(|e| e.class == "IfcProject")
+    {
+        metadata.entry("ifc.project_guid".into()).or_insert_with(|| project.guid().to_string());
+    }
+    let there = app.fileengine.with(&p.connection_id, |c| Ok(c.list(&p.folder_uid, false)?.into_iter().find(|e| !e.deleted && !e.is_dir() && e.name == name)))?;
+    if there.is_some() && !p.replace {
+        return Err(bad("fileengine.exists", format!("{name} is already in that folder; publish with replace to add a new version of it")));
+    }
+    app.fileengine.with(&p.connection_id, |c| {
+        let replaced = there.is_some();
+        let uid = match there {
+            Some(e) => e.uid,
+            None => c.create_file(&p.folder_uid, &name)?,
+        };
+        c.write_file(&uid, &p.path)?;
+        for (k, v) in &metadata {
+            c.set_metadata(&uid, k, v)?;
+        }
+        let version = c.stat(&uid)?.version;
+        Ok(Published { uid, name: name.clone(), version, replaced })
+    })
 });

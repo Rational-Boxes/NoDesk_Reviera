@@ -57,6 +57,7 @@ mod mep_ui;
 mod remote_analysis_ui;
 mod bimserver_ui;
 mod fileengine_ui;
+mod material_docs_ui;
 mod profiler_ui;
 mod terminal_ui;
 mod mep_electrical_ui;
@@ -4766,6 +4767,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "ui.fileengine_open" => with(gui, Gui::fileengine_open),
         "ui.fileengine_save" => with(gui, Gui::fileengine_save),
         "ui.fileengine_versions" => with(gui, Gui::fileengine_versions),
+        "ui.material_documents" => with(gui, Gui::material_documents),
         "ui.profiler" => with(gui, Gui::profiler_window),
         "mep_type.load_starters" => with(gui, Gui::load_mep_types),
         "mep.place_component" => with(gui, Gui::place_mep_component),
