@@ -5,7 +5,9 @@
 //! For a model opened from FileEngine, the discussion threads people raised on it there (in its
 //! 3D viewer or here), read from the server when the model opens; otherwise the BCF topics kept
 //! with the model. Choosing one shows its snapshot and comments; Show opens its viewpoint in the 3D
-//! view; Reply…, Resolve and New Issue… write to wherever the issues live.
+//! view; Reply…, Resolve and New Issue… write to wherever the issues live. A filter shows all,
+//! open or resolved issues; a FileEngine model's are read again every minute while the pane is
+//! shown, and the status bar says what changed.
 
 use base64::Engine;
 use serde_json::{Value, json};
@@ -16,6 +18,16 @@ use super::{Gui, error, with};
 /// The snapshot preview's width.
 const PICTURE_W: u32 = 300;
 const PICTURE_H: u32 = 188;
+
+/// How often a FileEngine model's issues are read again while the pane is shown.
+const POLL_MS: i32 = 60_000;
+
+/// The filter's choices.
+const FILTERS: &[&str] = &["All issues", "Open", "Resolved"];
+
+fn resolved(status: &str) -> bool {
+    matches!(status.to_lowercase().as_str(), "resolved" | "closed")
+}
 
 /// One issue as the pane shows it.
 #[derive(Clone)]
@@ -34,6 +46,11 @@ struct Row {
 
 pub(crate) struct IssuesPane {
     list: ListCtrl,
+    filter: Choice,
+    #[allow(dead_code)]
+    timer: Timer<Frame>,
+    /// Every issue read; `rows` are the ones the filter shows.
+    all: Vec<Row>,
     info: StaticText,
     picture: StaticBitmap,
     detail: TextCtrl,
@@ -129,11 +146,17 @@ impl Gui {
         let resolve = button(&panel, "Resolve", "Resolve the issue (or open it again)");
         let new = button(&panel, "New Issue…", "Raise an issue from the 3D view: its camera, cut, hidden elements, selection and a snapshot");
         let refresh = button(&panel, "Refresh", "Read the issues again");
+        let filter = Choice::builder(&panel).build();
+        for f in FILTERS {
+            filter.append(f);
+        }
+        filter.set_selection(0);
 
         let top = BoxSizer::builder(Orientation::Horizontal).build();
         for b in [&show, &reply, &resolve, &new, &refresh] {
             top.add(b, 0, SizerFlag::Right, 4);
         }
+        top.add(&filter, 0, SizerFlag::AlignCenterVertical | SizerFlag::Left, 8);
         top.add(&info, 1, SizerFlag::AlignCenterVertical | SizerFlag::Left, 8);
         let body = BoxSizer::builder(Orientation::Horizontal).build();
         body.add(&list, 3, SizerFlag::Expand | SizerFlag::Right, 6);
@@ -156,7 +179,17 @@ impl Gui {
                 .floatable(true),
         );
         aui.update();
-        self.issues_pane = Some(IssuesPane { list, info, picture, detail, resolve, rows: Vec::new(), doc: None, on_server: false, current: None });
+        let timer = Timer::new(&frame);
+        {
+            let g = gui.clone();
+            timer.on_tick(move |_| with(&g, Gui::poll_issues));
+        }
+        timer.start(POLL_MS, false);
+        {
+            let g = gui.clone();
+            filter.on_selection_changed(move |_| with(&g, Gui::show_issue_rows));
+        }
+        self.issues_pane = Some(IssuesPane { list, filter, timer, all: Vec::new(), info, picture, detail, resolve, rows: Vec::new(), doc: None, on_server: false, current: None });
         {
             let g = gui.clone();
             list.on_item_selected(move |e| {
@@ -275,17 +308,25 @@ impl Gui {
         let Some(p) = self.issues_pane.as_mut() else { return };
         p.doc = doc;
         p.on_server = linked;
+        p.info.set_label(&note);
+        p.all = rows;
+        self.show_issue_rows();
+    }
+
+    /// Fills the list with the issues the filter shows, keeping the one chosen.
+    fn show_issue_rows(&mut self) {
+        let Some(p) = self.issues_pane.as_mut() else { return };
+        let keep = p.current.and_then(|k| p.rows.get(k)).map(|r| r.id.clone());
+        let filter = p.filter.get_selection().unwrap_or(0);
+        p.rows = p.all.iter().filter(|r| match filter { 1 => !resolved(&r.status), 2 => resolved(&r.status), _ => true }).cloned().collect();
         p.list.delete_all_items();
-        for (k, r) in rows.iter().enumerate() {
+        for (k, r) in p.rows.iter().enumerate() {
             p.list.insert_item(k as i64, &r.title, None);
             p.list.set_item_text_by_column(k as i64, 1, &r.status);
             p.list.set_item_text_by_column(k as i64, 2, &r.by);
             p.list.set_item_text_by_column(k as i64, 3, &r.date);
             p.list.set_item_text_by_column(k as i64, 4, &r.comments.len().saturating_sub(1).to_string());
         }
-        p.info.set_label(&note);
-        let keep = p.current.and_then(|k| p.rows.get(k)).map(|r| r.id.clone());
-        p.rows = rows;
         p.current = None;
         let at = keep.and_then(|id| p.rows.iter().position(|r| r.id == id)).or((!p.rows.is_empty()).then_some(0));
         match at {
@@ -299,6 +340,41 @@ impl Gui {
                     p.picture.set_bitmap(&b);
                 }
             }
+        }
+    }
+
+    /// Every minute: a FileEngine model's issues read again while the pane is shown; the status
+    /// bar says what changed (new issues, replies, resolved or reopened).
+    fn poll_issues(&mut self) {
+        let on_server = self.issues_pane.as_ref().is_some_and(|p| p.on_server && p.doc == self.doc);
+        if !on_server || !self.aui.is_pane_shown("issues") || self.app.active().is_none() {
+            return;
+        }
+        let before: Vec<(String, String, usize)> = self.issues_pane.as_ref().map(|p| p.all.iter().map(|r| (r.id.clone(), r.status.clone(), r.comments.len())).collect()).unwrap_or_default();
+        self.refresh_issues(true);
+        let Some(p) = self.issues_pane.as_ref() else { return };
+        let (mut new, mut replies, mut changed) = (0, 0, 0);
+        for r in &p.all {
+            match before.iter().find(|b| b.0 == r.id) {
+                None => new += 1,
+                Some(b) => {
+                    replies += r.comments.len().saturating_sub(b.2);
+                    changed += usize::from(b.1 != r.status);
+                }
+            }
+        }
+        let mut what = Vec::new();
+        if new > 0 {
+            what.push(format!("{new} new issue{}", if new == 1 { "" } else { "s" }));
+        }
+        if replies > 0 {
+            what.push(format!("{replies} new repl{}", if replies == 1 { "y" } else { "ies" }));
+        }
+        if changed > 0 {
+            what.push(format!("{changed} resolved or reopened"));
+        }
+        if !what.is_empty() {
+            self.frame.set_status_text(&format!("Issues on FileEngine: {}", what.join(", ")), 0);
         }
     }
 
@@ -335,8 +411,7 @@ impl Gui {
             text.push_str(&format!("{e}\n"));
         }
         p.detail.set_value(text.trim_end());
-        let resolved = matches!(row.status.to_lowercase().as_str(), "resolved" | "closed");
-        p.resolve.set_label(if resolved { "Reopen" } else { "Resolve" });
+        p.resolve.set_label(if resolved(&row.status) { "Reopen" } else { "Resolve" });
     }
 
     fn current_issue(&self) -> Option<(Row, bool)> {
@@ -386,7 +461,7 @@ impl Gui {
     fn resolve_issue(&mut self) {
         let frame = self.frame;
         let Some((row, on_server)) = self.current_issue() else { return };
-        let resolved = matches!(row.status.to_lowercase().as_str(), "resolved" | "closed");
+        let resolved = resolved(&row.status);
         let r = if on_server {
             self.run("fileengine.resolve_issue", json!({ "thread_id": row.id, "resolved": !resolved }))
         } else {
