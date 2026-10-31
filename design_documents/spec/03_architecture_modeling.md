@@ -4058,7 +4058,32 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 - [ ] A fixture's zones turn when its wall is turned.
 - [x] With no side wall modelled, `bath.set_hand` puts the WC's ADA clearance on the chosen side.
 
-*Built (2026-10-31):* fixture spaces in `clearances::all` (so `clearance.list`, `clearance.check`, Check Overlaps and the views' virtual volumes include them, in green), `bath.check` in `reviera-app`, and View › Coordination › Check Bathrooms, which lists the findings and selects and frames the one picked. Defaults are recorded as E-65 in `EXPERT_REVIEW.md`. Not yet: grab bars by rule (ARC-BATH-003 to come), turning spaces, transfer showers, Approved Document M's ambulant cubicles, and the exceptions for single-user rooms.
+*Built (2026-10-31):* fixture spaces in `clearances::all` (so `clearance.list`, `clearance.check`, Check Overlaps and the views' virtual volumes include them, in green), `bath.check` in `reviera-app`, and View › Coordination › Check Bathrooms, which lists the findings and selects and frames the one picked. Defaults are recorded as E-65 in `EXPERT_REVIEW.md`. Not yet: turning spaces, transfer showers, Approved Document M's ambulant cubicles, and the exceptions for single-user rooms.
+
+### 3.9a.3 Grab bars
+**ID:** ARC-BATH-003 · **Priority:** P1 · **Ref:** owner requirement (2026-10-31: "rails"); `BATHROOMS_PLAN.md` §5; research/13 B1.7, B8
+
+**Purpose.** Put grab bars where the rules say, at the height and size they say, and say when a bar is missing or out of range, so that accessible bathrooms are right before anyone measures them on site.
+
+**Behaviour & rules.**
+- **A grab bar** is a round bar on a wall face, standing off it on a bracket at each end and corner, with a flange on the wall. It is drawn as a polyline in the face's plane: straight from two points, an L or a U from more. It keeps its place along its wall and its height above its level, so it moves with the wall. It has an outside diameter (default 38 mm, 1½ in) and a clear gap to the wall (default 38 mm). It is an `IfcRailing` with PredefinedType `HANDRAIL`, as NBS maps grab bars (research/13 B8), and may stand in a fixture's clear space (ARC-BATH-002).
+- `grab_bar.create` draws one from points on or near a face, each with the height of the top of the bar; `grab_bar.set` changes diameter, gap and the height of its top.
+- **Bar rules.** A rule pack may hold bar rules (`bars`). Each names the fixtures, the wall (the fixture's **side** wall or the **rear** wall behind it), the stretch the bar must cover at least (on the side wall, out from the rear wall's face; on the rear wall, across from the fixture's centreline, positive toward the open side), the range of the top of the bar above the floor, of the diameter and of the gap, each with a default, and a least length.
+- **The ADA pack's bars** (2010 ADA Standards 604.5, 609): beside a WC, at least 42 in (1065 mm) long, starting at most 12 in (305 mm) from the rear wall and reaching at least 54 in (1370 mm) from it; behind it, at least 36 in (915 mm) long, from 12 in (305 mm) on the wall side of the centreline to 24 in (610 mm) on the open side. Tops 33–36 in (840–915 mm) above the floor (34 in, 865 mm, by default), diameter 1¼–2 in (32–51 mm), gap exactly 1½ in (38 mm).
+- **`bath.place_grab_bars`** places the bars the packs in use ask for at fixtures (or the selected ones), each over exactly the stretch its rule covers, at the default height and size. Bars it placed before for the same fixture and rule are replaced. A bar that cannot be placed (no side wall modelled, a wall too short) is skipped and reported with the reason.
+- **Checks.** For each bar rule that applies to a fixture, `bath.check` looks at the bars on that wall that overlap the stretch. With none, a finding says the bar is missing. Otherwise it reports a bar that does not cover the stretch, is shorter than the least length, or has its top, diameter or gap outside the rule's range.
+
+**Data (IFC mapping).** `IfcRailing` (`HANDRAIL`), Name "Grab Bar", in its level's storey. Its body is `IfcSweptDiskSolid`s: the bar along its centreline and a bracket at each point. The recipe is RXD element data (`rxd:grab_bar`).
+
+**Commands.** See the catalog: `grab_bar.create`, `grab_bar.set`, `bath.place_grab_bars`.
+
+**Acceptance criteria.**
+- [x] Under `ada_2010`, a WC with its side wall modelled gets a 42 in side bar from 12 in to 54 in off the rear wall and a 36 in rear bar, both with their tops at 34 in; `bath.check` then reports neither as missing. Placing again replaces them.
+- [x] With no bars, `bath.check` reports both as missing; a side bar moved to 30 in is reported against its height range, and one 28 mm thick against its diameter range.
+- [x] A grab bar is written to IFC as an `IfcRailing` HANDRAIL with swept-disk geometry in its storey, and the file validates.
+- [ ] A grab bar moves with its wall.
+
+*Built (2026-10-31):* `reviera_core::grab_bars` (bodies with a bracket and a 75 mm flange at each point), bar rules in the pack schema and the ADA pack, `bath.place_grab_bars`, `grab_bar.create`, `grab_bar.set`, the bar checks in `bath.check`, and View › Coordination › Place Grab Bars (the selected fixtures, else all). Defaults are E-66 in `EXPERT_REVIEW.md`. Not yet: Approved Document M's drop-down and ambulant rails, A117.1 vertical and swing-up bars, bath and shower bars, children's heights, wall backing, and grips to drag a bar.
 
 ---
 
@@ -5241,6 +5266,9 @@ All commands below are registered once in the command registry and exposed autom
 | `bath.remove_rule_pack` | id | — | Yes | ARC-BATH-001 |
 | `bath.set_hand` | element_ids, hand: auto\|left\|right | — | Yes | ARC-BATH-002 |
 | `bath.check` | element_ids? | finding[] | No (query) | ARC-BATH-002 |
+| `bath.place_grab_bars` | element_ids? | {placed, skipped} | Yes | ARC-BATH-003 |
+| `grab_bar.create` | level, points, wall_id?, side?, diameter?, gap? | element_id | Yes | ARC-BATH-003 |
+| `grab_bar.set` | element_ids, diameter?, gap?, top? | — | Yes | ARC-BATH-003 |
 | `enclosure.create` | form, footprint \| host_wall_ids, level_id, params | element_id | Yes | ARC-GLZ-001 |
 | `enclosure.set` | enclosure_id, params | — | Yes | ARC-GLZ-001 |
 | `enclosure.get` | enclosure_id | {form, params, parts} | No (query) | ARC-GLZ-001 |

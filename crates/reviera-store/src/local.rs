@@ -808,6 +808,7 @@ impl LocalProject {
                 self.length_scale,
             )?;
             self.write_railings(doc)?;
+            self.write_grab_bars(doc)?;
             self.write_rooms(doc)?;
             self.write_spaces(doc)?;
             let owner_history = self.new_owner_history()?;
@@ -4181,6 +4182,34 @@ impl LocalProject {
     /// Writes every Reviera railing (ARC-RAIL-001): one faceted B-rep per rail, post and
     /// baluster, contained in its level (a free railing's, or its host's); and each gate
     /// (ARC-RAIL-003) as its leaves, in its railing's level.
+    /// Grab bars (ARC-BATH-003): swept disks along the bar and its brackets, in their level's
+    /// storey.
+    fn write_grab_bars(&mut self, doc: &Document) -> Result<()> {
+        let store = doc.store();
+        let bars = reviera_core::grab_bars::all(store);
+        if bars.is_empty() {
+            return Ok(());
+        }
+        let contexts = geometry::Contexts::find(&self.ifc)?;
+        let owner_history = self.new_owner_history()?;
+        for (id, g) in &bars {
+            let Some(&step) = self.steps.get(id) else {
+                continue;
+            };
+            geometry::write_swept_disks(&mut self.ifc, step, &g.lines(), self.length_scale, contexts)?;
+            let storey = store
+                .get(*id)
+                .and_then(reviera_core::grab_bars::recipe)
+                .and_then(|r| GlobalId::parse(&r.level))
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|l| self.steps.get(&l).copied());
+            if let Some(storey) = storey {
+                geometry::contain(&mut self.ifc, step, storey, owner_history)?;
+            }
+        }
+        Ok(())
+    }
+
     fn write_railings(&mut self, doc: &Document) -> Result<()> {
         let store = doc.store();
         let mut all: Vec<(ElementId, Vec<railings::Mesh>, ElementId)> = railings::all(store)

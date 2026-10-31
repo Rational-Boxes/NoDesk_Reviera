@@ -2,7 +2,8 @@
 // Copyright (C) 2026 Reviera contributors
 
 //! Check Bathrooms (ARC-BATH-002): runs `bath.check` under the bathroom rule packs in use, lists
-//! the findings (errors first), and selects and frames the fixture and what is in its way.
+//! the findings (errors first), and selects and frames the fixture and what is in its way. Place
+//! Grab Bars (ARC-BATH-003) puts the bars the packs ask for at the selected fixtures, or all.
 
 use serde_json::json;
 use wxdragon::prelude::*;
@@ -96,5 +97,35 @@ impl Gui {
             ),
             0,
         );
+    }
+
+    pub(crate) fn place_grab_bars(&mut self) {
+        let frame = self.frame;
+        let selected: Vec<serde_json::Value> = self.selection().into_iter().map(|id| json!(id.0)).collect();
+        let args = if selected.is_empty() { json!({}) } else { json!({ "element_ids": selected }) };
+        let out = match self.run("bath.place_grab_bars", args) {
+            Ok(v) => v,
+            Err(e) => return error(&frame, &format!("Grab bars were not placed:\n{e}")),
+        };
+        self.refresh_scene(&frame);
+        let placed = out["placed"].as_array().map_or(0, Vec::len);
+        let skipped: Vec<String> = out["skipped"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default()
+            .iter()
+            .map(|s| format!("{} ({}): {}", self.element_label(&s["fixture"]), s["rule"].as_str().unwrap_or_default(), s["reason"].as_str().unwrap_or_default()))
+            .collect();
+        if placed == 0 && skipped.is_empty() {
+            return error(&frame, "No grab bars to place: the bathroom rule packs in use ask for none at these fixtures (the ADA pack places WC bars).");
+        }
+        if skipped.is_empty() {
+            frame.set_status_text(&format!("{placed} grab bar(s) placed"), 0);
+        } else {
+            let d = MessageDialog::builder(&frame, &format!("{placed} grab bar(s) placed. Not placed:\n{}", skipped.join("\n")), "Place Grab Bars")
+                .with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation)
+                .build();
+            d.show_modal();
+        }
     }
 }

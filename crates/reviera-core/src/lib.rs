@@ -43,6 +43,7 @@ pub mod display_colors;
 pub mod document;
 pub mod dormers;
 pub mod enclosures;
+pub mod grab_bars;
 pub mod growing;
 pub mod hothouse;
 pub mod merge;

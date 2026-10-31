@@ -611,8 +611,13 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
   code and accessibility rule set; a project can add or replace packs. View › Coordination ›
   Check Bathrooms lists what stands in a clear space, doors swinging into one, and a WC's
   distance from its side wall, as errors or notes (`bath.rule_packs`, `bath.set_rule_packs`,
-  `bath.add_rule_pack`, `bath.remove_rule_pack`, `bath.set_hand`, `bath.check`). **Not yet**
-  (planned): grab bars by rule, room layouts, toilet cores and partitions, fixture counts,
+  `bath.add_rule_pack`, `bath.remove_rule_pack`, `bath.set_hand`, `bath.check`).
+- **Grab bars** (ARC-BATH-003): round bars on a wall face, on brackets, following their wall,
+  saved as `IfcRailing` HANDRAIL with swept-disk geometry. View › Coordination › Place Grab Bars
+  puts the bars the packs ask for at fixtures (the ADA's WC side and rear bars), and Check
+  Bathrooms reports a bar missing, short of its stretch, or with its height, diameter or gap out
+  of range (`bath.place_grab_bars`, `grab_bar.create`, `grab_bar.set`). **Not yet** (planned):
+  other packs' bars (Approved Document M's drop-down rails, shower and bath bars), room layouts, toilet cores and partitions, fixture counts,
   locker rooms, wet areas, spas, the generic bathroom component library and product swaps.
 
 ### Structure (in development)

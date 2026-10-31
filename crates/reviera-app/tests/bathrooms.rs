@@ -165,7 +165,7 @@ fn an_ada_wc_its_side_wall_door_and_grab_bar() {
     // A grab bar along the side wall may be in it.
     ok(&mut app, "railing.create", json!({ "path": [[0.2, -0.3], [0.2, -1.2]], "base_level": level }));
     let f = findings(&mut app);
-    assert!(f.is_empty(), "{f:#?}");
+    assert!(!f.iter().any(|x| x["kind"] == "intrusion"), "{f:#?}");
 
     // A door in a wall in front, swinging in: not allowed.
     let front = wall(&mut app, &level, [0.0, -2.2], [3.0, -2.2]);
@@ -199,4 +199,57 @@ fn the_hand_where_no_side_wall_is_modelled() {
     assert!((b[0] - (4.0 + 0.455)).abs() < 0.01 && (a[0] - (4.0 + 0.455 - 1.525)).abs() < 0.01, "{a:?} {b:?}");
     let wall_id = wall(&mut app, &level, [0.0, -5.0], [6.0, -5.0]);
     assert_eq!(run(&mut app, "bath.set_hand", json!({ "element_ids": [wall_id], "hand": "left" })).unwrap_err().code, "bath.not_a_fixture");
+}
+
+#[test]
+fn ada_grab_bars_placed_checked_and_saved() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = new_app(dir.path());
+    let level = model(&mut app);
+    ok(&mut app, "bath.set_rule_packs", json!({ "packs": ["ada_2010"] }));
+    wall(&mut app, &level, [0.0, 0.0], [0.0, -3.0]);
+    let wc = fixture(&mut app, &level, "Water Closet", 0.55);
+    let kinds = |app: &mut App| -> Vec<(String, String)> {
+        findings(app).iter().map(|f| (f["kind"].as_str().unwrap().to_owned(), f["rule"].as_str().unwrap().to_owned())).collect()
+    };
+    let k = kinds(&mut app);
+    assert!(k.contains(&("missing_bar".into(), "ADA 2010 604.5.1".into())) && k.contains(&("missing_bar".into(), "ADA 2010 604.5.2".into())), "{k:?}");
+
+    let placed = ok(&mut app, "bath.place_grab_bars", json!({ "element_ids": [wc] }));
+    assert_eq!(placed["placed"].as_array().unwrap().len(), 2, "{placed:#}");
+    assert!(placed["skipped"].as_array().unwrap().is_empty(), "{placed:#}");
+    let k = kinds(&mut app);
+    assert!(!k.iter().any(|(kind, _)| kind == "missing_bar" || kind == "bar"), "{k:?}");
+    // They may stand in the WC's clearance.
+    assert!(!k.iter().any(|(kind, _)| kind == "intrusion"), "{k:?}");
+
+    // Placed again: replaced, not doubled.
+    let again = ok(&mut app, "bath.place_grab_bars", json!({}));
+    let first = placed["placed"][0].as_u64().unwrap();
+    assert!(run(&mut app, "element.get_ids", json!({ "element_ids": [first] })).is_err(), "the old bar is gone");
+    let (side, rear) = (again["placed"][0].as_u64().unwrap(), again["placed"][1].as_u64().unwrap());
+
+    // The side bar lowered to 30 in, the rear bar made 28 mm thick.
+    ok(&mut app, "grab_bar.set", json!({ "element_ids": [side], "top": 0.762 }));
+    ok(&mut app, "grab_bar.set", json!({ "element_ids": [rear], "diameter": 0.028 }));
+    let f = findings(&mut app);
+    let bar = |rule: &str| f.iter().find(|x| x["kind"] == "bar" && x["rule"] == rule).unwrap_or_else(|| panic!("{f:#?}"))["message"].as_str().unwrap().to_owned();
+    assert!(bar("ADA 2010 604.5.1").contains("top 762 mm up"), "{}", bar("ADA 2010 604.5.1"));
+    assert!(bar("ADA 2010 604.5.2").contains("28 mm thick"), "{}", bar("ADA 2010 604.5.2"));
+
+    // Without a side wall, the side bar is skipped with the reason.
+    let lone = fixture(&mut app, &level, "Water Closet", 4.5);
+    let p = ok(&mut app, "bath.place_grab_bars", json!({ "element_ids": [lone] }));
+    assert_eq!(p["placed"].as_array().unwrap().len(), 1, "{p:#}");
+    assert!(p["skipped"][0]["reason"].as_str().unwrap().contains("no side wall"), "{p:#}");
+
+    // Drawn by hand: an L on the side wall.
+    let l = ok(&mut app, "grab_bar.create", json!({ "level": level, "points": [[0.1, -1.5, 0.9], [0.1, -0.9, 0.9], [0.1, -0.9, 1.5]] })).as_u64().unwrap();
+    let path = dir.path().join("bars.ifc");
+    ok(&mut app, "file.save_as", json!({ "path": path }));
+    let text = std::fs::read_to_string(&path).unwrap();
+    let rows = text.lines().filter(|l| l.contains("IFCRAILING(") && l.contains(".HANDRAIL.")).count();
+    assert_eq!(rows, 4, "three placed and one drawn");
+    assert!(text.contains("IFCSWEPTDISKSOLID("));
+    let _ = l;
 }

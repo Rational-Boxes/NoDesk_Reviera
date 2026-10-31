@@ -346,6 +346,9 @@ pub fn all(store: &Store) -> Vec<Body> {
             push(id, "IfcRailing", mesh, false);
         }
     }
+    for (id, g) in crate::grab_bars::all(store) {
+        push(id, "IfcRailing:metal", g.mesh(), false);
+    }
     for (id, parts) in crate::railings::all_gates(store) {
         for mesh in parts {
             push(id, "IfcDoor", mesh, false);
@@ -635,6 +638,10 @@ pub fn related(store: &Store, a: ElementId, b: ElementId) -> bool {
         // A part is cut from its original element (ARC-PART-001).
         if let Some(r) = crate::parts::recipe(e) {
             hosts.push(r.source);
+        }
+        // A grab bar is fixed to its wall.
+        if let Some(r) = crate::grab_bars::recipe(e) {
+            hosts.push(r.wall);
         }
         if let Some(r) = crate::railings::railing_recipe(e) {
             match r.path {

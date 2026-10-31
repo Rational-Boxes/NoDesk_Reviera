@@ -42,6 +42,10 @@ pub enum FindingKind {
     Distance,
     /// No side wall found to measure from.
     NoSideWall,
+    /// A grab bar the rules ask for is not there (ARC-BATH-003).
+    MissingBar,
+    /// A grab bar out of its rule's range: its stretch, length, height, diameter or gap.
+    Bar,
 }
 
 /// One thing the check found.
@@ -96,7 +100,9 @@ impl HostCommand for BathCheck {
         description: "Checks each bathroom fixture (or those given) under the rule packs in use (ARC-BATH-002): \
                       every element's body inside one of its clearance zones (the fixture itself, grab bars, rails \
                       and accessories excepted), any door swinging into a zone whose rule forbids it, and its \
-                      distance rules, such as a WC's centreline from its side wall. Each finding names the pack, \
+                      distance rules, such as a WC's centreline from its side wall, and its grab bars \
+                      (ARC-BATH-003): missing, not covering their stretch, too short, or with their \
+                      height, diameter or gap out of range. Each finding names the pack, \
                       its edition and layer, the rule, its source and confidence, and is an error, or a note \
                       when it comes from guidance or a rule marked advisory. Errors first.",
         effects: &[Effect::Read],
@@ -180,6 +186,70 @@ impl HostCommand for BathCheck {
                             });
                         }
                     }
+                }
+            }
+            // Grab bars (ARC-BATH-003): on the rule's wall and face, over its stretch.
+            let bars = reviera_core::grab_bars::all(store);
+            for (pack, b) in bath_rules::bars_of(store, f, &packs) {
+                let st = match f.bar_stretch(store, b) {
+                    Ok(st) => st,
+                    Err(why) => {
+                        out.push(finding(pack, &b.id, &b.description, b.confidence, &b.source, FindingKind::NoSideWall, format!("{} cannot be checked at {what}: {why}", b.id)));
+                        continue;
+                    }
+                };
+                let wall_guid = store.get(st.wall).map(|w| w.guid().to_string()).unwrap_or_default();
+                // The bars on that face overlapping the stretch, the most overlapping first.
+                let mut on: Vec<(ElementId, reviera_core::grab_bars::GrabBarRecipe, [f64; 2])> = bars
+                    .iter()
+                    .filter_map(|(id, _)| {
+                        let r = store.get(*id).and_then(reviera_core::grab_bars::recipe)?;
+                        let lo = r.points.iter().map(|p| p[0]).fold(f64::MAX, f64::min);
+                        let hi = r.points.iter().map(|p| p[0]).fold(f64::MIN, f64::max);
+                        (r.wall == wall_guid && (r.side - st.side).abs() < 0.5 && hi > st.along[0] && lo < st.along[1]).then_some((*id, r, [lo, hi]))
+                    })
+                    .collect();
+                let overlap = |u: &[f64; 2]| u[1].min(st.along[1]) - u[0].max(st.along[0]);
+                on.sort_by(|a, b| overlap(&b.2).total_cmp(&overlap(&a.2)));
+                let Some((bar, r, u)) = on.into_iter().next() else {
+                    out.push(finding(pack, &b.id, &b.description, b.confidence, &b.source, FindingKind::MissingBar, format!("{what} has no grab bar where {} asks for one", b.id)));
+                    continue;
+                };
+                let g = bars.iter().find(|(id, _)| *id == bar).map(|(_, g)| g).expect("listed");
+                let mut problems = Vec::new();
+                if u[0] > st.along[0] + tolerance || u[1] < st.along[1] - tolerance {
+                    problems.push("does not cover the stretch the rule asks for".to_owned());
+                }
+                if let Some(min) = b.length_min
+                    && g.length < min - tolerance
+                {
+                    problems.push(format!("is {} long, at least {} asked", mm(g.length), mm(min)));
+                }
+                let range = |r: &bath_rules::Range| match (r.min, r.max) {
+                    (Some(a), Some(z)) if (a - z).abs() < 1e-9 => mm(a),
+                    (Some(a), Some(z)) => format!("{:.0}–{}", a * 1000.0, mm(z)),
+                    (Some(a), None) => format!("at least {}", mm(a)),
+                    (None, Some(z)) => format!("at most {}", mm(z)),
+                    (None, None) => "any".into(),
+                };
+                if !b.top.holds(g.top, tolerance) {
+                    problems.push(format!("has its top {} up, {} asked", mm(g.top), range(&b.top)));
+                }
+                if let Some(d) = &b.diameter
+                    && !d.holds(r.diameter, 0.0005)
+                {
+                    problems.push(format!("is {} thick, {} asked", mm(r.diameter), range(d)));
+                }
+                if let Some(gp) = &b.gap
+                    && !gp.holds(r.gap, 0.0005)
+                {
+                    problems.push(format!("stands {} off the wall, {} asked", mm(r.gap), range(gp)));
+                }
+                if !problems.is_empty() {
+                    out.push(Finding {
+                        other: Some(bar),
+                        ..finding(pack, &b.id, &b.description, b.confidence, &b.source, FindingKind::Bar, format!("{}'s grab bar ({}) {}", what, b.id, problems.join("; ")))
+                    });
                 }
             }
             for (pack, d) in bath_rules::distances_of(store, f, &packs) {

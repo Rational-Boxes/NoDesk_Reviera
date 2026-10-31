@@ -198,6 +198,79 @@ pub struct Distance {
     pub max: Option<f64>,
 }
 
+/// Which wall a grab bar goes on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum BarWall {
+    /// The fixture's side wall.
+    Side,
+    /// The wall behind it.
+    Rear,
+}
+
+/// Where a bar's stretch is measured from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum CoverFrom {
+    /// Out from the rear wall's face (a side-wall bar).
+    RearWall,
+    /// Across from the fixture's centreline, positive toward the open side (a rear-wall bar).
+    Centre,
+}
+
+/// A range with the value used when placing.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct Range {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max: Option<f64>,
+    pub default: f64,
+}
+
+impl Range {
+    /// Whether `v` is in range, within `tolerance`.
+    pub fn holds(&self, v: f64, tolerance: f64) -> bool {
+        self.min.is_none_or(|m| v >= m - tolerance) && self.max.is_none_or(|m| v <= m + tolerance)
+    }
+}
+
+/// A grab bar a fixture needs (ARC-BATH-003).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct Bar {
+    pub id: String,
+    pub description: String,
+    pub fixtures: Vec<FixtureKind>,
+    #[serde(default)]
+    pub occupancy: RuleOccupancy,
+    pub source: String,
+    pub confidence: Confidence,
+    pub wall: BarWall,
+    /// The stretch it must cover at least (metres), and is placed over.
+    pub covers: [(CoverFrom, f64); 2],
+    /// The top of the bar above the floor.
+    pub top: Range,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub diameter: Option<Range>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gap: Option<Range>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub length_min: Option<f64>,
+}
+
+/// The diameter and gap a bar is placed with when its rule gives none (1½ in each).
+pub const DEFAULT_BAR: f64 = 0.038;
+
+impl Bar {
+    pub fn diameter_default(&self) -> f64 {
+        self.diameter.map_or(DEFAULT_BAR, |r| r.default)
+    }
+
+    pub fn gap_default(&self) -> f64 {
+        self.gap.map_or(DEFAULT_BAR, |r| r.default)
+    }
+}
+
 /// A rule pack.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Pack {
@@ -213,6 +286,8 @@ pub struct Pack {
     pub zones: Vec<Zone>,
     #[serde(default)]
     pub distances: Vec<Distance>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub bars: Vec<Bar>,
 }
 
 fn validator() -> &'static jsonschema::Validator {
@@ -235,6 +310,19 @@ pub fn parse(v: &Value) -> Result<Pack> {
             && min > max
         {
             return Err(bad("bath.pack_range", format!("{}: its minimum is above its maximum", d.id)));
+        }
+    }
+    for b in &pack.bars {
+        let ranges = [Some(b.top), b.diameter, b.gap];
+        if ranges.iter().flatten().any(|r| !r.holds(r.default, 0.0) || r.min.zip(r.max).is_some_and(|(a, z)| a > z)) {
+            return Err(bad("bath.pack_range", format!("{}: a range's default is outside it, or its minimum is above its maximum", b.id)));
+        }
+        let fits = match b.wall {
+            BarWall::Side => b.covers.iter().all(|c| c.0 == CoverFrom::RearWall),
+            BarWall::Rear => b.covers.iter().all(|c| c.0 == CoverFrom::Centre),
+        };
+        if !fits {
+            return Err(bad("bath.pack_range", format!("{}: a side-wall bar is measured from the rear wall, a rear-wall bar from the centreline", b.id)));
         }
     }
     Ok(pack)
@@ -319,8 +407,13 @@ pub struct Fixture {
     pub floor: f64,
     /// −1 when the side wall is on its left (−x), 1 on its right.
     pub side: f64,
-    /// The distance from its centreline to the side wall, when one was found.
+    /// The distance from its centreline to the side wall, and the wall, when one was found.
     pub side_distance: Option<f64>,
+    pub side_wall: Option<ElementId>,
+    /// The wall behind it, when there is one.
+    pub rear_wall: Option<ElementId>,
+    /// Its level (GlobalId).
+    pub level: String,
     pub hand: Hand,
 }
 
@@ -365,9 +458,9 @@ impl Fixture {
     }
 }
 
-/// Where a ray from `p` along `d` first meets a wall's plan outline within `reach`.
-fn ray_to_walls(store: &Store, p: [f64; 2], d: [f64; 2], z: f64, reach: f64) -> Option<f64> {
-    let mut best: Option<f64> = None;
+/// Where a ray from `p` along `d` first meets a wall's plan outline within `reach`, and the wall.
+fn ray_to_walls(store: &Store, p: [f64; 2], d: [f64; 2], z: f64, reach: f64) -> Option<(f64, ElementId)> {
+    let mut best: Option<(f64, ElementId)> = None;
     for w in store.iter().filter(|e| crate::walls::wall_recipe(e).is_some()) {
         let Ok(g) = crate::walls::regenerate(store, w) else { continue };
         if z < g.base_z || z > g.base_z + g.height {
@@ -378,8 +471,9 @@ fn ray_to_walls(store: &Store, p: [f64; 2], d: [f64; 2], z: f64, reach: f64) -> 
             let (a, b) = (f[k], f[(k + 1) % 4]);
             if let Some(t) = ray_segment(p, d, a, b)
                 && t <= reach
+                && best.is_none_or(|(x, _)| t < x)
             {
-                best = Some(best.map_or(t, |x: f64| x.min(t)));
+                best = Some((t, w.id()));
             }
         }
     }
@@ -426,17 +520,36 @@ pub fn fixture(store: &Store, e: &crate::element::Element) -> Option<Fixture> {
         ray_to_walls(store, [mid[0], mid[1]], [d[0], d[1]], floor + 0.3, SIDE_SEARCH)
     };
     let (left, right) = (look(-1.0), look(1.0));
-    let (side, side_distance) = match hand {
+    let (side, found) = match hand {
         Hand::Left => (-1.0, left),
         Hand::Right => (1.0, right),
         Hand::Auto => match (left, right) {
-            (Some(l), Some(r)) if r < l => (1.0, Some(r)),
+            (Some(l), Some(r)) if r.0 < l.0 => (1.0, Some(r)),
             (Some(l), _) => (-1.0, Some(l)),
             (None, Some(r)) => (1.0, Some(r)),
             (None, None) => (-1.0, None),
         },
     };
-    Some(Fixture { element: e.id(), kind, frame, x, front: y[0], back: y[1], floor, side, side_distance, hand })
+    // Behind it: the wall it is mounted on, else the nearest wall just behind its back.
+    let rear_wall = r.face.as_ref().and_then(|f| crate::id::GlobalId::parse(&f.wall)).and_then(|g| store.find_by_guid(&g)).or_else(|| {
+        let d = frame.apply_direction([0.0, 1.0, 0.0]);
+        ray_to_walls(store, [mid[0], mid[1]], [d[0], d[1]], floor + 0.3, (y[1] - y[0]) / 2.0 + 0.3).map(|(_, w)| w)
+    });
+    Some(Fixture {
+        element: e.id(),
+        kind,
+        frame,
+        x,
+        front: y[0],
+        back: y[1],
+        floor,
+        side,
+        side_distance: found.map(|f| f.0),
+        side_wall: found.map(|f| f.1),
+        rear_wall,
+        level: r.level.clone(),
+        hand,
+    })
 }
 
 /// Every bathroom fixture.
@@ -504,6 +617,60 @@ pub fn distances_of<'a>(store: &Store, f: &Fixture, packs: &'a [Pack]) -> Vec<(&
         .flat_map(|p| p.distances.iter().map(move |d| (p, d)))
         .filter(|(_, d)| d.fixtures.contains(&f.kind) && d.occupancy.applies(occupancy))
         .collect()
+}
+
+/// The bar rules that apply to a fixture.
+pub fn bars_of<'a>(store: &Store, f: &Fixture, packs: &'a [Pack]) -> Vec<(&'a Pack, &'a Bar)> {
+    let occupancy = crate::codes::settings(store).occupancy;
+    packs
+        .iter()
+        .flat_map(|p| p.bars.iter().map(move |b| (p, b)))
+        .filter(|(_, b)| b.fixtures.contains(&f.kind) && b.occupancy.applies(occupancy))
+        .collect()
+}
+
+/// Where a bar rule puts its bar at a fixture: the wall, its face (1 the exterior, −1 the
+/// interior), and the stretch along the wall's location line from its start, in order.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Stretch {
+    pub wall: ElementId,
+    pub side: f64,
+    pub along: [f64; 2],
+}
+
+impl Fixture {
+    /// The stretch a bar rule asks for, or why there is none.
+    pub fn bar_stretch(&self, store: &Store, bar: &Bar) -> std::result::Result<Stretch, String> {
+        let (wall, points) = match bar.wall {
+            BarWall::Side => {
+                let (Some(wall), Some(dist)) = (self.side_wall, self.side_distance) else {
+                    return Err(format!("no side wall within {:.0} mm", SIDE_SEARCH * 1000.0));
+                };
+                let x = self.side * dist;
+                (wall, bar.covers.map(|(_, d)| [x, self.back - d]))
+            }
+            BarWall::Rear => {
+                let Some(wall) = self.rear_wall else { return Err("no wall behind it".into()) };
+                let open = -self.side;
+                (wall, bar.covers.map(|(_, d)| [open * d, self.back]))
+            }
+        };
+        let w = store.get(wall).ok_or("its wall is gone")?;
+        let g = crate::walls::regenerate(store, w).map_err(|e| e.message)?;
+        let (d, n) = (g.direction(), g.normal());
+        let u = |p: [f64; 2]| {
+            let q = self.frame.apply([p[0], p[1], 0.0]);
+            (q[0] - g.start[0]) * d[0] + (q[1] - g.start[1]) * d[1]
+        };
+        let (a, b) = (u(points[0]), u(points[1]));
+        let along = [a.min(b), a.max(b)];
+        if along[0] < -0.005 || along[1] > g.length() + 0.005 {
+            return Err("its wall is too short".into());
+        }
+        let mid = self.frame.apply([0.0, (self.front + self.back) / 2.0, 0.0]);
+        let v = (mid[0] - g.start[0]) * n[0] + (mid[1] - g.start[1]) * n[1];
+        Ok(Stretch { wall, side: if v >= 0.0 { 1.0 } else { -1.0 }, along })
+    }
 }
 
 // ---- Commands ----
@@ -646,6 +813,70 @@ pub(crate) fn set_hand(txn: &mut Transaction<'_>, p: SetHandParams) -> Result<()
     Ok(())
 }
 
+#[derive(Debug, Default, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PlaceBarsParams {
+    /// The fixtures (default every bathroom fixture).
+    pub element_ids: Option<Vec<ElementRef>>,
+}
+
+/// A bar not placed, and why.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct Skipped {
+    pub fixture: ElementId,
+    pub rule: String,
+    pub reason: String,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct Placed {
+    pub placed: Vec<ElementId>,
+    pub skipped: Vec<Skipped>,
+}
+
+/// Places the grab bars the packs in use ask for at fixtures, replacing those placed before for
+/// the same fixture and rule (`bath.place_grab_bars`).
+pub(crate) fn place_grab_bars(txn: &mut Transaction<'_>, p: PlaceBarsParams) -> Result<Placed> {
+    let store = txn.store().clone();
+    let only: Option<Vec<ElementId>> = p
+        .element_ids
+        .map(|refs| refs.iter().map(|r| store.resolve(r).ok_or_else(|| bad("element.not_found", format!("no element {r:?}")))).collect::<Result<Vec<_>>>())
+        .transpose()?;
+    let packs = active(&store);
+    let mut out = Placed { placed: Vec::new(), skipped: Vec::new() };
+    for f in fixtures(&store).iter().filter(|f| only.as_ref().is_none_or(|ids| ids.contains(&f.element))) {
+        let guid = store.get(f.element).expect("listed").guid().to_string();
+        for (_, bar) in bars_of(&store, f, &packs) {
+            for (old, r) in crate::grab_bars::of_fixture(&store, f.element) {
+                if r.rule.as_deref() == Some(bar.id.as_str()) && txn.store().get(old).is_some() {
+                    txn.delete(old)?;
+                }
+            }
+            match f.bar_stretch(&store, bar) {
+                Ok(st) => {
+                    let wall = store.get(st.wall).expect("found");
+                    let d = bar.diameter_default();
+                    let z = bar.top.default - d / 2.0;
+                    let recipe = crate::grab_bars::GrabBarRecipe {
+                        kind: crate::grab_bars::KIND.into(),
+                        wall: wall.guid().to_string(),
+                        side: st.side,
+                        level: f.level.clone(),
+                        points: vec![[st.along[0], z], [st.along[1], z]],
+                        diameter: d,
+                        gap: bar.gap_default(),
+                        fixture: Some(guid.clone()),
+                        rule: Some(bar.id.clone()),
+                    };
+                    out.placed.push(crate::grab_bars::insert(txn, recipe)?);
+                }
+                Err(reason) => out.skipped.push(Skipped { fixture: f.element, rule: bar.id.clone(), reason }),
+            }
+        }
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -655,7 +886,7 @@ mod tests {
         let register = include_str!("../../../design_documents/SOURCE_REGISTER.md");
         assert_eq!(shipped().len(), 4);
         for p in shipped() {
-            let sources = p.zones.iter().map(|z| &z.source).chain(p.distances.iter().map(|d| &d.source));
+            let sources = p.zones.iter().map(|z| &z.source).chain(p.distances.iter().map(|d| &d.source)).chain(p.bars.iter().map(|b| &b.source));
             for s in sources {
                 for id in s.split(' ') {
                     assert!(register.contains(&format!("| {id} |")), "{}: {id} is not in the source register", p.id);

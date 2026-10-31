@@ -11,6 +11,7 @@ it, and whether a WC is the right distance from its side wall.</p>
   <a href="#zones">Clear spaces</a>
   <a href="#check">Check Bathrooms</a>
   <a href="#hand">The side wall</a>
+  <a href="#bars">Grab bars</a>
   <a href="#own">Your own packs</a>
   <a href="#limits">Limits and what to check</a>
   <a href="#scripts">Scripts and agents</a>
@@ -68,6 +69,22 @@ furthest distance the rules allow, and Check Bathrooms says so. To fix the side,
 fixtures and run <code>bath.set_hand</code> with <code>left</code> or <code>right</code> (as you
 face the fixture), or <code>auto</code> to look again.</p>
 
+<h2 id="bars">Grab bars</h2>
+<p>A grab bar is a round bar on a wall face, standing off it on a bracket at each end and corner.
+<a href="reviera:action/bath.place_grab_bars">View › Coordination › Place Grab Bars</a> puts the
+bars the rule packs ask for at the selected fixtures, or at all of them. Under the ADA, a WC gets a
+side-wall bar 42 in (1065 mm) long, from 12 in to 54 in off the rear wall, and a rear-wall bar 36 in
+(915 mm) long, from 12 in on the side-wall side of its centreline to 24 in on the open side; both
+with their tops 34 in (865 mm) up, 1½ in (38 mm) round and 1½ in off the wall. Placing again
+replaces the bars placed before. A bar that cannot be placed, for example where no side wall is
+modelled, is listed with the reason.</p>
+<p>To draw one yourself, use <code>grab_bar.create</code> with points on the wall, each with the
+height of the top of the bar: two for a straight bar, more for an L or U. <code>grab_bar.set</code>
+changes a bar's diameter, its gap from the wall or its height. Check Bathrooms reports a bar that
+is missing, does not cover the stretch its rule asks for, is too short, or has its height,
+diameter or gap out of range. Grab bars are written to IFC as <code>IfcRailing</code>
+(<code>HANDRAIL</code>), and may stand in a fixture's clear space.</p>
+
 <h2 id="own">Your own packs</h2>
 <p>A pack is a JSON file following <code>schemas/bath/reviera.bath-rules-1.schema.json</code>
 (MIT licensed). To use a local amendment or an office standard, copy a pack from
@@ -90,6 +107,7 @@ brings the shipped one back. Project packs are saved with the model.</p>
 
 <h2 id="scripts">Scripts and agents</h2>
 <p>Everything above is a command: <code>bath.rule_packs</code>, <code>bath.set_rule_packs</code>,
-<code>bath.add_rule_pack</code>, <code>bath.remove_rule_pack</code>, <code>bath.set_hand</code>
-and <code>bath.check</code>; <code>clearance.list</code> and <code>clearance.check</code> include
+<code>bath.add_rule_pack</code>, <code>bath.remove_rule_pack</code>, <code>bath.set_hand</code>,
+<code>bath.check</code>, <code>bath.place_grab_bars</code>, <code>grab_bar.create</code> and
+<code>grab_bar.set</code>; <code>clearance.list</code> and <code>clearance.check</code> include
 fixture spaces. Lua scripts and AI agents (MCP, the <i>modeling</i> toolset) can use them.</p>

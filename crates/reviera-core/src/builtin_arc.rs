@@ -536,6 +536,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(BathAddRulePack),
         registry.add(BathRemoveRulePack),
         registry.add(BathSetHand),
+        registry.add(BathPlaceGrabBars),
+        registry.add(GrabBarCreate),
+        registry.add(GrabBarSet),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -6785,4 +6788,46 @@ edit_command!(
     crate::bath_rules::SetHandParams,
     (),
     crate::bath_rules::set_hand
+);
+
+edit_command!(
+    BathPlaceGrabBars,
+    "bath.place_grab_bars",
+    "Place grab bars by the bathroom rule packs",
+    "Places the grab bars the bathroom rule packs in use ask for at fixtures, or at those given \
+     (ARC-BATH-003): for the ADA, a WC's side-wall bar (42 in, from 12 in to 54 in off the rear wall) and \
+     rear-wall bar (36 in, 12 in to the wall side of the centreline and 24 in to the open side), tops at \
+     34 in. Bars placed before for the same fixture and rule are replaced. Returns the bars placed, and \
+     those skipped with the reason (no side wall, a wall too short).",
+    "Place Grab Bars",
+    crate::bath_rules::PlaceBarsParams,
+    crate::bath_rules::Placed,
+    crate::bath_rules::place_grab_bars
+);
+
+edit_command!(
+    GrabBarCreate,
+    "grab_bar.create",
+    "Put a grab bar on a wall",
+    "Puts a round grab bar on a wall face (ARC-BATH-003), from points on or near the face, each with the \
+     height of the top of the bar above the level: a straight bar from two, an L or U from more. It stands \
+     `gap` off the wall (default 38 mm) on a bracket at each point, is `diameter` thick (default 38 mm), \
+     follows its wall, and is an IfcRailing HANDRAIL. The wall is the one given, or the face nearest the \
+     first point.",
+    "Grab Bar",
+    crate::grab_bars::CreateParams,
+    crate::id::ElementId,
+    crate::grab_bars::create
+);
+
+edit_command!(
+    GrabBarSet,
+    "grab_bar.set",
+    "Change grab bars",
+    "Changes grab bars' diameter (keeping their tops where they are), gap from the wall, or the height of \
+     their top above their level (ARC-BATH-003).",
+    "Grab Bar",
+    crate::grab_bars::SetParams,
+    (),
+    crate::grab_bars::set
 );

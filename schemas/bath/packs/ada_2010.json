@@ -69,5 +69,33 @@
       "source": "S0869",
       "confidence": "verified"
     }
+  ],
+  "bars": [
+    {
+      "id": "ADA 2010 604.5.1",
+      "description": "Side-wall grab bar at least 42 in (1065 mm) long, starting at most 12 in (305 mm) from the rear wall and reaching at least 54 in (1370 mm) from it; top 33–36 in, 1¼–2 in round, 1½ in from the wall (609)",
+      "fixtures": ["water_closet"],
+      "wall": "side",
+      "covers": [["rear_wall", 0.305], ["rear_wall", 1.37]],
+      "length_min": 1.065,
+      "top": { "min": 0.84, "max": 0.915, "default": 0.865 },
+      "diameter": { "min": 0.032, "max": 0.051, "default": 0.038 },
+      "gap": { "min": 0.038, "max": 0.038, "default": 0.038 },
+      "source": "S0869",
+      "confidence": "verified"
+    },
+    {
+      "id": "ADA 2010 604.5.2",
+      "description": "Rear-wall grab bar at least 36 in (915 mm) long, from 12 in (305 mm) on the side-wall side of the WC centreline to 24 in (610 mm) on the open side; top 33–36 in, 1¼–2 in round, 1½ in from the wall (609)",
+      "fixtures": ["water_closet"],
+      "wall": "rear",
+      "covers": [["centre", -0.305], ["centre", 0.61]],
+      "length_min": 0.915,
+      "top": { "min": 0.84, "max": 0.915, "default": 0.865 },
+      "diameter": { "min": 0.032, "max": 0.051, "default": 0.038 },
+      "gap": { "min": 0.038, "max": 0.038, "default": 0.038 },
+      "source": "S0869",
+      "confidence": "verified"
+    }
   ]
 }
