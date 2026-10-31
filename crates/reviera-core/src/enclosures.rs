@@ -112,6 +112,18 @@ pub enum Form {
 }
 
 impl Form {
+    /// How schedules and reports name it.
+    pub fn label(self) -> &'static str {
+        match self {
+            Form::Gable => "Gable",
+            Form::Multispan => "Gutter-connected multispan",
+            Form::Venlo => "Venlo",
+            Form::Hoop => "Hoop tunnel",
+            Form::Gothic => "Gothic tunnel",
+            Form::Sawtooth => "Sawtooth",
+        }
+    }
+
     /// A tunnel: one arched roof by extrusion.
     pub fn tunnel(self) -> bool {
         matches!(self, Form::Hoop | Form::Gothic)

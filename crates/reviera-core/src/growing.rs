@@ -74,6 +74,17 @@ pub enum System {
 }
 
 impl System {
+    /// How schedules and reports name it.
+    pub fn label(self) -> &'static str {
+        match self {
+            System::Benches => "Benches",
+            System::RollingBenches => "Rolling benches",
+            System::EbbFlow => "Ebb-and-flow tables",
+            System::Nft => "NFT gutters",
+            System::HighWire => "High-wire gutters",
+        }
+    }
+
     fn object_type(self) -> &'static str {
         match self {
             System::Benches => "Bench",
@@ -666,6 +677,15 @@ pub struct Summary {
     /// NFT and high-wire: the longest run.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub longest_run: Option<f64>,
+}
+
+/// The summaries of the growing layouts hosted by the enclosure or room with GlobalId `host`.
+pub fn on_host(store: &Store, host: &str) -> Vec<Summary> {
+    store
+        .iter()
+        .filter(|e| recipe(e).is_some_and(|r| r.enclosure.eq_ignore_ascii_case(host)))
+        .filter_map(|e| summary(store, SummaryParams { layout_id: ElementRef::Id(e.id()) }).ok())
+        .collect()
 }
 
 /// `growing.summary`.

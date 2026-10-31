@@ -208,6 +208,34 @@ pub fn available_fields(store: &Store, category: &str) -> Vec<FieldInfo> {
         | "cat.mechanical_equipment"
         | "cat.plumbing_fixtures"
         | "cat.furniture" => out.push(info("component.room", "Room", false)),
+        // Greenhouses and their growing (ARC-GLZ-015): one row per house.
+        "cat.glazed_enclosures" => out.extend([
+            info("glz.form", "Form", false),
+            info("glz.width", "Width", false),
+            info("glz.length", "Length", false),
+            info("glz.ridge", "Ridge Height", false),
+            info("glz.floor_area", "Floor Area", true),
+            info("glz.growing_area", "Growing Area", true),
+            info("glz.growing_share", "Growing Share", false),
+            info("glz.pieces", "Growing Pieces", true),
+            info("glz.crop", "Crop", false),
+            info("glz.day_temperature", "Day Temperature", false),
+            info("glz.night_temperature", "Night Temperature", false),
+            info("glz.target_dli", "Target DLI", false),
+            info("glz.co2", "CO2 Set Point", false),
+            info("glz.vent_percent", "Vent Area (% of Floor)", false),
+            info("glz.heat_loss", "Design Heat Loss", true),
+        ]),
+        // Growing layouts, and each piece (bench, table, gutter) of one.
+        "cat.growing_systems" => out.extend([
+            info("grow.system", "System", false),
+            info("grow.host", "Greenhouse or Room", false),
+            info("grow.pieces", "Pieces", true),
+            info("grow.growing_area", "Growing Area", true),
+            info("grow.floor_area", "Floor Area", false),
+            info("grow.share", "Growing Share", false),
+            info("grow.length", "Run Length", false),
+        ]),
         "cat.roofs" => out.extend([
             info("roof.area", "Area", true),
             info("roof.volume", "Volume", true),
@@ -296,6 +324,17 @@ pub fn default_fields(category: &str) -> Vec<&'static str> {
             "slab.volume",
         ],
         "cat.roofs" => vec!["type", "level", "roof.slope", "roof.area", "roof.volume"],
+        "cat.glazed_enclosures" => vec![
+            "param:elem.mark",
+            "glz.form",
+            "glz.floor_area",
+            "glz.growing_area",
+            "glz.growing_share",
+            "glz.crop",
+            "glz.target_dli",
+            "glz.heat_loss",
+        ],
+        "cat.growing_systems" => vec!["grow.host", "grow.system", "grow.pieces", "grow.growing_area", "grow.share"],
         "cat.structural_rebar" => vec![
             "rebar.number",
             "rebar.shape",
@@ -427,6 +466,62 @@ impl Context<'_> {
         }
     }
 
+    /// A greenhouse's fields (ARC-GLZ-015): its form and size, its growing layouts' area, its
+    /// climate, vents and design heat loss.
+    fn glazed(&self, e: &Element, key: &str) -> Cell {
+        let Some(r) = crate::enclosures::recipe(e) else { return Context::text("") };
+        let number = |v: f64, unit: &str, places: usize| Cell { text: format!("{v:.places$} {unit}").trim_end().to_owned(), value: Some(v), editable: false };
+        let floor = r.width() * r.length;
+        let growing = || crate::growing::on_host(self.store, e.guid().as_str());
+        let climate = crate::hothouse::climate(e);
+        match key {
+            "glz.form" => Context::text(r.form.label()),
+            "glz.width" => self.fmt(r.width(), "length"),
+            "glz.length" => self.fmt(r.length, "length"),
+            "glz.ridge" => self.fmt(r.ridge(), "length"),
+            "glz.floor_area" => self.fmt(floor, "area"),
+            "glz.growing_area" => self.fmt(growing().iter().map(|s| s.growing_area).sum(), "area"),
+            "glz.growing_share" => number(100.0 * growing().iter().map(|s| s.growing_area).sum::<f64>() / floor.max(1e-9), "%", 0),
+            "glz.pieces" => number(growing().iter().map(|s| s.pieces).sum::<usize>() as f64, "", 0),
+            "glz.crop" => Context::text(climate.as_ref().and_then(|c| c.crop.as_deref()).map(|id| crate::hothouse::crop(id).map_or_else(|| id.to_owned(), |c| c.name.to_owned())).unwrap_or_default()),
+            "glz.day_temperature" => climate.and_then(|c| c.day_temperature).map_or_else(|| Context::text(""), |t| number(t, "°C", 1)),
+            "glz.night_temperature" => climate.and_then(|c| c.night_temperature).map_or_else(|| Context::text(""), |t| number(t, "°C", 1)),
+            "glz.target_dli" => climate.map_or_else(|| Context::text(""), |c| number(c.target_dli, "mol/m²/d", 1)),
+            "glz.co2" => climate.map_or_else(|| Context::text(""), |c| number(c.co2, "ppm", 0)),
+            "glz.vent_percent" => crate::enclosures::get(self.store, crate::enclosures::GetParams { enclosure_id: ElementRef::Id(e.id()) }).map_or_else(|_| Context::text(""), |i| number(i.vent_percent, "%", 1)),
+            "glz.heat_loss" => crate::hothouse::heat_loss(self.store, crate::hothouse::HeatLossParams { enclosure_id: ElementRef::Id(e.id()), inside: None, outside: None, wind: None, air_changes: None })
+                .map_or_else(|_| Context::text(""), |h| number(h.total / 1000.0, "kW", 1)),
+            _ => Context::text(""),
+        }
+    }
+
+    /// A growing layout's fields, or one piece's (its own run and area).
+    fn growing(&self, e: &Element, key: &str) -> Cell {
+        let number = |v: f64, unit: &str, places: usize| Cell { text: format!("{v:.places$} {unit}").trim_end().to_owned(), value: Some(v), editable: false };
+        if let Some(p) = crate::growing::part_recipe(e) {
+            let run = (p.end[0] - p.start[0]).hypot(p.end[1] - p.start[1]);
+            return match key {
+                "grow.system" => Context::text(p.system.label()),
+                "grow.pieces" => number(1.0, "", 0),
+                "grow.growing_area" => self.fmt(run * p.width, "area"),
+                "grow.length" => self.fmt(run, "length"),
+                _ => Context::text(""),
+            };
+        }
+        let Some(r) = crate::growing::recipe(e) else { return Context::text("") };
+        let Ok(s) = crate::growing::summary(self.store, crate::growing::SummaryParams { layout_id: ElementRef::Id(e.id()) }) else { return Context::text("") };
+        match key {
+            "grow.system" => Context::text(s.system.label()),
+            "grow.host" => Context::text(GlobalId::parse(&r.enclosure).and_then(|g| self.store.find_by_guid(&g)).and_then(|h| self.store.get(h)).map(|h| h.name.clone().filter(|n| !n.is_empty()).unwrap_or_else(|| crate::rooms::number_and_name(h).1)).unwrap_or_default()),
+            "grow.pieces" => number(s.pieces as f64, "", 0),
+            "grow.growing_area" => self.fmt(s.growing_area, "area"),
+            "grow.floor_area" => self.fmt(s.floor_area, "area"),
+            "grow.share" => number(s.share, "%", 0),
+            "grow.length" => s.longest_run.map_or_else(|| Context::text(""), |l| self.fmt(l, "length")),
+            _ => Context::text(""),
+        }
+    }
+
     fn fmt(&self, v: f64, data_type: &str) -> Cell {
         Cell {
             text: crate::units::format(v, data_type, &self.settings, None)
@@ -484,6 +579,8 @@ impl Context<'_> {
                     editable: crate::rooms::room_recipe(e).is_some(),
                 }
             }
+            k if k.starts_with("glz.") => self.glazed(e, k),
+            k if k.starts_with("grow.") => self.growing(e, k),
             k if k.starts_with("space.") => {
                 let Some(s) = self.spaces.get(&e.id()) else { return none() };
                 let placed = s.placed;

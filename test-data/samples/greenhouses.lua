@@ -123,5 +123,11 @@ for _, e in ipairs({ venlo, range, hobby, saw, tunnel, gothic }) do
   print(string.format("%s: %.0f m², ridge %.2f m, %d roofs, %d gutters",
     info.recipe.form, info.floor_area, info.ridge, #info.roofs, #info.gutters))
 end
+-- Growing-area schedules (ARC-GLZ-015): the houses with their floor and growing area, crop and
+-- set points, and the growing layouts with their pieces.
+reviera.schedule.create{ category = "cat.glazed_enclosures", name = "Greenhouse Schedule",
+  fields = { "glz.form", "glz.floor_area", "glz.growing_area", "glz.growing_share", "glz.pieces",
+    "glz.crop", "glz.day_temperature", "glz.night_temperature", "glz.target_dli", "glz.heat_loss" } }
+reviera.schedule.create{ category = "cat.growing_systems", name = "Growing Area Schedule" }
 print("Greenhouses built")
 return true

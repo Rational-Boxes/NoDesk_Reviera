@@ -1717,7 +1717,9 @@ area by area (reviewed against the spec on 2026-10-15).
   the greenhouse table method, with an energy screen closed too (`enclosure.heat_loss`); heating
   sizing for unit heaters, perimeter and under-bench fin pipe and root-zone heat
   (`enclosure.heating`); fan, inlet, pad and HAF sizing with the natural vents checked (`enclosure.ventilation`) and CO₂
-  enrichment sizing (`enclosure.co2`); the `greenhouses` sample. Curtain walls' tops attach to one or more roofs
+  enrichment sizing (`enclosure.co2`); growing-area schedules of greenhouses (form, floor and
+  growing area, pieces, crop, set points, target DLI, design heat loss) and of growing layouts and
+  their pieces (ARC-GLZ-015); the `greenhouses` sample. Curtain walls' tops attach to one or more roofs
   (`wall.attach`).
 - **Digital twins, operational data and smart-city features** (`design_documents/DIGITAL_TWIN_PLAN.md`):
   sensor and controls design with points schedules, bindings from model elements to live BACnet,

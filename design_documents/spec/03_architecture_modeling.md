@@ -3047,6 +3047,28 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 
 *Built (2026-10-30):* `enclosure.heating` (`reviera_core::hothouse`): load (and with the energy screen closed), unit heaters and their size, perimeter fin pipe and its runs, under-bench fin pipe for the whole load and the runs the benches take, growing area, root-zone heat and its share, notes. Properties › Growing Climate › *Heating*.
 
+### Growing-area schedules
+**ID:** ARC-GLZ-015 · **Priority:** P2 · **Ref:** GLAZED_ENCLOSURES_PLAN §9 (phase 2, *growing-area schedules*); DOC-SCHED (schedules)
+
+**Purpose.** Tabulate a project's greenhouses and their growing, as schedules do every other category, for a grower's or a planning summary.
+
+**Behaviour & rules.**
+- **Glazed Enclosures** schedules (`cat.glazed_enclosures`) take these fields:
+  - `glz.form`, `glz.width`, `glz.length` and `glz.ridge`;
+  - `glz.floor_area`, `glz.growing_area` (its layouts' growing surface), `glz.growing_share` and `glz.pieces`;
+  - `glz.crop` (the climate preset's name), `glz.day_temperature`, `glz.night_temperature`, `glz.target_dli` and `glz.co2`;
+  - `glz.vent_percent`;
+  - `glz.heat_loss` (the quick heat loss of ARC-GLZ-011, in kW; blank when there is no outside design temperature).
+
+  The default columns are Mark, Form, Floor Area, Growing Area, Growing Share, Crop, Target DLI and Design Heat Loss. Areas, pieces and heat loss are summed.
+- **Growing Systems** schedules (`cat.growing_systems`) take `grow.system`, `grow.host` (the greenhouse or room), `grow.pieces`, `grow.growing_area`, `grow.floor_area`, `grow.share` and `grow.length` (a layout's longest run). A piece (bench, table, gutter) shows its own system, run and area, and counts as one.
+- The values are read live from the enclosures, layouts and climates, as other schedule fields are.
+
+**Acceptance criteria.**
+- [x] A 9.6 × 40 m gable house of tomatoes with an along-the-length bench layout shows 384 m² floor, a growing share between 60 and 75 %, 8 pieces and its crop. A Venlo house without a layout shows no growing area and no crop. The Growing Systems schedule lists the layout (8 pieces) and its 8 benches.
+
+*Built (2026-10-31):* the fields above in `reviera_core::schedules`; the `greenhouses` sample gains a Greenhouse Schedule and a Growing Area Schedule.
+
 
 ## 3.7 Stairs, railings and ramps
 

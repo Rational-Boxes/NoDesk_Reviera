@@ -66,7 +66,11 @@ Start with **File › New**. The model has Level 1 at 0. Open the Level 1 plan.
    *Energy and shade*. The two screens hang under the gutters above the grow lights; Shade Screen
    Closed counts the months the shade screen would be drawn, and Heat Loss gives the design loss
    and the loss with the energy screen closed.
-11. **Look at it.** In a 3D view the glass is translucent; select a roof to see its glazing grid,
+11. **Growing-area schedules.** View › **Schedule**: Category *Glazed Enclosures*, fields Form,
+   Floor Area, Growing Area, Growing Share, Growing Pieces, Crop, Day and Night Temperature,
+   Target DLI and Design Heat Loss; then one of *Growing Systems* (each layout with its pieces,
+   growing area and share, then each bench, gutter or table).
+12. **Look at it.** In a 3D view the glass is translucent; select a roof to see its glazing grid,
    or an end wall to see the glass clipped to the gables. Each part says which enclosure it
    belongs to; Modify › **Detach from Enclosure** **[gap]** (`enclosure.detach`) keeps a part
    when the enclosure changes.
@@ -76,7 +80,8 @@ walls (a door in each end wall), 2 knee walls, 5 gutters, 21 steel posts and 3 g
 and 2 gutters; the sawtooth 3 roofs, 6 glass walls (two of them inner vertical faces) and 3 gutters; the tunnels 1 roof by extrusion and 4 glass walls each. Saved, each is an `IfcElementAssembly` (ObjectType *GlazedEnclosure*) aggregating
 its parts. The lettuce and tomato ranges carry `Reviera_GrowingClimate`, and their grow lights
 are `IfcLightFixture`s (ObjectType *GrowLight*) with `Reviera_GrowLight`, every month at its
-target.
+target. The two schedules list the six houses (the lettuce and tomato ranges with their crops
+and growing area) and every growing layout with its pieces.
 
 ## Gaps
 
