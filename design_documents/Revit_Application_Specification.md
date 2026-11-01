@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Reviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Reviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 848 numbered requirements (320 P0 · 320 P1 · 201 P2 · 7 P3), 2,267 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 850 numbered requirements (320 P0 · 322 P1 · 201 P2 · 7 P3), 2,280 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,267 commands; 848 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,280 commands; 850 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -14268,6 +14268,7 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 - **The side wall** is the nearest wall within 1.2 m of the fixture's centreline on either side, found at the fixture's mid-depth. Where there is none, a zone measured from it assumes the largest distance the packs allow for that fixture (else 450 mm), and the distance check reports that no side wall was found. `bath.set_hand` fixes which side the wall is on (`left`, `right`, or `auto`), for when the partition is not modelled yet.
 - **What may be in a zone.** The fixture itself, grab bars and rails, and accessories (`IfcDiscreteAccessory`) may; so may the floor, and other fixtures' zones (clear floor spaces may overlap, ADA 305.2). Any other element's body in it is an intrusion. A rule marked `door_swing: forbidden` is also intruded on by any door's swing.
 - **Distances.** A distance rule measures from the fixture's centreline to its side wall and reports one outside its range.
+- **Accessible fixtures.** The accessibility packs' rules (zones, distances, grab bars) apply to a fixture unless it is marked not accessible (`bath.set_accessible`, RXD `rxd:bath_accessible`): the ADA asks only some fixtures to comply (one WC compartment, one urinal, one lavatory, ADA 213.3), so a toilet core's standard compartments are marked. Code and guidance packs apply to every fixture.
 - **`bath.check`** checks every fixture (or those given) and returns findings, each with the fixture, the pack, its edition and layer, the rule ID, its confidence, what was found against what is required, and, for an intrusion, the other element and where. A finding from a `recommended` pack or an `advisory` rule is a **note**; any other is an **error**. `clearance.check` and `clearance.list` include fixture spaces as they do door clearances.
 - **Display.** Views show fixture spaces with the other virtual volumes (hidden, translucent or solid), in green.
 
@@ -14437,6 +14438,33 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 - [x] With three WCs modelled on the level, the count reports a shortfall of seven for 360 occupants in Group B.
 
 *Built (2026-10-31):* count rows in the pack schema (`counts`, with ratio bands or step tables), IPC Table 403.1 rows in `us_plumbing`, the new `uk_workplace` pack, `bath.fixture_count`, and View › Coordination › Fixture Count… (an occupancy from the packs, the load, the share of males, units, separate or all-gender rooms, this level or the whole model). Not yet: NBC Canada and OSHA tables, the UPC's banded rows, mixed occupancies summed before rounding, family or assisted-use rooms (IBC 1110.2.1), and the counts feeding toilet-core layouts.
+
+### 3.9a.8 Toilet cores and partitions
+**ID:** ARC-BATH-008 · **Priority:** P1 · **Ref:** `BATHROOMS_PLAN.md` §6.2; research/13 B1.3, B4.2, C1.1, C7, E3
+
+**Purpose.** Lay out a run of toilet compartments, urinals and lavatories along a wall in one step, with compartments sized to the rules in use, and the numbers taken from the fixture count when wanted.
+
+**Behaviour & rules.**
+- **The run** is laid out along a wall face from a start point to an end point, in this order: the accessible compartment (when asked), standard compartments, ambulatory compartment (when asked), then urinals with screens, then lavatories on the same wall.
+- **Compartment sizes** (clear inside, from the packs in use, else the IPC's):
+  - standard: at least 30 × 60 in (760 × 1525 mm) with a floor WC (IPC 405.3.1); 36 in (915 mm) wide by default, NKBA's recommendation;
+  - accessible (ADA 604.8.1.1): at least 60 in (1525 mm) wide, 59 in (1500 mm) deep with a floor WC (56 in with a wall-hung one), the WC's centreline 16–18 in from the side partition, its grab bars placed (ARC-BATH-003);
+  - ambulatory (ADA 604.8.2): 35–37 in (890–940 mm) wide, at least 60 in deep, grab bars on both sides;
+  - England (Approved Document T): types C (920 × 1465 mm) and D (910 × 1740 mm) in place of ambulatory and standard compartments when `england_adm` is in use.
+- **Partitions** are walls of a *Toilet Partition* type (25 mm, one layer), standing 12 in (305 mm) off the floor and 58 in (1475 mm) tall (IPC 405.3.4 asks for privacy, the usual US partition is this), between the compartments and across their fronts. Each compartment's door is an ordinary door in its front panel, 24 in (610 mm) wide for a standard compartment, 32 in (815 mm) clear for the accessible and ambulatory ones, swinging out; a door's swing and the fixtures' clear spaces are then checked as any others are (ARC-BATH-002). Urinal screens are partitions 18 in (455 mm) out from the wall, 12 to 72 in (305–1830 mm) above the floor (IPC 405.3.5), one between each pair of urinals.
+- **Counts.** The numbers of WCs, urinals and lavatories are given, or come from `bath.fixture_count` for an occupancy and load (one sex's share, for a room of that sex).
+- **Fit.** If the run does not fit between its ends, nothing is placed and the shortfall is reported. The partitions, doors and fixtures are placed in one undo step and tagged with the core, so `replace` removes an earlier core on the same wall first.
+
+**Data (IFC mapping).** Partitions are `IfcWall` (`PARTITIONING`) of the *Toilet Partition* type; doors `IfcDoor`; fixtures as ARC-BATH-004. The core tag is RXD element data (`rxd:bath_core`).
+
+**Commands.** See the catalog: `bath.toilet_core`.
+
+**Acceptance criteria.**
+- [x] Along a 9 m wall (8.23 m needed), a core of one accessible and three standard compartments, two urinals and three lavatories under `us_plumbing` and `ada_2010` places the partitions, four doors, four WCs, two urinals with one screen between them, three lavatories and the accessible WC's two grab bars, with no `bath.check` errors.
+- [x] A core asked for 360 occupants in Group B (one sex) gets five WCs, two of them may be urinals when asked.
+- [x] A core that does not fit its wall places nothing and reports the shortfall.
+
+*Built (2026-10-31):* `reviera_core::bath_cores` and `bath.toilet_core`, the *Toilet Partition* wall type (25 mm, PARTITIONING), doors swung out of their compartments, `bath.set_accessible` (the core marks all but the accessible compartment, one urinal and one lavatory), the side-wall search raised to 600 mm so raised partitions count as side walls, and Architecture › Build › Toilet Core (on the selected wall, from numbers or an occupancy). Not yet: ambulatory grab bars (ADA 604.8.2, both sides), toe clearance at the accessible compartment's partitions, family or assisted-use rooms, partition-system types from manufacturers, and cores in two rows facing each other.
 
 ---
 
@@ -15342,6 +15370,75 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
 
 **Implementation note (2026-10-15, first build).** As built: `group.exclude_member` (by element or key) removes the member from that instance (so it is not scheduled or exported there), `group.restore_member` (one or all) makes it again from the template, `group.move_member_to_project` leaves it as an independent element. Not built yet: Save Group, Load as Group, converting to a link.
 
+### 3.13.4 Modular units
+**ID:** ARC-GRP-004 · **Priority:** P1 · **Ref:** owner requirements (2026-10-31); ARC-GRP-001 … 003, ARC-MOD-033, MEP-SYS-002, MEP-DUCT-008; Reviera's own design (Appendix A.2a). *Planned; not built.*
+
+**Purpose.** Design a repeated unit once and repeat it to fill a building or a site, wherever identical units recur. Every copy follows changes to the original, and each copy's services connect to the shared routes that serve them all. The use-cases are many:
+- **rooms:** hotel guest rooms, apartments, student and care-home rooms, cells, offices, classrooms, patient rooms;
+- **retail:** aisles of gondolas with their end caps, checkout lanes and self-checkout pods, fitting rooms, refrigerated case line-ups;
+- **industrial:** racking bays and rows, production cells and workstations, machine lines, loading docks, battery-charging bays;
+- **other:** data-centre rack rows with their containment, parking bays, greenhouse bays and benches, laboratory benches, auditorium seating blocks, toilet cores stacked floor on floor.
+
+*(Owner requirements, 2026-10-31: "Modular rooms, duplicate along a path similar to the component-array. Define a room and its duplicates fill a space volume, the rooms' systems need to connect to shared HVAC routings. Use-case: facilities like hotels and apartment complexes with a series of identical units." Then: "Modulars need to be more generalized, there are duplication of identical units in many use-cases, aisles and checkout lanes in retail settings, industrial settings, etc."; "The repeater framework should have a view option to show the template module in isolation for easy editing in its own context."; "Modular units also need an intelligent merge, for example a hotel room would define its window, the window would automatically merge with the building's outer wall."; "In addition to windows, rooms/units may have doors and balconies that merge with the building shell, defining the appropriate openings in the building shell walls.")*
+
+**Behaviour & rules.**
+- **A unit type** is a group type (ARC-GRP-001) made from any set of elements: rooms or spaces with their bounding walls, doors, floors, ceilings, fixtures and furniture; or no room at all, such as a gondola run with its end caps and lighting, a checkout lane (checkstand, bagging, card terminal, lane light, queue fixtures), a racking bay, a machine with its guarding, or a rack row with its containment. It also takes its own services: terminals, fan coils, branch ducts and pipes, panels, devices and process equipment. Each shared bounding element (a party wall, a corridor wall) belongs to one unit or to none when the building owns it. `unit.create_type` makes a type from rooms or a selection, and lists what it took and what it left out.
+- **Envelope and pitch.** A unit has a **bay**: the box it occupies, with its pitch along the repeat and any clearance it needs kept free (an aisle, a queue zone, a forklift aisle, a hot or cold aisle) as virtual volumes (ARC-MOD-031). Copies are placed bay to bay, so aisles and clearances between them come out right.
+- **Connection points.** A unit type has named connection points on its boundary, for every service that leaves it:
+  - building services: supply, return and exhaust air; domestic cold and hot water; sanitary and vent; power; data;
+  - process services: refrigeration suction and liquid, chilled or condenser water, compressed air, process gases, busway taps, cable tray drops, sprinkler branches.
+  
+  They are found from the MEP connectors left open at the unit's boundary (a duct or pipe end, a panel's feed), or placed by the user. Each records its classification, size and design flow or load, as one unit's share.
+- **Repeating.** Copies are placed:
+  - **along a path** (as ARC-MOD-033): a count or a pitch along a line or curve, such as rooms along a corridor, checkout lanes along a store front, or racking along an aisle;
+  - **in a grid**: rows and columns at their pitches within a boundary (gondola aisles across a sales floor, parking bays, workstations);
+  - **filling a volume**: the bays along a path or grid on each of a range of levels (rooms down both sides of a corridor on floors 2 to 12), skipping exclusion boundaries drawn round cores, stairs, columns, plant rooms or fire exits;
+  - **handed**: alternately mirrored so neighbours share walls, risers or a service spine (back-to-back rooms, checkout lanes paired on one power pole, racks facing across a hot aisle), or per copy; or turned 180° for the far side of a corridor or aisle.
+  
+  An arrangement is a *unit array* that stays parametric: change the path, grid, levels, pitch or exclusions, and the copies follow. Each copy keeps its GlobalId while it exists and carries a number (unit, lane, aisle, bay) by a numbering rule (prefix, level, sequence, direction).
+- **Editing the template in isolation.** *Edit Unit* (from any copy, the unit array or the Project Browser's unit types) opens the unit type in a view of its own: a plan, 3D view and elevations of the template alone, at the origin of its own frame, with the rest of the model hidden or shown faded for context (a per-view choice). It shows the bay, the unit's clearances and its connection points and merge rules (below). Edits made there go to every copy when the view is closed or applied, as in the group editor (ARC-GRP-002), and undo as one step. Any number of unit types may have such a view open; the views are saved with the model.
+- **Merging with the building.** Elements of a unit that meet elements the building owns combine with them in each copy, rather than duplicating or clashing:
+  - **hosted inserts:** a window or door the unit defines on a boundary it shares with the building (a hotel room's window or balcony door on the façade, its entrance door on the corridor wall, a curtain-wall panel turned door) is placed in the building's wall at each copy, cutting its opening there; the unit's own stand-in for that wall is not built. The insert stays a member of the unit, so editing it in the template edits every copy's, and it moves with the copy.
+  - **balconies and other projections:** a balcony the unit defines outside its façade face (its slab, railing, soffit and screens) is built outside the building's shell at each copy: its door is cut into the shell wall as above; its slab is joined to the building's floor edge at that level (with a thermal-break element where the rule pack or the floor type asks for one) and its railing hosted on the slab's edge (ARC-RAIL-001). Balconies of neighbouring copies that touch (a continuous balcony) join into one slab, or keep a division screen between them, by the merge rule of that face. Bay windows, Juliet balconies and canopies merge the same way, cutting what they need in the shell.
+  - **coincident walls, floors and ceilings:** a unit wall that lies on a building wall (a party wall, the façade) merges into it, keeping the building's type unless the unit's rule says to override it; a demising wall between two copies is built once and shared, belonging to the lower-numbered copy; floor and ceiling finishes merge with the slab they lie on.
+  - **attachments:** fixtures, rails and devices the unit places on a boundary wall are hosted on whichever wall is there in each copy.
+  
+  Each boundary face of the bay has a **merge rule**: *merge with the building* (the default for faces on the building's envelope or a corridor), *keep the unit's own* (a free-standing unit, such as a pod), or *share with the neighbour* (between copies). A copy whose face finds no building element to merge with keeps the unit's own element and is listed, so a fill that reaches past the façade or a missing corridor wall is seen at once.
+- **Variation.** A copy may exclude members (ARC-GRP-003) or take a variant type. Examples: an accessible unit for every n-th copy or a set count per floor (ADA 224.2 for hotels, Table 227.2 for checkout lanes), an express lane, an end bay. A variant is a second unit type derived from the first, kept in step for the members they share. Rules may set the count of a variant from the array's size.
+- **Shared services.** A **service spine** is a route the building or site owns:
+  - a corridor or aisle ceiling path, a riser or shaft, a floor trench or under-floor zone;
+  - a busway, a cable tray backbone, a compressed-air or refrigeration header, a plant connection.
+
+  `unit.connect` routes a branch, for each copy and each connection point, from the point to the nearest spine of the same classification. Routing uses MEP-DUCT-008, keeping to the unit's service zone and the spine's. It also adds the copies' terminals and equipment to the systems (MEP-SYS-002). Trunks and headers along a spine are then sized from the sum of the units they serve (MEP-CALC-001): airflow from the units' design flows, pipes from their fixture units (MEP-PIPE-005), refrigeration from their loads, panels and busways from their loads with diversity. Paired units share one branch where their points meet. A copy that cannot reach a spine is reported with the reason.
+- **Checks.** Overlaps between copies, and between copies and structure or columns, are found as any others (ARC-MOD-030). A fill that does not fit reports where. Clearances between copies (aisles, egress widths, queue depth) are checked from their virtual volumes. For room units, the ratings of shared walls and the penetrations through them are listed for fire separation.
+- **Schedules.** Units by type, variant, handing and level, with their numbers; the area and counts of each; and the service loads per spine, riser or header.
+
+**Data (IFC mapping).** A unit type is a group type pattern as ARC-GRP-001: each copy is an `IfcGroup` whose members are its elements, or an `IfcElementAssembly` (`USERDEFINED`, ObjectType the unit type's name) when the unit is a single built thing such as a checkstand with its belts or a racking bay. Room units' spaces are `IfcSpace`s grouped into an `IfcZone` per copy, named by unit number. Connection points are `IfcDistributionPort`s of the copy's elements. Branches and trunks are ordinary ducts, pipes and cable carriers, connected by `IfcRelConnectsPorts` and assigned to their `IfcDistributionSystem`s. The unit array's parameters are in the RXD document `model/groups`.
+
+**Commands (proposed).**
+- `unit.create_type(room_ids | element_ids, name, bay?) -> {type_id, members, left_out}`
+- `unit.set_connection_points(type_id, points[])`
+- `unit.array_path(type_id, path, count | pitch, handing?, numbering?) -> array_id`
+- `unit.array_grid(type_id, boundary, rows, columns | pitch, handing?, numbering?) -> array_id`
+- `unit.fill(type_id, path | boundary, levels[], pitch, exclusions?, handing?, variants?, numbering?) -> array_id`
+- `unit.set_array(array_id, params)`
+- `unit.set_variant(copy_ids | rule, variant_type_id)`
+- `unit.connect(array_id | copy_ids, spines[]) -> {branches, unconnected}`
+- `unit.list(array_id?) -> [{copy, number, level, type, handing, connected, unmerged}]`
+- `unit.edit(type_id | copy_id, context?: hidden|faded) -> view_id`
+- `unit.set_merge_rules(type_id, faces[])`
+
+**Acceptance criteria.**
+- [ ] A hotel room (bedroom, bathroom, fan coil, WC and basin) made a unit type and filled down both sides of a 60 m corridor on six floors, handed in pairs, gives one copy per bay per floor, numbered by floor; adding a chair to the type adds it to every copy.
+- [ ] `unit.connect` to a corridor supply-air spine and a sanitary riser connects every copy's points, and the trunk's airflow is the sum of the copies it serves.
+- [ ] Twelve checkout lanes along a store front from one checkstand unit, paired on power poles, with the accessible-lane count of ADA Table 227.2 (3 + 20 % beyond 15, here 3) as a variant rule, connect to a floor power and data spine.
+- [ ] Gondola aisles laid as a grid across a sales floor keep their aisle clearance between rows, and skip an exclusion round a column line.
+- [ ] Every fourth room swapped for an accessible variant keeps the others unchanged, and the schedule counts both types per floor.
+- [ ] *Edit Unit* on one copy opens the template alone in its own views; widening its window there widens the window in every copy, in the façade wall, as one undo step.
+- [ ] A hotel room's window, defined on the unit's façade face, is an opening in the building's exterior wall at every copy, with no unit wall built there; a copy whose façade face misses the wall is listed.
+- [ ] Two adjacent copies build their shared demising wall once.
+- [ ] An apartment unit with a balcony and balcony door, filled up six floors, cuts the door's opening in the façade at every copy and joins each balcony slab to that floor's slab edge with its railing on the slab.
+
 ---
 
 ## 3.14 Temporary dimensions, constraints and selection
@@ -15627,6 +15724,19 @@ All commands below are registered once in the command registry and exposed autom
 | `bath.make_product` | generic, path, name, manufacturer?, model_reference?, model_label?, article_number?, gtin?, units?, up_axis? | type_id | Yes | ARC-BATH-006 |
 | `bath.swap_product` | element_ids, type_id | [{element, size_before, size_after, connectors_moved, findings_new, findings_gone}] | Yes | ARC-BATH-006 |
 | `bath.fixture_count` | occupancy, occupant_load, male_share?, units?, all_gender?, pack?, level_id? | {pack, row, required, urinals_may_replace, modelled, short} | No (query) | ARC-BATH-007 |
+| `bath.toilet_core` | wall_id, start, end, level, wcs?, urinals?, lavatories?, accessible?, ambulatory?, occupancy?, occupant_load?, urinals_for_wcs?, replace? | {placed, partitions, doors, fit} | Yes | ARC-BATH-008 |
+| `bath.set_accessible` | element_ids, accessible | — | Yes | ARC-BATH-002 |
+| `unit.create_type` | room_ids \| element_ids, name, bay? | {type_id, members, left_out} | Yes | ARC-GRP-004 |
+| `unit.set_connection_points` | type_id, points | — | Yes | ARC-GRP-004 |
+| `unit.array_path` | type_id, path, count \| pitch, handing?, numbering? | array_id | Yes | ARC-GRP-004 |
+| `unit.array_grid` | type_id, boundary, rows, columns \| pitch, handing?, numbering? | array_id | Yes | ARC-GRP-004 |
+| `unit.fill` | type_id, path \| boundary, levels, pitch, exclusions?, handing?, variants?, numbering? | array_id | Yes | ARC-GRP-004 |
+| `unit.set_array` | array_id, params | — | Yes | ARC-GRP-004 |
+| `unit.set_variant` | copy_ids \| rule, variant_type_id | — | Yes | ARC-GRP-004 |
+| `unit.connect` | array_id \| copy_ids, spines | {branches, unconnected} | Yes | ARC-GRP-004 |
+| `unit.list` | array_id? | [{copy, number, level, type, handing, connected}] | No (query) | ARC-GRP-004 |
+| `unit.edit` | type_id \| copy_id, context?: hidden\|faded | view_id | No | ARC-GRP-004 |
+| `unit.set_merge_rules` | type_id, faces: [{face, rule: merge\|keep\|share}] | — | Yes | ARC-GRP-004 |
 | `grab_bar.create` | level, points, wall_id?, side?, diameter?, gap? | element_id | Yes | ARC-BATH-003 |
 | `grab_bar.set` | element_ids, diameter?, gap?, top? | — | Yes | ARC-BATH-003 |
 | `enclosure.create` | form, footprint \| host_wall_ids, level_id, params | element_id | Yes | ARC-GLZ-001 |
@@ -28757,14 +28867,14 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 39 | 8 | 0 | 123 |
 | DM | 91 | 65 | 34 | 3 | 193 |
-| ARC | 77 | 80 | 14 | 1 | 172 |
+| ARC | 77 | 82 | 14 | 1 | 174 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 28 | 0 | 29 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
 | COL | 8 | 50 | 11 | 1 | 70 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **320** | **201** | **7** | **848** |
+| **Total** | **320** | **322** | **201** | **7** | **850** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -28819,7 +28929,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.2a Reviera-originated features
 
-133 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
+134 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
 
 | Requirement | Ch | Feature |
 |-------------|----|---------|
@@ -28926,6 +29036,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | ARC-MOD-031 | 3 | 3.12.2a Volume overlaps, virtual volumes and their resolution |
 | ARC-MOD-032 | 3 | 3.12.2a Volume overlaps, virtual volumes and their resolution |
 | ARC-MOD-033 | 3 | 3.12.3a Array along a path |
+| ARC-GRP-004 | 3 | 3.13.4 Modular units |
 | MEP-PIPE-010 | 4 | 4.8.10 Roof drainage: gutters and downspouts |
 | MEP-PEN-001 | 4 | 4.8.11 Automatic penetrations for pipes, ducts, conduits and cable trays |
 | ANA-ENV-001 | 4 | 4.12.17 Built-in environmental providers (extrapolation) |
@@ -28959,7 +29070,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2267 unique commands** in 426 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2280 unique commands** in 427 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -28995,7 +29106,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `array` | 6 |
 | `assembly` | 16 |
 | `assemblytemplate` | 1 |
-| `bath` | 14 |
+| `bath` | 16 |
 | `bcf` | 33 |
 | `beam` | 6 |
 | `beam_system` | 5 |
@@ -29360,6 +29471,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `type` | 5 |
 | `ui` | 149 |
 | `underlay` | 1 |
+| `unit` | 11 |
 | `units` | 7 |
 | `validate` | 2 |
 | `vent` | 1 |
@@ -29513,9 +29625,11 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `bath.place_grab_bars` | 3 | element_ids? | {placed, skipped} | Yes | ARC-BATH-003 |
 | `bath.remove_rule_pack` | 3 | id | — | Yes | ARC-BATH-001 |
 | `bath.rule_packs` | 3 | — | [{id, title, layer, jurisdiction, edition, in_use, shipped, zones, distances}] | No (query) | ARC-BATH-001 |
+| `bath.set_accessible` | 3 | element_ids, accessible | — | Yes | ARC-BATH-002 |
 | `bath.set_hand` | 3 | element_ids, hand: auto\ | left\ | right | — |
 | `bath.set_rule_packs` | 3 | packs? (none for automatic) | — | Yes | ARC-BATH-001 |
 | `bath.swap_product` | 3 | element_ids, type_id | [{element, size_before, size_after, connectors_moved, findings_new, findings_gone}] | Yes | ARC-BATH-006 |
+| `bath.toilet_core` | 3 | wall_id, start, end, level, wcs?, urinals?, lavatories?, accessible?, ambulatory?, occupancy?, occupant_load?, urinals_for_wcs?, replace? | {placed, partitions, doors, fit} | Yes | ARC-BATH-008 |
 | `bcf.add_comment` | 6 | topic_id, text, viewpoint?: current\ | none | comment_id | Yes |
 | `bcf.add_viewpoint` | 6 | topic_id, view_id? | viewpoint_id | Yes | COL-BCF-001 |
 | `bcf.api_bind_project` | 6 | connection_id, project_id | () | No | COL-BCF-002 |
@@ -31412,6 +31526,17 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `ui.type_selector.list` | 1 | `category | tool` | `[TypeEntry]` | No |
 | `ui.user.get` | 1 | — | `{name, source: options\ | server, server_uri?}` | No |
 | `underlay.calibrate` | 6 | underlay_id, point_a, point_b, real_distance | () | Yes | COL-LNK-004 |
+| `unit.array_grid` | 3 | type_id, boundary, rows, columns \ | pitch, handing?, numbering? | array_id | Yes |
+| `unit.array_path` | 3 | type_id, path, count \ | pitch, handing?, numbering? | array_id | Yes |
+| `unit.connect` | 3 | array_id \ | copy_ids, spines | {branches, unconnected} | Yes |
+| `unit.create_type` | 3 | room_ids \ | element_ids, name, bay? | {type_id, members, left_out} | Yes |
+| `unit.edit` | 3 | type_id \ | copy_id, context?: hidden\ | faded | view_id |
+| `unit.fill` | 3 | type_id, path \ | boundary, levels, pitch, exclusions?, handing?, variants?, numbering? | array_id | Yes |
+| `unit.list` | 3 | array_id? | [{copy, number, level, type, handing, connected}] | No (query) | ARC-GRP-004 |
+| `unit.set_array` | 3 | array_id, params | — | Yes | ARC-GRP-004 |
+| `unit.set_connection_points` | 3 | type_id, points | — | Yes | ARC-GRP-004 |
+| `unit.set_merge_rules` | 3 | type_id, faces: [{face, rule: merge\ | keep\ | share}] | — |
+| `unit.set_variant` | 3 | copy_ids \ | rule, variant_type_id | — | Yes |
 | `units.edit` | 2 | — | — | No | DM-UNIT-001 |
 | `units.format` | 2 | value, data_type, format? | text | No | DM-UNIT-001 |
 | `units.get` | 2 | — | unit_settings | No | DM-UNIT-001 |

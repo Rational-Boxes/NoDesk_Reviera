@@ -492,3 +492,43 @@ fn fixture_counts_by_occupancy() {
     assert_eq!(need(&c130, "water_closet")["required"], 7);
     assert_eq!(run(&mut app, "bath.fixture_count", json!({ "occupancy": "Z", "occupant_load": 10 })).unwrap_err().code, "bath.no_occupancy");
 }
+
+#[test]
+fn a_toilet_core_along_a_wall() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = new_app(dir.path());
+    // A 9 m room, 4 m deep; the core along its north wall (inner face at y = 4): 8.23 m of
+    // compartments, urinals and lavatories.
+    let (level, walls) = room(&mut app, 9.0, 4.0);
+    ok(&mut app, "bath.set_rule_packs", json!({ "packs": ["us_plumbing", "ada_2010"] }));
+    let core = ok(&mut app, "bath.toilet_core", json!({ "wall_id": walls[2], "start": [0.0, 3.9], "end": [9.0, 3.9], "level": level, "wcs": 4, "urinals": 2, "lavatories": 3 }));
+    assert_eq!(core["doors"].as_array().unwrap().len(), 4, "{core:#}");
+    assert_eq!(core["placed"].as_array().unwrap().len(), 4 + 2 + 3);
+    assert_eq!(core["grab_bars"].as_array().unwrap().len(), 2, "the accessible WC's");
+    // Five side panels, four fronts, one urinal screen.
+    assert_eq!(core["partitions"].as_array().unwrap().len(), 5 + 4 + 1, "{core:#}");
+    let f = findings(&mut app);
+    let errors: Vec<&Value> = f.iter().filter(|x| x["severity"] == "error").collect();
+    assert!(errors.is_empty(), "{errors:#?}");
+
+    // Again with replace: the same counts, not doubled.
+    let again = ok(&mut app, "bath.toilet_core", json!({ "wall_id": walls[2], "start": [0.0, 3.9], "end": [9.0, 3.9], "level": level, "wcs": 4, "urinals": 2, "lavatories": 3, "replace": true }));
+    assert_eq!(again["placed"].as_array().unwrap().len(), 9);
+    let first = core["doors"][0].as_u64().unwrap();
+    assert!(run(&mut app, "element.get_ids", json!({ "element_ids": [first] })).is_err());
+
+    // Too short a wall: refused with the shortfall.
+    let e = run(&mut app, "bath.toilet_core", json!({ "wall_id": walls[0], "start": [0.0, 0.1], "end": [3.0, 0.1], "level": level, "wcs": 4, "urinals": 2, "lavatories": 3 })).unwrap_err();
+    assert_eq!(e.code, "bath.no_fit");
+    assert!(e.details["short"].as_f64().unwrap() > 0.0);
+}
+
+#[test]
+fn a_toilet_core_counted_for_its_occupancy() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = new_app(dir.path());
+    let (level, walls) = room(&mut app, 9.0, 4.0);
+    // 360 in Group B: five WCs a sex; for the men's room, urinals may take two of them.
+    let core = ok(&mut app, "bath.toilet_core", json!({ "wall_id": walls[2], "start": [0.0, 3.9], "end": [9.0, 3.9], "level": level, "occupancy": "B", "occupant_load": 360, "sex": "male", "urinals_for_wcs": true }));
+    assert_eq!((core["wcs"].as_u64(), core["urinals"].as_u64(), core["lavatories"].as_u64()), (Some(3), Some(2), Some(4)), "{core:#}");
+}

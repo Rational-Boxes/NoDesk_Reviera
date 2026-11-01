@@ -36,6 +36,9 @@ pub const RULES_KEY: &str = "rxd:bath_rules";
 pub const PACKS_KEY: &str = "rxd:bath_rule_packs";
 /// A fixture's side wall: `left` or `right` as you face it (absent: found).
 pub const HAND_KEY: &str = "rxd:fixture_hand";
+/// Whether a fixture is one the accessibility packs apply to (absent: it is). A toilet core's
+/// standard compartments, for example, are not (ARC-BATH-008).
+pub const ACCESSIBLE_KEY: &str = "rxd:bath_accessible";
 
 /// The published pack schema (MIT).
 pub const SCHEMA: &str = include_str!("../../../schemas/bath/reviera.bath-rules-1.schema.json");
@@ -419,6 +422,8 @@ pub struct Fixture {
     /// Its level (GlobalId).
     pub level: String,
     pub hand: Hand,
+    /// Whether the accessibility packs' rules apply to it.
+    pub accessible: bool,
 }
 
 impl Fixture {
@@ -517,11 +522,12 @@ pub fn fixture(store: &Store, e: &crate::element::Element) -> Option<Fixture> {
     let r = mesh_objects::mesh_object_recipe(e)?;
     let floor = crate::levels::elevation_of(store, &r.level).unwrap_or(g.placement.origin[2]);
     let hand: Hand = e.param(HAND_KEY).and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default();
-    // Look sideways from the centreline at mid-depth, a little above the floor.
+    // Look sideways from the centreline at mid-depth, 600 mm up: above the gap under toilet
+    // partitions (305 mm, ARC-BATH-008).
     let mid = frame.apply([0.0, (y[0] + y[1]) / 2.0, 0.0]);
     let look = |sign: f64| {
         let d = frame.apply_direction([sign, 0.0, 0.0]);
-        ray_to_walls(store, [mid[0], mid[1]], [d[0], d[1]], floor + 0.3, SIDE_SEARCH)
+        ray_to_walls(store, [mid[0], mid[1]], [d[0], d[1]], floor + 0.6, SIDE_SEARCH)
     };
     let (left, right) = (look(-1.0), look(1.0));
     let (side, found) = match hand {
@@ -553,6 +559,7 @@ pub fn fixture(store: &Store, e: &crate::element::Element) -> Option<Fixture> {
         rear_wall,
         level: r.level.clone(),
         hand,
+        accessible: e.param(ACCESSIBLE_KEY).and_then(serde_json::Value::as_bool) != Some(false),
     })
 }
 
@@ -581,12 +588,18 @@ pub struct Space {
     pub zone: Zone,
 }
 
+/// Whether a pack's rules apply to a fixture: an accessibility pack's only to fixtures not marked
+/// otherwise.
+fn applies_to(p: &Pack, f: &Fixture) -> bool {
+    p.layer != Layer::Accessible || f.accessible
+}
+
 /// The zones of the packs in use at one fixture.
 pub fn spaces_of(store: &Store, f: &Fixture, packs: &[Pack]) -> Vec<Space> {
     let occupancy = crate::codes::settings(store).occupancy;
     let assumed = assumed_side(packs, f.kind);
     let mut out = Vec::new();
-    for p in packs {
+    for p in packs.iter().filter(|p| applies_to(p, f)) {
         for z in p.zones.iter().filter(|z| z.fixtures.contains(&f.kind) && z.occupancy.applies(occupancy)) {
             out.push(Space {
                 clearance: Clearance {
@@ -618,6 +631,7 @@ pub fn distances_of<'a>(store: &Store, f: &Fixture, packs: &'a [Pack]) -> Vec<(&
     let occupancy = crate::codes::settings(store).occupancy;
     packs
         .iter()
+        .filter(|p| applies_to(p, f))
         .flat_map(|p| p.distances.iter().map(move |d| (p, d)))
         .filter(|(_, d)| d.fixtures.contains(&f.kind) && d.occupancy.applies(occupancy))
         .collect()
@@ -628,6 +642,7 @@ pub fn bars_of<'a>(store: &Store, f: &Fixture, packs: &'a [Pack]) -> Vec<(&'a Pa
     let occupancy = crate::codes::settings(store).occupancy;
     packs
         .iter()
+        .filter(|p| applies_to(p, f))
         .flat_map(|p| p.bars.iter().map(move |b| (p, b)))
         .filter(|(_, b)| b.fixtures.contains(&f.kind) && b.occupancy.applies(occupancy))
         .collect()
@@ -1065,6 +1080,33 @@ pub(crate) fn set_hand(txn: &mut Transaction<'_>, p: SetHandParams) -> Result<()
             }
             h => {
                 e.params.insert(HAND_KEY.into(), serde_json::to_value(h).expect("serialises"));
+            }
+        })?;
+    }
+    Ok(())
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SetAccessibleParams {
+    pub element_ids: Vec<ElementRef>,
+    /// False: the accessibility packs' rules do not apply to them; true: they do.
+    pub accessible: bool,
+}
+
+/// Marks fixtures as ones the accessibility packs apply to, or not (`bath.set_accessible`).
+pub(crate) fn set_accessible(txn: &mut Transaction<'_>, p: SetAccessibleParams) -> Result<()> {
+    let store = txn.store().clone();
+    for r in &p.element_ids {
+        let id = store.resolve(r).ok_or_else(|| bad("element.not_found", format!("no element {r:?}")))?;
+        if fixture(&store, store.get(id).expect("resolved")).is_none() {
+            return Err(bad("bath.not_a_fixture", format!("element {} is not a bathroom fixture", id.0)));
+        }
+        txn.modify(id, |e| {
+            if p.accessible {
+                e.params.remove(ACCESSIBLE_KEY);
+            } else {
+                e.params.insert(ACCESSIBLE_KEY.into(), false.into());
             }
         })?;
     }

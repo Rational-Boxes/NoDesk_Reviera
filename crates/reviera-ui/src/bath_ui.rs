@@ -402,4 +402,58 @@ impl Gui {
         let d = MessageDialog::builder(&frame, &lines.join("\n"), "Fixture Count").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build();
         d.show_modal();
     }
+
+    /// Toilet Core (ARC-BATH-008): on the selected wall, compartments, urinals and lavatories from
+    /// numbers or an occupancy, along its whole face on the plan's side.
+    pub(crate) fn toilet_core(&mut self) {
+        let frame = self.frame;
+        let Some(store) = self.store_now() else { return };
+        let Some(wall) = self.selection().into_iter().find(|id| store.get(*id).is_some_and(|e| reviera_core::walls::wall_recipe(e).is_some())) else {
+            return error(&frame, "Select the wall the toilet core stands against first.");
+        };
+        let Ok(g) = reviera_core::walls::regenerate(&store, store.get(wall).expect("selected")) else { return };
+        let Some(level) = self.active_view().and_then(|v| v.plan.clone()).map(|p| p.level) else {
+            return error(&frame, "Open a plan of the core's level first.");
+        };
+        let f = super::reinforcement_ui::Form::new(&frame, "Toilet Core");
+        let side = f.choice("Room side", &["Interior face".to_owned(), "Exterior face".to_owned()], 0);
+        let how = f.choice("Numbers", &["Given below".to_owned(), "Counted for an occupancy".to_owned()], 0);
+        let wcs = f.text("WCs", "4", "Compartments, the accessible one included");
+        let urinals = f.text("Urinals", "2", "");
+        let lavatories = f.text("Lavatories", "3", "");
+        let occ = f.text("Occupancy", "B", "As the count rules name it (B, A-3, workplace…)");
+        let load = f.text("Occupant load", "100", "People in the building or floor");
+        let sex = f.choice("Room for", &["Men".to_owned(), "Women".to_owned(), "All genders".to_owned()], 0);
+        let acc = f.choice("Accessible compartment", &["Yes".to_owned(), "No".to_owned()], 0);
+        let amb = f.choice("Ambulatory compartment", &["No".to_owned(), "Yes".to_owned()], 0);
+        let ok = f.show("Lays out along the wall's whole face: an accessible compartment, standard ones, urinals with screens, lavatories. Too short a wall is reported with the shortfall.", "Lay Out");
+        let num = |t: &TextCtrl| t.get_value().trim().parse::<f64>().ok();
+        let s = if side.get_selection() == Some(1) { 1.0 } else { -1.0 };
+        let n = g.normal();
+        let off = g.width / 2.0 + 0.05;
+        let start = [g.start[0] + n[0] * s * off, g.start[1] + n[1] * s * off];
+        let end = [g.end[0] + n[0] * s * off, g.end[1] + n[1] * s * off];
+        let mut args = json!({ "wall_id": wall.0, "start": start, "end": end, "level": level, "accessible": acc.get_selection() != Some(1), "ambulatory": amb.get_selection() == Some(1), "replace": true });
+        if how.get_selection() == Some(1) {
+            args["occupancy"] = json!(occ.get_value().trim());
+            args["occupant_load"] = json!(num(&load).unwrap_or(0.0));
+            args["sex"] = json!(["male", "female", "all"][sex.get_selection().unwrap_or(0) as usize]);
+            args["urinals_for_wcs"] = json!(sex.get_selection() == Some(0));
+        } else {
+            args["wcs"] = json!(num(&wcs).unwrap_or(0.0) as u32);
+            args["urinals"] = json!(num(&urinals).unwrap_or(0.0) as u32);
+            args["lavatories"] = json!(num(&lavatories).unwrap_or(0.0) as u32);
+        }
+        f.dialog.destroy();
+        if !ok {
+            return;
+        }
+        match self.run("bath.toilet_core", args) {
+            Ok(c) => {
+                self.refresh_scene(&frame);
+                frame.set_status_text(&format!("Toilet core: {} WC(s), {} urinal(s), {} lavatory(ies)", c["wcs"], c["urinals"], c["lavatories"]), 0);
+            }
+            Err(e) => error(&frame, &format!("The core was not laid out:\n{e}")),
+        }
+    }
 }

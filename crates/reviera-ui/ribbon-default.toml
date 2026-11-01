@@ -732,6 +732,12 @@ icon = "grab_bar"
 help = "Put the grab bars the bathroom rule packs ask for at the selected fixtures, or at all of them: for the ADA, a WC's side and rear bars (ARC-BATH-003)"
 
 [[action]]
+id = "ui.toilet_core"
+label = "Toilet Core"
+icon = "bathroom_layout"
+help = "On the selected wall, lay out toilet compartments (accessible, standard, ambulatory), urinals with screens and lavatories, from numbers or counted for an occupancy and load; partitions are walls standing off the floor, doors ordinary doors (ARC-BATH-008)"
+
+[[action]]
 id = "ui.fixture_count"
 label = "Fixture Count..."
 icon = "bath_check"
@@ -3415,6 +3421,7 @@ tools = [
   { action = "enclosure.create", size = "large" },
   { action = "ui.place_bathroom_component", size = "large" },
   { action = "ui.bathroom_layout", size = "large" },
+  { action = "ui.toilet_core", size = "large" },
   { action = "roof.create_geodesic", size = "small" },
   { action = "growing.layout", size = "small" },
   { action = "growing.lights", size = "small" },
@@ -4645,7 +4652,7 @@ items = [
   "ceiling.create", "ceiling.edit_boundary", "roof.create_footprint", "roof.edit_footprint", "-",
   "room.place", "room.place_automatically", "-",
   "roof.create_extrusion", "slabedge.create", "enclosure.create", "roof.create_geodesic", "growing.layout", "growing.lights", "-",
-  "ui.place_bathroom_component", "ui.bathroom_layout", "ui.make_product", "ui.swap_for_product", "ui.product_documents", "bath.place_grab_bars", "bath.check", "ui.fixture_count", "-",
+  "ui.place_bathroom_component", "ui.bathroom_layout", "ui.toilet_core", "ui.make_product", "ui.swap_for_product", "ui.product_documents", "bath.place_grab_bars", "bath.check", "ui.fixture_count", "-",
   "opening.create_wall", "opening.create_vertical", "opening.create_by_face", "opening.create_shaft", "-",
   "grid.create", "level.create", "refplane.create", "modelline.create", "-",
   "workplane.set", "workplane.show",

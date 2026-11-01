@@ -545,6 +545,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(BathLayout),
         registry.add(BathMakeProduct),
         registry.add(BathFixtureCount),
+        registry.add(BathToiletCore),
+        registry.add(BathSetAccessible),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -6925,4 +6927,35 @@ read_command!(
     crate::bath_rules::CountParams,
     crate::bath_rules::Counted,
     crate::bath_rules::fixture_count
+);
+
+edit_command!(
+    BathToiletCore,
+    "bath.toilet_core",
+    "Lay out a toilet core along a wall",
+    "Lays out toilet compartments, urinals and lavatories along a wall face from `start` to `end` (ARC-BATH-008): \
+     an accessible compartment first (60 × 59 in, its WC 18 in from the side partition, with its grab bars), \
+     standard compartments (36 × 60 in; Approved Document T's types under `england_adm`), an ambulatory one \
+     when asked, then urinals 30 in apart with screens between, then lavatories. Partitions are walls of a \
+     Toilet Partition type standing 12 in off the floor, 58 in tall; each compartment's door is an ordinary \
+     door in its front panel, swinging out. The numbers are given, or counted for an occupancy and load \
+     (one sex's room, or all-gender). If the run does not fit, nothing is placed and the shortfall is \
+     reported; `replace` removes an earlier core on the wall first.",
+    "Toilet Core",
+    crate::bath_cores::CoreParams,
+    crate::bath_cores::Core,
+    crate::bath_cores::toilet_core
+);
+
+edit_command!(
+    BathSetAccessible,
+    "bath.set_accessible",
+    "Mark fixtures accessible or not",
+    "Marks bathroom fixtures as ones the accessibility packs (ADA, Approved Document M) apply to, or not \
+     (ARC-BATH-002): a toilet core's standard compartments, or the second of two lavatories, need not meet \
+     them. Fixtures are accessible until marked otherwise; code and guidance packs apply to all.",
+    "Accessible Fixtures",
+    crate::bath_rules::SetAccessibleParams,
+    (),
+    crate::bath_rules::set_accessible
 );

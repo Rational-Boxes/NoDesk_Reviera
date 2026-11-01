@@ -638,6 +638,11 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
 - **Fixture counts** (ARC-BATH-007): Fixture Count… gives the WCs, urinals, lavatories,
   drinking fountains, showers and service sinks an occupancy needs (IPC Table 403.1, HSE L24),
   by sex or all-gender, against those modelled, with the shortfall (`bath.fixture_count`).
+- **Toilet cores** (ARC-BATH-008): Toilet Core lays out accessible, standard and ambulatory
+  compartments, urinals with screens and lavatories along a wall, from numbers or a fixture
+  count; partitions are raised walls of a Toilet Partition type and doors ordinary doors; only
+  the accessible fixtures are held to the accessibility pack (`bath.toilet_core`,
+  `bath.set_accessible`).
   **Not yet** (planned): living
   layouts that re-fit when the room changes, Jack-and-Jill and back-to-back wet walls,
   other packs' bars (Approved Document M's drop-down rails, shower and bath bars), room layouts, toilet cores and partitions, fixture counts,
@@ -1662,6 +1667,8 @@ Open one with `reviera gui test-data/samples/manor.ifc`, or rebuild them with
 The specification (`design_documents/spec/`) describes the whole application. Of the 121
 architecture requirements (Chapter 3), every area now has a first build; this is what is not built,
 area by area (reviewed against the spec on 2026-10-15).
+
+- **Modular units** (ARC-GRP-004, specified 2026-10-31): a unit designed once (a hotel room or apartment with its services, a gondola aisle, a checkout lane, a racking bay, a production cell, a rack row) and repeated along a path, in a grid or through a volume of floors, handed in pairs, with variants by rule (accessible units, express lanes) and numbering; each copy's connection points routed to shared spines (corridor ducts, risers, busways, refrigeration headers) and the trunks sized from the units they serve; the template edited in isolation in its own views; and an intelligent merge with the building shell (a room's windows, doors and balcony doors cut into the façade or corridor wall at every copy, balconies joined to the floor edge with their railings, walls on building walls merged, demising walls built once).
 
 **Still to build in the areas begun (architecture):**
 

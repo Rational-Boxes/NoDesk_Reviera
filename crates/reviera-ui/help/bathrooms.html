@@ -11,6 +11,7 @@ it, and whether a WC is the right distance from its side wall.</p>
   <a href="#layouts">Bathroom layouts</a>
   <a href="#products">Products in place of placeholders</a>
   <a href="#counts">Fixture counts</a>
+  <a href="#cores">Toilet cores</a>
   <a href="#packs">Rule packs</a>
   <a href="#zones">Clear spaces</a>
   <a href="#check">Check Bathrooms</a>
@@ -82,6 +83,20 @@ sex (half each, or the share you give), or counted whole for all-gender rooms (I
 403.1.1). Ratios such as "one per 25 for the first 50, then one per 50" are applied band by band
 and rounded up. The result compares each with the fixtures modelled on the plan's level or in
 the model, gives the shortfall, and says how many of the males' WCs urinals may replace.</p>
+
+<h2 id="cores">Toilet cores</h2>
+<p>Select the wall a public or workplace toilet stands against, and choose <b>Toilet Core</b>
+(Architecture › Build). Give the numbers of WCs, urinals and lavatories, or have them counted for
+an occupancy and load, for a men's, women's or all-gender room (urinals may take the share of the
+men's WCs the code allows). Along the wall's face come an accessible compartment (60 × 59 in, its
+WC 18 in from the side partition, with its grab bars), standard compartments (36 × 60 in; under
+Approved Document T, its types C and D), an ambulatory compartment if asked, urinals 30 in apart
+with screens between, and lavatories. Partitions are walls of a <i>Toilet Partition</i> type
+standing 12 in off the floor and 58 in tall; each compartment has an ordinary door in its front
+panel, swinging out. Only the accessible compartment, one urinal and one lavatory are held to the
+accessibility pack (<code>bath.set_accessible</code> marks the others); the plumbing code's
+spacing applies to all. Laying out again replaces the earlier core on that wall, and too short a
+wall is reported with the shortfall.</p>
 
 <h2 id="packs">Rule packs</h2>
 <p>Four packs ship with Reviera. Each rule names its clause, its source and how sure the reading
@@ -176,7 +191,7 @@ brings the shipped one back. Project packs are saved with the model.</p>
 <code>bath.add_rule_pack</code>, <code>bath.remove_rule_pack</code>, <code>bath.set_hand</code>,
 <code>bath.check</code>, <code>bath.load_components</code>, <code>bath.place_component</code>,
 <code>bath.layouts</code>, <code>bath.layout</code>, <code>bath.make_product</code>,
-<code>bath.swap_product</code>, <code>bath.fixture_count</code>,
+<code>bath.swap_product</code>, <code>bath.fixture_count</code>, <code>bath.toilet_core</code>, <code>bath.set_accessible</code>,
 <code>bath.place_grab_bars</code>, <code>grab_bar.create</code> and
 <code>grab_bar.set</code>; <code>clearance.list</code> and <code>clearance.check</code> include
 fixture spaces. Lua scripts and AI agents (MCP, the <i>modeling</i> toolset) can use them.</p>
