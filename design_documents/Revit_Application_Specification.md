@@ -14815,7 +14815,7 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
   - labelled `Bathroom` and with the pack's id;
   - a viewpoint boxed round the fixture (`margin`, default 1 m), with the fixture and the element in its way selected, and its snapshot.
   
-  A topic's GUID comes from the pack, rule, fixture and other element, so running it again adds only new findings. It takes one undoable step.
+  A topic's GUID comes from the pack, rule, fixture and other element, so running it again adds only new findings. An open topic labelled `Bathroom` whose finding has gone, fixed or no longer applying, is set Resolved; the report lists those.
 - **UI.** View › Coordination › Bathroom Report (saved, then opened in the browser) and Issues from Bathrooms.
 
 **Data (IFC mapping).** The report is a file; the topics are the project's BCF issues (COL-BCF-001).
@@ -14825,8 +14825,9 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 **Acceptance criteria.**
 - [x] A WC 600 mm from a lavatory in a named room gives a report with that room and its error, and as many BCF topics as errors; run again, none new.
 - [x] A hot tub's load shows in kPa.
+- [x] With the lavatory moved clear, the next run resolves the topics.
 
-*Built (2026-11-01):* both commands and their ribbon buttons. Not yet: a PDF report, per-room filtering, and closing topics whose findings are gone.
+*Built (2026-11-01):* both commands and their ribbon buttons, and topics resolved when their findings go. Not yet: a PDF report, and per-room filtering.
 
 ### 3.9a.20 Tile set-out
 **ID:** ARC-BATH-020 · **Priority:** P2 · **Ref:** `BATHROOMS_PLAN.md` §6.6; research/13 F (software observations)

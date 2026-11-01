@@ -194,6 +194,8 @@ pub struct FromCheckReport {
     pub topic_ids: Vec<String>,
     /// Findings that already had a topic.
     pub already: usize,
+    /// Open Bathroom topics whose findings have gone, now Resolved.
+    pub resolved: Vec<String>,
 }
 
 pub(crate) struct BcfFromBathCheck;
@@ -211,7 +213,8 @@ impl HostCommand for BcfFromBathCheck {
                       described by the finding with its pack, edition, confidence and source, labelled Bathroom and \
                       with the pack's id, with a viewpoint boxed round the fixture (`margin`, default 1 m), the \
                       fixture and the element in its way selected, and its snapshot. A finding that already has a \
-                      topic is skipped. One undoable step.",
+                      topic is skipped, and an open topic it made whose finding has gone is set Resolved. One \
+                      undoable step.",
         effects: &[Effect::Edit],
         transaction_name: "",
     };
@@ -229,11 +232,19 @@ impl HostCommand for BcfFromBathCheck {
         let store = app.get(doc)?.doc.store().clone();
         let existing: std::collections::HashSet<String> = issues::all(&store).into_iter().map(|(_, t)| t.guid.to_lowercase()).collect();
         let (mut topics, mut snapshots, mut made, mut already) = (Vec::new(), issues::Snapshots::new(), Vec::new(), 0);
+        let guid_of = |id: ElementId| store.get(id).map_or_else(|| id.0.to_string(), |e| e.guid().to_string());
+        let key_of = |f: &Finding| crate::bcf_topics::clash_guid(&[f.pack.as_str(), f.rule.as_str(), &guid_of(f.element), &f.other.map(guid_of).unwrap_or_default()]);
+        // Every finding's topic GUID, notes included: a topic stays open while its finding does.
+        let current: std::collections::HashSet<String> = check(app, CheckParams::default())?.iter().map(key_of).collect();
+        let resolved: Vec<String> = issues::all(&store)
+            .into_iter()
+            .map(|(_, t)| t)
+            .filter(|t| t.labels.iter().any(|l| l == "Bathroom") && t.status.as_deref() == Some("Open") && !current.contains(&t.guid.to_lowercase()))
+            .map(|t| t.guid)
+            .collect();
         for f in &findings {
-            let guid_of = |id: ElementId| store.get(id).map_or_else(|| id.0.to_string(), |e| e.guid().to_string());
             let other = f.other.map(guid_of).unwrap_or_default();
-            let key = [f.pack.as_str(), f.rule.as_str(), &guid_of(f.element), &other];
-            let guid = crate::bcf_topics::clash_guid(&key);
+            let guid = key_of(f);
             if existing.contains(&guid) || made.contains(&guid) {
                 already += 1;
                 continue;
@@ -298,6 +309,9 @@ impl HostCommand for BcfFromBathCheck {
         if !topics.is_empty() {
             app.execute("bcf.merge_topics", json!({ "topics": topics, "snapshots": snapshots }), caller)?;
         }
-        Ok(FromCheckReport { topic_ids: made, already })
+        for g in &resolved {
+            app.execute("bcf.update_topic", json!({ "topic_id": g, "fields": { "status": "Resolved" } }), caller)?;
+        }
+        Ok(FromCheckReport { topic_ids: made, already, resolved })
     }
 }

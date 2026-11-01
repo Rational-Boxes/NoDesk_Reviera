@@ -940,8 +940,9 @@ fn a_compliance_report_and_bcf_issues() {
     let r = ok(&mut app, "room.place", json!({ "level_id": level, "point": [1.5, 1.2] }));
     ok(&mut app, "room.set", json!({ "room_ids": [r], "name": "Washroom" }));
     let t = ok(&mut app, "mep_type.load_starters", json!({ "names": ["Water Closet", "Lavatory"] }));
+    let mut placed = Vec::new();
     for (name, x) in [("Water Closet", 1.0), ("Lavatory", 1.6)] {
-        ok(&mut app, "plumbing_fixture.place", json!({ "type_id": t[name], "point": [x, 0.1], "level": level }));
+        placed.push(ok(&mut app, "plumbing_fixture.place", json!({ "type_id": t[name], "point": [x, 0.1], "level": level })).as_u64().unwrap());
     }
     let errors = errors(&mut app).len();
     assert!(errors > 0);
@@ -958,6 +959,12 @@ fn a_compliance_report_and_bcf_issues() {
     assert_eq!((again["topic_ids"].as_array().unwrap().len(), again["already"].as_u64().unwrap() as usize), (0, errors));
     let topics = ok(&mut app, "bcf.list", json!({}));
     assert!(topics.to_string().contains("Bathroom"), "{topics:#}");
+    // The lavatory moved clear: the next run resolves the topics.
+    ok(&mut app, "element.move", json!({ "element_ids": [placed[1]], "vector": [0.6, 0.0, 0.0] }));
+    let after = ok(&mut app, "bcf.from_bath_check", json!({}));
+    assert_eq!((after["topic_ids"].as_array().unwrap().len(), after["resolved"].as_array().unwrap().len()), (0, errors), "{after:#}");
+    let topics = ok(&mut app, "bcf.list", json!({}));
+    assert!(!topics.to_string().contains("\"Open\""), "{topics:#}");
 }
 
 #[test]

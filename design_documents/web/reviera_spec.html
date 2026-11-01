@@ -28452,14 +28452,15 @@ CREATE TABLE base_rxd (
   - described by the finding with its pack, edition, confidence and source;
   - labelled <code>Bathroom</code> and with the pack's id;
   - a viewpoint boxed round the fixture (<code>margin</code>, default 1 m), with the fixture and the element in its way selected, and its snapshot.</p>
-<p>A topic's GUID comes from the pack, rule, fixture and other element, so running it again adds only new findings. It takes one undoable step.
+<p>A topic's GUID comes from the pack, rule, fixture and other element, so running it again adds only new findings. An open topic labelled <code>Bathroom</code> whose finding has gone, fixed or no longer applying, is set Resolved; the report lists those.
 - <strong>UI.</strong> View › Coordination › Bathroom Report (saved, then opened in the browser) and Issues from Bathrooms.</p>
 <p><strong>Data (IFC mapping).</strong> The report is a file; the topics are the project's BCF issues (COL-BCF-001).</p>
 <p><strong>Commands.</strong> See the catalog: <code>bath.report</code>, <code>bcf.from_bath_check</code>.</p>
 <p><strong>Acceptance criteria.</strong>
 - [x] A WC 600 mm from a lavatory in a named room gives a report with that room and its error, and as many BCF topics as errors; run again, none new.
-- [x] A hot tub's load shows in kPa.</p>
-<p><em>Built (2026-11-01):</em> both commands and their ribbon buttons. Not yet: a PDF report, per-room filtering, and closing topics whose findings are gone.</p>
+- [x] A hot tub's load shows in kPa.
+- [x] With the lavatory moved clear, the next run resolves the topics.</p>
+<p><em>Built (2026-11-01):</em> both commands and their ribbon buttons, and topics resolved when their findings go. Not yet: a PDF report, and per-room filtering.</p>
 <h3 id="39a20-tile-set-out">3.9a.20 Tile set-out</h3>
 <p><strong>ID:</strong> <code class="rid" id="ARC-BATH-020">ARC-BATH-020</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> <code>BATHROOMS_PLAN.md</code> §6.6; research/13 F (software observations)</p>
 <p><strong>Purpose.</strong> Set tiles out on walls and floors from a chosen datum, with the full and cut tiles drawn and counted. Tile set-out is weak in other tools: tile is often only a repeated texture.</p>

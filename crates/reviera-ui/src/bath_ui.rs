@@ -670,9 +670,9 @@ impl Gui {
         let frame = self.frame;
         match self.run("bcf.from_bath_check", json!({})) {
             Ok(r) => {
-                let (made, already) = (r["topic_ids"].as_array().map_or(0, Vec::len), r["already"].as_u64().unwrap_or(0));
+                let (made, already, resolved) = (r["topic_ids"].as_array().map_or(0, Vec::len), r["already"].as_u64().unwrap_or(0), r["resolved"].as_array().map_or(0, Vec::len));
                 self.refresh_scene(&frame);
-                frame.set_status_text(&format!("{made} BCF issue(s) made from Check Bathrooms' errors{}; see the Issues pane", if already > 0 { format!(", {already} already had one") } else { String::new() }), 0);
+                frame.set_status_text(&format!("{made} BCF issue(s) made from Check Bathrooms' errors{}{}; see the Issues pane", if already > 0 { format!(", {already} already had one") } else { String::new() }, if resolved > 0 { format!(", {resolved} resolved") } else { String::new() }), 0);
             }
             Err(e) => error(&frame, &e),
         }
