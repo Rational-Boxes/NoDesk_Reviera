@@ -635,6 +635,9 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
   `element.set_type` now swaps component types too). Product Documents… links a product's
   documents folder (local or FileEngine) and values to its type, saved as an
   `IfcRelAssociatesDocument` and property sets on the type (`docs.*` with `type:<GlobalId>`).
+- **Fixture counts** (ARC-BATH-007): Fixture Count… gives the WCs, urinals, lavatories,
+  drinking fountains, showers and service sinks an occupancy needs (IPC Table 403.1, HSE L24),
+  by sex or all-gender, against those modelled, with the shortfall (`bath.fixture_count`).
   **Not yet** (planned): living
   layouts that re-fit when the room changes, Jack-and-Jill and back-to-back wet walls,
   other packs' bars (Approved Document M's drop-down rails, shower and bath bars), room layouts, toilet cores and partitions, fixture counts,

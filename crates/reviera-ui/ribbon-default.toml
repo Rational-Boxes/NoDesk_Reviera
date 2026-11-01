@@ -732,6 +732,12 @@ icon = "grab_bar"
 help = "Put the grab bars the bathroom rule packs ask for at the selected fixtures, or at all of them: for the ADA, a WC's side and rear bars (ARC-BATH-003)"
 
 [[action]]
+id = "ui.fixture_count"
+label = "Fixture Count..."
+icon = "bath_check"
+help = "How many WCs, urinals, lavatories, drinking fountains, showers and service sinks an occupancy needs for its occupant load (IPC Table 403.1, HSE L24), against those modelled on the level or in the model (ARC-BATH-007)"
+
+[[action]]
 id = "ui.make_product"
 label = "Make Product..."
 icon = "bathroom"
@@ -4079,6 +4085,7 @@ tools = [
   { action = "overlap.find", size = "large" },
   { action = "bath.check", size = "large" },
   { action = "bath.place_grab_bars", size = "large" },
+  { action = "ui.fixture_count", size = "small" },
   { action = "geometry.remove_boolean", size = "small" },
   { action = "view.set_virtual_volumes", size = "large" },
   { action = "clearance.set_rule_set" },
@@ -4638,7 +4645,7 @@ items = [
   "ceiling.create", "ceiling.edit_boundary", "roof.create_footprint", "roof.edit_footprint", "-",
   "room.place", "room.place_automatically", "-",
   "roof.create_extrusion", "slabedge.create", "enclosure.create", "roof.create_geodesic", "growing.layout", "growing.lights", "-",
-  "ui.place_bathroom_component", "ui.bathroom_layout", "ui.make_product", "ui.swap_for_product", "ui.product_documents", "bath.place_grab_bars", "bath.check", "-",
+  "ui.place_bathroom_component", "ui.bathroom_layout", "ui.make_product", "ui.swap_for_product", "ui.product_documents", "bath.place_grab_bars", "bath.check", "ui.fixture_count", "-",
   "opening.create_wall", "opening.create_vertical", "opening.create_by_face", "opening.create_shaft", "-",
   "grid.create", "level.create", "refplane.create", "modelline.create", "-",
   "workplane.set", "workplane.show",

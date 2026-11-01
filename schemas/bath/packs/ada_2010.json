@@ -78,9 +78,9 @@
       "wall": "side",
       "covers": [["rear_wall", 0.305], ["rear_wall", 1.37]],
       "length_min": 1.065,
-      "top": { "min": 0.84, "max": 0.915, "default": 0.865 },
-      "diameter": { "min": 0.032, "max": 0.051, "default": 0.038 },
-      "gap": { "min": 0.038, "max": 0.038, "default": 0.038 },
+      "top": {"min": 0.84, "max": 0.915, "default": 0.865},
+      "diameter": {"min": 0.032, "max": 0.051, "default": 0.038},
+      "gap": {"min": 0.038, "max": 0.038, "default": 0.038},
       "source": "S0869",
       "confidence": "verified"
     },
@@ -91,9 +91,9 @@
       "wall": "rear",
       "covers": [["centre", -0.305], ["centre", 0.61]],
       "length_min": 0.915,
-      "top": { "min": 0.84, "max": 0.915, "default": 0.865 },
-      "diameter": { "min": 0.032, "max": 0.051, "default": 0.038 },
-      "gap": { "min": 0.038, "max": 0.038, "default": 0.038 },
+      "top": {"min": 0.84, "max": 0.915, "default": 0.865},
+      "diameter": {"min": 0.032, "max": 0.051, "default": 0.038},
+      "gap": {"min": 0.038, "max": 0.038, "default": 0.038},
       "source": "S0869",
       "confidence": "verified"
     }

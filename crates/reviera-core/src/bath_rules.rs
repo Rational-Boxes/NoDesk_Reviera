@@ -15,6 +15,7 @@
 //! the fixture's own frame: *across* from its centreline, an edge or its side wall (positive
 //! toward the open side), and *out* from the wall behind it or its front.
 
+use std::collections::BTreeMap;
 use std::sync::OnceLock;
 
 use schemars::JsonSchema;
@@ -43,6 +44,7 @@ const SHIPPED: &[&str] = &[
     include_str!("../../../schemas/bath/packs/us_nkba.json"),
     include_str!("../../../schemas/bath/packs/ada_2010.json"),
     include_str!("../../../schemas/bath/packs/england_adm.json"),
+    include_str!("../../../schemas/bath/packs/uk_workplace.json"),
 ];
 
 /// How far either side of a fixture a side wall is looked for.
@@ -288,6 +290,8 @@ pub struct Pack {
     pub distances: Vec<Distance>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub bars: Vec<Bar>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub counts: Vec<Count>,
 }
 
 fn validator() -> &'static jsonschema::Validator {
@@ -673,6 +677,260 @@ impl Fixture {
     }
 }
 
+
+// ---- Fixture counts (ARC-BATH-007) ----
+
+/// Whose number a count rule counts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Basis {
+    Male,
+    Female,
+    /// Each sex: the rule applies to the males and to the females, and the two are added.
+    EachSex,
+    Total,
+    /// Dwelling or sleeping units.
+    Unit,
+}
+
+/// One band of a ratio: one fixture per `per` people, up to `to` people (the last band has none).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct Band {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to: Option<f64>,
+    pub per: f64,
+}
+
+/// How many of a fixture.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct Requirement {
+    pub basis: Basis,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ratio: Option<Vec<Band>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub table: Option<Vec<(f64, u32)>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub then_per: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub minimum: Option<u32>,
+}
+
+impl Requirement {
+    /// The fixtures needed for `n` people (or units).
+    pub fn count(&self, n: f64) -> u32 {
+        if n <= 0.0 {
+            return 0;
+        }
+        let mut c = if let Some(bands) = &self.ratio {
+            let (mut done, mut sum) = (0.0f64, 0.0f64);
+            for b in bands {
+                let end = b.to.unwrap_or(f64::INFINITY);
+                let here = (n.min(end) - done).max(0.0);
+                sum += here / b.per;
+                done = end;
+                if n <= end {
+                    break;
+                }
+            }
+            // A hair below a whole number stays it: 2.0000000001 is 2.
+            (sum - 1e-9).ceil().max(0.0) as u32
+        } else if let Some(t) = &self.table {
+            match t.iter().find(|(to, _)| n <= *to) {
+                Some((_, k)) => *k,
+                None => {
+                    let (last_to, last_k) = *t.last().expect("non-empty");
+                    last_k + self.then_per.map_or(0, |p| ((n - last_to) / p - 1e-9).ceil().max(0.0) as u32)
+                }
+            }
+        } else {
+            0
+        };
+        if let Some(m) = self.minimum {
+            c = c.max(m);
+        }
+        c
+    }
+}
+
+/// A row of a count table.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct Count {
+    pub id: String,
+    pub occupancy: String,
+    pub description: String,
+    pub fixtures: BTreeMap<String, Requirement>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub urinal_substitution: Option<f64>,
+    pub source: String,
+    pub confidence: Confidence,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct CountParams {
+    /// The occupancy, as a count row names it (`B`, `A-3`, `workplace`).
+    pub occupancy: String,
+    pub occupant_load: f64,
+    /// The share of males (default 0.5).
+    pub male_share: Option<f64>,
+    /// Dwelling or sleeping units, for rows counted per unit.
+    pub units: Option<f64>,
+    /// IPC 2021 403.1.1: all-gender rooms, counted on the whole load.
+    #[serde(default)]
+    pub all_gender: bool,
+    /// The pack to count by (default the first in use with the occupancy).
+    pub pack: Option<String>,
+    /// Count the fixtures modelled on this level (default the whole model).
+    pub level_id: Option<ElementRef>,
+}
+
+/// One fixture's requirement against the model.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct Need {
+    pub fixture: String,
+    pub required: u32,
+    /// For WCs: of which for males and for females, when counted separately.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub male: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub female: Option<u32>,
+    pub modelled: u32,
+    pub short: u32,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct Counted {
+    pub pack: String,
+    pub row: String,
+    pub description: String,
+    pub source: String,
+    pub needs: Vec<Need>,
+    /// How many of the WCs required for males urinals may replace.
+    pub urinals_may_replace: u32,
+}
+
+/// The fixtures modelled, by the count's fixture names.
+fn modelled(store: &Store, level: Option<&str>) -> BTreeMap<&'static str, u32> {
+    let mut out = BTreeMap::new();
+    for e in store.iter().filter(|e| e.class == "IfcSanitaryTerminal" && crate::mesh_objects::mesh_object_recipe(e).is_some()) {
+        let r = crate::mesh_objects::mesh_object_recipe(e).expect("a copy");
+        if level.is_some_and(|l| l != r.level) {
+            continue;
+        }
+        let pre = crate::mesh_objects::type_of(store, e).map(|(_, t)| t.predefined_type().to_owned()).unwrap_or_default();
+        let key = match pre.as_str() {
+            "TOILETPAN" => "water_closet",
+            "URINAL" => "urinal",
+            "WASHHANDBASIN" => "lavatory",
+            "SHOWER" | "BATH" => "shower",
+            "SANITARYFOUNTAIN" => "drinking_fountain",
+            "SINK" => "service_sink",
+            _ => continue,
+        };
+        *out.entry(key).or_default() += 1;
+    }
+    out
+}
+
+/// `bath.fixture_count`.
+pub(crate) fn fixture_count(store: &Store, p: CountParams) -> Result<Counted> {
+    if !(p.occupant_load >= 0.0 && p.occupant_load.is_finite()) {
+        return Err(bad("bath.invalid_input", "the occupant load is a number of people"));
+    }
+    let share = p.male_share.unwrap_or(0.5);
+    if !(0.0..=1.0).contains(&share) {
+        return Err(bad("bath.invalid_input", "the share of males is between 0 and 1"));
+    }
+    let packs: Vec<Pack> = match &p.pack {
+        Some(id) => available(store).into_iter().filter(|x| &x.id == id).collect(),
+        None => active(store),
+    };
+    let wanted = p.occupancy.trim().to_lowercase();
+    let (pack, row) = packs
+        .iter()
+        .find_map(|x| x.counts.iter().find(|c| c.occupancy.to_lowercase() == wanted).map(|c| (x, c)))
+        .ok_or_else(|| {
+            let known: Vec<String> = packs.iter().flat_map(|x| x.counts.iter().map(|c| c.occupancy.clone())).collect();
+            bad("bath.no_occupancy", format!("no count rule for occupancy {:?} in the packs; there are: {}", p.occupancy, known.join(", ")))
+        })?;
+    let n = p.occupant_load;
+    let (males, females) = (n * share, n * (1.0 - share));
+    let level = p
+        .level_id
+        .as_ref()
+        .map(|r| store.resolve(r).and_then(|l| store.get(l)).filter(|l| l.class == crate::levels::CLASS).map(|l| l.guid().to_string()).ok_or_else(|| bad("bath.no_level", "no such level")))
+        .transpose()?;
+    let have = modelled(store, level.as_deref());
+    let mut by: BTreeMap<&str, (u32, Option<u32>, Option<u32>)> = BTreeMap::new();
+    let mut add = |name: &str, k: u32, m: Option<u32>, f: Option<u32>| {
+        let key: &'static str = match name {
+            n if n.starts_with("water_closet") => "water_closet",
+            n if n.starts_with("lavatory") => "lavatory",
+            "urinal" => "urinal",
+            "drinking_fountain" => "drinking_fountain",
+            "shower" => "shower",
+            "service_sink" => "service_sink",
+            _ => return,
+        };
+        let e = by.entry(key).or_insert((0, None, None));
+        e.0 += k;
+        if let Some(m) = m {
+            e.1 = Some(e.1.unwrap_or(0) + m);
+        }
+        if let Some(f) = f {
+            e.2 = Some(e.2.unwrap_or(0) + f);
+        }
+    };
+    let mut male_wcs = 0;
+    // The fixture a rule is for: `water_closet_male` → `water_closet`.
+    let family = |name: &str| name.trim_end_matches("_male").trim_end_matches("_female").to_owned();
+    let mut done: Vec<String> = Vec::new();
+    for (name, r) in &row.fixtures {
+        let wc = name.starts_with("water_closet");
+        match r.basis {
+            Basis::Unit => add(name, r.count(p.units.unwrap_or(0.0)), None, None),
+            Basis::Total => add(name, r.count(n), None, None),
+            // All-gender: the whole load, by the fixture's rule that asks for more.
+            _ if p.all_gender => {
+                let f = family(name);
+                if done.contains(&f) {
+                    continue;
+                }
+                let k = row.fixtures.iter().filter(|(k, q)| family(k) == f && !matches!(q.basis, Basis::Unit | Basis::Total)).map(|(_, q)| q.count(n)).max().unwrap_or(0);
+                add(&f, k, None, None);
+                done.push(f);
+            }
+            Basis::Male => {
+                let k = r.count(males);
+                if wc {
+                    male_wcs += k;
+                }
+                add(name, k, Some(k), None);
+            }
+            Basis::Female => {
+                let k = r.count(females);
+                add(name, k, None, Some(k));
+            }
+            Basis::EachSex => {
+                let (m, f) = (r.count(males), r.count(females));
+                if wc {
+                    male_wcs += m;
+                }
+                add(name, m + f, Some(m), Some(f));
+            }
+        }
+    }
+    let needs = by
+        .into_iter()
+        .map(|(fixture, (required, male, female))| {
+            let m = have.get(fixture).copied().unwrap_or(0);
+            Need { fixture: fixture.to_owned(), required, male, female, modelled: m, short: required.saturating_sub(m) }
+        })
+        .collect();
+    let urinals_may_replace = row.urinal_substitution.map_or(0, |s| (f64::from(male_wcs) * s + 1e-9).floor() as u32);
+    Ok(Counted { pack: pack.id.clone(), row: row.id.clone(), description: row.description.clone(), source: row.source.clone(), needs, urinals_may_replace })
+}
+
 // ---- Commands ----
 
 fn project_id(txn: &Transaction<'_>) -> Result<ElementId> {
@@ -884,9 +1142,9 @@ mod tests {
     #[test]
     fn the_shipped_packs_are_valid_and_cite_sources() {
         let register = include_str!("../../../design_documents/SOURCE_REGISTER.md");
-        assert_eq!(shipped().len(), 4);
+        assert_eq!(shipped().len(), 5);
         for p in shipped() {
-            let sources = p.zones.iter().map(|z| &z.source).chain(p.distances.iter().map(|d| &d.source)).chain(p.bars.iter().map(|b| &b.source));
+            let sources = p.zones.iter().map(|z| &z.source).chain(p.distances.iter().map(|d| &d.source)).chain(p.bars.iter().map(|b| &b.source)).chain(p.counts.iter().map(|c| &c.source));
             for s in sources {
                 for id in s.split(' ') {
                     assert!(register.contains(&format!("| {id} |")), "{}: {id} is not in the source register", p.id);
@@ -911,4 +1169,13 @@ mod tests {
         assert_eq!(ray_segment([0.0, 0.0], [-1.0, 0.0], [2.0, -1.0], [2.0, 1.0]), None);
         assert_eq!(ray_segment([0.0, 0.0], [1.0, 0.0], [2.0, 1.0], [2.0, 3.0]), None);
     }
+
+    #[test]
+    fn counts_by_ratio_bands_and_step_tables() {
+        let b = Requirement { basis: Basis::EachSex, ratio: Some(vec![Band { to: Some(50.0), per: 25.0 }, Band { to: None, per: 50.0 }]), table: None, then_per: None, minimum: None };
+        assert_eq!((b.count(180.0), b.count(50.0), b.count(51.0), b.count(0.0)), (5, 2, 3, 0));
+        let t = Requirement { basis: Basis::Total, ratio: None, table: Some(vec![(5.0, 1), (25.0, 2), (50.0, 3), (75.0, 4), (100.0, 5)]), then_per: Some(25.0), minimum: None };
+        assert_eq!((t.count(60.0), t.count(100.0), t.count(101.0), t.count(130.0)), (4, 5, 6, 7));
+    }
 }
+

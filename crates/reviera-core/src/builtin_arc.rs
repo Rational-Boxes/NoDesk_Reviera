@@ -544,6 +544,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(BathLayouts),
         registry.add(BathLayout),
         registry.add(BathMakeProduct),
+        registry.add(BathFixtureCount),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -6909,4 +6910,19 @@ edit_command!(
     crate::bath_components::MakeProductParams,
     crate::id::ElementId,
     crate::bath_components::make_product
+);
+
+read_command!(
+    BathFixtureCount,
+    "bath.fixture_count",
+    "Count the sanitary fixtures an occupancy needs",
+    "Counts the WCs, urinals, lavatories, drinking fountains, showers and service sinks an occupancy needs for \
+     its occupant load under the bathroom rule packs in use (ARC-BATH-007): IPC Table 403.1 in `us_plumbing`, \
+     HSE L24 in `uk_workplace`. The load is split by sex (half each unless `male_share` says otherwise), or \
+     counted whole with `all_gender` (IPC 2021 403.1.1); rows per unit use `units`. Returns each fixture's \
+     requirement (for WCs, by sex), the fixtures modelled on `level_id` or in the model, the shortfall, and how \
+     many of the males' WCs urinals may replace.",
+    crate::bath_rules::CountParams,
+    crate::bath_rules::Counted,
+    crate::bath_rules::fixture_count
 );

@@ -3,7 +3,7 @@
   "id": "us_plumbing",
   "title": "US plumbing code clearances (IPC and IRC)",
   "jurisdiction": "US",
-  "edition": "IPC §405.3.1 (2015 text as adopted by Ohio; the 2018 edition's change notes); IRC R307.1 (2015, as adopted by Seattle; NC OSFM interpretation)",
+  "edition": "IPC §405.3.1 (2015 text as adopted by Ohio; the 2018 edition's change notes); IRC R307.1 (2015, as adopted by Seattle; NC OSFM interpretation); IPC Table 403.1 (2015 via Ohio; the B row from ICC's 2021 excerpt) and 419.2",
   "layer": "minimum",
   "notes": "The UPC (California Plumbing Code 402.5) asks for 24 in in front of a WC, lavatory or bidet and 12 in from a urinal centreline; copy this pack to use it.",
   "zones": [
@@ -44,6 +44,205 @@
       "out": [["front", 0.0], ["front", 0.533]],
       "source": "S0886",
       "confidence": "advisory"
+    }
+  ],
+  "counts": [
+    {
+      "id": "IPC 403.1 A-1",
+      "occupancy": "A-1",
+      "description": "Theatres and other assembly with fixed seats for performances",
+      "fixtures": {
+        "water_closet_male": {"basis": "male", "ratio": [{"per": 125}]},
+        "water_closet_female": {"basis": "female", "ratio": [{"per": 65}]},
+        "lavatory": {"basis": "each_sex", "ratio": [{"per": 200}]},
+        "drinking_fountain": {"basis": "total", "ratio": [{"per": 500}]},
+        "service_sink": {"basis": "total", "table": [[1, 1]]}
+      },
+      "source": "S0873",
+      "confidence": "verified",
+      "urinal_substitution": 0.67
+    },
+    {
+      "id": "IPC 403.1 A-2 nightclubs",
+      "occupancy": "A-2 nightclubs",
+      "description": "Nightclubs, bars, taverns, dance halls",
+      "fixtures": {
+        "water_closet": {"basis": "each_sex", "ratio": [{"per": 40}]},
+        "lavatory": {"basis": "each_sex", "ratio": [{"per": 75}]},
+        "drinking_fountain": {"basis": "total", "ratio": [{"per": 500}]},
+        "service_sink": {"basis": "total", "table": [[1, 1]]}
+      },
+      "source": "S0873",
+      "confidence": "verified",
+      "urinal_substitution": 0.67
+    },
+    {
+      "id": "IPC 403.1 A-2 restaurants",
+      "occupancy": "A-2 restaurants",
+      "description": "Restaurants, banquet halls, food courts",
+      "fixtures": {
+        "water_closet": {"basis": "each_sex", "ratio": [{"per": 75}]},
+        "lavatory": {"basis": "each_sex", "ratio": [{"per": 200}]},
+        "drinking_fountain": {"basis": "total", "ratio": [{"per": 500}]},
+        "service_sink": {"basis": "total", "table": [[1, 1]]}
+      },
+      "source": "S0873",
+      "confidence": "verified",
+      "urinal_substitution": 0.67
+    },
+    {
+      "id": "IPC 403.1 A-3",
+      "occupancy": "A-3",
+      "description": "Auditoriums without fixed seats, galleries, libraries, gymnasiums",
+      "fixtures": {
+        "water_closet_male": {"basis": "male", "ratio": [{"per": 125}]},
+        "water_closet_female": {"basis": "female", "ratio": [{"per": 65}]},
+        "lavatory": {"basis": "each_sex", "ratio": [{"per": 200}]},
+        "drinking_fountain": {"basis": "total", "ratio": [{"per": 500}]},
+        "service_sink": {"basis": "total", "table": [[1, 1]]}
+      },
+      "source": "S0873 S1095",
+      "confidence": "verified",
+      "urinal_substitution": 0.67
+    },
+    {
+      "id": "IPC 403.1 A-3 worship",
+      "occupancy": "A-3 worship",
+      "description": "Places of worship",
+      "fixtures": {
+        "water_closet_male": {"basis": "male", "ratio": [{"per": 150}]},
+        "water_closet_female": {"basis": "female", "ratio": [{"per": 75}]},
+        "lavatory": {"basis": "each_sex", "ratio": [{"per": 200}]},
+        "drinking_fountain": {"basis": "total", "ratio": [{"per": 1000}]},
+        "service_sink": {"basis": "total", "table": [[1, 1]]}
+      },
+      "source": "S0873",
+      "confidence": "verified",
+      "urinal_substitution": 0.67
+    },
+    {
+      "id": "IPC 403.1 A-4/A-5",
+      "occupancy": "A-4/A-5",
+      "description": "Arenas, rinks, swimming pools, stadiums",
+      "fixtures": {
+        "water_closet_male": {"basis": "male", "ratio": [{"to": 1500, "per": 75}, {"per": 120}]},
+        "water_closet_female": {"basis": "female", "ratio": [{"to": 1520, "per": 40}, {"per": 60}]},
+        "lavatory_male": {"basis": "male", "ratio": [{"per": 200}]},
+        "lavatory_female": {"basis": "female", "ratio": [{"per": 150}]},
+        "drinking_fountain": {"basis": "total", "ratio": [{"per": 1000}]},
+        "service_sink": {"basis": "total", "table": [[1, 1]]}
+      },
+      "source": "S0873 S1095",
+      "confidence": "verified",
+      "urinal_substitution": 0.67
+    },
+    {
+      "id": "IPC 403.1 B",
+      "occupancy": "B",
+      "description": "Business (offices, banks, outpatient clinics)",
+      "fixtures": {
+        "water_closet": {"basis": "each_sex", "ratio": [{"to": 50, "per": 25}, {"per": 50}]},
+        "lavatory": {"basis": "each_sex", "ratio": [{"to": 80, "per": 40}, {"per": 80}]},
+        "drinking_fountain": {"basis": "total", "ratio": [{"per": 100}]},
+        "service_sink": {"basis": "total", "table": [[1, 1]]}
+      },
+      "source": "S0874",
+      "confidence": "verified",
+      "urinal_substitution": 0.5
+    },
+    {
+      "id": "IPC 403.1 E",
+      "occupancy": "E",
+      "description": "Educational",
+      "fixtures": {
+        "water_closet": {"basis": "each_sex", "ratio": [{"per": 50}]},
+        "lavatory": {"basis": "each_sex", "ratio": [{"per": 50}]},
+        "drinking_fountain": {"basis": "total", "ratio": [{"per": 100}]},
+        "service_sink": {"basis": "total", "table": [[1, 1]]}
+      },
+      "source": "S0873 S1095",
+      "confidence": "verified",
+      "urinal_substitution": 0.67
+    },
+    {
+      "id": "IPC 403.1 F",
+      "occupancy": "F-1/F-2",
+      "description": "Factories",
+      "fixtures": {
+        "water_closet": {"basis": "each_sex", "ratio": [{"per": 100}]},
+        "lavatory": {"basis": "each_sex", "ratio": [{"per": 100}]},
+        "drinking_fountain": {"basis": "total", "ratio": [{"per": 400}]},
+        "service_sink": {"basis": "total", "table": [[1, 1]]}
+      },
+      "source": "S0873",
+      "confidence": "verified",
+      "urinal_substitution": 0.5
+    },
+    {
+      "id": "IPC 403.1 M",
+      "occupancy": "M",
+      "description": "Mercantile (no customer facilities for 50 or fewer)",
+      "fixtures": {
+        "water_closet": {"basis": "each_sex", "ratio": [{"per": 500}]},
+        "lavatory": {"basis": "each_sex", "ratio": [{"per": 750}]},
+        "drinking_fountain": {"basis": "total", "ratio": [{"per": 1000}]},
+        "service_sink": {"basis": "total", "table": [[1, 1]]}
+      },
+      "source": "S0873",
+      "confidence": "verified",
+      "urinal_substitution": 0.5
+    },
+    {
+      "id": "IPC 403.1 R-1",
+      "occupancy": "R-1",
+      "description": "Hotels and motels: per sleeping unit",
+      "fixtures": {
+        "water_closet": {"basis": "unit", "ratio": [{"per": 1}]},
+        "lavatory": {"basis": "unit", "ratio": [{"per": 1}]},
+        "shower": {"basis": "unit", "ratio": [{"per": 1}]}
+      },
+      "source": "S0873",
+      "confidence": "verified"
+    },
+    {
+      "id": "IPC 403.1 R-2/R-3",
+      "occupancy": "R-2/R-3",
+      "description": "Apartments and dwellings: per dwelling unit",
+      "fixtures": {
+        "water_closet": {"basis": "unit", "ratio": [{"per": 1}]},
+        "lavatory": {"basis": "unit", "ratio": [{"per": 1}]},
+        "shower": {"basis": "unit", "ratio": [{"per": 1}]}
+      },
+      "source": "S0873",
+      "confidence": "verified"
+    },
+    {
+      "id": "IPC 403.1 R-2 dormitories",
+      "occupancy": "R-2 dormitories",
+      "description": "Dormitories, R-4 and I-1",
+      "fixtures": {
+        "water_closet": {"basis": "each_sex", "ratio": [{"per": 10}]},
+        "lavatory": {"basis": "each_sex", "ratio": [{"per": 10}]},
+        "shower": {"basis": "total", "ratio": [{"per": 8}]},
+        "drinking_fountain": {"basis": "total", "ratio": [{"per": 100}]}
+      },
+      "source": "S0873",
+      "confidence": "verified",
+      "urinal_substitution": 0.5
+    },
+    {
+      "id": "IPC 403.1 S",
+      "occupancy": "S",
+      "description": "Storage",
+      "fixtures": {
+        "water_closet": {"basis": "each_sex", "ratio": [{"per": 100}]},
+        "lavatory": {"basis": "each_sex", "ratio": [{"per": 100}]},
+        "drinking_fountain": {"basis": "total", "ratio": [{"per": 1000}]},
+        "service_sink": {"basis": "total", "table": [[1, 1]]}
+      },
+      "source": "S0873",
+      "confidence": "verified",
+      "urinal_substitution": 0.5
     }
   ]
 }

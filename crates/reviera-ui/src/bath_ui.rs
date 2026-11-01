@@ -328,4 +328,78 @@ impl Gui {
         let d = MessageDialog::builder(&frame, &lines.join("\n"), "Swap for Product").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build();
         d.show_modal();
     }
+
+    /// Fixture Count (ARC-BATH-007): an occupancy and its load, then the fixtures it needs under
+    /// the packs in use against those modelled.
+    pub(crate) fn fixture_count(&mut self) {
+        let frame = self.frame;
+        let packs = match self.run("bath.rule_packs", json!({})) {
+            Ok(v) => v.as_array().cloned().unwrap_or_default(),
+            Err(e) => return error(&frame, &e),
+        };
+        // Every count row of the packs, those in use first: (pack, occupancy, label).
+        let mut rows: Vec<(String, String, String)> = Vec::new();
+        for in_use in [true, false] {
+            for p in packs.iter().filter(|p| (p["in_use"] == true) == in_use) {
+                for c in p["counts"].as_array().cloned().unwrap_or_default() {
+                    let occ = c["occupancy"].as_str().unwrap_or_default().to_owned();
+                    rows.push((p["id"].as_str().unwrap_or_default().to_owned(), occ.clone(), format!("{occ} — {} ({})", c["description"].as_str().unwrap_or_default(), p["title"].as_str().unwrap_or_default())));
+                }
+            }
+        }
+        if rows.is_empty() {
+            return error(&frame, "No bathroom rule pack has fixture counts.");
+        }
+        let level = self.active_view().and_then(|v| v.plan.clone()).map(|p| p.level);
+        let f = super::reinforcement_ui::Form::new(&frame, "Fixture Count");
+        let labels: Vec<String> = rows.iter().map(|r| r.2.clone()).collect();
+        let occ = f.choice("Occupancy", &labels, 0);
+        let load = f.text("Occupant load", "100", "People");
+        let share = f.text("Males (%)", "50", "The share of the load counted as male");
+        let units = f.text("Units", "", "Dwelling or sleeping units, for rows counted per unit");
+        let mode = f.choice("Rooms", &["Separate for each sex".to_owned(), "All-gender (IPC 2021 403.1.1)".to_owned()], 0);
+        let scope_items = if level.is_some() { vec!["This plan's level".to_owned(), "The whole model".to_owned()] } else { vec!["The whole model".to_owned()] };
+        let scope = f.choice("Compare with", &scope_items, 0);
+        let ok = f.show("Counts the fixtures the occupancy needs and compares them with those modelled.", "Count");
+        let k = occ.get_selection().map_or(0, |k| k as usize);
+        let num = |t: &TextCtrl| t.get_value().trim().replace(',', ".").parse::<f64>().ok();
+        let mut args = json!({
+            "occupancy": rows[k].1, "pack": rows[k].0,
+            "occupant_load": num(&load).unwrap_or(0.0),
+            "male_share": num(&share).unwrap_or(50.0) / 100.0,
+            "all_gender": mode.get_selection() == Some(1),
+        });
+        if let Some(u) = num(&units) {
+            args["units"] = json!(u);
+        }
+        if let (Some(l), Some(0)) = (level, scope.get_selection()) {
+            args["level_id"] = json!(l);
+        }
+        f.dialog.destroy();
+        if !ok {
+            return;
+        }
+        let c = match self.run("bath.fixture_count", args) {
+            Ok(v) => v,
+            Err(e) => return error(&frame, &e),
+        };
+        let mut lines = vec![format!("{} — {} ({})", c["row"].as_str().unwrap_or_default(), c["description"].as_str().unwrap_or_default(), c["source"].as_str().unwrap_or_default()), String::new()];
+        for n in c["needs"].as_array().cloned().unwrap_or_default() {
+            let name = n["fixture"].as_str().unwrap_or_default().replace('_', " ");
+            let split = match (n["male"].as_u64(), n["female"].as_u64()) {
+                (Some(m), Some(fe)) => format!(" ({m} male, {fe} female)"),
+                (Some(m), None) => format!(" ({m} male)"),
+                (None, Some(fe)) => format!(" ({fe} female)"),
+                _ => String::new(),
+            };
+            let short = n["short"].as_u64().unwrap_or(0);
+            lines.push(format!("{name}: {} needed{split}, {} modelled{}", n["required"], n["modelled"], if short > 0 { format!(" — {short} short") } else { String::new() }));
+        }
+        let sub = c["urinals_may_replace"].as_u64().unwrap_or(0);
+        if sub > 0 {
+            lines.push(format!("\nUrinals may replace up to {sub} of the males' WCs."));
+        }
+        let d = MessageDialog::builder(&frame, &lines.join("\n"), "Fixture Count").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build();
+        d.show_modal();
+    }
 }

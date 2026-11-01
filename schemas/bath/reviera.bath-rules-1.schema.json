@@ -7,14 +7,14 @@
   "additionalProperties": false,
   "required": ["format", "id", "title", "jurisdiction", "edition", "layer"],
   "properties": {
-    "format": { "const": "reviera.bath-rules-1" },
+    "format": {"const": "reviera.bath-rules-1"},
     "id": {
       "type": "string",
       "pattern": "^[a-z0-9_]+$",
       "description": "Unique among the packs a project can use; a project pack with a shipped pack's id replaces it."
     },
-    "title": { "type": "string", "minLength": 1 },
-    "jurisdiction": { "type": "string", "minLength": 1, "description": "Where it applies: US, England, …" },
+    "title": {"type": "string", "minLength": 1},
+    "jurisdiction": {"type": "string", "minLength": 1, "description": "Where it applies: US, England, …"},
     "edition": {
       "type": "string",
       "minLength": 1,
@@ -24,13 +24,14 @@
       "enum": ["minimum", "accessible", "recommended"],
       "description": "A code minimum, an accessibility standard, or guidance (findings are notes)."
     },
-    "notes": { "type": "string" },
-    "zones": { "type": "array", "items": { "$ref": "#/$defs/zone" } },
-    "distances": { "type": "array", "items": { "$ref": "#/$defs/distance" } },
-    "bars": { "type": "array", "items": { "$ref": "#/$defs/bar" } }
+    "notes": {"type": "string"},
+    "zones": {"type": "array", "items": {"$ref": "#/$defs/zone"}},
+    "distances": {"type": "array", "items": {"$ref": "#/$defs/distance"}},
+    "bars": {"type": "array", "items": {"$ref": "#/$defs/bar"}},
+    "counts": {"type": "array", "items": {"$ref": "#/$defs/count"}}
   },
   "$defs": {
-    "fixture": { "enum": ["water_closet", "urinal", "lavatory", "bidet", "bath", "shower"] },
+    "fixture": {"enum": ["water_closet", "urinal", "lavatory", "bidet", "bath", "shower"]},
     "rule": {
       "type": "object",
       "required": ["id", "description", "fixtures", "source", "confidence"],
@@ -40,8 +41,8 @@
           "minLength": 1,
           "description": "The clause it comes from, e.g. `ADA 2010 604.3.1`."
         },
-        "description": { "type": "string", "minLength": 1 },
-        "fixtures": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/fixture" } },
+        "description": {"type": "string", "minLength": 1},
+        "fixtures": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/fixture"}},
         "occupancy": {
           "enum": ["any", "dwelling", "other"],
           "description": "Where it applies, as the building code settings name occupancies (default any)."
@@ -51,7 +52,7 @@
           "pattern": "^S[0-9]{4}( S[0-9]{4})*$",
           "description": "Source IDs in SOURCE_REGISTER.md."
         },
-        "confidence": { "enum": ["verified", "secondary", "advisory"] }
+        "confidence": {"enum": ["verified", "secondary", "advisory"]}
       }
     },
     "across": {
@@ -80,8 +81,8 @@
         "occupancy": true,
         "source": true,
         "confidence": true,
-        "across": { "type": "array", "items": { "$ref": "#/$defs/across" }, "minItems": 2, "maxItems": 2 },
-        "out": { "type": "array", "items": { "$ref": "#/$defs/out" }, "minItems": 2, "maxItems": 2 },
+        "across": {"type": "array", "items": {"$ref": "#/$defs/across"}, "minItems": 2, "maxItems": 2},
+        "out": {"type": "array", "items": {"$ref": "#/$defs/out"}, "minItems": 2, "maxItems": 2},
         "height": {
           "type": "number",
           "exclusiveMinimum": 0,
@@ -105,9 +106,9 @@
         "occupancy": true,
         "source": true,
         "confidence": true,
-        "measure": { "enum": ["centreline_to_side_wall"] },
-        "min": { "type": "number", "minimum": 0 },
-        "max": { "type": "number", "minimum": 0 }
+        "measure": {"enum": ["centreline_to_side_wall"]},
+        "min": {"type": "number", "minimum": 0},
+        "max": {"type": "number", "minimum": 0}
       }
     },
     "bar": {
@@ -122,7 +123,7 @@
         "occupancy": true,
         "source": true,
         "confidence": true,
-        "wall": { "enum": ["side", "rear"], "description": "The fixture's side wall, or the wall behind it." },
+        "wall": {"enum": ["side", "rear"], "description": "The fixture's side wall, or the wall behind it."},
         "covers": {
           "type": "array",
           "minItems": 2,
@@ -135,10 +136,10 @@
           },
           "description": "The stretch the bar must cover at least: on the side wall, out from the rear wall's face; on the rear wall, across from the fixture's centreline, positive toward the open side. A bar is placed over exactly this stretch."
         },
-        "top": { "$ref": "#/$defs/range", "description": "The top of the bar above the floor." },
-        "diameter": { "$ref": "#/$defs/range" },
-        "gap": { "$ref": "#/$defs/range", "description": "Clear space between the bar and the wall." },
-        "length_min": { "type": "number", "exclusiveMinimum": 0 }
+        "top": {"$ref": "#/$defs/range", "description": "The top of the bar above the floor."},
+        "diameter": {"$ref": "#/$defs/range"},
+        "gap": {"$ref": "#/$defs/range", "description": "Clear space between the bar and the wall."},
+        "length_min": {"type": "number", "exclusiveMinimum": 0}
       }
     },
     "range": {
@@ -146,9 +147,93 @@
       "additionalProperties": false,
       "required": ["default"],
       "properties": {
-        "min": { "type": "number", "minimum": 0 },
-        "max": { "type": "number", "minimum": 0 },
-        "default": { "type": "number", "minimum": 0 }
+        "min": {"type": "number", "minimum": 0},
+        "max": {"type": "number", "minimum": 0},
+        "default": {"type": "number", "minimum": 0}
+      }
+    },
+    "count": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "occupancy", "description", "fixtures", "source", "confidence"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1, "description": "The table row, e.g. `IPC 403.1 B`."},
+        "occupancy": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The occupancy or use the row is for (B, A-3, mixed-use workplace…)."
+        },
+        "description": {"type": "string", "minLength": 1},
+        "fixtures": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "water_closet_male": {"$ref": "#/$defs/requirement"},
+            "water_closet_female": {"$ref": "#/$defs/requirement"},
+            "water_closet": {"$ref": "#/$defs/requirement"},
+            "urinal": {"$ref": "#/$defs/requirement"},
+            "lavatory_male": {"$ref": "#/$defs/requirement"},
+            "lavatory_female": {"$ref": "#/$defs/requirement"},
+            "lavatory": {"$ref": "#/$defs/requirement"},
+            "drinking_fountain": {"$ref": "#/$defs/requirement"},
+            "shower": {"$ref": "#/$defs/requirement"},
+            "service_sink": {"$ref": "#/$defs/requirement"}
+          }
+        },
+        "urinal_substitution": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "The share of the WCs required for males that urinals may replace."
+        },
+        "source": {"type": "string", "pattern": "^S[0-9]{4}( S[0-9]{4})*$"},
+        "confidence": {"enum": ["verified", "secondary", "advisory"]}
+      }
+    },
+    "requirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["basis"],
+      "description": "How many of a fixture: by ratio bands (one per so many people, band by band, the sum rounded up) or by a step table (up to so many people, so many fixtures) with one more per so many beyond it.",
+      "properties": {
+        "basis": {
+          "enum": ["male", "female", "each_sex", "total", "unit"],
+          "description": "Whose number the rule counts: males, females, each sex (half the load each unless told), the whole load, or units (sleeping or dwelling units)."
+        },
+        "ratio": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["per"],
+            "properties": {
+              "to": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "The band ends at this many people (the last has none)."
+              },
+              "per": {"type": "number", "exclusiveMinimum": 0}
+            }
+          }
+        },
+        "table": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "array",
+            "prefixItems": [{"type": "number", "exclusiveMinimum": 0}, {"type": "integer", "minimum": 0}],
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "description": "[up to so many people, so many fixtures], ascending."
+        },
+        "then_per": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "With a table: one more fixture per so many people (or part) beyond its last row; without it, the last row's count holds beyond it."
+        },
+        "minimum": {"type": "integer", "minimum": 0}
       }
     }
   }

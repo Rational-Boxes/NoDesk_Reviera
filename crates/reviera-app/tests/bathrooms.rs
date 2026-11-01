@@ -459,3 +459,36 @@ fn a_products_documents_go_with_its_type() {
     assert_eq!(text.lines().filter(|l| l.contains("IFCPROPERTYSET(") && l.contains("'Reviera_EPD'")).count(), 1);
     assert!(text.contains("'EPD-ACME-1'") && text.contains("Acme Model 1 documents"));
 }
+
+#[test]
+fn fixture_counts_by_occupancy() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = new_app(dir.path());
+    let level = model(&mut app);
+    let need = |c: &Value, f: &str| -> Value { c["needs"].as_array().unwrap().iter().find(|n| n["fixture"] == f).cloned().unwrap_or_else(|| panic!("no {f}: {c:#}")) };
+    // IPC Table 403.1, Group B, 360 occupants half and half.
+    let c = ok(&mut app, "bath.fixture_count", json!({ "occupancy": "B", "occupant_load": 360 }));
+    assert_eq!(c["row"], "IPC 403.1 B");
+    let wc = need(&c, "water_closet");
+    assert_eq!((wc["required"].as_u64(), wc["male"].as_u64(), wc["female"].as_u64()), (Some(10), Some(5), Some(5)), "{c:#}");
+    assert_eq!(need(&c, "lavatory")["required"], 8);
+    assert_eq!(need(&c, "drinking_fountain")["required"], 4);
+    assert_eq!(need(&c, "service_sink")["required"], 1);
+    assert_eq!(c["urinals_may_replace"], 2, "50 % of the males' 5 WCs, rounded down");
+    let all = ok(&mut app, "bath.fixture_count", json!({ "occupancy": "B", "occupant_load": 360, "all_gender": true }));
+    assert_eq!((need(&all, "water_closet")["required"].as_u64(), need(&all, "lavatory")["required"].as_u64()), (Some(9), Some(6)));
+    // Three WCs modelled on the level: seven short.
+    let t = ok(&mut app, "bath.load_components", json!({ "names": ["WC, close-coupled"] }));
+    for x in [1.0, 2.0, 3.0] {
+        ok(&mut app, "bath.place_component", json!({ "type_id": t["WC, close-coupled"], "point": [x, -0.3], "level": level }));
+    }
+    let c = ok(&mut app, "bath.fixture_count", json!({ "occupancy": "B", "occupant_load": 360, "level_id": level }));
+    assert_eq!((need(&c, "water_closet")["modelled"].as_u64(), need(&c, "water_closet")["short"].as_u64()), (Some(3), Some(7)));
+    // HSE L24, by name.
+    let uk = |app: &mut App, n: u32| ok(app, "bath.fixture_count", json!({ "occupancy": "workplace", "occupant_load": n, "pack": "uk_workplace" }));
+    let c60 = uk(&mut app, 60);
+    assert_eq!((need(&c60, "water_closet")["required"].as_u64(), need(&c60, "lavatory")["required"].as_u64()), (Some(4), Some(4)));
+    let c130 = uk(&mut app, 130);
+    assert_eq!(need(&c130, "water_closet")["required"], 7);
+    assert_eq!(run(&mut app, "bath.fixture_count", json!({ "occupancy": "Z", "occupant_load": 10 })).unwrap_err().code, "bath.no_occupancy");
+}

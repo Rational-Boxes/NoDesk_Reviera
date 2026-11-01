@@ -4188,6 +4188,32 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 
 *Built (2026-10-31):* `bath.make_product` (in `reviera_core::bath_components`), `element.set_type` for component copies (same category; the copy's PredefinedType and ObjectType follow the new type), `bath.swap_product` in `reviera-app`, and Make Product… and Swap for Product… (Architecture › Component and the Architecture menu). Product documents (`type:` keys, the IFC association and property sets, Product Documents…) were built the same day. Not yet: products from Component Libraries and IFC files, and matching candidates by classification.
 
+### 3.9a.7 Fixture counts
+**ID:** ARC-BATH-007 · **Priority:** P1 · **Ref:** `BATHROOMS_PLAN.md` §6.4; research/13 C1
+
+**Purpose.** Say how many WCs, urinals, lavatories, drinking fountains, showers and service sinks a building or floor needs for its occupancy and occupant load, by the rules in use, and how many the model has.
+
+**Behaviour & rules.**
+- **Count rules** are part of the rule packs (`counts`): one row per occupancy, each fixture with a basis and a rule:
+  - *basis*: males, females, each sex (half the load each, unless the split is given), the whole load, or units (dwelling or sleeping units);
+  - *ratio bands*: one fixture per so many people, band by band (IPC: B WCs one per 25 for the first 50, then one per 50), the sum rounded up;
+  - *a step table*: up to so many people, so many fixtures, with one more per so many beyond it (HSE L24).
+  
+  A row may say what share of the WCs required for males urinals may replace (IPC 419.2: 67 % in assembly and educational occupancies, 50 % elsewhere).
+- **Packs.** `us_plumbing` gains IPC Table 403.1's rows (A-1, A-2, A-3, worship, A-4/A-5, B, E, F, M, R-1, R-2/R-3, dormitories, S); a new pack `uk_workplace` (HSE L24, regulation 21) has the mixed-use and men-only tables. Where sources disagree (Ohio's B row, NYC's gymnasium split) a project pack can replace the row.
+- **`bath.fixture_count`** takes the occupancy (a row's `occupancy`, from the packs in use or one named), the occupant load, optionally the share of males, the number of units for R rows, and `all_gender` (IPC 2021 403.1.1: counted on the whole load with each sex's larger ratio). It returns each fixture's requirement with the rule and band that set it, the most WCs urinals may replace, and the fixtures modelled (on a level, or in the model) with the shortfall.
+
+**Data (IFC mapping).** None: a calculation.
+
+**Commands.** See the catalog: `bath.fixture_count`.
+
+**Acceptance criteria.**
+- [x] Under `us_plumbing`, 360 occupants in Group B need 5 WCs and 4 lavatories for each sex (50/50: 2 + 130/50 rounded up; 2 + 100/80 rounded up), 4 drinking fountains (one per 100) and a service sink; counted all-gender on the whole load, 9 WCs and 6 lavatories.
+- [x] Under `uk_workplace`, 60 people in mixed use need 4 WCs and 4 basins, and 130 people 7 of each.
+- [x] With three WCs modelled on the level, the count reports a shortfall of seven for 360 occupants in Group B.
+
+*Built (2026-10-31):* count rows in the pack schema (`counts`, with ratio bands or step tables), IPC Table 403.1 rows in `us_plumbing`, the new `uk_workplace` pack, `bath.fixture_count`, and View › Coordination › Fixture Count… (an occupancy from the packs, the load, the share of males, units, separate or all-gender rooms, this level or the whole model). Not yet: NBC Canada and OSHA tables, the UPC's banded rows, mixed occupancies summed before rounding, family or assisted-use rooms (IBC 1110.2.1), and the counts feeding toilet-core layouts.
+
 ---
 
 ## 3.10 In-place models, model text and model lines
@@ -5376,6 +5402,7 @@ All commands below are registered once in the command registry and exposed autom
 | `bath.layout` | template, point, level, wet_wall_id?, start?, replace?, fit_only? | {placed, fit} | Yes | ARC-BATH-005 |
 | `bath.make_product` | generic, path, name, manufacturer?, model_reference?, model_label?, article_number?, gtin?, units?, up_axis? | type_id | Yes | ARC-BATH-006 |
 | `bath.swap_product` | element_ids, type_id | [{element, size_before, size_after, connectors_moved, findings_new, findings_gone}] | Yes | ARC-BATH-006 |
+| `bath.fixture_count` | occupancy, occupant_load, male_share?, units?, all_gender?, pack?, level_id? | {pack, row, required, urinals_may_replace, modelled, short} | No (query) | ARC-BATH-007 |
 | `grab_bar.create` | level, points, wall_id?, side?, diameter?, gap? | element_id | Yes | ARC-BATH-003 |
 | `grab_bar.set` | element_ids, diameter?, gap?, top? | — | Yes | ARC-BATH-003 |
 | `enclosure.create` | form, footprint \| host_wall_ids, level_id, params | element_id | Yes | ARC-GLZ-001 |

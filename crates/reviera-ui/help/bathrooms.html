@@ -10,6 +10,7 @@ it, and whether a WC is the right distance from its side wall.</p>
   <a href="#components">Bathroom components</a>
   <a href="#layouts">Bathroom layouts</a>
   <a href="#products">Products in place of placeholders</a>
+  <a href="#counts">Fixture counts</a>
   <a href="#packs">Rule packs</a>
   <a href="#zones">Clear spaces</a>
   <a href="#check">Check Bathrooms</a>
@@ -71,6 +72,16 @@ you link its folder (on this computer or on FileEngine), set the documents' type
 read values from them. They are saved with the product's type in IFC: the folder as a document
 reference, the values as property sets. A product's EPD does not make a carbon factor; those are
 for materials.</p>
+
+<h2 id="counts">Fixture counts</h2>
+<p><b>Fixture Count…</b> (View › Coordination, or the Architecture menu) says how many WCs,
+urinals, lavatories, drinking fountains, showers and service sinks an occupancy needs for its
+occupant load: IPC Table 403.1 in the US pack (assembly, business, educational, factory,
+mercantile, residential and storage rows), HSE L24 in the UK workplace pack. The load is split by
+sex (half each, or the share you give), or counted whole for all-gender rooms (IPC 2021
+403.1.1). Ratios such as "one per 25 for the first 50, then one per 50" are applied band by band
+and rounded up. The result compares each with the fixtures modelled on the plan's level or in
+the model, gives the shortfall, and says how many of the males' WCs urinals may replace.</p>
 
 <h2 id="packs">Rule packs</h2>
 <p>Four packs ship with Reviera. Each rule names its clause, its source and how sure the reading
@@ -165,7 +176,7 @@ brings the shipped one back. Project packs are saved with the model.</p>
 <code>bath.add_rule_pack</code>, <code>bath.remove_rule_pack</code>, <code>bath.set_hand</code>,
 <code>bath.check</code>, <code>bath.load_components</code>, <code>bath.place_component</code>,
 <code>bath.layouts</code>, <code>bath.layout</code>, <code>bath.make_product</code>,
-<code>bath.swap_product</code>,
+<code>bath.swap_product</code>, <code>bath.fixture_count</code>,
 <code>bath.place_grab_bars</code>, <code>grab_bar.create</code> and
 <code>grab_bar.set</code>; <code>clearance.list</code> and <code>clearance.check</code> include
 fixture spaces. Lua scripts and AI agents (MCP, the <i>modeling</i> toolset) can use them.</p>

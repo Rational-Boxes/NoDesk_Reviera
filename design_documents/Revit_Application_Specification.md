@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Reviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Reviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 847 numbered requirements (320 P0 · 319 P1 · 201 P2 · 7 P3), 2,266 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 848 numbered requirements (320 P0 · 320 P1 · 201 P2 · 7 P3), 2,267 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,266 commands; 847 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,267 commands; 848 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -14412,6 +14412,32 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 
 *Built (2026-10-31):* `bath.make_product` (in `reviera_core::bath_components`), `element.set_type` for component copies (same category; the copy's PredefinedType and ObjectType follow the new type), `bath.swap_product` in `reviera-app`, and Make Product… and Swap for Product… (Architecture › Component and the Architecture menu). Product documents (`type:` keys, the IFC association and property sets, Product Documents…) were built the same day. Not yet: products from Component Libraries and IFC files, and matching candidates by classification.
 
+### 3.9a.7 Fixture counts
+**ID:** ARC-BATH-007 · **Priority:** P1 · **Ref:** `BATHROOMS_PLAN.md` §6.4; research/13 C1
+
+**Purpose.** Say how many WCs, urinals, lavatories, drinking fountains, showers and service sinks a building or floor needs for its occupancy and occupant load, by the rules in use, and how many the model has.
+
+**Behaviour & rules.**
+- **Count rules** are part of the rule packs (`counts`): one row per occupancy, each fixture with a basis and a rule:
+  - *basis*: males, females, each sex (half the load each, unless the split is given), the whole load, or units (dwelling or sleeping units);
+  - *ratio bands*: one fixture per so many people, band by band (IPC: B WCs one per 25 for the first 50, then one per 50), the sum rounded up;
+  - *a step table*: up to so many people, so many fixtures, with one more per so many beyond it (HSE L24).
+  
+  A row may say what share of the WCs required for males urinals may replace (IPC 419.2: 67 % in assembly and educational occupancies, 50 % elsewhere).
+- **Packs.** `us_plumbing` gains IPC Table 403.1's rows (A-1, A-2, A-3, worship, A-4/A-5, B, E, F, M, R-1, R-2/R-3, dormitories, S); a new pack `uk_workplace` (HSE L24, regulation 21) has the mixed-use and men-only tables. Where sources disagree (Ohio's B row, NYC's gymnasium split) a project pack can replace the row.
+- **`bath.fixture_count`** takes the occupancy (a row's `occupancy`, from the packs in use or one named), the occupant load, optionally the share of males, the number of units for R rows, and `all_gender` (IPC 2021 403.1.1: counted on the whole load with each sex's larger ratio). It returns each fixture's requirement with the rule and band that set it, the most WCs urinals may replace, and the fixtures modelled (on a level, or in the model) with the shortfall.
+
+**Data (IFC mapping).** None: a calculation.
+
+**Commands.** See the catalog: `bath.fixture_count`.
+
+**Acceptance criteria.**
+- [x] Under `us_plumbing`, 360 occupants in Group B need 5 WCs and 4 lavatories for each sex (50/50: 2 + 130/50 rounded up; 2 + 100/80 rounded up), 4 drinking fountains (one per 100) and a service sink; counted all-gender on the whole load, 9 WCs and 6 lavatories.
+- [x] Under `uk_workplace`, 60 people in mixed use need 4 WCs and 4 basins, and 130 people 7 of each.
+- [x] With three WCs modelled on the level, the count reports a shortfall of seven for 360 occupants in Group B.
+
+*Built (2026-10-31):* count rows in the pack schema (`counts`, with ratio bands or step tables), IPC Table 403.1 rows in `us_plumbing`, the new `uk_workplace` pack, `bath.fixture_count`, and View › Coordination › Fixture Count… (an occupancy from the packs, the load, the share of males, units, separate or all-gender rooms, this level or the whole model). Not yet: NBC Canada and OSHA tables, the UPC's banded rows, mixed occupancies summed before rounding, family or assisted-use rooms (IBC 1110.2.1), and the counts feeding toilet-core layouts.
+
 ---
 
 ## 3.10 In-place models, model text and model lines
@@ -15600,6 +15626,7 @@ All commands below are registered once in the command registry and exposed autom
 | `bath.layout` | template, point, level, wet_wall_id?, start?, replace?, fit_only? | {placed, fit} | Yes | ARC-BATH-005 |
 | `bath.make_product` | generic, path, name, manufacturer?, model_reference?, model_label?, article_number?, gtin?, units?, up_axis? | type_id | Yes | ARC-BATH-006 |
 | `bath.swap_product` | element_ids, type_id | [{element, size_before, size_after, connectors_moved, findings_new, findings_gone}] | Yes | ARC-BATH-006 |
+| `bath.fixture_count` | occupancy, occupant_load, male_share?, units?, all_gender?, pack?, level_id? | {pack, row, required, urinals_may_replace, modelled, short} | No (query) | ARC-BATH-007 |
 | `grab_bar.create` | level, points, wall_id?, side?, diameter?, gap? | element_id | Yes | ARC-BATH-003 |
 | `grab_bar.set` | element_ids, diameter?, gap?, top? | — | Yes | ARC-BATH-003 |
 | `enclosure.create` | form, footprint \| host_wall_ids, level_id, params | element_id | Yes | ARC-GLZ-001 |
@@ -28730,14 +28757,14 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 39 | 8 | 0 | 123 |
 | DM | 91 | 65 | 34 | 3 | 193 |
-| ARC | 77 | 79 | 14 | 1 | 171 |
+| ARC | 77 | 80 | 14 | 1 | 172 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 28 | 0 | 29 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
 | COL | 8 | 50 | 11 | 1 | 70 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **319** | **201** | **7** | **847** |
+| **Total** | **320** | **320** | **201** | **7** | **848** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -28932,7 +28959,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2266 unique commands** in 426 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2267 unique commands** in 426 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -28968,7 +28995,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `array` | 6 |
 | `assembly` | 16 |
 | `assemblytemplate` | 1 |
-| `bath` | 13 |
+| `bath` | 14 |
 | `bcf` | 33 |
 | `beam` | 6 |
 | `beam_system` | 5 |
@@ -29477,6 +29504,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `assemblytemplate.save` | 5 | sheet_id, name | template_id | Yes | DOC-ASM-005 |
 | `bath.add_rule_pack` | 3 | pack | — | Yes | ARC-BATH-001 |
 | `bath.check` | 3 | element_ids? | finding[] | No (query) | ARC-BATH-002 |
+| `bath.fixture_count` | 3 | occupancy, occupant_load, male_share?, units?, all_gender?, pack?, level_id? | {pack, row, required, urinals_may_replace, modelled, short} | No (query) | ARC-BATH-007 |
 | `bath.layout` | 3 | template, point, level, wet_wall_id?, start?, replace?, fit_only? | {placed, fit} | Yes | ARC-BATH-005 |
 | `bath.layouts` | 3 | — | [{id, title, end?, run}] | No (query) | ARC-BATH-005 |
 | `bath.load_components` | 3 | names? | {name: type_id} | Yes | ARC-BATH-004 |
