@@ -1329,7 +1329,7 @@ fn duct(name: &str, origin: V3, direction: V3, cl: Classification, dir: FlowDire
     }
 }
 
-fn pipe(name: &str, origin: V3, direction: V3, cl: Classification, dir: FlowDirection, d: f64, fu: f64) -> Connector {
+pub(crate) fn pipe(name: &str, origin: V3, direction: V3, cl: Classification, dir: FlowDirection, d: f64, fu: f64) -> Connector {
     Connector {
         name: name.into(),
         origin,
@@ -1343,7 +1343,7 @@ fn pipe(name: &str, origin: V3, direction: V3, cl: Classification, dir: FlowDire
 }
 
 #[allow(clippy::too_many_arguments)]
-fn power(name: &str, origin: V3, direction: V3, dir: FlowDirection, voltage: f64, poles: u8, va: f64, class: &str) -> Connector {
+pub(crate) fn power(name: &str, origin: V3, direction: V3, dir: FlowDirection, voltage: f64, poles: u8, va: f64, class: &str) -> Connector {
     Connector {
         name: name.into(),
         origin,

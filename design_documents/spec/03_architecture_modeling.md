@@ -4085,6 +4085,50 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 
 *Built (2026-10-31):* `reviera_core::grab_bars` (bodies with a bracket and a 75 mm flange at each point), bar rules in the pack schema and the ADA pack, `bath.place_grab_bars`, `grab_bar.create`, `grab_bar.set`, the bar checks in `bath.check`, and View › Coordination › Place Grab Bars (the selected fixtures, else all). Defaults are E-66 in `EXPERT_REVIEW.md`. Not yet: Approved Document M's drop-down and ambulant rails, A117.1 vertical and swing-up bars, bath and shower bars, children's heights, wall backing, and grips to drag a bar.
 
+### 3.9a.4 Generic bathroom components
+**ID:** ARC-BATH-004 · **Priority:** P1 · **Ref:** owner requirement (2026-10-31: "common equipment placeholder items"); `BATHROOMS_PLAN.md` §8; research/13 E3, E4
+
+**Purpose.** Give a designer the common bathroom fixtures and accessories at their usual sizes and mounting heights, shaped enough to read in plans and 3D, with the right IFC classes and pipe connections, to stand in until products are chosen.
+
+**Behaviour & rules.**
+- **The catalogue** (research/13 E3), each a generated component type ([`mesh_objects`], DM-IMP-015) whose back goes against the wall and whose geometry stands at its mounting height:
+
+| Component | Size (mm) | Height | IFC |
+|---|---|---|---|
+| WC, close-coupled | 380 × 700, cistern to 780 | seat 430 (17 in); outlet 305 (12 in) off the wall | `IfcSanitaryTerminal` TOILETPAN |
+| WC, wall-hung | 360 × 540 pan | seat 430 | TOILETPAN |
+| WC, accessible height | 380 × 740, elongated | seat 460 (18 in; ADA 17–19 in) | TOILETPAN |
+| Urinal, wall-hung | 360 × 350 | rim 430 (ADA at most 17 in) | URINAL |
+| Lavatory, wall-hung; pedestal | 550 × 450 | rim 850 (ADA at most 34 in) | WASHHANDBASIN |
+| Hand-rinse basin | 350 × 200 | rim 800 | WASHHANDBASIN |
+| Vanity basin, 900 | 900 × 530 | top 850 | WASHHANDBASIN |
+| Bidet | 360 × 560 | 400 | BIDET |
+| Bath, 1700 × 700; 60 × 30 in | 1700 × 700; 1525 × 760 | rim 550; 380 | BATH |
+| Shower tray 900 × 900; 1200 × 800; roll-in shower 60 × 30 in | as named | 40; 40; 13 (ADA ½ in) | SHOWER |
+| Mirror, 600 × 800 | 600 × 20 | bottom 1000 (ADA at most 40 in over a lavatory) | `IfcFurniture` USERDEFINED "Mirror" |
+| Toilet roll holder; soap and paper towel dispensers | 150 × 100; 120 × 110; 280 × 120 | 600; 950; 900 (within 15–48 in) | `IfcFurniture` USERDEFINED |
+| Hand dryer | 300 × 200 × 650 | outlet 950 | `IfcElectricAppliance` HANDDRYER |
+| Baby changing unit (closed) | 895 × 100 × 565 | top 1070 | `IfcFurniture` USERDEFINED |
+| Sanitary bin; coat hook | 250 × 200 × 450; hook | floor; 1200 | `IfcFurniture` USERDEFINED |
+| Shower seat, folding | 400 × 400 | top 460 (ADA 17–19 in) | `IfcFurniture` USERDEFINED "Shower Seat" |
+| Heated towel rail, 500 × 800 | 500 × 30 | 300 to 1100 | `IfcSpaceHeater` RADIATOR |
+
+  Fixtures have cold, hot and waste connectors with fixture units (MEP-CONN-001); the hand dryer and towel rail a power connector.
+- `bath.load_components` loads them (or those named) into the project, reusing a type of the same name. A USERDEFINED component's name for IFC is its type's `ElementType` and each copy's `ObjectType`.
+- `bath.place_component` places one on the nearest wall face within 300 mm, its back to the wall (or on the wall given, or free on the work plane), as plumbing fixtures are placed (MEP-PIPE-006). Fixtures may also be placed with `plumbing_fixture.place`.
+- Their clear spaces (ARC-BATH-002) and grab bars (ARC-BATH-003) come with them, as with any fixture of their kind. A manufacturer's product replaces a placeholder by changing the copy's type (a later section).
+
+**Data (IFC mapping).** As custom objects (DM-IMP-015): a type with a representation map, copies as mapped items. `Pset_SanitaryTerminalTypeCommon` sizes come from the type's size.
+
+**Commands.** See the catalog: `bath.load_components`, `bath.place_component`.
+
+**Acceptance criteria.**
+- [x] Every catalogue component loads, with its IFC class and predefined type, and its size and mounting height as listed; loading twice reuses the types.
+- [x] A mirror placed on a wall is an `IfcFurniture` USERDEFINED with ObjectType "Mirror" in IFC, its bottom 1000 mm up.
+- [x] A WC, close-coupled placed against a wall has its waste connector 305 mm off the wall and gets its clear spaces under the packs in use.
+
+*Built (2026-10-31):* `reviera_core::bath_components` (the catalogue above, shaped from prisms), a new component category *Electric Appliance* (`IfcElectricAppliance`), `ElementType` written for types and `ObjectType` copied to copies of USERDEFINED types, `bath.load_components`, `bath.place_component`, and Architecture › Build › Bathroom, which loads them the first time and places the chosen one at each click (on the nearest wall face). Sizes marked as judgement in research/13 E3 are E-67 in `EXPERT_REVIEW.md`. Not yet: a WC seat as its own accessory, shower screens, cubicle partitions, lockers and benches (with toilet cores and locker rooms), and replacing a placeholder with a product.
+
 ---
 
 ## 3.10 In-place models, model text and model lines
@@ -5267,6 +5311,8 @@ All commands below are registered once in the command registry and exposed autom
 | `bath.set_hand` | element_ids, hand: auto\|left\|right | — | Yes | ARC-BATH-002 |
 | `bath.check` | element_ids? | finding[] | No (query) | ARC-BATH-002 |
 | `bath.place_grab_bars` | element_ids? | {placed, skipped} | Yes | ARC-BATH-003 |
+| `bath.load_components` | names? | {name: type_id} | Yes | ARC-BATH-004 |
+| `bath.place_component` | type_id, point, level, offset?, rotation?, host_wall?, side?, work_plane? | element_id | Yes | ARC-BATH-004 |
 | `grab_bar.create` | level, points, wall_id?, side?, diameter?, gap? | element_id | Yes | ARC-BATH-003 |
 | `grab_bar.set` | element_ids, diameter?, gap?, top? | — | Yes | ARC-BATH-003 |
 | `enclosure.create` | form, footprint \| host_wall_ids, level_id, params | element_id | Yes | ARC-GLZ-001 |

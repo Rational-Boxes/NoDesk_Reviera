@@ -128,4 +128,38 @@ impl Gui {
             d.show_modal();
         }
     }
+
+    /// Architecture › Build › Bathroom (ARC-BATH-004): a generic bathroom fixture or accessory,
+    /// loaded the first time; each click near a wall puts one on its face at its own height.
+    pub(crate) fn place_bathroom_component(&mut self) {
+        let frame = self.frame;
+        let components = |store: &reviera_core::Store| -> Vec<(reviera_core::ElementId, String)> {
+            store.iter().filter(|e| reviera_core::bath_components::is_component(e)).map(|e| (e.id(), e.name.clone().unwrap_or_default())).collect()
+        };
+        let Some(store) = self.store_now() else {
+            return frame.set_status_text("Open or create a project first (File > New)", 0);
+        };
+        let mut types = components(&store);
+        if types.len() < reviera_core::bath_components::names().len() {
+            if let Err(e) = self.run("bath.load_components", json!({})) {
+                return error(&frame, &e);
+            }
+            let Some(store) = self.store_now() else { return };
+            types = components(&store);
+        }
+        // In the catalogue's order: fixtures, then accessories.
+        let order = reviera_core::bath_components::names();
+        types.sort_by_key(|t| order.iter().position(|n| *n == t.1).unwrap_or(usize::MAX));
+        let f = super::reinforcement_ui::Form::new(&frame, "Place Bathroom Component");
+        let names: Vec<String> = types.iter().map(|t| t.1.clone()).collect();
+        let ty = f.choice("Component", &names, 0);
+        let height = f.text("Raise by (mm)", "0", "Above its own mounting height");
+        let ok = f.show("Click near a wall to put it on that face, its back to the wall (it follows the wall); away from walls it stands on the work plane. Spacebar turns it there.", "Place");
+        let k = ty.get_selection().map_or(0, |k| k as usize);
+        let h = height.get_value().trim().replace(',', ".").parse::<f64>().unwrap_or(0.0) / 1000.0;
+        f.dialog.destroy();
+        let Some((id, name)) = types.get(k).cloned().filter(|_| ok) else { return };
+        self.start_place_tool(super::components::Source::Type(id), name);
+        self.set_place_offset(h);
+    }
 }

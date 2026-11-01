@@ -732,6 +732,12 @@ icon = "grab_bar"
 help = "Put the grab bars the bathroom rule packs ask for at the selected fixtures, or at all of them: for the ADA, a WC's side and rear bars (ARC-BATH-003)"
 
 [[action]]
+id = "ui.place_bathroom_component"
+label = "Bathroom"
+icon = "bathroom"
+help = "Place generic bathroom fixtures and accessories (WCs, urinal, lavatories, bidet, baths, showers, mirror, dispensers, hand dryer, baby changing unit, shower seat, towel rail) on a wall face at their usual heights, to stand in until products are chosen (ARC-BATH-004)"
+
+[[action]]
 id = "overlap.find"
 label = "Check Overlaps"
 icon = "overlaps"
@@ -3377,6 +3383,7 @@ tools = [
   { action = "roof.create_dome", size = "small" },
   { action = "roof.create_extrusion", size = "small" },
   { action = "enclosure.create", size = "large" },
+  { action = "ui.place_bathroom_component", size = "large" },
   { action = "roof.create_geodesic", size = "small" },
   { action = "growing.layout", size = "small" },
   { action = "growing.lights", size = "small" },

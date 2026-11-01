@@ -35,6 +35,8 @@ pub const ATTRIBUTES: &[&str] = &[
     "Description",
     "Tag",
     "ObjectType",
+    // A type's user-defined kind (ARC-BATH-004: Mirror, Shower Seat, …).
+    "ElementType",
     "PredefinedType",
     "LongName",
     // Structural load groups and actions (STR-LC-001, STR-LOAD-001).

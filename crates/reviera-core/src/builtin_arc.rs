@@ -539,6 +539,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(BathPlaceGrabBars),
         registry.add(GrabBarCreate),
         registry.add(GrabBarSet),
+        registry.add(BathLoadComponents),
+        registry.add(BathPlaceComponent),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -6830,4 +6832,34 @@ edit_command!(
     crate::grab_bars::SetParams,
     (),
     crate::grab_bars::set
+);
+
+edit_command!(
+    BathLoadComponents,
+    "bath.load_components",
+    "Load the generic bathroom components",
+    "Loads generic bathroom fixtures and accessories into the project as component types (ARC-BATH-004), or \
+     those named: WCs (close-coupled, wall-hung, accessible height), a urinal, lavatories (wall-hung, pedestal, \
+     hand-rinse, vanity), a bidet, baths, shower trays and a roll-in shower, a mirror, toilet roll holder, \
+     soap and paper towel dispensers, a hand dryer, a baby changing unit, a sanitary bin, a coat hook, a \
+     folding shower seat and a heated towel rail; each at its usual size and mounting height, with its IFC \
+     class and pipe or power connectors. A type of the same name already there is reused. Returns the types \
+     by name.",
+    "Bathroom Components",
+    crate::bath_components::LoadParams,
+    std::collections::BTreeMap<String, crate::id::ElementId>,
+    crate::bath_components::load
+);
+
+edit_command!(
+    BathPlaceComponent,
+    "bath.place_component",
+    "Place a bathroom component",
+    "Places a generic bathroom component (ARC-BATH-004) on the nearest wall face within 300 mm, its back to the \
+     wall and following it, or on `host_wall`, or free with `work_plane`. Its mounting height is in its \
+     geometry, so it stands on the level unless `offset` says otherwise.",
+    "Place Bathroom Component",
+    crate::mep_controls::PlaceParams,
+    crate::id::ElementId,
+    crate::bath_components::place
 );

@@ -616,7 +616,13 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
   saved as `IfcRailing` HANDRAIL with swept-disk geometry. View › Coordination › Place Grab Bars
   puts the bars the packs ask for at fixtures (the ADA's WC side and rear bars), and Check
   Bathrooms reports a bar missing, short of its stretch, or with its height, diameter or gap out
-  of range (`bath.place_grab_bars`, `grab_bar.create`, `grab_bar.set`). **Not yet** (planned):
+  of range (`bath.place_grab_bars`, `grab_bar.create`, `grab_bar.set`).
+- **Generic bathroom components** (ARC-BATH-004): Architecture › Build › Bathroom places
+  placeholder WCs, a urinal, lavatories, a bidet, baths, shower trays, a roll-in shower and
+  accessories (mirror, dispensers, hand dryer, baby changing unit, shower seat, towel rail, …) on
+  a wall face at their usual sizes and heights, with pipe or power connectors, written to IFC as
+  sanitary terminals, furniture with their ObjectType, an electric appliance and a space heater
+  (`bath.load_components`, `bath.place_component`). **Not yet** (planned):
   other packs' bars (Approved Document M's drop-down rails, shower and bath bars), room layouts, toilet cores and partitions, fixture counts,
   locker rooms, wet areas, spas, the generic bathroom component library and product swaps.
 

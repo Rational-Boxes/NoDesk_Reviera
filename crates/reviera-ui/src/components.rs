@@ -1112,7 +1112,10 @@ impl Gui {
         }
         // Control devices go on the nearest wall face, at their mounting height (MEP-DUCT-012).
         // Plumbing fixtures too (MEP-PIPE-006), and sprinklers (MEP-PIPE-007).
+        let bathroom = matches!(&t.source, Source::Type(ty) if self.store_now().is_some_and(|s| s.get(*ty).is_some_and(reviera_core::bath_components::is_component)));
         let hosted = match &t.source {
+            // Bathroom components on the nearest wall face, at their own heights (ARC-BATH-004).
+            Source::Type(_) if bathroom => Some("bath.place_component"),
             Source::Type(ty) => self.store_now().and_then(|s| s.get(*ty).and_then(mesh_objects::mesh_object_type)).and_then(|ty| {
                 if ty.category.is_control_device() {
                     Some("mech_control_device.place")

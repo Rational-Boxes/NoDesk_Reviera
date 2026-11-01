@@ -253,3 +253,45 @@ fn ada_grab_bars_placed_checked_and_saved() {
     assert!(text.contains("IFCSWEPTDISKSOLID("));
     let _ = l;
 }
+
+#[test]
+fn generic_components_load_place_and_save() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = new_app(dir.path());
+    let level = model(&mut app);
+    let types = ok(&mut app, "bath.load_components", json!({}));
+    let n = types.as_object().unwrap().len();
+    assert!(n >= 24, "{types:#}");
+    assert_eq!(ok(&mut app, "bath.load_components", json!({})), types, "loading again reuses them");
+    let listed = ok(&mut app, "mesh_object.types", json!({}));
+    let size = |name: &str| -> Vec<f64> {
+        let t = listed.as_array().unwrap().iter().find(|t| t["name"] == name).unwrap_or_else(|| panic!("no {name}"));
+        t["size"].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect()
+    };
+    assert!((size("Bath, 1700 × 700")[0] - 1.7).abs() < 1e-9);
+    assert!((size("WC, accessible height")[2] - 0.81).abs() < 1e-9);
+    assert_eq!(run(&mut app, "bath.load_components", json!({ "names": ["Jacuzzi"] })).unwrap_err().code, "bath.no_component");
+
+    // On the wall: a WC, its outlet 305 mm (12 in) off the wall face, and its clear spaces.
+    let wc = ok(&mut app, "bath.place_component", json!({ "type_id": types["WC, close-coupled"], "point": [2.0, -0.3], "level": level })).as_u64().unwrap();
+    let ports = ok(&mut app, "connector.list", json!({ "element_id": wc }));
+    let waste = ports.as_array().unwrap().iter().find(|p| p["connector"]["name"] == "Waste").unwrap_or_else(|| panic!("{ports:#}"));
+    let face = ok(&mut app, "clearance.list", json!({ "element_ids": [wc] })).as_array().unwrap().iter().find(|c| c["rule"] == "IPC 405.3.1 side").unwrap()["max"][1].as_f64().unwrap();
+    assert!((face - waste["position"][1].as_f64().unwrap() - 0.305).abs() < 0.002, "{waste} {face}");
+    // A mirror over a lavatory, and a hand dryer.
+    let mirror = ok(&mut app, "bath.place_component", json!({ "type_id": types["Mirror, 600 × 800"], "point": [3.5, -0.2], "level": level })).as_u64().unwrap();
+    ok(&mut app, "bath.place_component", json!({ "type_id": types["Lavatory, wall-hung"], "point": [3.5, -0.3], "level": level }));
+    ok(&mut app, "bath.place_component", json!({ "type_id": types["Hand dryer"], "point": [4.5, -0.2], "level": level }));
+    // Only bathroom components.
+    let other = ok(&mut app, "mep_type.load_starters", json!({ "names": ["Thermostat"] }));
+    assert_eq!(run(&mut app, "bath.place_component", json!({ "type_id": other["Thermostat"], "point": [1.0, -0.2], "level": level })).unwrap_err().code, "bath.not_a_component");
+
+    let path = dir.path().join("components.ifc");
+    ok(&mut app, "file.save_as", json!({ "path": path }));
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert!(text.lines().any(|l| l.starts_with('#') && l.contains("IFCFURNITURE(") && l.contains("'Mirror'") && l.contains(".USERDEFINED.")), "a mirror as IfcFurniture USERDEFINED 'Mirror'");
+    assert!(text.lines().any(|l| l.contains("IFCFURNITURETYPE(") && l.contains("'Mirror'")), "its type's ElementType");
+    assert!(text.contains("IFCELECTRICAPPLIANCE(") && text.contains(".HANDDRYER."));
+    assert!(text.contains("IFCSANITARYTERMINAL(") && text.contains(".TOILETPAN."));
+    let _ = mirror;
+}

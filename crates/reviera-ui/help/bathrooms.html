@@ -7,6 +7,7 @@ and, for wheelchair users, to approach and transfer. Reviera keeps the rules for
 it is placed. <b>Check Bathrooms</b> then lists what stands in that space, which doors swing into
 it, and whether a WC is the right distance from its side wall.</p>
 <nav class="toc">
+  <a href="#components">Bathroom components</a>
   <a href="#packs">Rule packs</a>
   <a href="#zones">Clear spaces</a>
   <a href="#check">Check Bathrooms</a>
@@ -16,6 +17,18 @@ it, and whether a WC is the right distance from its side wall.</p>
   <a href="#limits">Limits and what to check</a>
   <a href="#scripts">Scripts and agents</a>
 </nav>
+
+<h2 id="components">Bathroom components</h2>
+<p><b>Place Bathroom Component</b> (Architecture › Build › Bathroom) offers generic fixtures and
+accessories at their usual sizes and heights, to stand in until products are chosen: WCs
+(close-coupled, wall-hung, accessible height), a urinal, lavatories (wall-hung, pedestal, hand-rinse,
+vanity), a bidet, baths, shower trays and a roll-in shower, a mirror, toilet roll holder, soap and
+paper towel dispensers, a hand dryer, a baby changing unit, a sanitary bin, a coat hook, a folding
+shower seat and a heated towel rail. Click near a wall: the component goes on its face, its back
+to the wall, at its own mounting height (a mirror's bottom 1000 mm up, a lavatory's rim 850 mm).
+Fixtures have their pipe connections, so they join plumbing systems, and their clear spaces and
+grab bars follow from the rule packs. In IFC they are sanitary terminals, furniture (named Mirror,
+Shower Seat, …), an electric appliance (the hand dryer) and a space heater (the towel rail).</p>
 
 <h2 id="packs">Rule packs</h2>
 <p>Four packs ship with Reviera. Each rule names its clause, its source and how sure the reading
@@ -108,6 +121,7 @@ brings the shipped one back. Project packs are saved with the model.</p>
 <h2 id="scripts">Scripts and agents</h2>
 <p>Everything above is a command: <code>bath.rule_packs</code>, <code>bath.set_rule_packs</code>,
 <code>bath.add_rule_pack</code>, <code>bath.remove_rule_pack</code>, <code>bath.set_hand</code>,
-<code>bath.check</code>, <code>bath.place_grab_bars</code>, <code>grab_bar.create</code> and
+<code>bath.check</code>, <code>bath.load_components</code>, <code>bath.place_component</code>,
+<code>bath.place_grab_bars</code>, <code>grab_bar.create</code> and
 <code>grab_bar.set</code>; <code>clearance.list</code> and <code>clearance.check</code> include
 fixture spaces. Lua scripts and AI agents (MCP, the <i>modeling</i> toolset) can use them.</p>

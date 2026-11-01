@@ -77,10 +77,12 @@ pub enum Category {
     /// Switches and dimmers, fire alarm and security devices (MEP-ELEC-001).
     SwitchingDevice,
     Alarm,
+    /// Hand dryers and other appliances (ARC-BATH-004).
+    ElectricAppliance,
 }
 
 impl Category {
-    pub const ALL: [Category; 24] = [
+    pub const ALL: [Category; 25] = [
         Category::GenericModel,
         Category::Furniture,
         Category::Column,
@@ -105,6 +107,7 @@ impl Category {
         Category::SpaceHeater,
         Category::SwitchingDevice,
         Category::Alarm,
+        Category::ElectricAppliance,
     ];
 
     pub fn label(self) -> &'static str {
@@ -133,6 +136,7 @@ impl Category {
             Category::SpaceHeater => "Space Heater",
             Category::SwitchingDevice => "Switching Device",
             Category::Alarm => "Alarm",
+            Category::ElectricAppliance => "Electric Appliance",
         }
     }
 
@@ -163,6 +167,7 @@ impl Category {
             Category::SpaceHeater => "IfcSpaceHeater",
             Category::SwitchingDevice => "IfcSwitchingDevice",
             Category::Alarm => "IfcAlarm",
+            Category::ElectricAppliance => "IfcElectricAppliance",
         }
     }
 
@@ -193,6 +198,7 @@ impl Category {
             Category::SpaceHeater => "IfcSpaceHeaterType",
             Category::SwitchingDevice => "IfcSwitchingDeviceType",
             Category::Alarm => "IfcAlarmType",
+            Category::ElectricAppliance => "IfcElectricApplianceType",
         }
     }
 
@@ -1240,9 +1246,19 @@ pub(crate) fn place(txn: &mut crate::txn::Transaction<'_>, p: PlaceParams) -> Re
         ));
     }
     let type_guid = store.get(type_id).expect("resolved").guid().to_string();
+    // A user-defined kind is named by its type's ElementType on each copy (Mirror, …).
+    let object_type = store
+        .get(type_id)
+        .and_then(|t| t.param("@ElementType"))
+        .and_then(|v| v.as_str())
+        .filter(|_| ty.predefined_type() == "USERDEFINED")
+        .map(str::to_owned);
+    let mut new = NewElement::new(ty.category.class());
+    if let Some(o) = object_type {
+        new = new.param("@ObjectType", o);
+    }
     let id = txn.create(
-        NewElement::new(ty.category.class())
-            .param("@PredefinedType", ty.predefined_type().to_owned())
+        new.param("@PredefinedType", ty.predefined_type().to_owned())
             .param("@type", type_guid)
             .param(
                 RECIPE_KEY,
