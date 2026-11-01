@@ -207,7 +207,13 @@ pub fn available_fields(store: &Store, category: &str) -> Vec<FieldInfo> {
         | "cat.air_terminals"
         | "cat.mechanical_equipment"
         | "cat.plumbing_fixtures"
-        | "cat.furniture" => out.push(info("component.room", "Room", false)),
+        | "cat.furniture" => {
+            out.push(info("component.room", "Room", false));
+            // A plumbing fixture's fixture units, from its connectors (ARC-BATH-018).
+            if category == "cat.plumbing_fixtures" {
+                out.extend([info("fixture.drainage_units", "Drainage Fixture Units", true), info("fixture.supply_units", "Water Supply Fixture Units", true)]);
+            }
+        }
         // Greenhouses and their growing (ARC-GLZ-015): one row per house.
         "cat.glazed_enclosures" => out.extend([
             info("glz.form", "Form", false),
@@ -621,6 +627,20 @@ impl Context<'_> {
                     },
                     _ => none(),
                 }
+            }
+            "fixture.drainage_units" | "fixture.supply_units" => {
+                use crate::mep::Classification as K;
+                let drainage = key == "fixture.drainage_units";
+                let u: f64 = crate::mep::ports(self.store, e)
+                    .iter()
+                    .filter(|p| match p.connector.classification {
+                        Some(K::Sanitary) => drainage,
+                        Some(K::DomesticColdWater | K::DomesticHotWater) => !drainage,
+                        _ => false,
+                    })
+                    .map(|p| p.connector.fixture_units)
+                    .sum();
+                Cell { text: format!("{u}"), value: Some(u), editable: false }
             }
             "component.room" => match crate::mep_lighting::room_of(self.store, e).and_then(|r| self.store.get(r)) {
                 Some(r) => {

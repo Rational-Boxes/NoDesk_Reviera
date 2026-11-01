@@ -762,6 +762,18 @@ icon = "steam_room"
 help = "Lay out a steam room in a room closed by walls: a ceiling sloped 1:6 to shed condensate, a tiled bench along the longer wall, the steam head and its control, the floor's falls to a drain; the generator's design volume from the walls' finish (ARC-BATH-015)"
 
 [[action]]
+id = "ui.bathroom_elevations"
+label = "Bathroom Elevations"
+icon = "elevation"
+help = "Click inside a room closed by walls: an interior elevation of each wall, cropped to the room at 1:25, on a new A3 sheet (ARC-BATH-018)"
+
+[[action]]
+id = "ui.bathroom_schedules"
+label = "Bathroom Schedules"
+icon = "export_csv"
+help = "Make a plumbing fixture schedule (each room's fixtures by type, with drainage and water supply fixture units, and totals) and a bathroom accessories schedule (ARC-BATH-018)"
+
+[[action]]
 id = "ui.toilet_core"
 label = "Toilet Core"
 icon = "bathroom_layout"
@@ -4095,7 +4107,9 @@ tools = [
   { action = "view.create_ceiling_plan", size = "large" },
   { action = "view.create_section", size = "large" },
   { action = "view.building_elevations", size = "small" },
+  { action = "ui.bathroom_elevations", size = "small" },
   { action = "view.new_schedule", size = "large" },
+  { action = "ui.bathroom_schedules", size = "small" },
   { action = "view.new_keynote_legend", size = "small" },
   { action = "view.new_legend", size = "small" },
   { action = "view.default_3d", size = "large" },

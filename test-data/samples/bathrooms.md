@@ -61,9 +61,18 @@ the sizes given are inside the walls, from the inside corner named.
    
    The script names the south wall as the bench wall (`bench_wall_id`).
 
+7. **Drawings.** Place rooms in the two baths (**Architecture › Room**, clicking inside each).
+   - **View › Create › Bathroom Elevations**, clicking inside the full bath, makes its four
+     interior elevations at 1:25 on an A3 sheet. Rename the views from *Bathroom - …* to
+     *Full bath - …* in the Project Browser, as the script names them.
+   - Make a second A3 sheet (**View › Sheet Composition › Sheet**). Then **View › Create › Bathroom Schedules**
+     makes the plumbing fixture schedule, with fixture units by room, and the accessories
+     schedule. Drag them onto the sheet from the Project Browser.
+
 Check Bathrooms on the finished model gives one note: the hot tub's pad.
 
 ## Gaps
 
+- **[gap]** Bathroom Elevations names its views *Bathroom - …*; the script names them (`name`).
 - **[gap]** The Sauna tool takes the longer wall for the benches. Its dialog has no choice of
   bench wall (`bench_wall_id`), and none of the heater's end.

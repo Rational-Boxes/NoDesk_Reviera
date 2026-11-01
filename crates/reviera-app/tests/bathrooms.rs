@@ -858,3 +858,57 @@ fn a_whirlpool_baths_pump_access_is_kept_clear() {
     let f = findings(&mut app);
     assert!(f.iter().any(|x| x["element"] == tub && x["other"] == v && x["rule"] == "IRC P2720 whirlpool pump access"), "{f:#?}");
 }
+
+#[test]
+fn a_bathrooms_wall_elevations_on_a_sheet() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = new_app(dir.path());
+    let (level, walls) = room(&mut app, 1.525, 2.44);
+    ok(&mut app, "bath.layout", json!({ "template": "full_bath", "point": [0.76, 1.22], "level": level }));
+    let e = ok(&mut app, "bath.elevations", json!({ "point": [0.76, 1.22], "level": level, "name": "Bath 1" }));
+    let views: Vec<u64> = e["views"].as_array().unwrap().iter().map(|v| v.as_u64().unwrap()).collect();
+    assert_eq!(views.len(), 4);
+    // One view per wall, each named for the way it looks.
+    let mut faced: Vec<u64> = e["walls"].as_array().unwrap().iter().map(|v| v.as_u64().unwrap()).collect();
+    faced.sort();
+    let mut all = walls.to_vec();
+    all.sort();
+    assert_eq!(faced, all);
+    let list = ok(&mut app, "view.list", json!({}));
+    let mut names: Vec<String> = list.as_array().unwrap().iter().filter(|v| views.contains(&v["id"].as_u64().unwrap())).map(|v| v["name"].as_str().unwrap().to_owned()).collect();
+    names.sort();
+    assert_eq!(names, ["Bath 1 - East", "Bath 1 - North", "Bath 1 - South", "Bath 1 - West"]);
+    // Cropped to the room, at 1:25, on one A3 sheet.
+    let store = app.document(app.active().unwrap()).unwrap().doc.store().clone();
+    let view = store.get(reviera_core::ElementId(views[0])).unwrap();
+    assert_eq!(view.param(reviera_core::views::VIEW_KEY).unwrap()["scale"], 25.0);
+    let crop = reviera_core::crop::crop_of(view).expect("cropped");
+    assert!(crop.enabled, "{crop:?}");
+    let sheet = store.get(reviera_core::ElementId(e["sheet"].as_u64().unwrap())).unwrap();
+    let data = reviera_core::sheets::sheet_data(sheet).unwrap();
+    assert_eq!((data.size.as_str(), data.viewports.len()), ("A3", 4));
+}
+
+#[test]
+fn bathroom_schedules_with_fixture_units() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = new_app(dir.path());
+    // A full bath with its room: three fixtures, each with its drainage and supply units.
+    let (level, _) = room(&mut app, 1.525, 2.44);
+    ok(&mut app, "room.place", json!({ "level_id": level, "point": [0.76, 1.22] }));
+    ok(&mut app, "bath.layout", json!({ "template": "full_bath", "point": [0.76, 1.22], "level": level }));
+    let sheet = ok(&mut app, "sheet.create", json!({ "size": "A3" }));
+    let s = ok(&mut app, "bath.schedules", json!({ "sheet_id": sheet }));
+    let t = ok(&mut app, "schedule.get_table", json!({ "schedule_id": s["fixtures"] }));
+    let col = |t: &Value, h: &str| -> Vec<String> {
+        let k = t["headings"].as_array().unwrap().iter().position(|x| x == h).unwrap_or_else(|| panic!("no {h}: {}", t["headings"]));
+        t["rows"].as_array().unwrap().iter().map(|r| r["cells"][k]["text"].as_str().unwrap().to_owned()).collect()
+    };
+    // One row per type (not itemized), all in the room, and drainage units from the wastes.
+    let rooms = col(&t, "Room");
+    assert_eq!(rooms.len(), 3, "{t:#}");
+    assert!(rooms.iter().all(|r| !r.is_empty()), "{t:#}");
+    let dfu: f64 = col(&t, "Drainage Fixture Units").iter().map(|v| v.parse::<f64>().unwrap()).sum();
+    let wsfu: f64 = col(&t, "Water Supply Fixture Units").iter().map(|v| v.parse::<f64>().unwrap()).sum();
+    assert!(dfu > 0.0 && wsfu > 0.0, "{t:#}");
+}

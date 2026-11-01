@@ -197,6 +197,11 @@ impl Gui {
         let command = args.as_object_mut().and_then(|o| o.remove("command")).and_then(|c| c.as_str().map(str::to_owned)).unwrap_or_else(|| "bath.layout".to_owned());
         match self.app.execute(&command, args, &super::user()) {
             Ok(out) => {
+                if let Some(views) = out.result["views"].as_array() {
+                    self.refresh_scene(&frame);
+                    frame.set_status_text(&format!("{} elevations made{}; see Project Browser › Elevations", views.len(), if out.result["sheet"].is_null() { "" } else { " on a new A3 sheet" }), 0);
+                    return;
+                }
                 let placed = out.result["placed"].as_array().map_or(0, Vec::len);
                 self.refresh_scene(&frame);
                 let problems = self
@@ -599,6 +604,28 @@ impl Gui {
         if let Some(tool) = self.room_tool.as_mut() {
             tool.layout = Some(args);
             frame.set_status_text("Steam Room: click inside the room; Esc ends", 0);
+        }
+    }
+
+    /// View › Create › Bathroom Elevations (ARC-BATH-018): a click inside a room closed by walls.
+    pub(crate) fn bathroom_elevations(&mut self) {
+        let frame = self.frame;
+        self.start_room_tool();
+        if let Some(tool) = self.room_tool.as_mut() {
+            tool.layout = Some(json!({ "command": "bath.elevations" }));
+            frame.set_status_text("Bathroom Elevations: click inside the room in a plan; Esc ends", 0);
+        }
+    }
+
+    /// View › Create › Bathroom Schedules (ARC-BATH-018).
+    pub(crate) fn bathroom_schedules(&mut self) {
+        let frame = self.frame;
+        match self.run("bath.schedules", json!({})) {
+            Ok(_) => {
+                self.refresh_scene(&frame);
+                frame.set_status_text("Plumbing Fixture Schedule and Bathroom Accessories made: see Project Browser › Schedules", 0);
+            }
+            Err(e) => error(&frame, &e),
         }
     }
 }

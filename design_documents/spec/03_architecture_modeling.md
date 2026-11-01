@@ -4542,6 +4542,31 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 
 *Built (2026-11-01):* the `whirlpool` section and its `us_plumbing` values, the component and the zone. Not yet: the access panel drawn in the apron, NEC Part VII (the pump's GFCI circuit and its receptacle within 1 ft of the opening), and a bath enclosed on its apron side by tiling (the opening is then cut into it, which Reviera does not model).
 
+### 3.9a.18 Bathroom elevations and schedules
+**ID:** ARC-BATH-018 · **Priority:** P1 · **Ref:** `BATHROOMS_PLAN.md` §9
+
+**Purpose.** Draw a bathroom's walls and schedule its fixtures in a step each.
+
+**Behaviour & rules.**
+- **`bath.elevations`** works on the room closed by walls around a point. It makes an interior elevation of each of its four walls:
+  - each view stands just inside the opposite wall and looks at its wall, as wide as the room;
+  - each is cropped to the room from the floor to the walls' top, at 1:`scale` (default 1:25);
+  - each is named `name - North`, `- East` and so on, by the way it looks.
+  
+  With `sheet` (default true) the four go on a new A3 sheet, two by two. Plans draw the four as one interior elevation marker at the room's middle: four small arrows labelled N, E, S, W. Building elevations keep their own markers.
+- **Schedule fields.** A plumbing fixture schedule can show each fixture's drainage and water supply fixture units, the sums of its connectors' fixture units (sanitary ones, and domestic hot and cold), with totals. It can also show the room it is in.
+- **`bath.schedules`** makes a *Plumbing Fixture Schedule* (room, type, count, the two fixture-unit fields) and a *Bathroom Accessories* schedule (furniture and accessories by room and type). Both are sorted by room then type, not itemized, with grand totals. With `sheet_id` they are placed on that sheet too. The fixture count against the requirement (ARC-BATH-007) and the waterproofing schedule (ARC-BATH-012) are their own commands.
+
+**Data (IFC mapping).** Ordinary elevation views, sheets and schedules (DOC-SHT, DOC-SCH). The interior marker is RXD view data (`rxd:view` › `marker`).
+
+**Commands.** See the catalog: `bath.elevations`, `bath.schedules`.
+
+**Acceptance criteria.**
+- [x] A 5 × 8 ft bath gets four elevations named for their directions, one facing each wall, cropped, at 1:25, on an A3 sheet with four viewports.
+- [x] Its plumbing fixture schedule has one row per type in the room, with drainage and supply fixture units.
+
+*Built (2026-11-01):* both commands, the fixture-unit fields, the interior marker, View › Create › Bathroom Elevations and Bathroom Schedules, and both in the bathrooms sample. Not yet: tiles, rails and mounting heights dimensioned on the elevations, rooms other than rectangles, the compliance report as HTML and BCF topics (§9), tile set-out (§6.6), and the fixture-unit values themselves (the generic components carry placeholder units, not the IPC tables').
+
 ### 3.10.1 Model In-Place
 **ID:** ARC-INPL-001 · **Priority:** P1 · **Ref:** research/02 §11.1
 
@@ -5803,6 +5828,8 @@ All commands below are registered once in the command registry and exposed autom
 | `bath.waterproofing` | element_ids? | {extents, wall_area, floor_area} | No | ARC-BATH-012 |
 | `bath.sauna` | point, level, bench_wall_id?, start?, tiers?, height?, uninsulated_area?, log_walls?, heater_kw?, accessible?, replace? | {placed, heater, heater_kw, sizing, length, depth, height, benches, bench_tops} | Yes | ARC-BATH-014 |
 | `bath.steam_room` | point, level, bench_wall_id?, start?, height?, material?, exterior_wall?, floor_falls?, accessible?, replace? | {placed, ceiling, steam_head, drain?, length, depth, ceiling_high, ceiling_low, ceiling_slope, volume, design_volume, benches} | Yes | ARC-BATH-015 |
+| `bath.elevations` | point, level, name?, scale?, sheet? | {views, walls, sheet?} | Yes | ARC-BATH-018 |
+| `bath.schedules` | sheet_id? | {fixtures, accessories} | Yes | ARC-BATH-018 |
 | `unit.create_type` | room_ids \| element_ids, name, bay? | {type_id, members, left_out} | Yes | ARC-GRP-004 |
 | `unit.set_connection_points` | type_id, points | — | Yes | ARC-GRP-004 |
 | `unit.array_path` | type_id, path, count \| pitch, handing?, numbering? | array_id | Yes | ARC-GRP-004 |

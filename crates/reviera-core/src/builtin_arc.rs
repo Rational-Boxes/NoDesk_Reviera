@@ -552,6 +552,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(BathWaterproofing),
         registry.add(BathSauna),
         registry.add(BathSteamRoom),
+        registry.add(BathElevations),
+        registry.add(BathSchedules),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -7044,4 +7046,31 @@ edit_command!(
     crate::bath_layouts::SteamRoomParams,
     crate::bath_layouts::SteamRoom,
     crate::bath_layouts::steam_room
+);
+
+edit_command!(
+    BathElevations,
+    "bath.elevations",
+    "Make a bathroom's wall elevations",
+    "Makes an interior elevation of each wall of the room around `point`, closed by walls (ARC-BATH-018): each \
+     view stands just inside the opposite wall, looks at its wall, is as wide as the room and cropped to it from \
+     the floor to the walls' top, at 1:`scale` (default 1:25), named `name - North` and so on by the way it \
+     looks. With `sheet` (default true) the four go on a new A3 sheet, two by two.",
+    "Bathroom Elevations",
+    crate::bath_layouts::ElevationsParams,
+    crate::bath_layouts::Elevations,
+    crate::bath_layouts::elevations
+);
+
+edit_command!(
+    BathSchedules,
+    "bath.schedules",
+    "Make the bathroom schedules",
+    "Makes a plumbing fixture schedule (each room's fixtures by type, with their drainage and water supply \
+     fixture units from their connectors, and totals) and a bathroom accessories schedule (furniture and \
+     accessories by room and type) (ARC-BATH-018); with `sheet_id` they are placed on that sheet as well.",
+    "Bathroom Schedules",
+    crate::bath_layouts::SchedulesParams,
+    crate::bath_layouts::Schedules,
+    crate::bath_layouts::schedules
 );

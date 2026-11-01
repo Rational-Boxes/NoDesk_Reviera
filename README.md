@@ -679,6 +679,10 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
   bench, and the components include a transfer wall and a pool lift.
 - **Whirlpool baths** (ARC-BATH-017): a whirlpool bath component whose pump position is product
   data; the IRC's 18 × 18 in pump access is kept clear in front of its apron.
+- **Bathroom elevations and schedules** (ARC-BATH-018): one click makes a bathroom's four
+  interior elevations at 1:25 on an A3 sheet, shown in plan as one interior marker; Bathroom
+  Schedules makes a plumbing fixture schedule with drainage and water supply fixture units by
+  room, and an accessories schedule (`bath.elevations`, `bath.schedules`).
   **Not yet** (planned): living
   layouts that re-fit when the room changes, Jack-and-Jill and back-to-back wet walls,
   other packs' bars (Approved Document M's drop-down rails, shower and bath bars), room layouts, toilet cores and partitions, fixture counts,

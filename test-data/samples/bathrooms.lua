@@ -82,3 +82,13 @@ end
 local steam_walls = room(21, 0, 2.4, 1.8, 2.4)
 floor(21, 0, 2.4, 1.8)
 reviera.bath.steam_room{ point = {22.2, 0.9}, level = l1, bench_wall_id = steam_walls[1], material = "tile" }
+
+-- 7. Drawings: rooms for the two baths, interior elevations of the full bath's four walls at
+--    1:25 on an A3 sheet (`bath.elevations`), and the plumbing fixture and accessories schedules
+--    on a sheet of their own (`bath.schedules`), the fixtures with their drainage and water
+--    supply fixture units by room.
+reviera.room.place{ level_id = l1, point = {0.76, 1.22} }
+reviera.room.place{ level_id = l1, point = {3.8, 1.4} }
+reviera.bath.elevations{ point = {0.76, 1.22}, level = l1, name = "Full bath" }
+local schedules_sheet = reviera.sheet.create{ name = "Bathroom schedules", size = "A3" }
+reviera.bath.schedules{ sheet_id = schedules_sheet }

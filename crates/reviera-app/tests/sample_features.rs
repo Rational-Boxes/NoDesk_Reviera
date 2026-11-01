@@ -983,6 +983,11 @@ fn the_bathrooms_sample_keeps_its_rooms() {
     assert_eq!(found, [("note".to_owned(), "load".to_owned())]);
     let w = ok(&mut app, "bath.waterproofing", json!({}));
     assert!(f(&w["wall_area"]) > 5.0 && f(&w["floor_area"]) > 1.0, "{w}");
+    // The full bath's four interior elevations, and two sheets: the elevations and the schedules.
+    let elevations = views(&mut app).into_iter().filter(|(n, k, _)| n.starts_with("Full bath - ") && k == "view.elevation").count();
+    assert_eq!(elevations, 4);
+    let sheets: Vec<_> = s.iter().filter_map(reviera_core::sheets::sheet_data).collect();
+    assert_eq!(sheets.iter().map(|d| (d.viewports.len(), d.schedules.len())).collect::<Vec<_>>(), [(4, 0), (0, 2)]);
 }
 
 #[test]

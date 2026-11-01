@@ -8,8 +8,9 @@ rule (ARC-BATH-003), the generic component catalogue (ARC-BATH-004) and layout t
 toilet cores (ARC-BATH-008), locker rooms (ARC-BATH-009), and step 9's wet areas: electrical
 zones (ARC-BATH-010), shower falls (ARC-BATH-011) and waterproofing extents (ARC-BATH-012), and
 all of §7: hot tubs (ARC-BATH-013), saunas (ARC-BATH-014), steam rooms (ARC-BATH-015), their
-accessibility (ARC-BATH-016) and whirlpool baths (ARC-BATH-017), with samples. Next: schedules,
-elevation sheets and tile set-out (§9, §6.6).
+accessibility (ARC-BATH-016) and whirlpool baths (ARC-BATH-017), with samples; and from §9 wall
+elevations and schedules (ARC-BATH-018). Next: the compliance report (§9) and tile set-out
+(§6.6).
 **Owner's requests (2026-10-31):**
 - "deeper research into bathroom features, standards, and common components";
 - "review clearance rules, accessibility rules, rails, etc.";

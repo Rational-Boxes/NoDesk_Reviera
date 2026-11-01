@@ -320,7 +320,12 @@ impl Gui {
                 continue;
             };
             let name = e.name.clone().unwrap_or_default();
-            let l = marker_lines(&def, kind == sections::KIND_ELEVATION, &name, scale, z);
+            // An interior elevation (ARC-BATH-018): a small arrow from its room's middle.
+            let marker = e.param(reviera_core::views::VIEW_KEY).and_then(|v| v.get("marker")).and_then(|m| Some((serde_json::from_value::<[f64; 2]>(m.get("at")?.clone()).ok()?, m.get("label")?.as_str()?.to_owned())));
+            let l = match marker {
+                Some((at, label)) => interior_marker(&def, at, &label, scale, z),
+                None => marker_lines(&def, kind == sections::KIND_ELEVATION, &name, scale, z),
+            };
             lines.segments.extend(l.segments);
         }
         vec![lines]
@@ -396,6 +401,21 @@ impl Gui {
             }
         }
     }
+}
+
+/// An interior elevation's arrow: from a little out of the room's middle, pointing the way the
+/// view looks, with a short label (its direction's initial) at its tail.
+fn interior_marker(def: &SectionDef, at: [f64; 2], label: &str, scale: f32, z: f32) -> Lines {
+    let mm = f64::from(scale) / 1000.0;
+    let f = def.frame();
+    let p = |along: f64, out: f64| [(at[0] + f.right[0] * along + f.look[0] * out) as f32, (at[1] + f.right[1] * along + f.look[1] * out) as f32, z];
+    let r = 1.5 * mm;
+    let mut out = vec![[p(-r, r), p(0.0, r * 2.5)], [p(r, r), p(0.0, r * 2.5)], [p(-r, r), p(r, r)]];
+    let height = 2.0 * mm;
+    let w = f64::from(reviera_render::font::width(label, height as f32));
+    let c = p(0.0, r * 2.5 + height);
+    out.extend(label_strokes(&[Label { origin: [c[0] - (w / 2.0) as f32, c[1] - (height / 2.0) as f32, z], right: [1.0, 0.0, 0.0], up: [0.0, 1.0, 0.0], height: height as f32, text: label.to_owned() }]));
+    Lines { color: MARKER, width: 0.35, segments: out }
 }
 
 /// A section line with a head arrow at each end pointing the way the view looks, and its name;

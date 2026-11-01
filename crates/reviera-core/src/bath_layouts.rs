@@ -863,3 +863,145 @@ pub(crate) fn steam_room(txn: &mut Transaction<'_>, p: SteamRoomParams) -> Resul
     }
     Ok(SteamRoom { placed, ceiling, steam_head, drain, length: room.length, depth: room.depth, ceiling_high: high, ceiling_low: low, ceiling_slope: slope, volume, design_volume, benches: modules })
 }
+
+// ---- Bathroom elevations (ARC-BATH-018) ----
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ElevationsParams {
+    /// A point inside the room, in plan.
+    pub point: [f64; 2],
+    pub level: ElementRef,
+    /// The views' names start with it (default `Bathroom`): `Bathroom - North` …
+    pub name: Option<String>,
+    /// The views' scale, 1:n (default 25).
+    pub scale: Option<f64>,
+    /// Place the four views on a new A3 sheet (default true).
+    pub sheet: Option<bool>,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct Elevations {
+    /// The interior elevations, each looking at one wall: their ids and the walls they face.
+    pub views: Vec<ElementId>,
+    pub walls: Vec<ElementId>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sheet: Option<ElementId>,
+}
+
+/// Interior elevations of a room's four walls, cropped to the room, on a sheet
+/// (`bath.elevations`).
+pub(crate) fn elevations(txn: &mut Transaction<'_>, p: ElevationsParams) -> Result<Elevations> {
+    let store = txn.store().clone();
+    let level = store.resolve(&p.level).and_then(|l| store.get(l)).filter(|l| l.class == crate::levels::CLASS).ok_or_else(|| bad("bath.no_level", "no such level"))?;
+    let floor_z = crate::levels::elevation(level);
+    let lp = LayoutParams { template: String::new(), point: p.point, level: p.level.clone(), wet_wall_id: None, start: Start::Left, replace: false, fit_only: false };
+    let room = find_room(&store, &lp, floor_z + 0.3)?;
+    let scale = p.scale.unwrap_or(25.0);
+    if !(scale >= 1.0 && scale.is_finite()) {
+        return Err(bad("bath.invalid_input", "a scale is 1:n with n at least 1"));
+    }
+    let name = p.name.clone().unwrap_or_else(|| "Bathroom".to_owned());
+    let top = [room.wet, room.opposite, room.start_wall, room.end_wall]
+        .iter()
+        .filter_map(|w| crate::walls::regenerate(&store, store.get(*w)?).ok())
+        .map(|g| g.base_z + g.height)
+        .fold(floor_z + 2.4, f64::max);
+    let (w, run, start) = (room.w, room.run, room.start);
+    let at = |a: f64, b: f64| [start[0] + run[0] * a - w[0] * b, start[1] + run[1] * a - w[1] * b];
+    // Each wall: where the view plane stands (just inside the opposite wall), the way it looks,
+    // its width and how far it sees (to just behind the wall's face).
+    let faces = [
+        (room.wet, at(room.length / 2.0, room.depth - 0.01), w, room.length, room.depth),
+        (room.opposite, at(room.length / 2.0, 0.01), [-w[0], -w[1]], room.length, room.depth),
+        (room.start_wall, at(room.length - 0.01, room.depth / 2.0), [-run[0], -run[1]], room.depth, room.length),
+        (room.end_wall, at(0.01, room.depth / 2.0), run, room.depth, room.length),
+    ];
+    let compass = |d: [f64; 2]| {
+        if d[1].abs() >= d[0].abs() {
+            if d[1] > 0.0 { "North" } else { "South" }
+        } else if d[0] > 0.0 {
+            "East"
+        } else {
+            "West"
+        }
+    };
+    let mut views = Vec::new();
+    let mut walls = Vec::new();
+    // Plans draw interior elevations as one marker at the room's middle, each arrow labelled
+    // with its direction's initial.
+    let middle = at(room.length / 2.0, room.depth / 2.0);
+    for (wall, point, look, width, deep) in faces {
+        let view = crate::sections::create_elevation(
+            txn,
+            crate::sections::CreateElevationParams { point, look, width: Some(width), far_offset: Some(json!(deep + 0.05)), name: Some(format!("{name} - {}", compass(look))) },
+        )?;
+        txn.modify(view, |e| {
+            let mut v = e.params.get(crate::views::VIEW_KEY).cloned().unwrap_or_else(|| json!({}));
+            v["scale"] = json!(scale);
+            v["marker"] = json!({ "at": middle, "label": &compass(look)[..1] });
+            e.params.insert(crate::views::VIEW_KEY.into(), v);
+        })?;
+        crate::crop::set_crop(
+            txn,
+            crate::crop::SetCropParams { view_id: ElementRef::Id(view), enabled: Some(true), visible: Some(false), shape: Some(crate::crop::Rect { min: [0.0, floor_z - 0.05], max: [width, top + 0.05] }) },
+        )?;
+        views.push(view);
+        walls.push(wall);
+    }
+    let sheet = if p.sheet.unwrap_or(true) {
+        let sheet = crate::sheets::create(txn, crate::sheets::CreateParams { number: None, name: Some(format!("{name} elevations")), size: Some("A3".into()) })?;
+        // Two by two on A3 (420 × 297 mm), clear of the title block on the right.
+        let spots = [[95.0, 210.0], [255.0, 210.0], [95.0, 90.0], [255.0, 90.0]];
+        for (v, at) in views.iter().zip(spots) {
+            crate::sheets::place_view(txn, crate::sheets::PlaceViewParams { sheet_id: ElementRef::Id(sheet), view_id: ElementRef::Id(*v), position: Some(at) })?;
+        }
+        Some(sheet)
+    } else {
+        None
+    };
+    Ok(Elevations { views, walls, sheet })
+}
+
+// ---- Bathroom schedules (ARC-BATH-018) ----
+
+#[derive(Debug, Default, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SchedulesParams {
+    /// Place the schedules on this sheet too, down its left side.
+    pub sheet_id: Option<ElementRef>,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct Schedules {
+    /// The plumbing fixture schedule (by room and type, with fixture units and totals) and the
+    /// accessories schedule (furniture by room and type).
+    pub fixtures: ElementId,
+    pub accessories: ElementId,
+}
+
+/// A plumbing fixture schedule with fixture units by room, and an accessories schedule
+/// (`bath.schedules`).
+pub(crate) fn schedules(txn: &mut Transaction<'_>, p: SchedulesParams) -> Result<Schedules> {
+    let make = |txn: &mut Transaction<'_>, category: &str, name: &str, fields: &[&str]| -> Result<ElementId> {
+        let id = crate::schedules::create(txn, crate::schedules::CreateParams { category: category.into(), name: Some(name.into()), fields: Some(fields.iter().map(|f| (*f).to_owned()).collect()) })?;
+        crate::schedules::set_sort(
+            txn,
+            crate::schedules::SetSortParams {
+                schedule_id: ElementRef::Id(id),
+                levels: ["component.room", "type"].iter().map(|f| crate::schedules::SortLevel { field: (*f).to_owned(), descending: false }).collect(),
+                itemize: Some(false),
+                grand_totals: Some(true),
+            },
+        )?;
+        Ok(id)
+    };
+    let fixtures = make(txn, "cat.plumbing_fixtures", "Plumbing Fixture Schedule", &["component.room", "type", "count", "fixture.drainage_units", "fixture.supply_units"])?;
+    let accessories = make(txn, "cat.furniture", "Bathroom Accessories", &["component.room", "type", "count"])?;
+    if let Some(sheet) = &p.sheet_id {
+        for (id, at) in [(fixtures, [20.0, 280.0]), (accessories, [20.0, 150.0])] {
+            crate::sheets::place_schedule(txn, crate::sheets::PlaceScheduleParams { sheet_id: sheet.clone(), schedule_id: ElementRef::Id(id), position: Some(at) })?;
+        }
+    }
+    Ok(Schedules { fixtures, accessories })
+}
