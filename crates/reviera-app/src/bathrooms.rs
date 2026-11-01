@@ -452,6 +452,10 @@ fn electrical_findings(store: &reviera_core::Store, only: Option<&[ElementId]>) 
                 if only.is_some_and(|ids| !ids.contains(&f.element)) {
                     continue;
                 }
+                // Zones stop at walls: a device behind one is outside them.
+                if bath_rules::wall_between(store, &bath_rules::outline(f), [mid[0], mid[1]], mid[2]) {
+                    continue;
+                }
                 let mine: Vec<&bath_rules::ElectricalZone> = zones.iter().filter(|z| z.element == f.element && z.pack == pack.id).collect();
                 let Some(zone1) = mine.iter().find(|z| z.zone == 1) else { continue };
                 let inner = mine.iter().filter(|z| z.contains(mid)).map(|z| z.zone).min();
@@ -637,6 +641,11 @@ fn spa_findings(store: &reviera_core::Store, only: Option<&[ElementId]>) -> Vec<
             };
             let water = rim - rules.water_below_rim;
             for (id, dev, mid, low, label) in &devices {
+                // A permanent barrier (a wall) between them changes how the distance runs; taken
+                // as clear here.
+                if bath_rules::wall_between(store, &outline, *mid, *low + 0.05) {
+                    continue;
+                }
                 let d = bath_rules::plan_distance(&outline, *mid);
                 let (need, what_dev) = match dev {
                     Dev::Receptacle => (rules.receptacle_distance, "a receptacle"),
@@ -1038,6 +1047,10 @@ fn receptacle_findings(store: &reviera_core::Store, only: Option<&[ElementId]>) 
                     let top = store.get(f.element).and_then(|e| mo::regenerate(store, e).ok()).map_or(f.floor, |g| g.placement.origin[2] + g.mesh.positions.iter().map(|q| f64::from(q[2]) * g.placement.scale).fold(f64::MIN, f64::max));
                     let rim = if bath_rules::level_access(store, f) { f.floor } else { top };
                     for (id, mid, label) in &sockets {
+                        // The zone stops at walls, doors and fixed barriers.
+                        if bath_rules::wall_between(store, &outline, [mid[0], mid[1]], mid[2]) {
+                            continue;
+                        }
                         let d = bath_rules::plan_distance(&outline, [mid[0], mid[1]]);
                         if d < r.tub_zone - 1e-6 && mid[2] <= rim + r.tub_zone_height + 1e-6 {
                             out.push(base(format!("{label} is {} from the {what}, within {}'s {} zone", mm(d), r.id, mm(r.tub_zone)), Some(*id), Some(d), Some(r.tub_zone), None, Some(*mid)));

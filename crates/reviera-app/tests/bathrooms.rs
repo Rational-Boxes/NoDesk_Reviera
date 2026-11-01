@@ -607,6 +607,11 @@ fn bathroom_electrical_zones() {
     ok(&mut app, "element.move", json!({ "element_ids": [near], "vector": [0.6, 1.4, 0.0] }));
     let f = findings(&mut app);
     assert!(!f.iter().any(|x| x["other"] == near), "3 m away: {f:#?}");
+    // Behind the south wall the bath stands against, 0.3 m from it: the zones stop at the wall.
+    let behind = ok(&mut app, "device.place", json!({ "type_id": starters["Receptacle"], "point": [1.0, -0.35], "level": level, "offset": 0.4, "work_plane": true })).as_u64().unwrap();
+    let f = findings(&mut app);
+    assert!(!f.iter().any(|x| x["other"] == behind), "through a wall: {f:#?}");
+    ok(&mut app, "element.delete", json!({ "element_ids": [behind] }));
     // A luminaire over the bath in zone 1: no rating → a note; IP20 → an error; IPX4 → fine.
     let lum = ok(&mut app, "lighting_fixture.place", json!({ "type_id": starters["Wall Luminaire"], "point": [1.0, 0.4], "level": level, "offset": 2.0, "work_plane": true })).as_u64().unwrap();
     let state = |app: &mut App| findings(app).into_iter().find(|x| x["other"] == lum).map(|x| x["severity"].as_str().unwrap().to_owned());

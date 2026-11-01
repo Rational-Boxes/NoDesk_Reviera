@@ -1087,6 +1087,38 @@ pub fn plan_distance(poly: &[[f64; 2]], p: [f64; 2]) -> f64 {
         .fold(f64::MAX, f64::min)
 }
 
+/// The point of a polygon's boundary nearest `p` (itself when inside).
+pub fn nearest_on(poly: &[[f64; 2]], p: [f64; 2]) -> [f64; 2] {
+    if inside(poly, p) {
+        return p;
+    }
+    let n = poly.len();
+    (0..n)
+        .map(|i| {
+            let (a, b) = (poly[i], poly[(i + 1) % n]);
+            let d = [b[0] - a[0], b[1] - a[1]];
+            let t = (((p[0] - a[0]) * d[0] + (p[1] - a[1]) * d[1]) / (d[0] * d[0] + d[1] * d[1]).max(1e-18)).clamp(0.0, 1.0);
+            [a[0] + d[0] * t, a[1] + d[1] * t]
+        })
+        .min_by(|a, b| (a[0] - p[0]).hypot(a[1] - p[1]).total_cmp(&(b[0] - p[0]).hypot(b[1] - p[1])))
+        .unwrap_or(p)
+}
+
+/// Whether a wall stands between a point and a fixture's outline in plan, at height `z`: the
+/// zones BS 7671 701 and NEC 406.9(C) draw stop at walls.
+pub fn wall_between(store: &Store, outline: &[[f64; 2]], p: [f64; 2], z: f64) -> bool {
+    let q = nearest_on(outline, p);
+    let d = [q[0] - p[0], q[1] - p[1]];
+    let l = d[0].hypot(d[1]);
+    if l < 0.02 {
+        return false;
+    }
+    let u = [d[0] / l, d[1] / l];
+    // From just off the point, so a device on a wall's face does not see its own wall.
+    let start = [p[0] + u[0] * 0.01, p[1] + u[1] * 0.01];
+    ray_to_walls(store, start, u, z, l - 0.02).is_some()
+}
+
 /// A rectangle in a fixture's frame, `grow` larger each way, in plan.
 fn rect(f: &Fixture, x: [f64; 2], y: [f64; 2], grow: f64) -> Vec<[f64; 2]> {
     [[x[0] - grow, y[0] - grow], [x[1] + grow, y[0] - grow], [x[1] + grow, y[1] + grow], [x[0] - grow, y[1] + grow]]
