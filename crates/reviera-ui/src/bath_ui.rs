@@ -510,4 +510,35 @@ impl Gui {
             Err(e) => error(&frame, &format!("The falls were not laid:\n{e}")),
         }
     }
+
+    /// Architecture › Build › Waterproofing (ARC-BATH-012): the waterproofing schedule for the
+    /// selected fixtures or all, offered as CSV.
+    pub(crate) fn waterproofing(&mut self) {
+        let frame = self.frame;
+        let selected: Vec<serde_json::Value> = self.selection().into_iter().map(|id| json!(id.0)).collect();
+        let s = match self.run("bath.waterproofing", json!({ "element_ids": selected })) {
+            Ok(v) => v,
+            Err(e) => return error(&frame, &e),
+        };
+        let extents = s["extents"].as_array().cloned().unwrap_or_default();
+        if extents.is_empty() {
+            return error(&frame, "No waterproofing: the bathroom rule packs in use ask for none at these fixtures (the IPC pack covers showers, tubs and urinals; Approved Document M wet rooms).");
+        }
+        let n = |v: &serde_json::Value| v.as_f64().unwrap_or(0.0);
+        let mut csv = vec!["Fixture,Kind,Surface,On,Width (m),Height (m),Area (m²),Rule,Class".to_owned()];
+        let mut lines = Vec::new();
+        for e in &extents {
+            let fixture = self.element_label(&e["element"]);
+            let on = if e["host"].is_null() { String::new() } else { self.element_label(&e["host"]) };
+            let (surface, rule, class) = (e["surface"].as_str().unwrap_or_default(), e["rule"].as_str().unwrap_or_default(), e["class"].as_str().unwrap_or_default());
+            lines.push(format!("{fixture}: {surface} {:.2} × {:.2} m = {:.2} m² ({rule})", n(&e["width"]), n(&e["height"]), n(&e["area"])));
+            csv.push(format!("\"{fixture}\",{},{surface},\"{on}\",{:.3},{:.3},{:.3},\"{rule}\",{class}", e["fixture"].as_str().unwrap_or_default(), n(&e["width"]), n(&e["height"]), n(&e["area"])));
+        }
+        lines.push(format!("\nWalls {:.2} m², floors {:.2} m². Copy the schedule as CSV?", n(&s["wall_area"]), n(&s["floor_area"])));
+        let d = MessageDialog::builder(&frame, &lines.join("\n"), "Waterproofing").with_style(MessageDialogStyle::YesNo | MessageDialogStyle::IconInformation).build();
+        if d.show_modal() == ID_YES {
+            Clipboard::get().set_text(&csv.join("\n"));
+            frame.set_status_text("The waterproofing schedule was copied as CSV", 0);
+        }
+    }
 }

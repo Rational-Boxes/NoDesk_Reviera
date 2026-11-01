@@ -657,3 +657,42 @@ fn shower_falls_to_a_drain() {
     let f: Vec<Value> = findings(&mut app).into_iter().filter(|f| f["kind"] == "falls").collect();
     assert!(f.iter().any(|x| x["message"].as_str().unwrap().contains("steeper")), "{f:#?}");
 }
+
+#[test]
+fn waterproofing_extents() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = new_app(dir.path());
+    // A 900 × 900 tray in the south-west corner of a room under the IPC: its back and side walls
+    // to 6 ft, and its floor.
+    let (level, [south, _, _, west]) = room(&mut app, 3.0, 2.5);
+    room_floor(&mut app, &level, 3.0, 2.5);
+    let t = ok(&mut app, "bath.load_components", json!({ "names": ["Shower tray, 900 × 900", "Urinal, wall-hung", "Roll-in shower, 60 × 30 in"] }));
+    let tray = ok(&mut app, "bath.place_component", json!({ "type_id": t["Shower tray, 900 × 900"], "point": [0.45, 0.1], "level": level })).as_u64().unwrap();
+    let s = ok(&mut app, "bath.waterproofing", json!({ "element_ids": [tray] }));
+    let ext = s["extents"].as_array().unwrap();
+    let walls: Vec<&Value> = ext.iter().filter(|e| e["surface"] == "wall").collect();
+    let hosts: Vec<u64> = walls.iter().map(|e| e["host"].as_u64().unwrap()).collect();
+    assert!(walls.len() == 2 && hosts.contains(&south) && hosts.contains(&west), "{s:#}");
+    assert!((s["wall_area"].as_f64().unwrap() - 2.0 * 0.9 * 1.829).abs() < 0.01, "{s:#}");
+    assert!((s["floor_area"].as_f64().unwrap() - 0.81).abs() < 0.01, "{s:#}");
+    // Shown with the virtual volumes.
+    let list = ok(&mut app, "clearance.list", json!({ "element_ids": [tray] }));
+    assert_eq!(list.as_array().unwrap().iter().filter(|c| c["kind"] == "waterproofing").count(), 3, "{list:#}");
+
+    // A urinal on the north wall: 4 ft up and 2 ft past each side, 2 ft of floor in front.
+    let urinal = ok(&mut app, "bath.place_component", json!({ "type_id": t["Urinal, wall-hung"], "point": [2.2, 2.4], "level": level })).as_u64().unwrap();
+    let s = ok(&mut app, "bath.waterproofing", json!({ "element_ids": [urinal] }));
+    let wall = s["extents"].as_array().unwrap().iter().find(|e| e["surface"] == "wall").unwrap().clone();
+    assert!((wall["height"].as_f64().unwrap() - 1.219).abs() < 1e-3 && (wall["width"].as_f64().unwrap() - (0.36 + 1.22)).abs() < 0.01, "{s:#}");
+    let floor = s["extents"].as_array().unwrap().iter().find(|e| e["surface"] == "floor").unwrap().clone();
+    assert!((floor["height"].as_f64().unwrap() - (0.35 + 0.61)).abs() < 0.01, "{s:#}");
+
+    // Approved Document M: a level-access shower makes a wet room, its whole floor tanked.
+    let (level, _) = room(&mut app, 3.0, 2.5);
+    room_floor(&mut app, &level, 3.0, 2.5);
+    ok(&mut app, "code.set", json!({ "code": "uk_adk", "occupancy": "dwelling" }));
+    let t = ok(&mut app, "bath.load_components", json!({ "names": ["Roll-in shower, 60 × 30 in"] }));
+    let shower = ok(&mut app, "bath.place_component", json!({ "type_id": t["Roll-in shower, 60 × 30 in"], "point": [1.0, 0.1], "level": level })).as_u64().unwrap();
+    let s = ok(&mut app, "bath.waterproofing", json!({ "element_ids": [shower] }));
+    assert!((s["floor_area"].as_f64().unwrap() - 7.5).abs() < 0.05, "{s:#}");
+}

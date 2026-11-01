@@ -549,6 +549,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(BathSetAccessible),
         registry.add(BathLockerRoom),
         registry.add(BathShowerFalls),
+        registry.add(BathWaterproofing),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -6991,4 +6992,19 @@ edit_command!(
     crate::bath_rules::ShowerFallsParams,
     crate::bath_rules::ShowerFallsOut,
     crate::bath_rules::shower_falls
+);
+
+read_command!(
+    BathWaterproofing,
+    "bath.waterproofing",
+    "Schedule the waterproofing round bathroom fixtures",
+    "Lists where walls and floors round baths, showers and urinals are to be waterproof or nonabsorbent under \
+     the bathroom rule packs in use (ARC-BATH-012): a strip up each wall bounding the fixture (6 ft round IPC \
+     showers and tubs; 4 ft up and 2 ft either side of a urinal), the floor where the rule asks (a shower's \
+     floor, 2 ft in front of a urinal, a wet room's whole floor under Approved Document M), each with its wall \
+     or floor, size, area, rule and water-exposure class, and the total wall and floor areas. The same \
+     extents are shown with the virtual volumes and listed by `clearance.list`.",
+    crate::bath_rules::WaterproofingParams,
+    crate::bath_rules::WaterproofingSchedule,
+    crate::bath_rules::waterproofing_schedule
 );

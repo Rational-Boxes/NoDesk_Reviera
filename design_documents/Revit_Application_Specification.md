@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Reviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Reviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 853 numbered requirements (320 P0 · 325 P1 · 201 P2 · 7 P3), 2,282 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 854 numbered requirements (320 P0 · 326 P1 · 201 P2 · 7 P3), 2,283 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,282 commands; 853 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,283 commands; 854 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -14558,6 +14558,39 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 
 ## 3.10 In-place models, model text and model lines
 
+### 3.9a.12 Waterproofing extents
+**ID:** ARC-BATH-012 · **Priority:** P1 · **Ref:** `BATHROOMS_PLAN.md` §6.5, §9; research/13 A1.1, A4, A9
+
+**Purpose.** Mark where walls and floors round baths, showers and urinals must be waterproof or nonabsorbent, from the rule packs, and schedule the areas.
+
+**Behaviour & rules.**
+- **Waterproofing rules** are part of a rule pack (`waterproofing`), each for some fixtures:
+  - the height up the walls that bound the fixture;
+  - how far the wall strip runs past the fixture's sides;
+  - the floor beyond the fixture, in front and to each side;
+  - optionally, the whole floor of the room, for a level-access shower (a wet room);
+  - optionally, a water-exposure class (DIN 18534 W0-I to W3-I) as data.
+  
+  `us_plumbing`:
+  - showers: walls to 6 ft (IPC 417.4);
+  - baths: walls to 6 ft above a tub with a shower (IRC R307.2);
+  - urinals: walls 4 ft up and 2 ft to each side, and the floor 2 ft in front (IPC 419.3).
+  
+  `england_adm`: a level-access shower's room is a wet room, its whole floor tanked and the shower's walls to 1.8 m (advisory, practice sources).
+- **Extents.** A wall bounds a fixture where its face lies along one of the fixture's edges (back or sides) within 50 mm. Each extent is a thin virtual volume on the wall face or the floor (blue, with the other virtual volumes). They are computed from the fixtures as they stand, so they follow them.
+- **Schedule.** `bath.waterproofing` lists each extent: the fixture, the surface (wall or floor) and its element, the size and area, the rule and its class, and totals for walls and floors. Architecture › Build › Waterproofing shows it and copies it as CSV.
+
+**Data (IFC mapping).** Extents are not exported (ARC-MOD-031). The rules are in the pack.
+
+**Commands.** See the catalog: `bath.waterproofing`; `clearance.list` (extended).
+
+**Acceptance criteria.**
+- [x] Under `us_plumbing`, a 900 × 900 mm shower tray in a corner gets 1829 mm strips on its back and side walls (2 × 0.9 × 1.829 m²) and its floor.
+- [x] A urinal gets a wall strip 1219 mm up and 610 mm past each side, and 610 mm of floor in front.
+- [x] Under `england_adm`, a level-access shower's room has its whole floor in the schedule.
+
+*Built (2026-10-31):* the `waterproofing` section of the pack schema with `us_plumbing` and `england_adm` rules, extents as virtual volumes (`clearance.list`, blue), `bath.waterproofing`, and Architecture › Build › Waterproofing with CSV to the clipboard. Not yet: strips clipped to the wall's ends and openings, overlaps between neighbouring fixtures' extents counted once, rooms other than rectangles for a wet room's floor, DIN 18534 classes in a pack, screened showers in England told from open ones, and extents drawn in elevations and plans (they show with the virtual volumes in 3D only).
+
 ### 3.10.1 Model In-Place
 **ID:** ARC-INPL-001 · **Priority:** P1 · **Ref:** research/02 §11.1
 
@@ -15816,6 +15849,7 @@ All commands below are registered once in the command registry and exposed autom
 | `bath.set_accessible` | element_ids, accessible | — | Yes | ARC-BATH-002 |
 | `bath.locker_room` | point, level, lockers, tiers?, showers?, accessible?, replace? | {placed, lockers, accessible_lockers, fit} | Yes | ARC-BATH-009 |
 | `bath.shower_falls` | element_ids, fall?, drain?: centre\|linear | {drains, floors} | Yes | ARC-BATH-011 |
+| `bath.waterproofing` | element_ids? | {extents, wall_area, floor_area} | No | ARC-BATH-012 |
 | `unit.create_type` | room_ids \| element_ids, name, bay? | {type_id, members, left_out} | Yes | ARC-GRP-004 |
 | `unit.set_connection_points` | type_id, points | — | Yes | ARC-GRP-004 |
 | `unit.array_path` | type_id, path, count \| pitch, handing?, numbering? | array_id | Yes | ARC-GRP-004 |
@@ -28957,14 +28991,14 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 39 | 8 | 0 | 123 |
 | DM | 91 | 65 | 34 | 3 | 193 |
-| ARC | 77 | 85 | 14 | 1 | 177 |
+| ARC | 77 | 86 | 14 | 1 | 178 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 28 | 0 | 29 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
 | COL | 8 | 50 | 11 | 1 | 70 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **325** | **201** | **7** | **853** |
+| **Total** | **320** | **326** | **201** | **7** | **854** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -29160,7 +29194,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2282 unique commands** in 427 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2283 unique commands** in 427 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -29196,7 +29230,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `array` | 6 |
 | `assembly` | 16 |
 | `assemblytemplate` | 1 |
-| `bath` | 18 |
+| `bath` | 19 |
 | `bcf` | 33 |
 | `beam` | 6 |
 | `beam_system` | 5 |
@@ -29722,6 +29756,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `bath.shower_falls` | 3 | element_ids, fall?, drain?: centre\ | linear | {drains, floors} | Yes |
 | `bath.swap_product` | 3 | element_ids, type_id | [{element, size_before, size_after, connectors_moved, findings_new, findings_gone}] | Yes | ARC-BATH-006 |
 | `bath.toilet_core` | 3 | wall_id, start, end, level, wcs?, urinals?, lavatories?, accessible?, ambulatory?, occupancy?, occupant_load?, urinals_for_wcs?, replace? | {placed, partitions, doors, fit} | Yes | ARC-BATH-008 |
+| `bath.waterproofing` | 3 | element_ids? | {extents, wall_area, floor_area} | No | ARC-BATH-012 |
 | `bcf.add_comment` | 6 | topic_id, text, viewpoint?: current\ | none | comment_id | Yes |
 | `bcf.add_viewpoint` | 6 | topic_id, view_id? | viewpoint_id | Yes | COL-BCF-001 |
 | `bcf.api_bind_project` | 6 | connection_id, project_id | () | No | COL-BCF-002 |

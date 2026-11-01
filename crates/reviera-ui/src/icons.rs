@@ -1410,6 +1410,10 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "bathroom" => format!(
             r#"<rect x="19" y="4" width="8" height="12" fill="{f}" {s}/><path d="M5 16h22v2c0 4-4 6-8 6h-2l-1 4H11l1-5c-4-1-7-3-7-7z" fill="{f}" {s}/><path d="M5 16h14" {sa}/>"#
         ),
+        // A wall and floor in section, a membrane lapped up the wall and a drop on it.
+        "waterproofing" => format!(
+            r#"<path d="M4 4v22h24" fill="none" {s}/><path d="M8 4v18h20" fill="none" {sa} stroke-width="2.5"/><path d="M20 8c-2 3-3 4.5-3 6a3 3 0 0 0 6 0c0-1.5-1-3-3-6z" fill="{a}" {s}/>"#
+        ),
         // A shower floor in section falling from both sides to a drain.
         "shower_falls" => format!(
             r#"<path d="M3 12l13 5 13-5v10H3z" fill="{f}" {s}/><rect x="13" y="17" width="6" height="7" fill="{a}" {s}/><path d="M6 7l4 2M26 7l-4 2" {sa}/>"#

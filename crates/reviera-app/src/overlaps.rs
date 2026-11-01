@@ -259,7 +259,7 @@ impl HostCommand for ClearanceCheck {
         let clearances: Vec<_> = reviera_core::clearances::all(store)
             .into_iter()
             // Electrical zones restrict equipment, not space (ARC-BATH-010).
-            .filter(|c| c.kind != reviera_core::clearances::ClearanceKind::ElectricalZone)
+            .filter(|c| !matches!(c.kind, reviera_core::clearances::ClearanceKind::ElectricalZone | reviera_core::clearances::ClearanceKind::Waterproofing))
             .filter(|c| only.as_ref().is_none_or(|ids| ids.contains(&c.element)))
             .collect();
         let label = |id: ElementId| {

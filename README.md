@@ -655,10 +655,14 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
   (centre or linear) and warps the floor so the shower area falls to it, by the rule packs'
   default (IPC ¼ in per foot; 1:60 under Approved Document M) or a given fall; Check Bathrooms
   reports showers that fall too little, too steeply or not at all (`bath.shower_falls`).
+- **Waterproofing extents** (ARC-BATH-012): the walls and floors round showers, tubs and urinals
+  that the rule packs want waterproof (IPC 417.4 and 419.3, IRC R307.2; a wet room's whole floor
+  under Approved Document M), shown with the virtual volumes and scheduled with areas
+  (Waterproofing, `bath.waterproofing`, CSV to the clipboard).
   **Not yet** (planned): living
   layouts that re-fit when the room changes, Jack-and-Jill and back-to-back wet walls,
   other packs' bars (Approved Document M's drop-down rails, shower and bath bars), room layouts, toilet cores and partitions, fixture counts,
-  locker rooms, waterproofing, spas, the generic bathroom component library and product swaps.
+  locker rooms, wet areas, spas, the generic bathroom component library and product swaps.
 
 ### Structure (in development)
 

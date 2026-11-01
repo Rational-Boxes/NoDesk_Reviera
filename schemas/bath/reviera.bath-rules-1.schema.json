@@ -30,7 +30,8 @@
     "bars": {"type": "array", "items": {"$ref": "#/$defs/bar"}},
     "counts": {"type": "array", "items": {"$ref": "#/$defs/count"}},
     "electrical": {"$ref": "#/$defs/electrical"},
-    "falls": {"$ref": "#/$defs/falls"}
+    "falls": {"$ref": "#/$defs/falls"},
+    "waterproofing": {"type": "array", "items": {"$ref": "#/$defs/waterproofing"}}
   },
   "$defs": {
     "fixture": {"enum": ["water_closet", "urinal", "lavatory", "bidet", "bath", "shower", "locker", "bench"]},
@@ -318,6 +319,27 @@
           "exclusiveMinimum": 0,
           "description": "The fall bath.shower_falls lays when none is given."
         },
+        "source": {"type": "string", "pattern": "^S[0-9]{4}( S[0-9]{4})*$"},
+        "confidence": {"enum": ["verified", "secondary", "advisory"]}
+      }
+    },
+    "waterproofing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description", "fixtures", "wall_height", "source", "confidence"],
+      "description": "Where walls and floors round some fixtures are waterproof or nonabsorbent.",
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "description": {"type": "string", "minLength": 1},
+        "fixtures": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/fixture"}},
+        "level_access_only": {"type": "boolean", "description": "Only for level-access showers (no raised tray)."},
+        "wall_height": {"type": "number", "minimum": 0, "description": "Up the walls bounding the fixture, from its floor (metres)."},
+        "wall_beyond": {"type": "number", "minimum": 0, "description": "How far the wall strip runs past the fixture's sides."},
+        "floor": {"type": "boolean", "description": "The floor: the fixture's footprint grown by floor_front and floor_sides."},
+        "floor_front": {"type": "number", "minimum": 0},
+        "floor_sides": {"type": "number", "minimum": 0},
+        "whole_room": {"type": "boolean", "description": "The whole floor of the room the fixture stands in (a wet room)."},
+        "class": {"type": "string", "pattern": "^W[0-3]-I$", "description": "A DIN 18534 water-exposure class, as data."},
         "source": {"type": "string", "pattern": "^S[0-9]{4}( S[0-9]{4})*$"},
         "confidence": {"enum": ["verified", "secondary", "advisory"]}
       }

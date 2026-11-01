@@ -701,23 +701,13 @@ impl Gui {
         let Some(t) = &self.terminal else { return };
         let Some(tab) = t.tabs.iter().find(|x| x.id == id) else { return };
         let text = tab.parser.lock().expect("parser").screen().contents();
-        let c = Clipboard::get();
-        if c.open() {
-            c.set_text(&text);
-            c.close();
-        }
+        // set_text opens and closes the clipboard itself; opening it first trips wx's assertion.
+        Clipboard::get().set_text(&text);
         self.frame.set_status_text("The terminal's screen was copied", 0);
     }
 
     fn terminal_paste(&mut self, id: u32) {
-        let c = Clipboard::get();
-        let text = if c.open() {
-            let t = c.get_text();
-            c.close();
-            t
-        } else {
-            None
-        };
+        let text = Clipboard::get().get_text();
         let Some(text) = text else { return };
         let bracketed = self
             .terminal

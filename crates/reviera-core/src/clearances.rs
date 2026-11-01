@@ -69,6 +69,8 @@ pub enum ClearanceKind {
     FixtureSpace,
     /// A bath's or shower's electrical zone (ARC-BATH-010): shown, not kept clear.
     ElectricalZone,
+    /// A waterproofed wall or floor area round a fixture (ARC-BATH-012): shown, not kept clear.
+    Waterproofing,
 }
 
 impl ClearanceKind {
@@ -81,6 +83,7 @@ impl ClearanceKind {
             Self::SlideSpace => "Clearance:slide_space/3d",
             Self::FixtureSpace => "Clearance:fixture_space/3d",
             Self::ElectricalZone => "Clearance:electrical_zone/3d",
+            Self::Waterproofing => "Clearance:waterproofing/3d",
         }
     }
 
@@ -92,6 +95,7 @@ impl ClearanceKind {
             Self::SlideSpace => "slide space",
             Self::FixtureSpace => "fixture clear space",
             Self::ElectricalZone => "electrical zone",
+            Self::Waterproofing => "waterproofing",
         }
     }
 }
@@ -267,6 +271,13 @@ pub fn all(store: &Store) -> Vec<Clearance> {
         kind: ClearanceKind::ElectricalZone,
         rule: format!("{} zone {}", z.pack, z.zone),
         mesh: z.mesh(),
+        door_swing_forbidden: false,
+    }));
+    out.extend(crate::bath_rules::waterproofing(store).into_iter().map(|x| Clearance {
+        element: x.element,
+        kind: ClearanceKind::Waterproofing,
+        rule: x.rule.clone(),
+        mesh: x.mesh(),
         door_swing_forbidden: false,
     }));
     out

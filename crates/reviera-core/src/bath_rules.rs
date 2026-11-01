@@ -314,6 +314,8 @@ pub struct Pack {
     pub electrical: Option<Electrical>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub falls: Option<Falls>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub waterproofing: Vec<Waterproofing>,
 }
 
 fn validator() -> &'static jsonschema::Validator {
@@ -1568,6 +1570,197 @@ pub(crate) fn shower_falls(txn: &mut Transaction<'_>, p: ShowerFallsParams) -> R
         }
     }
     Ok(out)
+}
+
+// ---- Waterproofing extents (ARC-BATH-012) ----
+
+/// Where walls and floors round some fixtures are waterproof or nonabsorbent.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct Waterproofing {
+    pub id: String,
+    pub description: String,
+    pub fixtures: Vec<FixtureKind>,
+    /// Only for level-access showers (no raised tray).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub level_access_only: bool,
+    /// Up the walls bounding the fixture, from its floor.
+    pub wall_height: f64,
+    /// How far the wall strip runs past the fixture's sides.
+    #[serde(default)]
+    pub wall_beyond: f64,
+    /// The floor: the fixture's footprint, grown in front and to each side.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub floor: bool,
+    #[serde(default)]
+    pub floor_front: f64,
+    #[serde(default)]
+    pub floor_sides: f64,
+    /// The whole floor of the room it stands in (a wet room).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub whole_room: bool,
+    /// A water-exposure class (DIN 18534 W0-I to W3-I), as data.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub class: Option<String>,
+    pub source: String,
+    pub confidence: Confidence,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Surface {
+    Wall,
+    Floor,
+}
+
+/// One waterproofed area: a thin volume on a wall face or the floor.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct Extent {
+    /// The fixture it is for.
+    pub element: ElementId,
+    pub fixture: FixtureKind,
+    pub surface: Surface,
+    /// The wall or floor it is on, when one was found.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub host: Option<ElementId>,
+    /// Along the wall (or across the floor) and up it (or deep), in metres; the area in m².
+    pub width: f64,
+    pub height: f64,
+    pub area: f64,
+    pub pack: String,
+    pub rule: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub class: Option<String>,
+    #[serde(skip)]
+    pub outline: Vec<[f64; 2]>,
+    #[serde(skip)]
+    pub z: [f64; 2],
+}
+
+impl Extent {
+    pub fn mesh(&self) -> Mesh {
+        extrude(&self.outline, &[], self.z[0], self.z[1])
+    }
+}
+
+/// How thick an extent's volume is drawn.
+const SKIN: f64 = 0.005;
+/// How far a wall face may stand from a fixture's edge and still bound it.
+const FACE_GAP: f64 = 0.05;
+
+fn polygon_area(p: &[[f64; 2]]) -> f64 {
+    let n = p.len();
+    (0..n).map(|i| p[i][0] * p[(i + 1) % n][1] - p[(i + 1) % n][0] * p[i][1]).sum::<f64>().abs() / 2.0
+}
+
+/// The extents round one fixture under a pack's rules.
+pub fn waterproofing_of(store: &Store, f: &Fixture, pack: &Pack) -> Vec<Extent> {
+    let mut out = Vec::new();
+    let world = |q: [f64; 2]| {
+        let w = f.frame.apply([q[0], q[1], 0.0]);
+        [w[0], w[1]]
+    };
+    let o = world([0.0, 0.0]);
+    let dir = |q: [f64; 2]| {
+        let w = world(q);
+        [w[0] - o[0], w[1] - o[1]]
+    };
+    let (x, y) = (f.x, [f.front, f.back]);
+    let mid = [(x[0] + x[1]) / 2.0, (y[0] + y[1]) / 2.0];
+    let c = world(mid);
+    let z = f.floor + 0.6;
+    for rule in pack.waterproofing.iter().filter(|r| r.fixtures.contains(&f.kind)) {
+        if rule.level_access_only && !level_access(store, f) {
+            continue;
+        }
+        let extent = |surface, host, width: f64, height: f64, area: f64, outline: Vec<[f64; 2]>, z: [f64; 2]| Extent {
+            element: f.element,
+            fixture: f.kind,
+            surface,
+            host,
+            width,
+            height,
+            area,
+            pack: pack.id.clone(),
+            rule: rule.id.clone(),
+            class: rule.class.clone(),
+            outline,
+            z,
+        };
+        // The walls along its back and sides: each edge's direction out, its half-depth from
+        // the middle, and the edge's two ends.
+        let edges = [
+            ([0.0, 1.0], (y[1] - y[0]) / 2.0, [x[0], y[1]], [x[1], y[1]]),
+            ([-1.0, 0.0], (x[1] - x[0]) / 2.0, [x[0], y[0]], [x[0], y[1]]),
+            ([1.0, 0.0], (x[1] - x[0]) / 2.0, [x[1], y[0]], [x[1], y[1]]),
+        ];
+        for (d, half, a, b) in edges {
+            let dw = dir(d);
+            let Some((t, wall)) = ray_to_walls(store, c, dw, z, half + FACE_GAP) else { continue };
+            if t < half - FACE_GAP {
+                continue;
+            }
+            // The strip on the face, `wall_beyond` past each end.
+            let along = [b[0] - a[0], b[1] - a[1]];
+            let len = along[0].hypot(along[1]);
+            let u = [along[0] / len, along[1] / len];
+            let shift = t - half;
+            let end = |q: [f64; 2], s: f64, back: f64| world([q[0] + u[0] * s + d[0] * (shift - back), q[1] + u[1] * s + d[1] * (shift - back)]);
+            let wb = rule.wall_beyond;
+            let outline = vec![end(a, -wb, 0.0), end(b, wb, 0.0), end(b, wb, SKIN), end(a, -wb, SKIN)];
+            let width = len + 2.0 * wb;
+            out.push(extent(Surface::Wall, Some(wall), width, rule.wall_height, width * rule.wall_height, outline, [f.floor, f.floor + rule.wall_height]));
+        }
+        // The floor: the room's, or the fixture's grown.
+        let room = rule.whole_room.then(|| {
+            let hit = |d: [f64; 2]| ray_to_walls(store, c, dir(d), z, 30.0).map(|h| h.0);
+            Some((hit([-1.0, 0.0])?, hit([1.0, 0.0])?, hit([0.0, -1.0])?, hit([0.0, 1.0])?))
+        });
+        let rect = match room {
+            Some(Some((l, r, fr, bk))) => Some(([mid[0] - l, mid[0] + r], [mid[1] - fr, mid[1] + bk])),
+            _ if rule.floor || rule.whole_room => Some(([x[0] - rule.floor_sides, x[1] + rule.floor_sides], [y[0] - rule.floor_front, y[1]])),
+            _ => None,
+        };
+        if let Some((rx, ry)) = rect {
+            let outline: Vec<[f64; 2]> = [[rx[0], ry[0]], [rx[1], ry[0]], [rx[1], ry[1]], [rx[0], ry[1]]].into_iter().map(world).collect();
+            let host = floor_under(store, &f.level, c);
+            let (w, h) = (rx[1] - rx[0], ry[1] - ry[0]);
+            out.push(extent(Surface::Floor, host, w, h, polygon_area(&outline), outline, [f.floor, f.floor + SKIN]));
+        }
+    }
+    out
+}
+
+/// Every extent under the packs in use.
+pub fn waterproofing(store: &Store) -> Vec<Extent> {
+    let packs: Vec<Pack> = active(store).into_iter().filter(|p| !p.waterproofing.is_empty()).collect();
+    if packs.is_empty() {
+        return Vec::new();
+    }
+    fixtures(store).iter().flat_map(|f| packs.iter().flat_map(|p| waterproofing_of(store, f, p))).collect()
+}
+
+#[derive(Debug, Default, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WaterproofingParams {
+    /// These fixtures only (default all).
+    #[serde(default)]
+    pub element_ids: Vec<ElementRef>,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct WaterproofingSchedule {
+    pub extents: Vec<Extent>,
+    /// m².
+    pub wall_area: f64,
+    pub floor_area: f64,
+}
+
+/// The waterproofing schedule (`bath.waterproofing`).
+pub(crate) fn waterproofing_schedule(store: &Store, p: WaterproofingParams) -> Result<WaterproofingSchedule> {
+    let only = p.element_ids.iter().map(|r| store.resolve(r).ok_or_else(|| bad("element.not_found", format!("no element {r:?}")))).collect::<Result<Vec<_>>>()?;
+    let extents: Vec<Extent> = waterproofing(store).into_iter().filter(|e| only.is_empty() || only.contains(&e.element)).collect();
+    let sum = |s: Surface| extents.iter().filter(|e| e.surface == s).map(|e| e.area).sum();
+    Ok(WaterproofingSchedule { wall_area: sum(Surface::Wall), floor_area: sum(Surface::Floor), extents })
 }
 
 #[cfg(test)]

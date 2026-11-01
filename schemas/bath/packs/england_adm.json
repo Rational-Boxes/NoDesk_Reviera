@@ -59,5 +59,19 @@
     "default": 0.0167,
     "source": "S1044 S0925",
     "confidence": "advisory"
-  }
+  },
+  "waterproofing": [
+    {
+      "id": "Wet-room tanking",
+      "description": "A level-access shower makes its room a wet room: the whole floor tanked, and the shower's walls to 1.8 m",
+      "fixtures": [
+        "shower"
+      ],
+      "level_access_only": true,
+      "wall_height": 1.8,
+      "whole_room": true,
+      "source": "S1044 S0904",
+      "confidence": "advisory"
+    }
+  ]
 }

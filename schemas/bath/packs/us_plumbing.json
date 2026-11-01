@@ -252,5 +252,42 @@
     "default": 0.0208,
     "source": "S0873",
     "confidence": "verified"
-  }
+  },
+  "waterproofing": [
+    {
+      "id": "IPC 417.4 shower walls and floor",
+      "description": "Shower compartment walls smooth, corrosion-resistant and nonabsorbent to 6 ft (1829 mm) above the floor, and a waterproof shower floor or pan",
+      "fixtures": [
+        "shower"
+      ],
+      "wall_height": 1.829,
+      "floor": true,
+      "source": "S0873",
+      "confidence": "verified"
+    },
+    {
+      "id": "IRC R307.2 bathtub walls",
+      "description": "Walls above a bathtub with a shower head nonabsorbent to 6 ft (1829 mm) above the floor",
+      "fixtures": [
+        "bath"
+      ],
+      "wall_height": 1.829,
+      "source": "S0883",
+      "confidence": "verified"
+    },
+    {
+      "id": "IPC 419.3 urinal surround",
+      "description": "Wall and floor round a urinal waterproof, smooth and nonabsorbent: 2 ft (610 mm) in front of its lip, 2 ft to each side and 4 ft (1219 mm) up",
+      "fixtures": [
+        "urinal"
+      ],
+      "wall_height": 1.219,
+      "wall_beyond": 0.61,
+      "floor": true,
+      "floor_front": 0.61,
+      "floor_sides": 0.61,
+      "source": "S0873",
+      "confidence": "verified"
+    }
+  ]
 }
