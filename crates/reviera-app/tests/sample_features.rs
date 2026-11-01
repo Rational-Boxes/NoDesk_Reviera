@@ -950,3 +950,76 @@ fn the_greenhouses_sample_keeps_its_enclosures() {
     // Up under the ridges (5.5 m + 2 m × tan 22°), short of them by the roof's glazing bars.
     assert!(g.z[1] > venlo.1.ridge() - 0.1 && g.z[1] < venlo.1.ridge(), "{:?} vs ridge {}", g.z, venlo.1.ridge());
 }
+
+#[test]
+fn the_bathrooms_sample_keeps_its_rooms() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "bathrooms");
+    let s = store(&app);
+    // The fixtures by kind: two layouts' worth, the roll-in shower, the hot tub and the heater.
+    let mut kinds: Vec<String> = reviera_core::bath_rules::fixtures(&s).iter().map(|f| f.kind.label().to_owned()).collect();
+    kinds.sort();
+    assert_eq!(kinds, ["bath", "hot tub", "lavatory", "lavatory", "sauna heater", "shower", "shower", "water closet", "water closet"]);
+    // The shower room's drain, and its floor warped to fall to it.
+    let drain = s.iter().find(|e| e.param(reviera_core::bath_rules::DRAIN_KEY).is_some()).expect("a drain");
+    let floor = drain.param(reviera_core::bath_rules::DRAIN_KEY).unwrap()["floor"].as_str().unwrap().to_owned();
+    let floor = s.iter().find(|e| e.guid().to_string() == floor).unwrap();
+    assert!(reviera_core::shape_edit::shape_of(floor).is_some(), "the floor falls");
+    // The sauna: eight bench modules and an 8 kW heater.
+    let benches = s.iter().filter(|e| e.param("@ObjectType").and_then(Value::as_str) == Some("Sauna Bench")).count();
+    assert_eq!(benches, 8);
+    let heater = s.iter().find(|e| e.param("@ObjectType").and_then(Value::as_str) == Some("Sauna Heater")).unwrap();
+    assert!(near(reviera_core::bath_rules::product_number(&s, heater, reviera_core::bath_rules::HEATER_POWER).unwrap(), 8000.0, 1e-6));
+    // Check Bathrooms finds only the hot tub's pad note; the waterproofing is scheduled.
+    let found = ok(&mut app, "bath.check", json!({}));
+    let found: Vec<(String, String)> = found.as_array().unwrap().iter().map(|f| (f["severity"].as_str().unwrap().to_owned(), f["kind"].as_str().unwrap().to_owned())).collect();
+    assert_eq!(found, [("note".to_owned(), "load".to_owned())]);
+    let w = ok(&mut app, "bath.waterproofing", json!({}));
+    assert!(f(&w["wall_area"]) > 5.0 && f(&w["floor_area"]) > 1.0, "{w}");
+}
+
+#[test]
+fn the_washrooms_sample_keeps_its_core_and_lockers() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "washrooms");
+    let s = store(&app);
+    let kinds = |k: reviera_core::bath_rules::FixtureKind| reviera_core::bath_rules::fixtures(&s).iter().filter(|f| f.kind == k).count();
+    use reviera_core::bath_rules::FixtureKind as K;
+    // The men's core (counted for 75 men: an accessible and a standard compartment, a urinal for
+    // the third WC, two lavatories), the single-user toilet, and the locker room.
+    assert_eq!((kinds(K::WaterCloset), kinds(K::Urinal), kinds(K::Lavatory)), (3, 1, 3));
+    assert_eq!((kinds(K::Locker), kinds(K::Shower)), (20, 6));
+    // The standard compartment's door is marked not accessible: it keeps only its swing.
+    let doors: Vec<&Element> = s.iter().filter(|e| e.class == "IfcDoor").collect();
+    assert_eq!(doors.len(), 2);
+    assert_eq!(doors.iter().filter(|e| e.param(reviera_core::bath_rules::ACCESSIBLE_KEY) == Some(&json!(false))).count(), 1);
+    // Grab bars at both accessible WCs; Check Bathrooms finds nothing.
+    assert_eq!(s.iter().filter(|e| reviera_core::grab_bars::recipe(e).is_some()).count(), 4);
+    assert_eq!(ok(&mut app, "bath.check", json!({})), json!([]));
+}
+
+#[test]
+fn the_wet_room_sample_falls_and_is_tanked() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "wet_room");
+    let s = store(&app);
+    // England's packs: Approved Document M and BS 7671 Section 701.
+    let packs = ok(&mut app, "bath.rule_packs", json!({}));
+    let in_use: Vec<&str> = packs.as_array().unwrap().iter().filter(|p| p["in_use"] == true).map(|p| p["id"].as_str().unwrap()).collect();
+    assert_eq!(in_use, ["england_adm", "uk_bs7671"]);
+    // The family bathroom's bath has its electrical zones 0, 1 and 2.
+    let bath = reviera_core::bath_rules::fixtures(&s).into_iter().find(|f| f.kind == reviera_core::bath_rules::FixtureKind::Bath).unwrap();
+    let zones = ok(&mut app, "clearance.list", json!({ "element_ids": [bath.element] }));
+    let n = zones.as_array().unwrap().iter().filter(|c| c["kind"] == "electrical_zone").count();
+    assert_eq!(n, 3, "{zones:#}");
+    // The wet room: a drain with its floor falling within 1:80–1:40, the whole floor tanked.
+    let shower = reviera_core::bath_rules::fixtures(&s).into_iter().find(|f| reviera_core::bath_rules::level_access(&s, f)).unwrap();
+    let area = reviera_core::bath_rules::shower_area(&s, &shower);
+    let floor = reviera_core::bath_rules::floor_under(&s, &shower.level, area[0]).unwrap();
+    let (least, steepest) = reviera_core::bath_rules::falls_in(&s, floor, &area).unwrap();
+    assert!(least >= 0.0125 - 1e-4 && steepest <= 0.025 + 1e-4, "{least} {steepest}");
+    let w = ok(&mut app, "bath.waterproofing", json!({}));
+    assert!(near(f(&w["floor_area"]), 2.6 * 2.4, 0.01), "{w}");
+    // Nothing for Check Bathrooms.
+    assert_eq!(ok(&mut app, "bath.check", json!({})), json!([]));
+}

@@ -135,7 +135,9 @@ fn spaces(packs: &[Pack], kind: FixtureKind, occupancy: crate::codes::Occupancy)
             let r = z.across.iter().map(|a| a.1).fold(0.0, f64::max);
             reach = Some(reach.map_or(r, |x| x.max(r)));
         }
-        if z.across.iter().all(|a| a.0 == AcrossFrom::Centre) && z.out.iter().any(|o| o.0 == OutFrom::Wall) {
+        // Spaces either side of the centreline, beside the fixture or in front of it (AD M's WC
+        // access zone): the fixtures beside it, and an end bath, stay out of both.
+        if z.across.iter().all(|a| a.0 == AcrossFrom::Centre) {
             let h = z.across.iter().map(|a| a.1.abs()).fold(0.0, f64::max);
             half = Some(half.map_or(h, |x| x.max(h)));
         }

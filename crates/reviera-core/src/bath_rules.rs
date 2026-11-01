@@ -1301,8 +1301,11 @@ pub(crate) fn set_accessible(txn: &mut Transaction<'_>, p: SetAccessibleParams) 
     let store = txn.store().clone();
     for r in &p.element_ids {
         let id = store.resolve(r).ok_or_else(|| bad("element.not_found", format!("no element {r:?}")))?;
-        if fixture(&store, store.get(id).expect("resolved")).is_none() {
-            return Err(bad("bath.not_a_fixture", format!("element {} is not a bathroom fixture", id.0)));
+        let e = store.get(id).expect("resolved");
+        // A door: one not marked accessible has no maneuvering clearances (a standard toilet
+        // compartment's, ADA 604.8.1.2 asking them only of the wheelchair compartment's).
+        if fixture(&store, e).is_none() && e.class != "IfcDoor" {
+            return Err(bad("bath.not_a_fixture", format!("element {} is not a bathroom fixture or a door", id.0)));
         }
         txn.modify(id, |e| {
             if p.accessible {
@@ -1491,6 +1494,10 @@ pub struct ShowerFallsOut {
     pub floors: Vec<ElementId>,
 }
 
+/// On a drain `bath.shower_falls` placed: the floor it sits in and the shower it serves
+/// (GlobalIds), which it may overlap.
+pub const DRAIN_KEY: &str = "rxd:bath_drain";
+
 /// Lays the falls of level-access showers to new drains (`bath.shower_falls`).
 pub(crate) fn shower_falls(txn: &mut Transaction<'_>, p: ShowerFallsParams) -> Result<ShowerFallsOut> {
     let store = txn.store().clone();
@@ -1522,7 +1529,8 @@ pub(crate) fn shower_falls(txn: &mut Transaction<'_>, p: ShowerFallsParams) -> R
         let drain_at = match p.drain {
             DrainAt::Centre => centre,
             DrainAt::Linear => {
-                let t = 0.05 / deep.max(0.1);
+                // 100 mm in, clear of the wall behind.
+                let t = 0.1 / deep.max(0.2);
                 let b = [(area[2][0] + area[3][0]) / 2.0, (area[2][1] + area[3][1]) / 2.0];
                 let fr = [(area[0][0] + area[1][0]) / 2.0, (area[0][1] + area[1][1]) / 2.0];
                 [b[0] + (fr[0] - b[0]) * t, b[1] + (fr[1] - b[1]) * t]
@@ -1552,13 +1560,15 @@ pub(crate) fn shower_falls(txn: &mut Transaction<'_>, p: ShowerFallsParams) -> R
         }
         crate::shape_edit::clear_within(txn, floor, &area)?;
         let level_ref = ElementRef::Guid(crate::id::GlobalId::parse(&f.level).ok_or_else(|| bad("bath.no_level", "the shower's level is gone"))?);
+        // The drain's top flush with the fallen floor.
+        let drain_height = txn.store().get(drain_type).and_then(mesh_objects::mesh_object_type).map_or(0.08, |t| t.size[2] * t.scale);
         let drain = crate::mep_controls::place_fixture(
             txn,
             crate::mep_controls::PlaceParams {
                 type_id: ElementRef::Id(drain_type),
                 point: drain_at,
                 level: level_ref,
-                offset: Some(-depth),
+                offset: Some(-depth - drain_height),
                 rotation: 0.0,
                 host_wall: None,
                 side: None,
@@ -1566,6 +1576,11 @@ pub(crate) fn shower_falls(txn: &mut Transaction<'_>, p: ShowerFallsParams) -> R
                 controlled_ids: Vec::new(),
             },
         )?;
+        let (floor_guid, shower_guid) = (store.get(floor).map(|e| e.guid().to_string()), f.element);
+        let shower_guid = store.get(shower_guid).map(|e| e.guid().to_string());
+        txn.modify(drain, |e| {
+            e.params.insert(DRAIN_KEY.into(), serde_json::json!({ "floor": floor_guid, "shower": shower_guid }));
+        })?;
         out.drains.push(drain);
         match p.drain {
             // The area's edge stays where it is; the drain point drops.

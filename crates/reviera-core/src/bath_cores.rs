@@ -176,7 +176,9 @@ pub(crate) fn toilet_core(txn: &mut Transaction<'_>, p: CoreParams) -> Result<Co
     };
     let mut comps = Vec::new();
     if accessible {
-        comps.push(Compartment { width: 1.525, depth: 1.5, kind: "accessible" });
+        // 60 × 59 in at least (ADA 604.8.1.1); in the US as deep as the standard ones, so the
+        // fronts line up.
+        comps.push(Compartment { width: 1.525, depth: if england { 1.5 } else { std_c.depth.max(1.5) }, kind: "accessible" });
     }
     let n_std = wcs - u32::from(accessible) - u32::from(ambulatory);
     for _ in 0..n_std {
@@ -269,9 +271,11 @@ pub(crate) fn toilet_core(txn: &mut Transaction<'_>, p: CoreParams) -> Result<Co
             not_accessible.push(wc);
         }
         placed.push(wc);
-        // The door: centred, or beyond the WC in the accessible compartment; opening outward.
+        // The door: centred, or beyond the WC in the accessible compartment (ADA 604.8.1.2);
+        // opening outward.
         let width = if c.kind == "standard" { 0.61 } else { 0.915 };
-        let door_at = if c.kind == "accessible" { x1 - width / 2.0 - 0.05 } else { (x0 + x1) / 2.0 };
+        // The accessible door hard by the far partition, its push side clear of the WC.
+        let door_at = if c.kind == "accessible" { x1 - width / 2.0 - 0.01 } else { (x0 + x1) / 2.0 };
         let gf = crate::walls::regenerate(txn.store(), txn.store().get(front).expect("made"))?;
         let along_front = ((at(door_at, c.depth + T / 2.0)[0] - gf.start[0]) * gf.direction()[0] + (at(door_at, c.depth + T / 2.0)[1] - gf.start[1]) * gf.direction()[1]).clamp(width / 2.0, gf.length() - width / 2.0);
         let args = json!({ "host_wall_id": front.0, "point_along": along_front, "sill_height": RAISE, "width": width, "height": PANEL - 0.05, "fit": false });
@@ -284,6 +288,9 @@ pub(crate) fn toilet_core(txn: &mut Transaction<'_>, p: CoreParams) -> Result<Co
             if out < c.depth {
                 crate::inserts::flip(txn, serde_json::from_value(json!({ "element_ids": [door.0] })).map_err(|e| bad("bath.params", e.to_string()))?, false)?;
             }
+        }
+        if c.kind == "standard" {
+            not_accessible.push(door);
         }
         doors.push(door);
         a = x1;

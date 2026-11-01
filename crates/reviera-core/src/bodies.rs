@@ -639,6 +639,10 @@ pub fn related(store: &Store, a: ElementId, b: ElementId) -> bool {
         if let Some(r) = crate::parts::recipe(e) {
             hosts.push(r.source);
         }
+        // A shower's drain sits in its floor and under its former (ARC-BATH-011).
+        if let Some(d) = e.param(crate::bath_rules::DRAIN_KEY) {
+            hosts.extend(["floor", "shower"].iter().filter_map(|k| d[*k].as_str().map(str::to_owned)));
+        }
         // A grab bar is fixed to its wall.
         if let Some(r) = crate::grab_bars::recipe(e) {
             hosts.push(r.wall);

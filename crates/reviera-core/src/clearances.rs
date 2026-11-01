@@ -261,9 +261,11 @@ pub fn of_door(p: &Placed, rules: RuleSet) -> Vec<Clearance> {
 /// Every virtual volume in the model.
 pub fn all(store: &Store) -> Vec<Clearance> {
     let rules = rule_set(store);
+    // A door marked not accessible keeps its swing only (ARC-BATH-008).
+    let exempt = |id: crate::id::ElementId| store.get(id).and_then(|e| e.param(crate::bath_rules::ACCESSIBLE_KEY)).and_then(serde_json::Value::as_bool) == Some(false);
     let mut out: Vec<Clearance> = crate::inserts::placed(store)
         .iter()
-        .flat_map(|p| of_door(p, rules))
+        .flat_map(|p| of_door(p, if exempt(p.id) { RuleSet::None } else { rules }))
         .collect();
     out.extend(crate::bath_rules::spaces(store).into_iter().map(|s| s.clearance));
     out.extend(crate::bath_rules::electrical_zones(store).into_iter().map(|z| Clearance {
