@@ -816,6 +816,19 @@ fn steam_findings(store: &reviera_core::Store, only: Option<&[ElementId]>) -> Ve
         if room.height > rules.ceiling_max + 1e-6 {
             out.push(base(format!("The steam room round {what} is {} high; {} gives at most {}", mm(room.height), rules.id, mm(rules.ceiling_max)), None, Some(room.height), None, Some(rules.ceiling_max)));
         }
+        // Vapour-proof walls: each of the room's walls a layered type with a membrane.
+        let bare: Vec<String> = room
+            .walls
+            .iter()
+            .filter(|w| {
+                let t = store.get(**w).and_then(|e| e.param("@type")?.as_str().and_then(reviera_core::id::GlobalId::parse)).and_then(|g| store.find_by_guid(&g)).and_then(|t| store.get(t));
+                !t.and_then(reviera_core::compound::of_wall_type).is_some_and(|c| c.layers.iter().any(|l| l.function == reviera_core::compound::Function::Membrane))
+            })
+            .map(|w| w.0.to_string())
+            .collect();
+        if !bare.is_empty() {
+            out.push(base(format!("The steam room round {what} has walls without a vapour-proof membrane ({}); give them a layered type with one, such as Steam Room Wall (TCNA SR614)", bare.join(", ")), None, None, None, None));
+        }
         let head = bath_rules::outline(f);
         for (b, outline) in &benches {
             let d = outline.iter().map(|q| bath_rules::plan_distance(&head, *q)).fold(f64::MAX, f64::min).min(head.iter().map(|q| bath_rules::plan_distance(outline, *q)).fold(f64::MAX, f64::min));

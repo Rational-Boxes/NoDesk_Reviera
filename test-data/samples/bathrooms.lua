@@ -78,10 +78,13 @@ end
 --    2.13 m high over the bench wall falling 2 in per ft (1:6) to 1.83 m so condensate runs to
 --    the far wall, a tiled bench along the south wall, the steam head low on the east wall across
 --    from it and its control 1.5 m up on the north wall, and the floor falling ¼ in per ft to a
---    centre drain. A tiled room of 8.6 m³ needs a generator for that volume (makers' factors).
+--    centre drain. Its walls take the vapour-proof TCNA SR614 assembly (steel studs, cement
+--    board, a bonded membrane and a vapour retarder; `wall_assembly`), which is thinner than the
+--    200 mm walls, so the room grows a little. A tiled room of about 9 m³ needs a generator for
+--    that volume (makers' factors).
 local steam_walls = room(21, 0, 2.4, 1.8, 2.4)
 floor(21, 0, 2.4, 1.8)
-reviera.bath.steam_room{ point = {22.2, 0.9}, level = l1, bench_wall_id = steam_walls[1], material = "tile" }
+reviera.bath.steam_room{ point = {22.2, 0.9}, level = l1, bench_wall_id = steam_walls[1], material = "tile", wall_assembly = true }
 
 -- 7. Drawings: rooms for the two baths, interior elevations of the full bath's four walls at
 --    1:25 on an A3 sheet (`bath.elevations`), and the plumbing fixture and accessories schedules

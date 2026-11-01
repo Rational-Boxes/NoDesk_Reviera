@@ -793,13 +793,24 @@ fn a_steam_room_its_ceiling_bench_head_and_falls() {
     assert_eq!(s["benches"], 4);
     assert!(s["drain"].is_u64(), "{s:#}");
     assert!((s["design_volume"].as_f64().unwrap() - 2.4 * 1.8 * (2.13 + 1.83) / 2.0).abs() < 0.01, "tile, no height or outside-wall factors: {s:#}");
-    let head = s["steam_head"].as_u64().unwrap();
     let steam = |app: &mut App| findings(app).into_iter().filter(|f| f["kind"] == "steam").collect::<Vec<_>>();
+    // Its walls are plain: no vapour-proof membrane.
+    let f = steam(&mut app);
+    assert!(f.len() == 1 && f[0]["message"].as_str().unwrap().contains("membrane"), "{f:#?}");
+    // With the TCNA SR614 assembly on its walls: nothing.
+    let with = ok(&mut app, "bath.steam_room", json!({ "point": [1.2, 0.9], "level": level, "wall_assembly": true, "replace": true }));
     assert_eq!(steam(&mut app), Vec::<Value>::new());
+    let store = app.document(app.active().unwrap()).unwrap().doc.store().clone();
+    let t = store.iter().find(|e| e.name.as_deref() == Some("Steam Room Wall (TCNA SR614)")).expect("the type");
+    let c = reviera_core::compound::of_wall_type(t).unwrap();
+    assert_eq!(c.layers.iter().filter(|l| l.function == reviera_core::compound::Function::Membrane).count(), 2);
+    let head = with["steam_head"].as_u64().unwrap();
     // Natural stone, an outside wall and the ceiling at the walls' 2.4 m: × 1.65 × 1.1, and
     // 10 % a foot above 7 ft.
     let again = ok(&mut app, "bath.steam_room", json!({ "point": [1.2, 0.9], "level": level, "height": 2.4, "material": "stone", "exterior_wall": true, "replace": true, "floor_falls": false }));
-    let v = 2.4 * 1.8 * (2.4 + (2.4 - 0.1667 * 1.8)) / 2.0;
+    // The room as the thinner steam walls leave it.
+    let (len, dep) = (again["length"].as_f64().unwrap(), again["depth"].as_f64().unwrap());
+    let v = len * dep * (2.4 + (2.4 - 0.1667 * dep)) / 2.0;
     let expect = v * 1.65 * (1.0 + 0.1 * (2.4 - 2.13) / 0.3048) * 1.1;
     assert!((again["design_volume"].as_f64().unwrap() - expect).abs() < 0.01, "{again:#}");
     assert!(run(&mut app, "element.get_ids", json!({ "element_ids": [head] })).is_err(), "the earlier layout replaced");

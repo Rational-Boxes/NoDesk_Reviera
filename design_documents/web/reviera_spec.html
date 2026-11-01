@@ -28365,19 +28365,21 @@ CREATE TABLE base_rxd (
   - the bench along the bench wall;
   - the steam head on the start end wall, across the room from the bench, and the control on the far wall;
   - where a Reviera floor is under the room, its falls to a centre drain (as ARC-BATH-011).</p>
-<p>It returns the room's volume (under the sloped ceiling) and the generator's design volume for <code>material</code> and <code>exterior_wall</code>. With <code>replace</code> set, it removes an earlier layout in the room first.
+<p>It returns the room's volume (under the sloped ceiling) and the generator's design volume for <code>material</code> and <code>exterior_wall</code>. With <code>replace</code> set, it removes an earlier layout in the room first. With <code>wall_assembly</code> it first gives the room's four walls the <em>Steam Room Wall (TCNA SR614)</em> type. That is a layered type (ARC-CMPD-001), steam side last: gypsum board 12.7 mm; steel studs, 20 ga at 406 mm, 92 mm; a vapour retarder lapped over the pan; cement backer board 12.7 mm; a bonded waterproof membrane; tile and setting bed 12 mm. The walls keep their location lines, so the room's faces move.
 - <strong>Checks</strong> in <code>bath.check</code>, for each steam head, of kind <code>steam</code>:
   - no ceiling modelled over the room, or one flatter than the least slope;
   - a room higher than the greatest height;
-  - a bench nearer the head than its distance.</p>
+  - a bench nearer the head than its distance;
+  - walls whose type has no membrane layer (a note naming them).</p>
 <p><strong>Data (IFC mapping).</strong> The ceiling as <code>IfcCovering</code> CEILING, sloped through its shape (<code>rxd:shape</code>); the head and control as above.</p>
 <p><strong>Commands.</strong> See the catalog: <code>bath.steam_room</code>.</p>
 <p><strong>Acceptance criteria.</strong>
 - [x] A 2.4 × 1.8 m room with 2.4 m walls on a floor gets a ceiling 2.13 m over the bench wall falling to 1.83 m (1:6), four bench modules and a drain under it; <code>bath.check</code> finds nothing.
 - [x] Natural stone, an outside wall and a 2.4 m ceiling raise the design volume by × 1.65 × 1.1 and 10 % a foot above 7 ft.
 - [x] With its ceiling removed, the room is reported as having none.
-- [x] A 2.4 m deep room is refused, its 1:6 ceiling coming down below 1.8 m under 2.13 m.</p>
-<p><em>Built (2026-11-01):</em> the <code>steam</code> section of the pack schema and its <code>us_spa</code> values, the three components, <code>bath.steam_room</code> (Architecture › Build › Steam Room, then a click in the room) and the checks. Not yet: the vapour-proof assembly as a wall type (TCNA SR614: steel studs at 16 in, cement board, a bonded membrane, a vapour retarder lapped over the pan), the generator placed outside the room with its steam line pitched back, generator sizing in kW (makers' tables were not read), a vapour-tight door, the control's height checked (4–6 ft), steam showers in bathrooms, and the shape commands on ceilings.</p>
+- [x] A 2.4 m deep room is refused, its 1:6 ceiling coming down below 1.8 m under 2.13 m.
+- [x] Plain walls are reported as having no membrane; with <code>wall_assembly</code> they take the SR614 type, with its two membranes, and nothing is reported.</p>
+<p><em>Built (2026-11-01):</em> the <code>steam</code> section of the pack schema and its <code>us_spa</code> values, the three components, <code>bath.steam_room</code> (Architecture › Build › Steam Room, then a click in the room) and the checks. Not yet: the generator placed outside the room with its steam line pitched back, generator sizing in kW (makers' tables were not read), a vapour-tight door, the control's height checked (4–6 ft), steam showers in bathrooms, and the shape commands on ceilings.</p>
 <h3 id="39a16-accessible-saunas-steam-rooms-and-spas">3.9a.16 Accessible saunas, steam rooms and spas</h3>
 <p><strong>ID:</strong> <code class="rid" id="ARC-BATH-016">ARC-BATH-016</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> <code>BATHROOMS_PLAN.md</code> §7; research/13 D6</p>
 <p><strong>Purpose.</strong> Lay out saunas and steam rooms with an accessible bench, and check accessible saunas, steam rooms and spas: the bench, the turning space and a spa's means of entry.</p>

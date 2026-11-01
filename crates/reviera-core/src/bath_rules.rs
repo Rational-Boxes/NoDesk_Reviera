@@ -1948,6 +1948,8 @@ pub struct RoomAround {
     pub area: f64,
     /// The walls' lowest top above the fixture's floor.
     pub height: f64,
+    /// The walls found, toward the fixture's left, right, front and back.
+    pub walls: Vec<ElementId>,
 }
 
 pub fn room_around(store: &Store, f: &Fixture) -> Option<RoomAround> {
@@ -1974,7 +1976,7 @@ pub fn room_around(store: &Store, f: &Fixture) -> Option<RoomAround> {
         .filter_map(|(_, w)| crate::walls::regenerate(store, store.get(*w)?).ok())
         .map(|g| g.base_z + g.height - f.floor)
         .fold(f64::MAX, f64::min);
-    Some(RoomAround { outline, area: (l + r) * (fr + bk), height })
+    Some(RoomAround { outline, area: (l + r) * (fr + bk), height, walls: hits.iter().map(|h| h.1).collect() })
 }
 
 /// The pack standing for a product's own rules (its installation manual).

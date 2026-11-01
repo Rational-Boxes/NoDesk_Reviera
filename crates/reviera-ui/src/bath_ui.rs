@@ -601,8 +601,9 @@ impl Gui {
         let material = f.choice("Walls' finish", &labels, 0);
         let outside = f.choice("Outside wall", &["No".to_owned(), "Yes (+10 %)".to_owned()], 0);
         let acc = f.choice("Bench", &["Standard (450 deep)".to_owned(), "Accessible (ADA §903: 24 in deep, 18 in high)".to_owned()], 0);
+        let assembly = f.choice("Walls", &["Vapour-proof (TCNA SR614 assembly)".to_owned(), "As they are".to_owned()], 0);
         let ok = f.show("Then click inside a room closed by walls, in a plan: the bench runs along its longer wall, the steam head goes on an end wall, and a floor under it falls to a drain.", "Choose Room");
-        let mut args = json!({ "command": "bath.steam_room", "material": materials[material.get_selection().unwrap_or(0) as usize], "exterior_wall": outside.get_selection() == Some(1), "accessible": acc.get_selection() == Some(1), "replace": true });
+        let mut args = json!({ "command": "bath.steam_room", "material": materials[material.get_selection().unwrap_or(0) as usize], "exterior_wall": outside.get_selection() == Some(1), "accessible": acc.get_selection() == Some(1), "wall_assembly": assembly.get_selection() != Some(1), "replace": true });
         if let Ok(mm) = height.get_value().trim().parse::<f64>() {
             args["height"] = json!(mm / 1000.0);
         }

@@ -51,13 +51,14 @@ the sizes given are inside the walls, from the inside corner named.
 
 6. **A steam room.** Walls 2.4 m high round 2.4 × 1.8 m from (21, 0), and a floor.
    1. **Architecture › Build › Steam Room**: the ceiling's high side 2130 mm, ceramic tile, no
-      outside wall. Click inside the room.
+      outside wall, Walls *Vapour-proof*. Click inside the room. The four walls take the *Steam
+      Room Wall (TCNA SR614)* type, thinner than 200 mm, so the room grows a little.
    2. The ceiling goes over the room: 2.13 m over the south wall, falling 1:6 to 1.83 m at the
       north wall.
    3. Four tiled bench modules go along the south wall. The steam head goes low on the east wall
       and the control 1.5 m up on the north wall.
    4. The floor falls ¼ in per foot to a centre drain.
-   5. The status bar asks for a generator for 8.6 m³.
+   5. The status bar asks for a generator for about 9 m³.
    
    The script names the south wall as the bench wall (`bench_wall_id`).
 

@@ -767,8 +767,39 @@ pub struct SteamRoomParams {
     /// The bench to ADA §903 (24 in deep, 18 in high), as ADA §612 asks (ARC-BATH-016).
     #[serde(default)]
     pub accessible: bool,
+    /// Give the room's four walls the vapour-proof *Steam Room Wall (TCNA SR614)* type (they keep
+    /// their location lines).
+    #[serde(default)]
+    pub wall_assembly: bool,
     #[serde(default)]
     pub replace: bool,
+}
+
+/// The vapour-proof steam room wall's type name.
+pub const STEAM_WALL: &str = "Steam Room Wall (TCNA SR614)";
+
+/// The steam room wall type, made with its layers on first use: TCNA SR614 as the International
+/// Masonry Institute details it, the steam side last.
+pub(crate) fn steam_wall_type(txn: &mut Transaction<'_>) -> Result<ElementId> {
+    if let Some(e) = txn.store().iter().find(|e| e.class == "IfcWallType" && e.name.as_deref() == Some(STEAM_WALL)) {
+        return Ok(e.id());
+    }
+    let id = txn.create(
+        crate::element::NewElement::new("IfcWallType")
+            .name(STEAM_WALL)
+            .param("@PredefinedType", "PARTITIONING")
+            .param(crate::walls::RECIPE_KEY, json!({ "kind": crate::walls::WALL_TYPE_RECIPE, "width": 0.13 })),
+    )?;
+    let layers = json!({ "type_id": id.0, "layers": [
+        { "function": "finish2", "material": "Gypsum board", "thickness": 0.0127 },
+        { "function": "structure", "material": "Steel stud, 20 ga at 406 mm", "thickness": 0.092 },
+        { "function": "membrane", "material": "Vapour retarder, lapped over the pan", "thickness": 0.0 },
+        { "function": "substrate", "material": "Cement backer board", "thickness": 0.0127 },
+        { "function": "membrane", "material": "Bonded waterproof membrane", "thickness": 0.0 },
+        { "function": "finish1", "material": "Tile and setting bed", "thickness": 0.012 }
+    ] });
+    crate::compound::set_layers(txn, serde_json::from_value(layers).map_err(|e| bad("bath.params", e.to_string()))?)?;
+    Ok(id)
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -800,7 +831,15 @@ pub(crate) fn steam_room(txn: &mut Transaction<'_>, p: SteamRoomParams) -> Resul
     let floor_z = crate::levels::elevation(level);
     let level_guid = level.guid().to_string();
     let lp = LayoutParams { template: String::new(), point: p.point, level: p.level.clone(), wet_wall_id: p.bench_wall_id.clone(), start: p.start, replace: false, fit_only: false };
-    let room = find_room(&store, &lp, floor_z + 0.3)?;
+    let mut room = find_room(&store, &lp, floor_z + 0.3)?;
+    // The vapour-proof walls first: the room's faces move with them.
+    if p.wall_assembly {
+        let t = steam_wall_type(txn)?;
+        let walls = [room.wet, room.opposite, room.start_wall, room.end_wall];
+        crate::types::set_type(txn, crate::types::SetTypeParams { element_ids: walls.iter().map(|w| ElementRef::Id(*w)).collect(), type_id: ElementRef::Id(t) })?;
+        room = find_room(txn.store(), &lp, floor_z + 0.3)?;
+    }
+    let store = txn.store().clone();
     let rules = bath_rules::steam_rules(&store);
     let walls = {
         let g = crate::walls::regenerate(&store, store.get(room.wet).expect("found"))?;
