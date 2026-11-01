@@ -773,3 +773,36 @@ fn a_sauna_its_benches_heater_and_door() {
     let e = run(&mut app, "bath.sauna", json!({ "point": [1.2, 0.75], "level": level })).unwrap_err();
     assert_eq!(e.code, "bath.no_fit", "{e:?}");
 }
+
+#[test]
+fn a_steam_room_its_ceiling_bench_head_and_falls() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = new_app(dir.path());
+    // 2.4 × 1.8 m with walls 2.4 m high, on a floor: the ceiling 2.13 m over the bench wall
+    // falling 1:6 to 1.83 m across the room, four bench modules, a drain under it.
+    let (level, _) = room_h(&mut app, 2.4, 1.8, 2.4);
+    room_floor(&mut app, &level, 2.4, 1.8);
+    let s = ok(&mut app, "bath.steam_room", json!({ "point": [1.2, 0.9], "level": level }));
+    assert!((s["ceiling_high"].as_f64().unwrap() - 2.13).abs() < 1e-6 && (s["ceiling_low"].as_f64().unwrap() - 1.83).abs() < 0.001, "{s:#}");
+    assert_eq!(s["benches"], 4);
+    assert!(s["drain"].is_u64(), "{s:#}");
+    assert!((s["design_volume"].as_f64().unwrap() - 2.4 * 1.8 * (2.13 + 1.83) / 2.0).abs() < 0.01, "tile, no height or outside-wall factors: {s:#}");
+    let head = s["steam_head"].as_u64().unwrap();
+    let steam = |app: &mut App| findings(app).into_iter().filter(|f| f["kind"] == "steam").collect::<Vec<_>>();
+    assert_eq!(steam(&mut app), Vec::<Value>::new());
+    // Natural stone, an outside wall and the ceiling at the walls' 2.4 m: × 1.65 × 1.1, and
+    // 10 % a foot above 7 ft.
+    let again = ok(&mut app, "bath.steam_room", json!({ "point": [1.2, 0.9], "level": level, "height": 2.4, "material": "stone", "exterior_wall": true, "replace": true, "floor_falls": false }));
+    let v = 2.4 * 1.8 * (2.4 + (2.4 - 0.1667 * 1.8)) / 2.0;
+    let expect = v * 1.65 * (1.0 + 0.1 * (2.4 - 2.13) / 0.3048) * 1.1;
+    assert!((again["design_volume"].as_f64().unwrap() - expect).abs() < 0.01, "{again:#}");
+    assert!(run(&mut app, "element.get_ids", json!({ "element_ids": [head] })).is_err(), "the earlier layout replaced");
+    // No ceiling: reported.
+    ok(&mut app, "element.delete", json!({ "element_ids": [again["ceiling"]] }));
+    let f = steam(&mut app);
+    assert!(f.len() == 1 && f[0]["message"].as_str().unwrap().contains("no ceiling"), "{f:#?}");
+    // Too deep for a 1:6 ceiling under 2.13 m.
+    let (level, _) = room_h(&mut app, 3.0, 2.4, 2.4);
+    let e = run(&mut app, "bath.steam_room", json!({ "point": [1.5, 1.2], "level": level, "bench_wall_id": null })).unwrap_err();
+    assert_eq!(e.code, "bath.no_fit", "{e:?}");
+}

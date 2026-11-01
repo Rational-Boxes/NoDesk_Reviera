@@ -551,6 +551,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(BathShowerFalls),
         registry.add(BathWaterproofing),
         registry.add(BathSauna),
+        registry.add(BathSteamRoom),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -7026,4 +7027,21 @@ edit_command!(
     crate::bath_layouts::SaunaParams,
     crate::bath_layouts::Sauna,
     crate::bath_layouts::sauna
+);
+
+edit_command!(
+    BathSteamRoom,
+    "bath.steam_room",
+    "Lay out a steam room",
+    "Lays out a steam room in the room around `point`, closed by walls (ARC-BATH-015): a ceiling over the \
+     room sloped at the rule packs' 2 in per ft (1:6) so condensate runs to the walls, highest over the bench \
+     wall (at `height`, default 7 ft); a tiled bench in 600 mm modules along that wall; a steam head low on the \
+     start end wall across the room from the bench, and its control 1.5 m up on the far wall; and, where a \
+     Reviera floor is under the room, its falls to a centre drain (¼ in per ft). Returns the generator's design \
+     volume by one maker's factors (`material`: tile, acrylic, glass or stone; `exterior_wall`). `bath.check` \
+     reports a ceiling flatter than 1:6 or missing, a room higher than 8 ft and a steam head near a bench.",
+    "Steam Room",
+    crate::bath_layouts::SteamRoomParams,
+    crate::bath_layouts::SteamRoom,
+    crate::bath_layouts::steam_room
 );

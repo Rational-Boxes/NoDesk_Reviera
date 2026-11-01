@@ -2,7 +2,7 @@
 -- Copyright (C) 2026 Reviera contributors
 
 -- title: Bathrooms and a home spa
--- description: Five rooms of a house under the IRC: a 5 × 8 ft full bath and a three-quarter bath laid out from templates, a level-access shower room with its floor falling to a linear drain and its waterproofing scheduled, a hot tub room, and a two-tier sauna with its heater sized from the room.
+-- description: Six rooms of a house under the IRC: a 5 × 8 ft full bath and a three-quarter bath laid out from templates, a level-access shower room with its floor falling to a linear drain and its waterproofing scheduled, a hot tub room, a two-tier sauna with its heater sized from the room, and a steam room with its ceiling sloped to shed condensate.
 --
 -- Reviera sample model (test-data/samples): the bathroom tools (ARC-BATH-001…014). The rule
 -- packs come from the building code: the IRC brings `us_plumbing` (IPC/IRC clearances, shower
@@ -73,3 +73,12 @@ for _, f in ipairs(reviera.bath.check{}) do
     reviera.insert.flip_facing{ element_ids = { door } }
   end
 end
+
+-- 6. A steam room, 2.4 × 1.8 m with walls 2.4 m high, on a floor (`bath.steam_room`): a ceiling
+--    2.13 m high over the bench wall falling 2 in per ft (1:6) to 1.83 m so condensate runs to
+--    the far wall, a tiled bench along the south wall, the steam head low on the east wall across
+--    from it and its control 1.5 m up on the north wall, and the floor falling ¼ in per ft to a
+--    centre drain. A tiled room of 8.6 m³ needs a generator for that volume (makers' factors).
+local steam_walls = room(21, 0, 2.4, 1.8, 2.4)
+floor(21, 0, 2.4, 1.8)
+reviera.bath.steam_room{ point = {22.2, 0.9}, level = l1, bench_wall_id = steam_walls[1], material = "tile" }

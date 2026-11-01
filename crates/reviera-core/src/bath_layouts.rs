@@ -691,3 +691,154 @@ pub(crate) fn sauna(txn: &mut Transaction<'_>, p: SaunaParams) -> Result<Sauna> 
     })?;
     Ok(Sauna { placed, heater, heater_kw, sizing, length: room.length, depth: room.depth, height, benches: modules * tiers, bench_tops })
 }
+
+// ---- Steam rooms (ARC-BATH-015) ----
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SteamRoomParams {
+    /// A point inside the room, in plan.
+    pub point: [f64; 2],
+    pub level: ElementRef,
+    /// The wall the bench runs along; default the longer side. The ceiling is highest over it.
+    pub bench_wall_id: Option<ElementRef>,
+    /// The end the steam head goes at, as you face the bench wall.
+    #[serde(default)]
+    pub start: Start,
+    /// The ceiling's high side (metres); default the rules' ideal, at most the walls' height.
+    pub height: Option<f64>,
+    /// The walls' finish, for the generator's design volume: `tile` (default), `acrylic`,
+    /// `glass` or `stone` (as the rules name them).
+    pub material: Option<String>,
+    /// One wall is an outside wall.
+    #[serde(default)]
+    pub exterior_wall: bool,
+    /// Lay the floor's falls to a centre drain when a Reviera floor is under the room (default
+    /// true).
+    pub floor_falls: Option<bool>,
+    #[serde(default)]
+    pub replace: bool,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct SteamRoom {
+    pub placed: Vec<ElementId>,
+    pub ceiling: ElementId,
+    pub steam_head: ElementId,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub drain: Option<ElementId>,
+    /// The room's plan size, the ceiling's high and low sides (metres) and its slope.
+    pub length: f64,
+    pub depth: f64,
+    pub ceiling_high: f64,
+    pub ceiling_low: f64,
+    pub ceiling_slope: f64,
+    /// m³: the room, and the design volume a generator is chosen for.
+    pub volume: f64,
+    pub design_volume: f64,
+    pub benches: u32,
+}
+
+/// Lays out a steam room (`bath.steam_room`): a ceiling sloped to shed condensate, a tiled bench,
+/// the steam head and its control, and the floor's falls to a drain.
+pub(crate) fn steam_room(txn: &mut Transaction<'_>, p: SteamRoomParams) -> Result<SteamRoom> {
+    const MODULE: f64 = 0.6;
+    const BENCH: f64 = 0.45;
+    let store = txn.store().clone();
+    let level = store.resolve(&p.level).and_then(|l| store.get(l)).filter(|l| l.class == crate::levels::CLASS).ok_or_else(|| bad("bath.no_level", "no such level"))?;
+    let floor_z = crate::levels::elevation(level);
+    let level_guid = level.guid().to_string();
+    let lp = LayoutParams { template: String::new(), point: p.point, level: p.level.clone(), wet_wall_id: p.bench_wall_id.clone(), start: p.start, replace: false, fit_only: false };
+    let room = find_room(&store, &lp, floor_z + 0.3)?;
+    let rules = bath_rules::steam_rules(&store);
+    let walls = {
+        let g = crate::walls::regenerate(&store, store.get(room.wet).expect("found"))?;
+        g.base_z + g.height - floor_z
+    };
+    let high = p.height.unwrap_or(rules.ceiling_ideal).min(walls);
+    let low = high - rules.ceiling_slope * room.depth;
+    if low < 1.8 {
+        return Err(bad("bath.no_fit", format!("sloped 1:{:.0} across the room's {:.0} mm, the ceiling would come down to {:.0} mm; a shallower room or a higher ceiling is needed", 1.0 / rules.ceiling_slope, room.depth * 1000.0, low * 1000.0)));
+    }
+    let material = p.material.clone().unwrap_or_else(|| "tile".to_owned());
+    let volume = room.length * room.depth * (high + low) / 2.0;
+    let design_volume = bath_rules::steam_design_volume(&rules, volume, high, &material, p.exterior_wall)?;
+    let modules = ((room.length / MODULE) + 1e-9).floor() as u32;
+    if room.depth < BENCH + 0.7 {
+        return Err(bad("bath.no_fit", format!("the room is {:.0} mm too narrow for a bench and a 700 mm walkway", (BENCH + 0.7 - room.depth) * 1000.0)));
+    }
+
+    if p.replace {
+        let old: Vec<ElementId> = txn.store().iter().filter(|e| e.param(LAYOUT_KEY).and_then(|v| v.get("room")).and_then(|v| v.as_str()) == Some(room.key.as_str())).map(crate::element::Element::id).collect();
+        for id in old {
+            if txn.store().get(id).is_some() {
+                txn.delete(id)?;
+            }
+        }
+    }
+    let tag = json!({ "template": "steam_room", "room": room.key });
+    let (w, run, start) = (room.w, room.run, room.start);
+    let at = |a: f64, b: f64| [start[0] + run[0] * a - w[0] * b, start[1] + run[1] * a - w[1] * b];
+    let mut placed = Vec::new();
+    // The ceiling over the room, its low side on the far wall and rising toward the bench wall;
+    // 10 mm in from the walls, as its sloped edges lean out by its thickness's sine.
+    let corners = [at(0.0, 0.0), at(room.length, 0.0), at(room.length, room.depth), at(0.0, room.depth)];
+    let inset = [at(0.01, 0.01), at(room.length - 0.01, 0.01), at(room.length - 0.01, room.depth - 0.01), at(0.01, room.depth - 0.01)];
+    let loop_: Vec<serde_json::Value> = (0..4).map(|k| json!({ "line": { "start": inset[k], "end": inset[(k + 1) % 4] } })).collect();
+    let cp: crate::floors::CreateParams = serde_json::from_value(json!({ "loops": [loop_], "level_id": ElementRef::Guid(level.guid().clone()), "offset": low })).map_err(|e| bad("bath.params", e.to_string()))?;
+    let ceiling = crate::floors::create_kind(txn, crate::floors::SlabKind::Ceiling, cp)?;
+    let out_of = |q: [f64; 2]| -((q[0] - start[0]) * w[0] + (q[1] - start[1]) * w[1]);
+    let (slope, depth) = (rules.ceiling_slope, room.depth);
+    crate::shape_edit::set_corner_offsets(txn, ceiling, |q| slope * (depth - out_of(q)).clamp(0.0, depth))?;
+    let tag2 = tag.clone();
+    txn.modify(ceiling, |e| {
+        e.params.insert(LAYOUT_KEY.into(), tag2);
+    })?;
+    placed.push(ceiling);
+
+    let names = ["Steam room bench 600", "Steam head", "Steam control"];
+    let types = crate::bath_components::load(txn, crate::bath_components::LoadParams { names: names.iter().map(|n| (*n).to_owned()).collect() })?;
+    let facing = (-w[0]).atan2(w[1]);
+    let mut put = |txn: &mut Transaction<'_>, name: &str, host: Option<ElementId>, q: [f64; 2], rotation: f64| -> Result<ElementId> {
+        let id = crate::bath_components::place(
+            txn,
+            crate::mep_controls::PlaceParams {
+                type_id: ElementRef::Id(types[name]),
+                point: q,
+                level: p.level.clone(),
+                offset: None,
+                rotation,
+                host_wall: host.map(ElementRef::Id),
+                side: None,
+                work_plane: host.is_none(),
+                controlled_ids: Vec::new(),
+            },
+        )?;
+        let tag = tag.clone();
+        txn.modify(id, |e| {
+            e.params.insert(LAYOUT_KEY.into(), tag);
+        })?;
+        placed.push(id);
+        Ok(id)
+    };
+    // The bench along the bench wall, the head on the start wall across the room from it, the
+    // control on the far wall by the start end.
+    let a0 = (room.length - f64::from(modules) * MODULE) / 2.0;
+    for k in 0..modules {
+        put(txn, names[0], None, at(a0 + MODULE * (f64::from(k) + 0.5), BENCH / 2.0), facing)?;
+    }
+    let head_b = (BENCH + rules.head_clearance + 0.1).max(room.depth - 0.35).min(room.depth - 0.1);
+    let steam_head = put(txn, names[1], Some(room.start_wall), at(0.1, head_b), 0.0)?;
+    put(txn, names[2], Some(room.opposite), at(0.4, room.depth - 0.1), 0.0)?;
+    // The floor's falls to a centre drain.
+    let mut drain = None;
+    if p.floor_falls.unwrap_or(true)
+        && let Some(floor) = bath_rules::floor_under(txn.store(), &level_guid, [(corners[0][0] + corners[2][0]) / 2.0, (corners[0][1] + corners[2][1]) / 2.0])
+    {
+        let drain_type = crate::mep::load_starters(txn, crate::mep::LoadStartersParams { names: vec!["Floor Drain".into()] })?["Floor Drain"];
+        let serves = txn.store().get(steam_head).map(|e| e.guid().to_string());
+        let d = bath_rules::lay_falls(txn, floor, &corners, bath_rules::DrainAt::Centre, rules.floor_fall, None, ElementRef::Guid(level.guid().clone()), drain_type, serves)?;
+        drain = Some(d);
+    }
+    Ok(SteamRoom { placed, ceiling, steam_head, drain, length: room.length, depth: room.depth, ceiling_high: high, ceiling_low: low, ceiling_slope: slope, volume, design_volume, benches: modules })
+}

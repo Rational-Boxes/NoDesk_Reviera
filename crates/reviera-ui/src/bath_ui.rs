@@ -192,7 +192,8 @@ impl Gui {
     /// Lays out a bathroom where the Bathroom Layout tool was clicked, and reports the fit.
     pub(crate) fn layout_bathroom_at(&mut self, mut args: serde_json::Value) {
         let frame = self.frame;
-        // The Locker Room and Sauna tools ride on the same click, with their own commands.
+        // The Locker Room, Sauna and Steam Room tools ride on the same click, with their own
+        // commands.
         let command = args.as_object_mut().and_then(|o| o.remove("command")).and_then(|c| c.as_str().map(str::to_owned)).unwrap_or_else(|| "bath.layout".to_owned());
         match self.app.execute(&command, args, &super::user()) {
             Ok(out) => {
@@ -203,7 +204,11 @@ impl Gui {
                     .ok()
                     .and_then(|v| v.as_array().map(|a| a.iter().filter(|f| f["severity"] == "error").count()))
                     .unwrap_or(0);
-                let heater = out.result["heater_kw"].as_f64().map(|k| format!(", the heater {k} kW for {:.1} m³", out.result["sizing"]["design_volume"].as_f64().unwrap_or(0.0))).unwrap_or_default();
+                let heater = out.result["heater_kw"]
+                    .as_f64()
+                    .map(|k| format!(", the heater {k} kW for {:.1} m³", out.result["sizing"]["design_volume"].as_f64().unwrap_or(0.0)))
+                    .or_else(|| out.result["design_volume"].as_f64().map(|v| format!(", a steam generator for {v:.1} m³")))
+                    .unwrap_or_default();
                 frame.set_status_text(&format!("{placed} component(s) laid out{heater}; Check Bathrooms finds {problems} error(s)"), 0);
             }
             Err(e) => error(&frame, &format!("The layout was not made:\n{}", e.message)),
@@ -566,6 +571,32 @@ impl Gui {
         if let Some(tool) = self.room_tool.as_mut() {
             tool.layout = Some(args);
             frame.set_status_text("Sauna: click inside the room; Esc ends", 0);
+        }
+    }
+
+    /// Architecture › Build › Steam Room (ARC-BATH-015): the ceiling, finish and outside wall,
+    /// then a click inside a room closed by walls.
+    pub(crate) fn steam_room(&mut self) {
+        let frame = self.frame;
+        let f = super::reinforcement_ui::Form::new(&frame, "Steam Room");
+        let height = f.text("Ceiling, high side (mm)", "2130", "Over the bench wall; it falls 1:6 across the room");
+        let materials = ["tile", "acrylic", "glass", "stone"];
+        let labels: Vec<String> = ["Ceramic tile (× 1.0)", "Acrylic or fibreglass (× 0.65)", "Glass tile or block (× 1.35)", "Natural stone (× 1.65)"].iter().map(|s| (*s).to_owned()).collect();
+        let material = f.choice("Walls' finish", &labels, 0);
+        let outside = f.choice("Outside wall", &["No".to_owned(), "Yes (+10 %)".to_owned()], 0);
+        let ok = f.show("Then click inside a room closed by walls, in a plan: the bench runs along its longer wall, the steam head goes on an end wall, and a floor under it falls to a drain.", "Choose Room");
+        let mut args = json!({ "command": "bath.steam_room", "material": materials[material.get_selection().unwrap_or(0) as usize], "exterior_wall": outside.get_selection() == Some(1), "replace": true });
+        if let Ok(mm) = height.get_value().trim().parse::<f64>() {
+            args["height"] = json!(mm / 1000.0);
+        }
+        f.dialog.destroy();
+        if !ok {
+            return;
+        }
+        self.start_room_tool();
+        if let Some(tool) = self.room_tool.as_mut() {
+            tool.layout = Some(args);
+            frame.set_status_text("Steam Room: click inside the room; Esc ends", 0);
         }
     }
 }

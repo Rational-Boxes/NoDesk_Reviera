@@ -294,27 +294,39 @@ fn surface_offset(profile: &Profile, shape: &Shape, p: [f64; 2]) -> f64 {
 }
 
 fn floor_of(store: &Store, r: &ElementRef) -> Result<(ElementId, Profile, f64)> {
+    if !store
+        .resolve(r)
+        .and_then(|id| store.get(id))
+        .and_then(crate::floors::floor_recipe)
+        .is_some()
+    {
+        return Err(Error::new(
+            "shape.host",
+            "shape editing works on Reviera floors for now",
+        ));
+    }
+    slab_of(store, r)
+}
+
+/// A Reviera floor or ceiling, its outline and top: ceilings are shaped by tools (a steam room's
+/// sloped ceiling, ARC-BATH-015), not yet by the shape commands.
+fn slab_of(store: &Store, r: &ElementRef) -> Result<(ElementId, Profile, f64)> {
     let id = store
         .resolve(r)
         .filter(|id| {
             store
                 .get(*id)
-                .and_then(crate::floors::floor_recipe)
+                .and_then(crate::floors::slab_recipe)
                 .is_some()
         })
-        .ok_or_else(|| {
-            Error::new(
-                "shape.host",
-                "shape editing works on Reviera floors for now",
-            )
-        })?;
+        .ok_or_else(|| Error::new("shape.host", "not a Reviera floor or ceiling"))?;
     let e = store.get(id).expect("resolved");
     let g = crate::floors::regenerate(store, e)?;
     let profile = g
         .profiles
         .into_iter()
         .next()
-        .ok_or_else(|| Error::new("shape.host", "the floor has no outline"))?;
+        .ok_or_else(|| Error::new("shape.host", "the slab has no outline"))?;
     Ok((id, profile, g.top))
 }
 
@@ -337,7 +349,7 @@ fn write(txn: &mut Transaction<'_>, id: ElementId, s: &Shape) -> Result<()> {
         }
     })?;
     let store = txn.store().clone();
-    let (_, profile, top) = floor_of(&store, &ElementRef::Id(id))?;
+    let (_, profile, top) = slab_of(&store, &ElementRef::Id(id))?;
     let t = store
         .get(id)
         .and_then(|e| crate::floors::regenerate(&store, e).ok())
@@ -429,6 +441,20 @@ pub(crate) fn add_split_line(txn: &mut Transaction<'_>, p: AddLineParams) -> Res
     });
     write(txn, id, &s)?;
     Ok(key)
+}
+
+/// Sets a slab's outline corners' offsets (v1 … in its profile's order) by a function of their
+/// plan position: a ceiling sloped from one side to the other.
+pub(crate) fn set_corner_offsets(txn: &mut Transaction<'_>, id: ElementId, offset: impl Fn([f64; 2]) -> f64) -> Result<()> {
+    let store = txn.store().clone();
+    let e = store.get(id).ok_or_else(|| Error::new("element.not_found", "no such slab"))?;
+    let g = crate::floors::regenerate(&store, e)?;
+    let profile = g.profiles.first().ok_or_else(|| Error::new("shape.host", "the slab has no outline"))?;
+    let mut s = shape_now(&store, id);
+    for (k, q) in profile.outer.iter().enumerate() {
+        s.vertices.insert(format!("v{}", k + 1), offset(*q));
+    }
+    write(txn, id, &s)
 }
 
 /// Removes the points and split lines lying wholly within an area (its edge included).

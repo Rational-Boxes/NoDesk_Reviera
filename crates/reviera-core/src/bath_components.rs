@@ -308,6 +308,37 @@ pub fn catalogue() -> Vec<Component> {
             shape: || Shape::default().cuboid([-0.3, 0.3], [-0.225, 0.225], [0.41, 0.45]).cuboid([-0.3, 0.3], [-0.225, -0.205], [0.0, 0.41]),
             connectors: none,
         },
+        // Steam rooms (ARC-BATH-015): the steam head low on a wall, its control and a tiled bench.
+        Component {
+            name: "Steam head",
+            category: C::PlumbingFixture,
+            predefined: "USERDEFINED",
+            element_type: Some("Steam Head"),
+            color: STEEL,
+            // A 120 mm head 300 mm up, 60 mm off the wall.
+            shape: || Shape::default().cuboid([-0.06, 0.06], [-0.06, 0.0], [0.25, 0.35]),
+            connectors: || vec![pipe("Steam", [0.0, 0.0, 0.3], [0.0, 1.0, 0.0], K::DomesticHotWater, 0.015, 0.0)],
+        },
+        Component {
+            name: "Steam control",
+            category: C::Controller,
+            predefined: "USERDEFINED",
+            element_type: Some("Steam Control"),
+            color: GREY,
+            // A 120 × 80 mm control pad 1.5 m up.
+            shape: || Shape::default().cuboid([-0.06, 0.06], [-0.02, 0.0], [1.46, 1.54]),
+            connectors: none,
+        },
+        Component {
+            name: "Steam room bench 600",
+            category: C::Furniture,
+            predefined: "USERDEFINED",
+            element_type: Some("Steam Bench"),
+            color: WHITE,
+            // A tiled masonry bench 600 long, 450 deep, 450 high.
+            shape: || Shape::default().cuboid([-0.3, 0.3], [-0.225, 0.225], [0.0, 0.45]),
+            connectors: none,
+        },
         // Accessories (IfcFurniture USERDEFINED, as research/13 E3 maps them).
         Component {
             name: "Mirror, 600 × 800",

@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Reviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Reviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 856 numbered requirements (320 P0 · 326 P1 · 203 P2 · 7 P3), 2,284 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 857 numbered requirements (320 P0 · 326 P1 · 204 P2 · 7 P3), 2,285 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,284 commands; 856 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,285 commands; 857 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -14664,6 +14664,50 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 
 *Built (2026-10-31):* the `sauna` section of the pack schema and its `us_spa` values, the heater and bench components, `bath.sauna` (Architecture › Build › Sauna, then a click in the room), the heater's product zone and the checks. Not yet: vent presets (the makers' patterns differ: a low inlet near the heater and a high outlet across, or the IMC's 4 × 8 in vent at the door's top), the thermostat sensor placed and checked, gas and wood heaters, infrared cabins, BS 7671 Section 703's temperature zones, the heater's guard, rooms other than rectangles, and the door's lock (doors carry no hardware data yet).
 
+### 3.9a.15 Steam rooms
+**ID:** ARC-BATH-015 · **Priority:** P2 · **Ref:** `BATHROOMS_PLAN.md` §7; research/13 D4
+
+**Purpose.** Lay out a steam room in one step, with its ceiling sloped to shed condensate, its floor falling to a drain and the generator's design volume, and check its ceiling, height and steam head.
+
+**Behaviour & rules.**
+- **Rules.** A pack's `steam` section holds:
+  - the ceiling's least slope, its ideal height and its greatest;
+  - the floor's fall;
+  - the steam head's least distance from a bench;
+  - one maker's factors for the generator's design volume: per wall finish, per foot of height above a base, and for an outside wall.
+  
+  `us_spa` carries practice values, advisory:
+  - the ceiling sloped at least 2 in per ft (1:6), ideally 7 ft (2.13 m) high and at most 8 ft (2.44 m);
+  - the floor a pre-pitched bed at ¼ in per ft (TCNA SR614);
+  - the head 300 mm from benches;
+  - the factors: acrylic or fibreglass ×0.65, ceramic tile ×1.0, glass ×1.35, natural stone ×1.65, +10 % a foot above 7 ft, +10 % with an outside wall.
+  
+  Makers' factors conflict, so a product's own replace them.
+- **Components.** `Steam head`: an `IfcSanitaryTerminal`, USERDEFINED, ObjectType `Steam Head`, 300 mm up. `Steam control`: an `IfcController`, 1.5 m up. `Steam room bench 600`: an `IfcFurniture`, ObjectType `Steam Bench`, tiled, 450 × 450 mm.
+- **`bath.steam_room`** works on the room closed by walls around a point. It lays out:
+  - a ceiling over the room, 10 mm in from its walls. Its high side is over the bench wall at `height` (default the ideal, at most the walls' height), and it falls at the least slope to the far wall. A room too deep for that slope above 1.8 m is reported. Ceilings take their slope from shape offsets on their corners (ARC-SHAPE-001), which the shape commands do not yet edit on ceilings.
+  - the bench along the bench wall;
+  - the steam head on the start end wall, across the room from the bench, and the control on the far wall;
+  - where a Reviera floor is under the room, its falls to a centre drain (as ARC-BATH-011).
+  
+  It returns the room's volume (under the sloped ceiling) and the generator's design volume for `material` and `exterior_wall`. With `replace` set, it removes an earlier layout in the room first.
+- **Checks** in `bath.check`, for each steam head, of kind `steam`:
+  - no ceiling modelled over the room, or one flatter than the least slope;
+  - a room higher than the greatest height;
+  - a bench nearer the head than its distance.
+
+**Data (IFC mapping).** The ceiling as `IfcCovering` CEILING, sloped through its shape (`rxd:shape`); the head and control as above.
+
+**Commands.** See the catalog: `bath.steam_room`.
+
+**Acceptance criteria.**
+- [x] A 2.4 × 1.8 m room with 2.4 m walls on a floor gets a ceiling 2.13 m over the bench wall falling to 1.83 m (1:6), four bench modules and a drain under it; `bath.check` finds nothing.
+- [x] Natural stone, an outside wall and a 2.4 m ceiling raise the design volume by × 1.65 × 1.1 and 10 % a foot above 7 ft.
+- [x] With its ceiling removed, the room is reported as having none.
+- [x] A 2.4 m deep room is refused, its 1:6 ceiling coming down below 1.8 m under 2.13 m.
+
+*Built (2026-11-01):* the `steam` section of the pack schema and its `us_spa` values, the three components, `bath.steam_room` (Architecture › Build › Steam Room, then a click in the room) and the checks. Not yet: the vapour-proof assembly as a wall type (TCNA SR614: steel studs at 16 in, cement board, a bonded membrane, a vapour retarder lapped over the pan), the generator placed outside the room with its steam line pitched back, generator sizing in kW (makers' tables were not read), a vapour-tight door, the control's height checked (4–6 ft), steam showers in bathrooms, and the shape commands on ceilings.
+
 ### 3.10.1 Model In-Place
 **ID:** ARC-INPL-001 · **Priority:** P1 · **Ref:** research/02 §11.1
 
@@ -15924,6 +15968,7 @@ All commands below are registered once in the command registry and exposed autom
 | `bath.shower_falls` | element_ids, fall?, drain?: centre\|linear | {drains, floors} | Yes | ARC-BATH-011 |
 | `bath.waterproofing` | element_ids? | {extents, wall_area, floor_area} | No | ARC-BATH-012 |
 | `bath.sauna` | point, level, bench_wall_id?, start?, tiers?, height?, uninsulated_area?, log_walls?, heater_kw?, replace? | {placed, heater, heater_kw, sizing, length, depth, height, benches, bench_tops} | Yes | ARC-BATH-014 |
+| `bath.steam_room` | point, level, bench_wall_id?, start?, height?, material?, exterior_wall?, floor_falls?, replace? | {placed, ceiling, steam_head, drain?, length, depth, ceiling_high, ceiling_low, ceiling_slope, volume, design_volume, benches} | Yes | ARC-BATH-015 |
 | `unit.create_type` | room_ids \| element_ids, name, bay? | {type_id, members, left_out} | Yes | ARC-GRP-004 |
 | `unit.set_connection_points` | type_id, points | — | Yes | ARC-GRP-004 |
 | `unit.array_path` | type_id, path, count \| pitch, handing?, numbering? | array_id | Yes | ARC-GRP-004 |
@@ -29065,14 +29110,14 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 39 | 8 | 0 | 123 |
 | DM | 91 | 65 | 34 | 3 | 193 |
-| ARC | 77 | 86 | 16 | 1 | 180 |
+| ARC | 77 | 86 | 17 | 1 | 181 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 28 | 0 | 29 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
 | COL | 8 | 50 | 11 | 1 | 70 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **326** | **203** | **7** | **856** |
+| **Total** | **320** | **326** | **204** | **7** | **857** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -29268,7 +29313,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2284 unique commands** in 427 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2285 unique commands** in 427 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -29304,7 +29349,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `array` | 6 |
 | `assembly` | 16 |
 | `assemblytemplate` | 1 |
-| `bath` | 20 |
+| `bath` | 21 |
 | `bcf` | 33 |
 | `beam` | 6 |
 | `beam_system` | 5 |
@@ -29829,6 +29874,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `bath.set_hand` | 3 | element_ids, hand: auto\ | left\ | right | — |
 | `bath.set_rule_packs` | 3 | packs? (none for automatic) | — | Yes | ARC-BATH-001 |
 | `bath.shower_falls` | 3 | element_ids, fall?, drain?: centre\ | linear | {drains, floors} | Yes |
+| `bath.steam_room` | 3 | point, level, bench_wall_id?, start?, height?, material?, exterior_wall?, floor_falls?, replace? | {placed, ceiling, steam_head, drain?, length, depth, ceiling_high, ceiling_low, ceiling_slope, volume, design_volume, benches} | Yes | ARC-BATH-015 |
 | `bath.swap_product` | 3 | element_ids, type_id | [{element, size_before, size_after, connectors_moved, findings_new, findings_gone}] | Yes | ARC-BATH-006 |
 | `bath.toilet_core` | 3 | wall_id, start, end, level, wcs?, urinals?, lavatories?, accessible?, ambulatory?, occupancy?, occupant_load?, urinals_for_wcs?, replace? | {placed, partitions, doors, fit} | Yes | ARC-BATH-008 |
 | `bath.waterproofing` | 3 | element_ids? | {extents, wall_area, floor_area} | No | ARC-BATH-012 |

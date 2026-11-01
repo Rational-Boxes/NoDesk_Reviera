@@ -54,6 +54,8 @@ pub enum FindingKind {
     Load,
     /// A sauna's heater, height or door (ARC-BATH-014).
     Sauna,
+    /// A steam room's ceiling, height or steam head (ARC-BATH-015).
+    Steam,
 }
 
 /// One thing the check found.
@@ -295,6 +297,7 @@ pub(crate) fn check(app: &mut App, p: CheckParams) -> Result<Vec<Finding>> {
         out.extend(falls_findings(store, only.as_deref()));
         out.extend(spa_findings(store, only.as_deref()));
         out.extend(sauna_findings(store, only.as_deref()));
+        out.extend(steam_findings(store, only.as_deref()));
         out.sort_by(|a, b| a.severity.cmp(&b.severity).then(a.element.0.cmp(&b.element.0)));
         Ok(out)
     }
@@ -727,6 +730,76 @@ fn sauna_findings(store: &reviera_core::Store, only: Option<&[ElementId]>) -> Ve
             }
             if n > 0.0 && bath_rules::plan_distance(&room.outline, [c[0] / n, c[1] / n]) == 0.0 {
                 out.push(base(format!("Door {} opens into the sauna round {what}; sauna doors open outward, with no lock", s.element.0), Some(s.element), None, None, None));
+            }
+        }
+    }
+    out
+}
+
+/// Steam rooms: the ceiling's slope, the room's height and the steam head's distance from the
+/// benches (ARC-BATH-015).
+fn steam_findings(store: &reviera_core::Store, only: Option<&[ElementId]>) -> Vec<Finding> {
+    let heads: Vec<bath_rules::Fixture> = bath_rules::fixtures(store).into_iter().filter(|f| f.kind == FixtureKind::SteamHead && !only.is_some_and(|ids| !ids.contains(&f.element))).collect();
+    if heads.is_empty() {
+        return Vec::new();
+    }
+    let rules = bath_rules::steam_rules(store);
+    let pack = bath_rules::active(store).into_iter().find(|p| p.steam.is_some()).or_else(|| bath_rules::shipped().iter().find(|p| p.steam.is_some()).cloned()).expect("a pack has steam rules");
+    // Benches' outlines in plan.
+    let benches: Vec<(ElementId, Vec<[f64; 2]>)> = store
+        .iter()
+        .filter(|e| matches!(e.param("@ObjectType").and_then(serde_json::Value::as_str), Some("Steam Bench" | "Sauna Bench")))
+        .filter_map(|e| {
+            let g = reviera_core::mesh_objects::regenerate(store, e).ok()?;
+            let (mut lo, mut hi) = ([f64::MAX; 2], [f64::MIN; 2]);
+            for (_, (pts, _)) in g.slot_meshes() {
+                for q in pts {
+                    lo = [lo[0].min(q[0]), lo[1].min(q[1])];
+                    hi = [hi[0].max(q[0]), hi[1].max(q[1])];
+                }
+            }
+            (lo[0] <= hi[0]).then(|| (e.id(), vec![lo, [hi[0], lo[1]], hi, [lo[0], hi[1]]]))
+        })
+        .collect();
+    let mut out = Vec::new();
+    for f in &heads {
+        let what = format!("Steam head {}", f.element.0);
+        let base = |message: String, other: Option<ElementId>, measured: Option<f64>, min: Option<f64>, max: Option<f64>| Finding {
+            severity: if pack.layer == Layer::Recommended || rules.confidence == Confidence::Advisory { Severity::Note } else { Severity::Error },
+            kind: FindingKind::Steam,
+            element: f.element,
+            fixture: f.kind,
+            pack: pack.id.clone(),
+            edition: pack.edition.clone(),
+            layer: pack.layer,
+            rule: rules.id.clone(),
+            description: rules.description.clone(),
+            confidence: rules.confidence,
+            source: rules.source.clone(),
+            message,
+            other,
+            depth: None,
+            centroid: None,
+            measured,
+            min,
+            max,
+        };
+        let Some(room) = bath_rules::room_around(store, f) else { continue };
+        let n = room.outline.len() as f64;
+        let middle = [room.outline.iter().map(|q| q[0]).sum::<f64>() / n, room.outline.iter().map(|q| q[1]).sum::<f64>() / n];
+        match bath_rules::ceiling_over(store, &f.level, middle) {
+            None => out.push(base(format!("The steam room round {what} has no ceiling modelled; it slopes at least 1:{:.0} so condensate runs to the walls", 1.0 / rules.ceiling_slope), None, None, None, None)),
+            Some((c, slope)) if slope < rules.ceiling_slope - 1e-4 => out.push(base(format!("The steam room's ceiling {} slopes {:.1} %; {} asks for at least {:.1} % (2 in per ft)", c.0, slope * 100.0, rules.id, rules.ceiling_slope * 100.0), Some(c), Some(slope), Some(rules.ceiling_slope), None)),
+            _ => {}
+        }
+        if room.height > rules.ceiling_max + 1e-6 {
+            out.push(base(format!("The steam room round {what} is {} high; {} gives at most {}", mm(room.height), rules.id, mm(rules.ceiling_max)), None, Some(room.height), None, Some(rules.ceiling_max)));
+        }
+        let head = bath_rules::outline(f);
+        for (b, outline) in &benches {
+            let d = outline.iter().map(|q| bath_rules::plan_distance(&head, *q)).fold(f64::MAX, f64::min).min(head.iter().map(|q| bath_rules::plan_distance(outline, *q)).fold(f64::MAX, f64::min));
+            if d < rules.head_clearance - 1e-6 {
+                out.push(base(format!("{what} is {} from bench {}; {} keeps it at least {} from seats", mm(d), b.0, rules.id, mm(rules.head_clearance)), Some(*b), Some(d), Some(rules.head_clearance), None));
             }
         }
     }

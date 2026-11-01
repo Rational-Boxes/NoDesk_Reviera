@@ -959,7 +959,7 @@ fn the_bathrooms_sample_keeps_its_rooms() {
     // The fixtures by kind: two layouts' worth, the roll-in shower, the hot tub and the heater.
     let mut kinds: Vec<String> = reviera_core::bath_rules::fixtures(&s).iter().map(|f| f.kind.label().to_owned()).collect();
     kinds.sort();
-    assert_eq!(kinds, ["bath", "hot tub", "lavatory", "lavatory", "sauna heater", "shower", "shower", "water closet", "water closet"]);
+    assert_eq!(kinds, ["bath", "hot tub", "lavatory", "lavatory", "sauna heater", "shower", "shower", "steam head", "water closet", "water closet"]);
     // The shower room's drain, and its floor warped to fall to it.
     let drain = s.iter().find(|e| e.param(reviera_core::bath_rules::DRAIN_KEY).is_some()).expect("a drain");
     let floor = drain.param(reviera_core::bath_rules::DRAIN_KEY).unwrap()["floor"].as_str().unwrap().to_owned();
@@ -970,6 +970,13 @@ fn the_bathrooms_sample_keeps_its_rooms() {
     assert_eq!(benches, 8);
     let heater = s.iter().find(|e| e.param("@ObjectType").and_then(Value::as_str) == Some("Sauna Heater")).unwrap();
     assert!(near(reviera_core::bath_rules::product_number(&s, heater, reviera_core::bath_rules::HEATER_POWER).unwrap(), 8000.0, 1e-6));
+    // The steam room's ceiling slopes 2 in per ft.
+    let head = reviera_core::bath_rules::fixtures(&s).into_iter().find(|f| f.kind == reviera_core::bath_rules::FixtureKind::SteamHead).unwrap();
+    let room = reviera_core::bath_rules::room_around(&s, &head).unwrap();
+    let n = room.outline.len() as f64;
+    let middle = [room.outline.iter().map(|q| q[0]).sum::<f64>() / n, room.outline.iter().map(|q| q[1]).sum::<f64>() / n];
+    let (_, slope) = reviera_core::bath_rules::ceiling_over(&s, &head.level, middle).expect("a ceiling");
+    assert!(near(slope, 0.1667, 1e-3), "{slope}");
     // Check Bathrooms finds only the hot tub's pad note; the waterproofing is scheduled.
     let found = ok(&mut app, "bath.check", json!({}));
     let found: Vec<(String, String)> = found.as_array().unwrap().iter().map(|f| (f["severity"].as_str().unwrap().to_owned(), f["kind"].as_str().unwrap().to_owned())).collect();

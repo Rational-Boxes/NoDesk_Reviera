@@ -668,10 +668,15 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
   surfaces and log walls counted); the heater's own safety distances are kept clear, and Check
   Bathrooms reports a heater that does not suit the room, too little ceiling over it, a room
   height outside 2.1–2.44 m and a door opening inward (`bath.sauna`).
+- **Steam rooms** (ARC-BATH-015): Steam Room lays out a ceiling sloped 2 in per ft so
+  condensate runs to the walls, a tiled bench, the steam head and its control, and the floor's
+  falls to a drain, and gives the generator's design volume from the walls' finish; Check
+  Bathrooms reports a flat or missing ceiling, a room over 8 ft and a head near a bench
+  (`bath.steam_room`).
   **Not yet** (planned): living
   layouts that re-fit when the room changes, Jack-and-Jill and back-to-back wet walls,
   other packs' bars (Approved Document M's drop-down rails, shower and bath bars), room layouts, toilet cores and partitions, fixture counts,
-  locker rooms, wet areas, steam rooms, whirlpool baths, the generic bathroom component library and product swaps.
+  locker rooms, wet areas, whirlpool baths, spa accessibility, the generic bathroom component library and product swaps.
 
 ### Structure (in development)
 

@@ -91,6 +91,8 @@ pub enum FixtureKind {
     Spa,
     /// A sauna heater (ARC-BATH-014), by its ObjectType.
     SaunaHeater,
+    /// A steam room's steam head (ARC-BATH-015), by its ObjectType.
+    SteamHead,
 }
 
 impl FixtureKind {
@@ -101,6 +103,7 @@ impl FixtureKind {
             "Bench" => Self::Bench,
             "Hot Tub" => Self::Spa,
             "Sauna Heater" => Self::SaunaHeater,
+            "Steam Head" => Self::SteamHead,
             _ => return None,
         })
     }
@@ -130,6 +133,7 @@ impl FixtureKind {
             Self::Bench => "bench",
             Self::Spa => "hot tub",
             Self::SaunaHeater => "sauna heater",
+            Self::SteamHead => "steam head",
         }
     }
 }
@@ -329,6 +333,8 @@ pub struct Pack {
     pub spa: Option<SpaRules>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sauna: Option<SaunaRules>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub steam: Option<SteamRules>,
 }
 
 fn validator() -> &'static jsonschema::Validator {
@@ -1523,86 +1529,95 @@ pub(crate) fn shower_falls(txn: &mut Transaction<'_>, p: ShowerFallsParams) -> R
         let n = area.len() as f64;
         let centre = [area.iter().map(|q| q[0]).sum::<f64>() / n, area.iter().map(|q| q[1]).sum::<f64>() / n];
         let floor = floor_under(&store, &f.level, centre).ok_or_else(|| bad("bath.no_floor", format!("no Reviera floor under shower {}", id.0)))?;
-        // The drain: the middle, or along the back (the area is front-left, front-right,
-        // back-right, back-left) for a linear drain.
-        let deep = (area[3][0] - area[0][0]).hypot(area[3][1] - area[0][1]);
-        let drain_at = match p.drain {
-            DrainAt::Centre => centre,
-            DrainAt::Linear => {
-                // 100 mm in, clear of the wall behind.
-                let t = 0.1 / deep.max(0.2);
-                let b = [(area[2][0] + area[3][0]) / 2.0, (area[2][1] + area[3][1]) / 2.0];
-                let fr = [(area[0][0] + area[1][0]) / 2.0, (area[0][1] + area[1][1]) / 2.0];
-                [b[0] + (fr[0] - b[0]) * t, b[1] + (fr[1] - b[1]) * t]
-            }
-        };
-        // How deep the drain sits: the fall over the longest run to it, square to an edge of
-        // the area, so every face falls at least that much; by default no steeper than the
-        // pack's steepest over the shortest run.
-        let runs: Vec<f64> = match p.drain {
-            DrainAt::Centre => (0..area.len()).map(|i| edge_distance(area[i], area[(i + 1) % area.len()], drain_at)).collect(),
-            DrainAt::Linear => vec![deep],
-        };
-        let (shortest, longest) = runs.iter().fold((f64::MAX, 0.0f64), |(a, b), r| (a.min(*r), b.max(*r)));
-        let mut depth = fall * longest;
-        if p.fall.is_none() {
-            if let Some(max) = steepest {
-                depth = depth.min(max * shortest);
-            }
-        }
-        // An earlier run's drains and falls go first.
-        for e in store.iter().filter(|e| e.class == "IfcWasteTerminal") {
-            let floor_trap = crate::mesh_objects::type_of(&store, e).is_some_and(|(_, t)| t.predefined_type() == "FLOORTRAP");
-            let at = crate::mesh_objects::mesh_object_recipe(e).map(|r| r.point);
-            if floor_trap && at.is_some_and(|o| inside(&area, o)) {
-                txn.delete(e.id())?;
-            }
-        }
-        crate::shape_edit::clear_within(txn, floor, &area)?;
         let level_ref = ElementRef::Guid(crate::id::GlobalId::parse(&f.level).ok_or_else(|| bad("bath.no_level", "the shower's level is gone"))?);
-        // The drain's top flush with the fallen floor.
-        let drain_height = txn.store().get(drain_type).and_then(mesh_objects::mesh_object_type).map_or(0.08, |t| t.size[2] * t.scale);
-        let drain = crate::mep_controls::place_fixture(
-            txn,
-            crate::mep_controls::PlaceParams {
-                type_id: ElementRef::Id(drain_type),
-                point: drain_at,
-                level: level_ref,
-                offset: Some(-depth - drain_height),
-                rotation: 0.0,
-                host_wall: None,
-                side: None,
-                work_plane: true,
-                controlled_ids: Vec::new(),
-            },
-        )?;
-        let (floor_guid, shower_guid) = (store.get(floor).map(|e| e.guid().to_string()), f.element);
-        let shower_guid = store.get(shower_guid).map(|e| e.guid().to_string());
-        txn.modify(drain, |e| {
-            e.params.insert(DRAIN_KEY.into(), serde_json::json!({ "floor": floor_guid, "shower": shower_guid }));
-        })?;
+        let serves = store.get(f.element).map(|e| e.guid().to_string());
+        let drain = lay_falls(txn, floor, &area, p.drain, fall, if p.fall.is_none() { steepest } else { None }, level_ref, drain_type, serves)?;
         out.drains.push(drain);
-        match p.drain {
-            // The area's edge stays where it is; the drain point drops.
-            DrainAt::Centre => {
-                let mut ring = area.clone();
-                ring.push(area[0]);
-                let n = ring.len();
-                crate::shape_edit::add_offsets(txn, floor, ring, &vec![0.0; n])?;
-                crate::shape_edit::add_offsets(txn, floor, vec![drain_at], &[-depth])?;
-            }
-            // The front and sides fall to a line along the back.
-            DrainAt::Linear => {
-                let edge = vec![area[3], area[0], area[1], area[2]];
-                crate::shape_edit::add_offsets(txn, floor, edge, &[-depth, 0.0, 0.0, -depth])?;
-                crate::shape_edit::add_offsets(txn, floor, vec![area[3], area[2]], &[-depth, -depth])?;
-            }
-        }
         if !out.floors.contains(&floor) {
             out.floors.push(floor);
         }
     }
     Ok(out)
+}
+
+/// Lays falls over an area of a floor to a new drain: the area's edge stays where it is and
+/// the drain (at its centre, or along its back for a linear one: the area is front-left,
+/// front-right, back-right, back-left) sinks by the fall over the longest run to it, no deeper
+/// than `steepest` allows over the shortest. Earlier drains and falls within the area go first.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn lay_falls(txn: &mut Transaction<'_>, floor: ElementId, area: &[[f64; 2]], drain_kind: DrainAt, fall: f64, steepest: Option<f64>, level_ref: ElementRef, drain_type: ElementId, serves: Option<String>) -> Result<ElementId> {
+    let store = txn.store().clone();
+    // The drain: the middle, or along the back (the area is front-left, front-right,
+    // back-right, back-left) for a linear drain.
+    let deep = (area[3][0] - area[0][0]).hypot(area[3][1] - area[0][1]);
+    let drain_at = match drain_kind {
+        DrainAt::Centre => [area.iter().map(|q| q[0]).sum::<f64>() / area.len() as f64, area.iter().map(|q| q[1]).sum::<f64>() / area.len() as f64],
+        DrainAt::Linear => {
+            // 100 mm in, clear of the wall behind.
+            let t = 0.1 / deep.max(0.2);
+            let b = [(area[2][0] + area[3][0]) / 2.0, (area[2][1] + area[3][1]) / 2.0];
+            let fr = [(area[0][0] + area[1][0]) / 2.0, (area[0][1] + area[1][1]) / 2.0];
+            [b[0] + (fr[0] - b[0]) * t, b[1] + (fr[1] - b[1]) * t]
+        }
+    };
+    // How deep the drain sits: the fall over the longest run to it, square to an edge of
+    // the area, so every face falls at least that much; by default no steeper than the
+    // pack's steepest over the shortest run.
+    let runs: Vec<f64> = match drain_kind {
+        DrainAt::Centre => (0..area.len()).map(|i| edge_distance(area[i], area[(i + 1) % area.len()], drain_at)).collect(),
+        DrainAt::Linear => vec![deep],
+    };
+    let (shortest, longest) = runs.iter().fold((f64::MAX, 0.0f64), |(a, b), r| (a.min(*r), b.max(*r)));
+    let mut depth = fall * longest;
+    if let Some(max) = steepest {
+        depth = depth.min(max * shortest);
+    }
+    // An earlier run's drains and falls go first.
+    for e in store.iter().filter(|e| e.class == "IfcWasteTerminal") {
+        let floor_trap = crate::mesh_objects::type_of(&store, e).is_some_and(|(_, t)| t.predefined_type() == "FLOORTRAP");
+        let at = crate::mesh_objects::mesh_object_recipe(e).map(|r| r.point);
+        if floor_trap && at.is_some_and(|o| inside(&area, o)) {
+            txn.delete(e.id())?;
+        }
+    }
+    crate::shape_edit::clear_within(txn, floor, &area)?;
+    // The drain's top flush with the fallen floor.
+    let drain_height = txn.store().get(drain_type).and_then(mesh_objects::mesh_object_type).map_or(0.08, |t| t.size[2] * t.scale);
+    let drain = crate::mep_controls::place_fixture(
+        txn,
+        crate::mep_controls::PlaceParams {
+            type_id: ElementRef::Id(drain_type),
+            point: drain_at,
+            level: level_ref,
+            offset: Some(-depth - drain_height),
+            rotation: 0.0,
+            host_wall: None,
+            side: None,
+            work_plane: true,
+            controlled_ids: Vec::new(),
+        },
+    )?;
+    let floor_guid = store.get(floor).map(|e| e.guid().to_string());
+    txn.modify(drain, |e| {
+        e.params.insert(DRAIN_KEY.into(), serde_json::json!({ "floor": floor_guid, "shower": serves }));
+    })?;
+    match drain_kind {
+        // The area's edge stays where it is; the drain point drops.
+        DrainAt::Centre => {
+            let mut ring = area.to_vec();
+            ring.push(area[0]);
+            let n = ring.len();
+            crate::shape_edit::add_offsets(txn, floor, ring, &vec![0.0; n])?;
+            crate::shape_edit::add_offsets(txn, floor, vec![drain_at], &[-depth])?;
+        }
+        // The front and sides fall to a line along the back.
+        DrainAt::Linear => {
+            let edge = vec![area[3], area[0], area[1], area[2]];
+            crate::shape_edit::add_offsets(txn, floor, edge, &[-depth, 0.0, 0.0, -depth])?;
+            crate::shape_edit::add_offsets(txn, floor, vec![area[3], area[2]], &[-depth, -depth])?;
+        }
+    }
+    Ok(drain)
 }
 
 // ---- Waterproofing extents (ARC-BATH-012) ----
@@ -1972,6 +1987,7 @@ pub fn product_pack() -> Pack {
         waterproofing: Vec::new(),
         spa: None,
         sauna: None,
+        steam: None,
     }
 }
 
@@ -2001,6 +2017,72 @@ fn heater_space(store: &Store, f: &Fixture) -> Option<Space> {
         clearance: Clearance { element: f.element, kind: ClearanceKind::FixtureSpace, rule: zone.id.clone(), mesh: f.zone_mesh(&zone, 0.0), door_swing_forbidden: false },
         pack: "product".into(),
         zone,
+    })
+}
+
+// ---- Steam rooms (ARC-BATH-015) ----
+
+/// A pack's steam-room rules: the ceiling's slope and height, the floor's fall, the steam head's
+/// distance from seats, and one maker's factors for the generator's design volume.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct SteamRules {
+    pub id: String,
+    pub description: String,
+    /// The ceiling's least slope (a gradient: 2 in per ft is 0.1667).
+    pub ceiling_slope: f64,
+    /// The ceiling's height: the ideal (its high side by default) and the most.
+    pub ceiling_ideal: f64,
+    pub ceiling_max: f64,
+    /// The floor's fall to its drain.
+    pub floor_fall: f64,
+    /// A steam head at least this far (in plan) from a bench.
+    pub head_clearance: f64,
+    /// The generator's design volume: the room's volume times the walls' material factor,
+    /// raised by `height_step` for each `height_unit` above `height_base`, and by
+    /// `exterior_wall` for an outside wall.
+    pub materials: BTreeMap<String, f64>,
+    pub height_base: f64,
+    pub height_unit: f64,
+    pub height_step: f64,
+    pub exterior_wall: f64,
+    pub source: String,
+    pub confidence: Confidence,
+}
+
+/// The steam rules in use, else the shipped ones.
+pub fn steam_rules(store: &Store) -> SteamRules {
+    active(store).into_iter().find_map(|p| p.steam).or_else(|| shipped().iter().find_map(|p| p.steam.clone())).expect("a shipped pack has steam rules")
+}
+
+/// A steam generator's design volume (m³), by one maker's factors.
+pub fn steam_design_volume(r: &SteamRules, volume: f64, high: f64, material: &str, exterior: bool) -> Result<f64> {
+    let m = r.materials.get(material).copied().ok_or_else(|| bad("bath.invalid_input", format!("no factor for walls of {material:?}; there are: {}", r.materials.keys().cloned().collect::<Vec<_>>().join(", "))))?;
+    let steps = ((high - r.height_base) / r.height_unit).max(0.0);
+    Ok(volume * m * (1.0 + r.height_step * steps) * if exterior { 1.0 + r.exterior_wall } else { 1.0 })
+}
+
+/// The ceiling (a Reviera ceiling) over a plan point on a level, and its slope there: the
+/// steepest of its underside's facets over the point's room, 0 when it is flat.
+pub fn ceiling_over(store: &Store, level: &str, p: [f64; 2]) -> Option<(ElementId, f64)> {
+    store.iter().find_map(|e| {
+        let (kind, r) = crate::floors::slab_recipe(e)?;
+        if kind != crate::floors::SlabKind::Ceiling || r.level != level {
+            return None;
+        }
+        let g = crate::floors::regenerate(store, e).ok()?;
+        let profile = g.profiles.first().filter(|pr| inside(&pr.outer, p))?;
+        let slope = crate::shape_edit::shape_of(e)
+            .and_then(|s| crate::shape_edit::top_triangles(profile, &s).ok())
+            .map_or(0.0, |tris| {
+                tris.iter()
+                    .filter_map(|t| {
+                        let (u, v) = ([t[1][0] - t[0][0], t[1][1] - t[0][1], t[1][2] - t[0][2]], [t[2][0] - t[0][0], t[2][1] - t[0][1], t[2][2] - t[0][2]]);
+                        let n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+                        (n[2].abs() > 1e-12).then(|| (n[0] * n[0] + n[1] * n[1]).sqrt() / n[2].abs())
+                    })
+                    .fold(f64::MAX, f64::min)
+            });
+        Some((e.id(), if slope == f64::MAX { 0.0 } else { slope }))
     })
 }
 

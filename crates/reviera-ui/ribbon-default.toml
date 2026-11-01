@@ -756,6 +756,12 @@ icon = "sauna"
 help = "Lay out a sauna in a room closed by walls: bench modules in one or two tiers along the longer wall, and a wall heater sized from the room's volume (glass and tile counted, log walls × 1.5), its safety distances kept clear (ARC-BATH-014)"
 
 [[action]]
+id = "ui.steam_room"
+label = "Steam Room"
+icon = "steam_room"
+help = "Lay out a steam room in a room closed by walls: a ceiling sloped 1:6 to shed condensate, a tiled bench along the longer wall, the steam head and its control, the floor's falls to a drain; the generator's design volume from the walls' finish (ARC-BATH-015)"
+
+[[action]]
 id = "ui.toilet_core"
 label = "Toilet Core"
 icon = "bathroom_layout"
@@ -3448,6 +3454,7 @@ tools = [
   { action = "ui.toilet_core", size = "large" },
   { action = "ui.locker_room", size = "large" },
   { action = "ui.sauna", size = "large" },
+  { action = "ui.steam_room", size = "small" },
   { action = "ui.shower_falls", size = "small" },
   { action = "ui.waterproofing", size = "small" },
   { action = "roof.create_geodesic", size = "small" },
@@ -4680,7 +4687,7 @@ items = [
   "ceiling.create", "ceiling.edit_boundary", "roof.create_footprint", "roof.edit_footprint", "-",
   "room.place", "room.place_automatically", "-",
   "roof.create_extrusion", "slabedge.create", "enclosure.create", "roof.create_geodesic", "growing.layout", "growing.lights", "-",
-  "ui.place_bathroom_component", "ui.bathroom_layout", "ui.toilet_core", "ui.locker_room", "ui.sauna", "ui.shower_falls", "ui.waterproofing", "ui.make_product", "ui.swap_for_product", "ui.product_documents", "bath.place_grab_bars", "bath.check", "ui.fixture_count", "-",
+  "ui.place_bathroom_component", "ui.bathroom_layout", "ui.toilet_core", "ui.locker_room", "ui.sauna", "ui.steam_room", "ui.shower_falls", "ui.waterproofing", "ui.make_product", "ui.swap_for_product", "ui.product_documents", "bath.place_grab_bars", "bath.check", "ui.fixture_count", "-",
   "opening.create_wall", "opening.create_vertical", "opening.create_by_face", "opening.create_shaft", "-",
   "grid.create", "level.create", "refplane.create", "modelline.create", "-",
   "workplane.set", "workplane.show",
