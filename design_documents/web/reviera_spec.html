@@ -28241,7 +28241,7 @@ CREATE TABLE base_rxd (
 - [x] Under <code>uk_bs7671</code>, a bath has zones 0, 1 (to 2.25 m) and 2 (0.6 m beyond), and a level shower's head a 1.2 m zone 1.
 - [x] A socket 1.5 m from the bath's zone 1 is reported, and one 3 m away is not.
 - [x] A luminaire in zone 1 rated IPX4 passes, one rated IP20 is reported, and one with no rating gets a note.</p>
-<p><em>Built (2026-10-31):</em> the <code>electrical</code> section of the pack schema, the <code>uk_bs7671</code> pack (chosen with England's code), zones as virtual volumes in <code>clearances::all</code> (yellow, passed by <code>clearance.check</code>), and the device checks in <code>bath.check</code>. Not yet: NEC luminaire rules for the US (410.10(D), not verified; receptacles are ARC-BATH-021), shaver units and SELV equipment told apart, zones clipped by walls and screens (DIN VDE 0100-701's "string" round a partial wall), and IP ratings in the component catalogue.</p>
+<p><em>Built (2026-10-31):</em> the <code>electrical</code> section of the pack schema, the <code>uk_bs7671</code> pack (chosen with England's code), zones as virtual volumes in <code>clearances::all</code> (yellow, passed by <code>clearance.check</code>), and the device checks in <code>bath.check</code>. Not yet: NEC luminaire rules for the US (410.10(D), not verified; receptacles are ARC-BATH-021), shaver units and SELV equipment told apart, the zones' drawn volumes clipped by walls (the checks already pass a device with a wall between it and the fixture), screens and partial walls (DIN VDE 0100-701's "string" round a partial wall), and IP ratings in the component catalogue.</p>
 <h3 id="39a11-shower-falls">3.9a.11 Shower falls</h3>
 <p><strong>ID:</strong> <code class="rid" id="ARC-BATH-011">ARC-BATH-011</code> · <strong>Priority:</strong> <span class="pri pri-p1">P1</span> · <strong>Ref:</strong> <code>BATHROOMS_PLAN.md</code> §6.5; research/13 A4, A9</p>
 <p><strong>Purpose.</strong> Lay the falls of a level-access shower's floor to its drain in one step, and check that showers fall enough, and not too much.</p>
@@ -28515,7 +28515,7 @@ CREATE TABLE base_rxd (
 - [x] Under the IRC, a 5 × 8 ft bath with no receptacles has no NEC findings; with one by the basin, none; with one 300 mm in front of the tub, 400 mm up, that one is reported.
 - [x] With the only receptacle across the room from the basin, the basin is reported.</p>
 <p><em>Built (2026-11-01):</em> the pack, the schema section and the checks. Not yet:
-- the zone cut by walls, doors and fixed barriers;
+- the zone cut by doors and fixed barriers other than walls (a receptacle with a wall between it and the fixture is passed);
 - 406.9(C)'s exceptions;
 - GFCI protection (210.8) and the 20 A bathroom circuit (210.11(C)(3)) checked on circuits (MEP-ELEC);
 - the luminaire and switch rules (410.10(D), 404.4(C)), whose wording was not verified;

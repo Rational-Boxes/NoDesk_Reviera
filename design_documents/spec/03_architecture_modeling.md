@@ -4304,7 +4304,7 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 - [x] A socket 1.5 m from the bath's zone 1 is reported, and one 3 m away is not.
 - [x] A luminaire in zone 1 rated IPX4 passes, one rated IP20 is reported, and one with no rating gets a note.
 
-*Built (2026-10-31):* the `electrical` section of the pack schema, the `uk_bs7671` pack (chosen with England's code), zones as virtual volumes in `clearances::all` (yellow, passed by `clearance.check`), and the device checks in `bath.check`. Not yet: NEC luminaire rules for the US (410.10(D), not verified; receptacles are ARC-BATH-021), shaver units and SELV equipment told apart, zones clipped by walls and screens (DIN VDE 0100-701's "string" round a partial wall), and IP ratings in the component catalogue.
+*Built (2026-10-31):* the `electrical` section of the pack schema, the `uk_bs7671` pack (chosen with England's code), zones as virtual volumes in `clearances::all` (yellow, passed by `clearance.check`), and the device checks in `bath.check`. Not yet: NEC luminaire rules for the US (410.10(D), not verified; receptacles are ARC-BATH-021), shaver units and SELV equipment told apart, the zones' drawn volumes clipped by walls (the checks already pass a device with a wall between it and the fixture), screens and partial walls (DIN VDE 0100-701's "string" round a partial wall), and IP ratings in the component catalogue.
 
 ### 3.9a.11 Shower falls
 **ID:** ARC-BATH-011 · **Priority:** P1 · **Ref:** `BATHROOMS_PLAN.md` §6.5; research/13 A4, A9
@@ -4673,7 +4673,7 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 - [x] With the only receptacle across the room from the basin, the basin is reported.
 
 *Built (2026-11-01):* the pack, the schema section and the checks. Not yet:
-- the zone cut by walls, doors and fixed barriers;
+- the zone cut by doors and fixed barriers other than walls (a receptacle with a wall between it and the fixture is passed);
 - 406.9(C)'s exceptions;
 - GFCI protection (210.8) and the 20 A bathroom circuit (210.11(C)(3)) checked on circuits (MEP-ELEC);
 - the luminaire and switch rules (410.10(D), 404.4(C)), whose wording was not verified;
