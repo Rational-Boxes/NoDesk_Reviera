@@ -56,6 +56,9 @@ pub enum FindingKind {
     Sauna,
     /// A steam room's ceiling, height or steam head (ARC-BATH-015).
     Steam,
+    /// An accessible sauna's, steam room's or spa's bench, turning space or means of entry
+    /// (ARC-BATH-016).
+    Access,
 }
 
 /// One thing the check found.
@@ -298,6 +301,7 @@ pub(crate) fn check(app: &mut App, p: CheckParams) -> Result<Vec<Finding>> {
         out.extend(spa_findings(store, only.as_deref()));
         out.extend(sauna_findings(store, only.as_deref()));
         out.extend(steam_findings(store, only.as_deref()));
+        out.extend(access_findings(store, only.as_deref()));
         out.sort_by(|a, b| a.severity.cmp(&b.severity).then(a.element.0.cmp(&b.element.0)));
         Ok(out)
     }
@@ -800,6 +804,139 @@ fn steam_findings(store: &reviera_core::Store, only: Option<&[ElementId]>) -> Ve
             let d = outline.iter().map(|q| bath_rules::plan_distance(&head, *q)).fold(f64::MAX, f64::min).min(head.iter().map(|q| bath_rules::plan_distance(outline, *q)).fold(f64::MAX, f64::min));
             if d < rules.head_clearance - 1e-6 {
                 out.push(base(format!("{what} is {} from bench {}; {} keeps it at least {} from seats", mm(d), b.0, rules.id, mm(rules.head_clearance)), Some(*b), Some(d), Some(rules.head_clearance), None));
+            }
+        }
+    }
+    out
+}
+
+/// Accessible saunas, steam rooms and spas (ARC-BATH-016): a §903 bench and a turning space in a
+/// sauna or steam room, and a means of entry at a spa where the building is not a dwelling.
+fn access_findings(store: &reviera_core::Store, only: Option<&[ElementId]>) -> Vec<Finding> {
+    let packs: Vec<bath_rules::Pack> = bath_rules::active(store).into_iter().filter(|p| p.spa_access.is_some()).collect();
+    if packs.is_empty() {
+        return Vec::new();
+    }
+    let fixtures: Vec<bath_rules::Fixture> = bath_rules::fixtures(store)
+        .into_iter()
+        .filter(|f| matches!(f.kind, FixtureKind::SaunaHeater | FixtureKind::SteamHead | FixtureKind::Spa) && f.accessible && !only.is_some_and(|ids| !ids.contains(&f.element)))
+        .collect();
+    if fixtures.is_empty() {
+        return Vec::new();
+    }
+    let object_type = |e: &reviera_core::Element| e.param("@ObjectType").and_then(serde_json::Value::as_str).map(str::to_owned);
+    let dwelling = reviera_core::codes::settings(store).occupancy == reviera_core::codes::Occupancy::Dwelling;
+    let mut out = Vec::new();
+    for pack in &packs {
+        let r = pack.spa_access.as_ref().expect("filtered");
+        for f in &fixtures {
+            let base = |message: String, other: Option<ElementId>, measured: Option<f64>, min: Option<f64>, max: Option<f64>| Finding {
+                severity: if pack.layer == Layer::Recommended || r.confidence == Confidence::Advisory { Severity::Note } else { Severity::Error },
+                kind: FindingKind::Access,
+                element: f.element,
+                fixture: f.kind,
+                pack: pack.id.clone(),
+                edition: pack.edition.clone(),
+                layer: pack.layer,
+                rule: r.id.clone(),
+                description: r.description.clone(),
+                confidence: r.confidence,
+                source: r.source.clone(),
+                message,
+                other,
+                depth: None,
+                centroid: None,
+                measured,
+                min,
+                max,
+            };
+            if f.kind == FixtureKind::Spa {
+                // A spa in a building other than a dwelling: a lift, transfer wall or system by it.
+                if dwelling {
+                    continue;
+                }
+                let tub = bath_rules::outline(f);
+                let entries: Vec<bath_rules::Piece> = store
+                    .iter()
+                    .filter(|e| object_type(e).is_some_and(|o| r.entries.contains(&o)))
+                    .filter_map(|e| bath_rules::piece(store, e, f.floor))
+                    .filter(|p| p.outline.iter().map(|q| bath_rules::plan_distance(&tub, *q)).fold(f64::MAX, f64::min) <= r.entry_reach)
+                    .collect();
+                if entries.is_empty() {
+                    out.push(base(format!("Hot tub {} has no accessible means of entry (a pool lift, transfer wall or transfer system, {})", f.element.0, r.id), None, None, None, None));
+                }
+                for p in entries.iter().filter(|p| store.get(p.element).and_then(object_type).as_deref() == Some("Spa Transfer Wall")) {
+                    let mut wrong = Vec::new();
+                    if p.end_top < r.transfer_wall_height[0] - 1e-3 || p.end_top > r.transfer_wall_height[1] + 1e-3 {
+                        wrong.push(format!("{} high", mm(p.end_top)));
+                    }
+                    let (long, deep) = (p.length.max(p.depth), p.length.min(p.depth));
+                    if deep < r.transfer_wall_depth[0] - 1e-3 || deep > r.transfer_wall_depth[1] + 1e-3 {
+                        wrong.push(format!("{} deep", mm(deep)));
+                    }
+                    if long < r.transfer_wall_length - 1e-3 {
+                        wrong.push(format!("{} long", mm(long)));
+                    }
+                    if !wrong.is_empty() {
+                        out.push(base(format!("Transfer wall {} at hot tub {} is {}; {} asks for {}–{} high, {}–{} deep and at least {} long", p.element.0, f.element.0, wrong.join(", "), r.id, mm(r.transfer_wall_height[0]), mm(r.transfer_wall_height[1]), mm(r.transfer_wall_depth[0]), mm(r.transfer_wall_depth[1]), mm(r.transfer_wall_length)), Some(p.element), None, None, None));
+                    }
+                }
+                continue;
+            }
+            // A sauna or steam room: its benches and what else stands in it.
+            let what = if f.kind == FixtureKind::SaunaHeater { "sauna" } else { "steam room" };
+            let Some(room) = bath_rules::room_around(store, f) else { continue };
+            let inside = |p: &bath_rules::Piece| {
+                let n = p.outline.len() as f64;
+                let c = [p.outline.iter().map(|q| q[0]).sum::<f64>() / n, p.outline.iter().map(|q| q[1]).sum::<f64>() / n];
+                bath_rules::plan_distance(&room.outline, c) == 0.0
+            };
+            let benches: Vec<bath_rules::Piece> = store
+                .iter()
+                .filter(|e| matches!(object_type(e).as_deref(), Some("Sauna Bench" | "Steam Bench" | "Bench")))
+                .filter_map(|e| bath_rules::piece(store, e, f.floor))
+                .filter(|p| inside(p))
+                .collect();
+            if !benches.is_empty() {
+                let fit: f64 = benches
+                    .iter()
+                    .filter(|p| p.top >= r.bench_height[0] - 1e-3 && p.top <= r.bench_height[1] + 1e-3 && p.depth >= r.bench_depth[0] - 1e-3 && p.depth <= r.bench_depth[1] + 1e-3)
+                    .map(|p| p.length)
+                    .sum();
+                if fit < r.bench_length - 1e-3 {
+                    out.push(base(format!("The {what} round {} {} has no bench to §903 ({} of one): {}–{} high, {}–{} deep, at least {} long", f.kind.label(), f.element.0, mm(fit), mm(r.bench_height[0]), mm(r.bench_height[1]), mm(r.bench_depth[0]), mm(r.bench_depth[1]), mm(r.bench_length)), None, Some(fit), Some(r.bench_length), None));
+                }
+            }
+            // The turning space: a circle clear of the walls, benches and the heater or head.
+            let mut obstacles: Vec<Vec<[f64; 2]>> = benches.iter().map(|p| p.outline.clone()).collect();
+            if let Some(p) = store.get(f.element).and_then(|e| bath_rules::piece(store, e, f.floor)) {
+                obstacles.push(p.outline);
+            }
+            let radius = r.turning_diameter / 2.0;
+            let (lo, hi) = room.outline.iter().fold(([f64::MAX; 2], [f64::MIN; 2]), |(lo, hi), q| ([lo[0].min(q[0]), lo[1].min(q[1])], [hi[0].max(q[0]), hi[1].max(q[1])]));
+            let edge = |c: [f64; 2]| (0..room.outline.len()).map(|i| {
+                let (a, b) = (room.outline[i], room.outline[(i + 1) % room.outline.len()]);
+                let d = [b[0] - a[0], b[1] - a[1]];
+                let t = (((c[0] - a[0]) * d[0] + (c[1] - a[1]) * d[1]) / (d[0] * d[0] + d[1] * d[1]).max(1e-18)).clamp(0.0, 1.0);
+                (c[0] - a[0] - d[0] * t).hypot(c[1] - a[1] - d[1] * t)
+            }).fold(f64::MAX, f64::min);
+            let step = 0.05;
+            let mut fits = false;
+            let mut x = lo[0] + radius;
+            'search: while x <= hi[0] - radius + 1e-9 {
+                let mut y = lo[1] + radius;
+                while y <= hi[1] - radius + 1e-9 {
+                    let c = [x, y];
+                    if bath_rules::plan_distance(&room.outline, c) == 0.0 && edge(c) >= radius - 1e-6 && obstacles.iter().all(|o| bath_rules::plan_distance(o, c) >= radius - 1e-6) {
+                        fits = true;
+                        break 'search;
+                    }
+                    y += step;
+                }
+                x += step;
+            }
+            if !fits {
+                out.push(base(format!("The {what} round {} {} has no {} turning space clear of its benches ({})", f.kind.label(), f.element.0, mm(r.turning_diameter), r.id), None, None, Some(r.turning_diameter), None));
             }
         }
     }

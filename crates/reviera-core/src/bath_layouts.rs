@@ -574,6 +574,10 @@ pub struct SaunaParams {
     pub log_walls: bool,
     /// The heater's power (kW); default sized from the room.
     pub heater_kw: Option<f64>,
+    /// The lowest bench to ADA §903 (17–19 in high, 24 in deep), as ADA §241 asks where a sauna
+    /// has seats (ARC-BATH-016).
+    #[serde(default)]
+    pub accessible: bool,
     #[serde(default)]
     pub replace: bool,
 }
@@ -624,7 +628,10 @@ pub(crate) fn sauna(txn: &mut Transaction<'_>, p: SaunaParams) -> Result<Sauna> 
             return Err(bad("bath.no_fit", format!("the design volume, {:.1} m³, is outside the heater table ({lo}–{hi} m³); give heater_kw", sizing.design_volume)).with_details(serde_json::to_value(&sizing).expect("serialises")));
         }
     };
-    let benches_deep = if tiers == 2 { UPPER + LOWER } else { UPPER };
+    // The accessible bench is 610 mm deep, the lower tier (or the only one).
+    const ACCESSIBLE: f64 = 0.61;
+    let lower = if p.accessible { ACCESSIBLE } else { LOWER };
+    let benches_deep = if tiers == 2 { UPPER + lower } else if p.accessible { ACCESSIBLE } else { UPPER };
     if room.depth < benches_deep + WALKWAY - 1e-6 {
         return Err(bad("bath.no_fit", format!("the room is {:.0} mm too narrow for {tiers} bench tier(s) ({:.0} mm deep) and a {:.0} mm walkway", (benches_deep + WALKWAY - room.depth) * 1000.0, benches_deep * 1000.0, WALKWAY * 1000.0)));
     }
@@ -634,7 +641,12 @@ pub(crate) fn sauna(txn: &mut Transaction<'_>, p: SaunaParams) -> Result<Sauna> 
     }
     // The upper bench a headroom below the ceiling, the lower 450 mm below it.
     let upper_top = (height - rules.upper_bench_headroom).clamp(0.45, 1.2);
-    let bench_tops = if tiers == 2 { vec![upper_top, (upper_top - 0.45).max(0.4)] } else { vec![upper_top.min(0.9)] };
+    let bench_tops = match (tiers, p.accessible) {
+        (2, true) => vec![upper_top, 0.46],
+        (2, false) => vec![upper_top, (upper_top - 0.45).max(0.4)],
+        (_, true) => vec![0.46],
+        (_, false) => vec![upper_top.min(0.9)],
+    };
 
     if p.replace {
         let old: Vec<ElementId> = txn.store().iter().filter(|e| e.param(LAYOUT_KEY).and_then(|v| v.get("room")).and_then(|v| v.as_str()) == Some(room.key.as_str())).map(crate::element::Element::id).collect();
@@ -644,7 +656,7 @@ pub(crate) fn sauna(txn: &mut Transaction<'_>, p: SaunaParams) -> Result<Sauna> 
             }
         }
     }
-    let names = ["Sauna heater, wall", "Sauna bench, upper 600", "Sauna bench, lower 600"];
+    let names = ["Sauna heater, wall", "Sauna bench, upper 600", if p.accessible { "Sauna bench, accessible 600" } else { "Sauna bench, lower 600" }];
     let types = crate::bath_components::load(txn, crate::bath_components::LoadParams { names: names.iter().map(|n| (*n).to_owned()).collect() })?;
     let tag = json!({ "template": "sauna", "room": room.key });
     let mut placed = Vec::new();
@@ -677,9 +689,15 @@ pub(crate) fn sauna(txn: &mut Transaction<'_>, p: SaunaParams) -> Result<Sauna> 
     let a0 = (room.length - f64::from(modules) * MODULE) / 2.0;
     for k in 0..modules {
         let a = a0 + MODULE * (f64::from(k) + 0.5);
-        put(txn, names[1], None, at(a, UPPER / 2.0), facing, Some(bench_tops[0] - 0.45))?;
+        // The accessible module's top is 460 mm in its geometry, the others' 450 mm.
+        let top_of = |name: &str| if name == "Sauna bench, accessible 600" { 0.46 } else { 0.45 };
         if tiers == 2 {
-            put(txn, names[2], None, at(a, UPPER + LOWER / 2.0), facing, Some(bench_tops[1] - 0.45))?;
+            put(txn, names[1], None, at(a, UPPER / 2.0), facing, Some(bench_tops[0] - 0.45))?;
+            put(txn, names[2], None, at(a, UPPER + lower / 2.0), facing, Some(bench_tops[1] - top_of(names[2])))?;
+        } else if p.accessible {
+            put(txn, names[2], None, at(a, ACCESSIBLE / 2.0), facing, Some(bench_tops[0] - top_of(names[2])))?;
+        } else {
+            put(txn, names[1], None, at(a, UPPER / 2.0), facing, Some(bench_tops[0] - 0.45))?;
         }
     }
     // The heater on the start wall, toward the far side from the benches.
@@ -716,6 +734,9 @@ pub struct SteamRoomParams {
     /// Lay the floor's falls to a centre drain when a Reviera floor is under the room (default
     /// true).
     pub floor_falls: Option<bool>,
+    /// The bench to ADA §903 (24 in deep, 18 in high), as ADA §612 asks (ARC-BATH-016).
+    #[serde(default)]
+    pub accessible: bool,
     #[serde(default)]
     pub replace: bool,
 }
@@ -743,7 +764,7 @@ pub struct SteamRoom {
 /// the steam head and its control, and the floor's falls to a drain.
 pub(crate) fn steam_room(txn: &mut Transaction<'_>, p: SteamRoomParams) -> Result<SteamRoom> {
     const MODULE: f64 = 0.6;
-    const BENCH: f64 = 0.45;
+    let bench_depth = if p.accessible { 0.61 } else { 0.45 };
     let store = txn.store().clone();
     let level = store.resolve(&p.level).and_then(|l| store.get(l)).filter(|l| l.class == crate::levels::CLASS).ok_or_else(|| bad("bath.no_level", "no such level"))?;
     let floor_z = crate::levels::elevation(level);
@@ -764,8 +785,8 @@ pub(crate) fn steam_room(txn: &mut Transaction<'_>, p: SteamRoomParams) -> Resul
     let volume = room.length * room.depth * (high + low) / 2.0;
     let design_volume = bath_rules::steam_design_volume(&rules, volume, high, &material, p.exterior_wall)?;
     let modules = ((room.length / MODULE) + 1e-9).floor() as u32;
-    if room.depth < BENCH + 0.7 {
-        return Err(bad("bath.no_fit", format!("the room is {:.0} mm too narrow for a bench and a 700 mm walkway", (BENCH + 0.7 - room.depth) * 1000.0)));
+    if room.depth < bench_depth + 0.7 {
+        return Err(bad("bath.no_fit", format!("the room is {:.0} mm too narrow for a bench and a 700 mm walkway", (bench_depth + 0.7 - room.depth) * 1000.0)));
     }
 
     if p.replace {
@@ -796,7 +817,7 @@ pub(crate) fn steam_room(txn: &mut Transaction<'_>, p: SteamRoomParams) -> Resul
     })?;
     placed.push(ceiling);
 
-    let names = ["Steam room bench 600", "Steam head", "Steam control"];
+    let names = [if p.accessible { "Steam room bench, accessible 600" } else { "Steam room bench 600" }, "Steam head", "Steam control"];
     let types = crate::bath_components::load(txn, crate::bath_components::LoadParams { names: names.iter().map(|n| (*n).to_owned()).collect() })?;
     let facing = (-w[0]).atan2(w[1]);
     let mut put = |txn: &mut Transaction<'_>, name: &str, host: Option<ElementId>, q: [f64; 2], rotation: f64| -> Result<ElementId> {
@@ -825,9 +846,9 @@ pub(crate) fn steam_room(txn: &mut Transaction<'_>, p: SteamRoomParams) -> Resul
     // control on the far wall by the start end.
     let a0 = (room.length - f64::from(modules) * MODULE) / 2.0;
     for k in 0..modules {
-        put(txn, names[0], None, at(a0 + MODULE * (f64::from(k) + 0.5), BENCH / 2.0), facing)?;
+        put(txn, names[0], None, at(a0 + MODULE * (f64::from(k) + 0.5), bench_depth / 2.0), facing)?;
     }
-    let head_b = (BENCH + rules.head_clearance + 0.1).max(room.depth - 0.35).min(room.depth - 0.1);
+    let head_b = (bench_depth + rules.head_clearance + 0.1).max(room.depth - 0.35).min(room.depth - 0.1);
     let steam_head = put(txn, names[1], Some(room.start_wall), at(0.1, head_b), 0.0)?;
     put(txn, names[2], Some(room.opposite), at(0.4, room.depth - 0.1), 0.0)?;
     // The floor's falls to a centre drain.

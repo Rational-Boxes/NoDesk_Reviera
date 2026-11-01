@@ -339,6 +339,53 @@ pub fn catalogue() -> Vec<Component> {
             shape: || Shape::default().cuboid([-0.3, 0.3], [-0.225, 0.225], [0.0, 0.45]),
             connectors: none,
         },
+        // Accessible spa rooms and spas (ARC-BATH-016): a §903 bench module for saunas and steam
+        // rooms, a transfer wall and a pool lift.
+        Component {
+            name: "Sauna bench, accessible 600",
+            category: C::Furniture,
+            predefined: "USERDEFINED",
+            element_type: Some("Sauna Bench"),
+            color: WOOD,
+            // 600 long, 610 (24 in) deep, its top 460 mm up (17–19 in).
+            shape: || Shape::default().cuboid([-0.3, 0.3], [-0.305, 0.305], [0.42, 0.46]).cuboid([-0.3, 0.3], [-0.305, -0.285], [0.0, 0.42]),
+            connectors: none,
+        },
+        Component {
+            name: "Steam room bench, accessible 600",
+            category: C::Furniture,
+            predefined: "USERDEFINED",
+            element_type: Some("Steam Bench"),
+            color: WHITE,
+            shape: || Shape::default().cuboid([-0.3, 0.3], [-0.305, 0.305], [0.0, 0.46]),
+            connectors: none,
+        },
+        Component {
+            name: "Spa transfer wall",
+            category: C::Furniture,
+            predefined: "USERDEFINED",
+            element_type: Some("Spa Transfer Wall"),
+            color: WHITE,
+            // 1525 long, 355 deep, 455 high (ADA 1009.4), with two grab bars across it 4–6 in
+            // above, 610 mm apart.
+            shape: || {
+                Shape::default()
+                    .cuboid([-0.7625, 0.7625], [-0.1775, 0.1775], [0.0, 0.455])
+                    .cuboid([-0.325, -0.285], [-0.1775, 0.1775], [0.455, 0.585])
+                    .cuboid([0.285, 0.325], [-0.1775, 0.1775], [0.455, 0.585])
+            },
+            connectors: none,
+        },
+        Component {
+            name: "Pool lift",
+            category: C::Furniture,
+            predefined: "USERDEFINED",
+            element_type: Some("Pool Lift"),
+            color: GREY,
+            // A post on the deck with a seat 460 mm up swung over the water.
+            shape: || Shape::default().cuboid([-0.08, 0.08], [0.2, 0.36], [0.0, 1.4]).cuboid([-0.23, 0.23], [-0.25, 0.2], [0.42, 0.46]),
+            connectors: none,
+        },
         // Accessories (IfcFurniture USERDEFINED, as research/13 E3 maps them).
         Component {
             name: "Mirror, 600 × 800",

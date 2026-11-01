@@ -4484,6 +4484,43 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 
 *Built (2026-11-01):* the `steam` section of the pack schema and its `us_spa` values, the three components, `bath.steam_room` (Architecture › Build › Steam Room, then a click in the room) and the checks. Not yet: the vapour-proof assembly as a wall type (TCNA SR614: steel studs at 16 in, cement board, a bonded membrane, a vapour retarder lapped over the pan), the generator placed outside the room with its steam line pitched back, generator sizing in kW (makers' tables were not read), a vapour-tight door, the control's height checked (4–6 ft), steam showers in bathrooms, and the shape commands on ceilings.
 
+### 3.9a.16 Accessible saunas, steam rooms and spas
+**ID:** ARC-BATH-016 · **Priority:** P2 · **Ref:** `BATHROOMS_PLAN.md` §7; research/13 D6
+
+**Purpose.** Lay out saunas and steam rooms with an accessible bench, and check accessible saunas, steam rooms and spas: the bench, the turning space and a spa's means of entry.
+
+**Behaviour & rules.**
+- **Rules.** An accessibility pack's `spa_access` section holds:
+  - the turning space;
+  - an accessible bench's height, depth and least length;
+  - the ObjectTypes that are a spa's means of entry, and how near the spa they must stand;
+  - a transfer wall's height, depth and least length.
+  
+  `ada_2010` carries the 2010 ADA Standards:
+  - §241 and §612: a §304 turning space, 60 in (1525 mm), in a sauna or steam room, and where it has seats at least one §903 bench, 17–19 in high, 20–24 in deep and at least 42 in long;
+  - §242.4: each spa has an accessible means of entry: a pool lift (§1009.2), a transfer wall (§1009.4: 16–19 in high, 12–16 in deep, at least 60 in long) or a transfer system (§1009.5).
+  
+  The pack applies to fixtures not marked otherwise (ARC-BATH-008's `bath.set_accessible`).
+- **Components.**
+  - Accessible bench modules (600 mm long, 610 mm deep, their tops 460 mm up) for saunas (`Sauna Bench`) and steam rooms (`Steam Bench`).
+  - `Spa transfer wall`: an `IfcFurniture`, ObjectType `Spa Transfer Wall`, 1525 × 355 mm and 455 mm high, with two grab bars across it 610 mm apart.
+  - `Pool lift`: an `IfcFurniture`, ObjectType `Pool Lift`.
+- **`accessible`** on `bath.sauna` makes the lowest tier (or the only one) accessible bench modules. On `bath.steam_room` it makes the bench accessible.
+- **Checks** in `bath.check`, of kind `access`:
+  - in a sauna or steam room (found from its heater or steam head), with benches: no run of benches to §903 at least the least length;
+  - no turning circle clear of the walls, the benches and the heater or head. The circle is sought on a 50 mm grid.
+  - at a spa in a building that is not a dwelling: no means of entry within reach of its outline, and a transfer wall outside its height, depth or length. The height is measured at the wall's ends, below its grab bars.
+
+**Data (IFC mapping).** The components as above.
+
+**Commands.** `bath.sauna` and `bath.steam_room` (`accessible`), `bath.load_components`, `bath.place_component`, `bath.check`.
+
+**Acceptance criteria.**
+- [x] Under the ADA, a 2.4 × 2.0 m sauna laid out without `accessible` is reported as having no §903 bench and no turning space; a 3.2 × 2.9 m one with `accessible` passes, its lower bench at 460 mm.
+- [x] A hot tub in a building other than a dwelling is reported without a means of entry, and passes with a transfer wall beside it.
+
+*Built (2026-11-01):* the `spa_access` section and its `ada_2010` values, the components, `accessible` on the Sauna and Steam Room tools and dialogs, and the checks. Not yet: the transfer wall's 60 × 60 in clear deck and its grab bars' gaps checked, the pool lift's seat and deck, transfer systems' steps, the door kept out of the bench's clear floor space, clusters (5 % of spas), and UK guidance (none public for spas).
+
 ### 3.10.1 Model In-Place
 **ID:** ARC-INPL-001 · **Priority:** P1 · **Ref:** research/02 §11.1
 
@@ -5743,8 +5780,8 @@ All commands below are registered once in the command registry and exposed autom
 | `bath.locker_room` | point, level, lockers, tiers?, showers?, accessible?, replace? | {placed, lockers, accessible_lockers, fit} | Yes | ARC-BATH-009 |
 | `bath.shower_falls` | element_ids, fall?, drain?: centre\|linear | {drains, floors} | Yes | ARC-BATH-011 |
 | `bath.waterproofing` | element_ids? | {extents, wall_area, floor_area} | No | ARC-BATH-012 |
-| `bath.sauna` | point, level, bench_wall_id?, start?, tiers?, height?, uninsulated_area?, log_walls?, heater_kw?, replace? | {placed, heater, heater_kw, sizing, length, depth, height, benches, bench_tops} | Yes | ARC-BATH-014 |
-| `bath.steam_room` | point, level, bench_wall_id?, start?, height?, material?, exterior_wall?, floor_falls?, replace? | {placed, ceiling, steam_head, drain?, length, depth, ceiling_high, ceiling_low, ceiling_slope, volume, design_volume, benches} | Yes | ARC-BATH-015 |
+| `bath.sauna` | point, level, bench_wall_id?, start?, tiers?, height?, uninsulated_area?, log_walls?, heater_kw?, accessible?, replace? | {placed, heater, heater_kw, sizing, length, depth, height, benches, bench_tops} | Yes | ARC-BATH-014 |
+| `bath.steam_room` | point, level, bench_wall_id?, start?, height?, material?, exterior_wall?, floor_falls?, accessible?, replace? | {placed, ceiling, steam_head, drain?, length, depth, ceiling_high, ceiling_low, ceiling_slope, volume, design_volume, benches} | Yes | ARC-BATH-015 |
 | `unit.create_type` | room_ids \| element_ids, name, bay? | {type_id, members, left_out} | Yes | ARC-GRP-004 |
 | `unit.set_connection_points` | type_id, points | — | Yes | ARC-GRP-004 |
 | `unit.array_path` | type_id, path, count \| pitch, handing?, numbering? | array_id | Yes | ARC-GRP-004 |

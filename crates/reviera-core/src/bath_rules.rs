@@ -335,6 +335,8 @@ pub struct Pack {
     pub sauna: Option<SaunaRules>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub steam: Option<SteamRules>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spa_access: Option<SpaAccess>,
 }
 
 fn validator() -> &'static jsonschema::Validator {
@@ -1988,6 +1990,7 @@ pub fn product_pack() -> Pack {
         spa: None,
         sauna: None,
         steam: None,
+        spa_access: None,
     }
 }
 
@@ -2084,6 +2087,68 @@ pub fn ceiling_over(store: &Store, level: &str, p: [f64; 2]) -> Option<(ElementI
             });
         Some((e.id(), if slope == f64::MAX { 0.0 } else { slope }))
     })
+}
+
+// ---- Spa accessibility (ARC-BATH-016) ----
+
+/// An accessibility pack's rules for saunas, steam rooms and spas.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct SpaAccess {
+    pub id: String,
+    pub description: String,
+    /// A sauna's or steam room's turning space (metres).
+    pub turning_diameter: f64,
+    /// An accessible bench: its top's least and most height, its depth's, and its least length.
+    pub bench_height: [f64; 2],
+    pub bench_depth: [f64; 2],
+    pub bench_length: f64,
+    /// The ObjectTypes that are a spa's means of entry, and how near its outline they stand.
+    pub entries: Vec<String>,
+    pub entry_reach: f64,
+    /// A transfer wall's height, depth and least length.
+    pub transfer_wall_height: [f64; 2],
+    pub transfer_wall_depth: [f64; 2],
+    pub transfer_wall_length: f64,
+    pub source: String,
+    pub confidence: Confidence,
+}
+
+/// A copy's plan box and top: in its own frame's axes, its length along local x and depth along
+/// y (metres), its outline, and its top's height above `floor`.
+#[derive(Debug, Clone)]
+pub struct Piece {
+    pub element: ElementId,
+    pub outline: Vec<[f64; 2]>,
+    pub length: f64,
+    pub depth: f64,
+    pub top: f64,
+    /// Its top at its two ends: a transfer wall's, below the grab bars across it.
+    pub end_top: f64,
+}
+
+pub fn piece(store: &Store, e: &crate::element::Element, floor: f64) -> Option<Piece> {
+    let g = mesh_objects::regenerate(store, e).ok()?;
+    let s = g.placement.scale;
+    let (mut lo, mut hi) = ([f64::MAX; 3], [f64::MIN; 3]);
+    for q in &g.mesh.positions {
+        for k in 0..3 {
+            lo[k] = lo[k].min(f64::from(q[k]) * s);
+            hi[k] = hi[k].max(f64::from(q[k]) * s);
+        }
+    }
+    if lo[0] > hi[0] {
+        return None;
+    }
+    let end_top = g.mesh.positions.iter().filter(|q| (f64::from(q[0]) * s - lo[0]).abs() < 1e-3 || (f64::from(q[0]) * s - hi[0]).abs() < 1e-3).map(|q| f64::from(q[2]) * s).fold(f64::MIN, f64::max);
+    let frame = Placement { scale: 1.0, ..g.placement };
+    let outline = [[lo[0], lo[1]], [hi[0], lo[1]], [hi[0], hi[1]], [lo[0], hi[1]]]
+        .iter()
+        .map(|q| {
+            let w = frame.apply([q[0], q[1], 0.0]);
+            [w[0], w[1]]
+        })
+        .collect();
+    Some(Piece { element: e.id(), outline, length: hi[0] - lo[0], depth: hi[1] - lo[1], top: g.placement.origin[2] + hi[2] - floor, end_top: g.placement.origin[2] + end_top - floor })
 }
 
 #[cfg(test)]

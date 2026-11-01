@@ -806,3 +806,34 @@ fn a_steam_room_its_ceiling_bench_head_and_falls() {
     let e = run(&mut app, "bath.steam_room", json!({ "point": [1.5, 1.2], "level": level, "bench_wall_id": null })).unwrap_err();
     assert_eq!(e.code, "bath.no_fit", "{e:?}");
 }
+
+#[test]
+fn accessible_saunas_and_spas() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = new_app(dir.path());
+    let access = |app: &mut App| findings(app).into_iter().filter(|f| f["kind"] == "access").map(|f| f["message"].as_str().unwrap().to_owned()).collect::<Vec<_>>();
+    // A 2.4 × 2.0 m sauna under the ADA: its lower bench 450 mm deep at 600 mm is not to §903,
+    // and its benches leave no 60 in turning space.
+    let (level, _) = room_h(&mut app, 2.4, 2.0, 2.2);
+    ok(&mut app, "clearance.set_rule_set", json!({ "standard": "ada_2010" }));
+    ok(&mut app, "bath.sauna", json!({ "point": [1.2, 1.0], "level": level }));
+    let a = access(&mut app);
+    assert!(a.len() == 2 && a.iter().any(|m| m.contains("§903")) && a.iter().any(|m| m.contains("turning space")), "{a:#?}");
+    // 3.2 × 2.9 m with an accessible lower bench (610 deep, 460 high): both met.
+    let (level, _) = room_h(&mut app, 3.2, 2.9, 2.2);
+    ok(&mut app, "clearance.set_rule_set", json!({ "standard": "ada_2010" }));
+    let s = ok(&mut app, "bath.sauna", json!({ "point": [1.6, 1.45], "level": level, "accessible": true }));
+    assert!((s["bench_tops"][1].as_f64().unwrap() - 0.46).abs() < 1e-9, "{s:#}");
+    assert_eq!(access(&mut app), Vec::<String>::new());
+
+    // A hot tub in a club (not a dwelling): no means of entry, then a transfer wall beside it.
+    let (level, _) = room(&mut app, 6.0, 5.0);
+    ok(&mut app, "code.set", json!({ "code": "ibc", "occupancy": "other" }));
+    ok(&mut app, "clearance.set_rule_set", json!({ "standard": "ada_2010" }));
+    let t = ok(&mut app, "bath.load_components", json!({ "names": ["Hot tub, 2.0 × 2.0 m", "Spa transfer wall"] }));
+    ok(&mut app, "bath.place_component", json!({ "type_id": t["Hot tub, 2.0 × 2.0 m"], "point": [3.0, 2.0], "level": level, "work_plane": true }));
+    let a = access(&mut app);
+    assert!(a.len() == 1 && a[0].contains("means of entry"), "{a:#?}");
+    ok(&mut app, "bath.place_component", json!({ "type_id": t["Spa transfer wall"], "point": [3.0, 3.2], "level": level, "work_plane": true }));
+    assert_eq!(access(&mut app), Vec::<String>::new());
+}

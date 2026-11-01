@@ -673,10 +673,14 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
   falls to a drain, and gives the generator's design volume from the walls' finish; Check
   Bathrooms reports a flat or missing ceiling, a room over 8 ft and a head near a bench
   (`bath.steam_room`).
+- **Accessible saunas, steam rooms and spas** (ARC-BATH-016): under the ADA, Check Bathrooms asks
+  a sauna or steam room for a §903 bench and a 60 in turning space, and a spa outside a dwelling
+  for a pool lift, transfer wall or transfer system; Sauna and Steam Room lay out an accessible
+  bench, and the components include a transfer wall and a pool lift.
   **Not yet** (planned): living
   layouts that re-fit when the room changes, Jack-and-Jill and back-to-back wet walls,
   other packs' bars (Approved Document M's drop-down rails, shower and bath bars), room layouts, toilet cores and partitions, fixture counts,
-  locker rooms, wet areas, whirlpool baths, spa accessibility, the generic bathroom component library and product swaps.
+  locker rooms, wet areas, whirlpool baths, the generic bathroom component library and product swaps.
 
 ### Structure (in development)
 

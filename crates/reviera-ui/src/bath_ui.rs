@@ -557,9 +557,10 @@ impl Gui {
         let glass = f.text("Uninsulated surface (m²)", "0", "Glass door, tile, brick or glass block: each m² sizes as 1.2 m³ more");
         let logs = f.choice("Walls", &["Insulated, panelled".to_owned(), "Log (× 1.5)".to_owned()], 0);
         let kw = f.text("Heater (kW)", "", "Empty to size it from the room");
+        let acc = f.choice("Lowest bench", &["Standard".to_owned(), "Accessible (ADA §903: 24 in deep, 18 in high)".to_owned()], 0);
         let ok = f.show("Then click inside a room closed by walls, in a plan: benches run along its longer wall, the heater goes on an end wall.", "Choose Room");
         let num = |t: &TextCtrl| t.get_value().trim().replace(',', ".").parse::<f64>().ok();
-        let mut args = json!({ "command": "bath.sauna", "tiers": if tiers.get_selection() == Some(1) { 1 } else { 2 }, "uninsulated_area": num(&glass).unwrap_or(0.0).max(0.0), "log_walls": logs.get_selection() == Some(1), "replace": true });
+        let mut args = json!({ "command": "bath.sauna", "tiers": if tiers.get_selection() == Some(1) { 1 } else { 2 }, "uninsulated_area": num(&glass).unwrap_or(0.0).max(0.0), "log_walls": logs.get_selection() == Some(1), "accessible": acc.get_selection() == Some(1), "replace": true });
         if let Some(k) = num(&kw) {
             args["heater_kw"] = json!(k);
         }
@@ -584,8 +585,9 @@ impl Gui {
         let labels: Vec<String> = ["Ceramic tile (× 1.0)", "Acrylic or fibreglass (× 0.65)", "Glass tile or block (× 1.35)", "Natural stone (× 1.65)"].iter().map(|s| (*s).to_owned()).collect();
         let material = f.choice("Walls' finish", &labels, 0);
         let outside = f.choice("Outside wall", &["No".to_owned(), "Yes (+10 %)".to_owned()], 0);
+        let acc = f.choice("Bench", &["Standard (450 deep)".to_owned(), "Accessible (ADA §903: 24 in deep, 18 in high)".to_owned()], 0);
         let ok = f.show("Then click inside a room closed by walls, in a plan: the bench runs along its longer wall, the steam head goes on an end wall, and a floor under it falls to a drain.", "Choose Room");
-        let mut args = json!({ "command": "bath.steam_room", "material": materials[material.get_selection().unwrap_or(0) as usize], "exterior_wall": outside.get_selection() == Some(1), "replace": true });
+        let mut args = json!({ "command": "bath.steam_room", "material": materials[material.get_selection().unwrap_or(0) as usize], "exterior_wall": outside.get_selection() == Some(1), "accessible": acc.get_selection() == Some(1), "replace": true });
         if let Ok(mm) = height.get_value().trim().parse::<f64>() {
             args["height"] = json!(mm / 1000.0);
         }

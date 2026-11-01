@@ -34,7 +34,8 @@
     "waterproofing": {"type": "array", "items": {"$ref": "#/$defs/waterproofing"}},
     "spa": {"$ref": "#/$defs/spa"},
     "sauna": {"$ref": "#/$defs/sauna"},
-    "steam": {"$ref": "#/$defs/steam"}
+    "steam": {"$ref": "#/$defs/steam"},
+    "spa_access": {"$ref": "#/$defs/spa_access"}
   },
   "$defs": {
     "fixture": {"enum": ["water_closet", "urinal", "lavatory", "bidet", "bath", "shower", "locker", "bench", "spa", "sauna_heater", "steam_head"]},
@@ -408,6 +409,28 @@
         "height_unit": {"type": "number", "exclusiveMinimum": 0},
         "height_step": {"type": "number", "minimum": 0},
         "exterior_wall": {"type": "number", "minimum": 0},
+        "source": {"type": "string", "pattern": "^S[0-9]{4}( S[0-9]{4})*$"},
+        "confidence": {"enum": ["verified", "secondary", "advisory"]}
+      }
+    },
+    "pair": {"type": "array", "prefixItems": [{"type": "number", "minimum": 0}, {"type": "number", "minimum": 0}], "minItems": 2, "maxItems": 2},
+    "spa_access": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description", "turning_diameter", "bench_height", "bench_depth", "bench_length", "entries", "entry_reach", "transfer_wall_height", "transfer_wall_depth", "transfer_wall_length", "source", "confidence"],
+      "description": "Accessible saunas, steam rooms and spas: the turning space, an accessible bench, and a spa's means of entry.",
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "description": {"type": "string", "minLength": 1},
+        "turning_diameter": {"type": "number", "exclusiveMinimum": 0},
+        "bench_height": {"$ref": "#/$defs/pair", "description": "An accessible bench's top, least and most (metres)."},
+        "bench_depth": {"$ref": "#/$defs/pair"},
+        "bench_length": {"type": "number", "exclusiveMinimum": 0},
+        "entries": {"type": "array", "items": {"type": "string", "minLength": 1}, "description": "The ObjectTypes that are means of entry to a spa."},
+        "entry_reach": {"type": "number", "minimum": 0, "description": "A means of entry within this of the spa's outline (metres)."},
+        "transfer_wall_height": {"$ref": "#/$defs/pair"},
+        "transfer_wall_depth": {"$ref": "#/$defs/pair"},
+        "transfer_wall_length": {"type": "number", "exclusiveMinimum": 0},
         "source": {"type": "string", "pattern": "^S[0-9]{4}( S[0-9]{4})*$"},
         "confidence": {"enum": ["verified", "secondary", "advisory"]}
       }

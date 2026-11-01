@@ -3,16 +3,36 @@
   "id": "ada_2010",
   "title": "2010 ADA Standards for Accessible Design",
   "jurisdiction": "US",
-  "edition": "2010 ADA Standards §§225, 305, 603–608, 811, 903",
+  "edition": "2010 ADA Standards §§225, 241, 242, 305, 603–608, 612, 811, 903, 1009",
   "layer": "accessible",
   "notes": "Clear floor spaces may overlap each other and the turning space (305.2, 603.2.1); doors may not swing into any fixture's clear floor space or clearance (603.2.3), with exceptions for single-user rooms that this pack does not apply. Showers are taken as standard roll-in showers; a transfer shower's 36 × 48 in clearance differs.",
   "zones": [
     {
       "id": "ADA 2010 604.3.1",
       "description": "WC clearance 60 in (1525 mm) from the side wall by 56 in (1420 mm) from the rear wall; grab bars, dispensers and other fixtures' clear floor spaces may overlap it",
-      "fixtures": ["water_closet"],
-      "across": [["side_wall", 0.0], ["side_wall", 1.525]],
-      "out": [["wall", 0.0], ["wall", 1.42]],
+      "fixtures": [
+        "water_closet"
+      ],
+      "across": [
+        [
+          "side_wall",
+          0.0
+        ],
+        [
+          "side_wall",
+          1.525
+        ]
+      ],
+      "out": [
+        [
+          "wall",
+          0.0
+        ],
+        [
+          "wall",
+          1.42
+        ]
+      ],
       "door_swing": "forbidden",
       "source": "S0869",
       "confidence": "verified"
@@ -20,9 +40,29 @@
     {
       "id": "ADA 2010 606.2",
       "description": "30 × 48 in (760 × 1220 mm) clear floor space for a forward approach to a lavatory, 17 in of it in the knee and toe space under the lavatory",
-      "fixtures": ["lavatory"],
-      "across": [["centre", -0.38], ["centre", 0.38]],
-      "out": [["front", -0.43], ["front", 0.79]],
+      "fixtures": [
+        "lavatory"
+      ],
+      "across": [
+        [
+          "centre",
+          -0.38
+        ],
+        [
+          "centre",
+          0.38
+        ]
+      ],
+      "out": [
+        [
+          "front",
+          -0.43
+        ],
+        [
+          "front",
+          0.79
+        ]
+      ],
       "door_swing": "forbidden",
       "source": "S0869",
       "confidence": "verified"
@@ -30,9 +70,29 @@
     {
       "id": "ADA 2010 605.3",
       "description": "30 × 48 in (760 × 1220 mm) clear floor space for a forward approach to a urinal",
-      "fixtures": ["urinal"],
-      "across": [["centre", -0.38], ["centre", 0.38]],
-      "out": [["front", 0.0], ["front", 1.22]],
+      "fixtures": [
+        "urinal"
+      ],
+      "across": [
+        [
+          "centre",
+          -0.38
+        ],
+        [
+          "centre",
+          0.38
+        ]
+      ],
+      "out": [
+        [
+          "front",
+          0.0
+        ],
+        [
+          "front",
+          1.22
+        ]
+      ],
       "door_swing": "forbidden",
       "source": "S0869",
       "confidence": "verified"
@@ -40,9 +100,29 @@
     {
       "id": "ADA 2010 607.2",
       "description": "Clearance 30 in (760 mm) wide along the whole length of a bathtub",
-      "fixtures": ["bath"],
-      "across": [["near_edge", 0.0], ["far_edge", 0.0]],
-      "out": [["front", 0.0], ["front", 0.76]],
+      "fixtures": [
+        "bath"
+      ],
+      "across": [
+        [
+          "near_edge",
+          0.0
+        ],
+        [
+          "far_edge",
+          0.0
+        ]
+      ],
+      "out": [
+        [
+          "front",
+          0.0
+        ],
+        [
+          "front",
+          0.76
+        ]
+      ],
       "door_swing": "forbidden",
       "source": "S0869",
       "confidence": "verified"
@@ -50,9 +130,29 @@
     {
       "id": "ADA 2010 608.2.2.1",
       "description": "Clearance 30 in (760 mm) wide along the open face of a standard roll-in shower",
-      "fixtures": ["shower"],
-      "across": [["near_edge", 0.0], ["far_edge", 0.0]],
-      "out": [["front", 0.0], ["front", 0.76]],
+      "fixtures": [
+        "shower"
+      ],
+      "across": [
+        [
+          "near_edge",
+          0.0
+        ],
+        [
+          "far_edge",
+          0.0
+        ]
+      ],
+      "out": [
+        [
+          "front",
+          0.0
+        ],
+        [
+          "front",
+          0.76
+        ]
+      ],
       "door_swing": "forbidden",
       "source": "S0869",
       "confidence": "verified"
@@ -60,18 +160,58 @@
     {
       "id": "ADA 2010 811.3",
       "description": "48 × 30 in (1220 × 760 mm) clear floor space for a parallel approach in front of an accessible locker (225.2.1: at least 5 %, and at least one, of each type)",
-      "fixtures": ["locker"],
-      "across": [["centre", -0.61], ["centre", 0.61]],
-      "out": [["front", 0.0], ["front", 0.76]],
+      "fixtures": [
+        "locker"
+      ],
+      "across": [
+        [
+          "centre",
+          -0.61
+        ],
+        [
+          "centre",
+          0.61
+        ]
+      ],
+      "out": [
+        [
+          "front",
+          0.0
+        ],
+        [
+          "front",
+          0.76
+        ]
+      ],
       "source": "S0869",
       "confidence": "verified"
     },
     {
       "id": "ADA 2010 903.2",
       "description": "30 × 48 in (760 × 1220 mm) clear floor space at the end of an accessible bench, parallel to its short axis",
-      "fixtures": ["bench"],
-      "across": [["far_edge", 0.0], ["far_edge", 0.76]],
-      "out": [["wall", 0.0], ["wall", 1.22]],
+      "fixtures": [
+        "bench"
+      ],
+      "across": [
+        [
+          "far_edge",
+          0.0
+        ],
+        [
+          "far_edge",
+          0.76
+        ]
+      ],
+      "out": [
+        [
+          "wall",
+          0.0
+        ],
+        [
+          "wall",
+          1.22
+        ]
+      ],
       "source": "S0869",
       "confidence": "verified"
     }
@@ -80,7 +220,9 @@
     {
       "id": "ADA 2010 604.2",
       "description": "WC centreline 16–18 in (405–455 mm) from the side wall or partition",
-      "fixtures": ["water_closet"],
+      "fixtures": [
+        "water_closet"
+      ],
       "measure": "centreline_to_side_wall",
       "min": 0.405,
       "max": 0.455,
@@ -92,28 +234,105 @@
     {
       "id": "ADA 2010 604.5.1",
       "description": "Side-wall grab bar at least 42 in (1065 mm) long, starting at most 12 in (305 mm) from the rear wall and reaching at least 54 in (1370 mm) from it; top 33–36 in, 1¼–2 in round, 1½ in from the wall (609)",
-      "fixtures": ["water_closet"],
+      "fixtures": [
+        "water_closet"
+      ],
       "wall": "side",
-      "covers": [["rear_wall", 0.305], ["rear_wall", 1.37]],
+      "covers": [
+        [
+          "rear_wall",
+          0.305
+        ],
+        [
+          "rear_wall",
+          1.37
+        ]
+      ],
       "length_min": 1.065,
-      "top": {"min": 0.84, "max": 0.915, "default": 0.865},
-      "diameter": {"min": 0.032, "max": 0.051, "default": 0.038},
-      "gap": {"min": 0.038, "max": 0.038, "default": 0.038},
+      "top": {
+        "min": 0.84,
+        "max": 0.915,
+        "default": 0.865
+      },
+      "diameter": {
+        "min": 0.032,
+        "max": 0.051,
+        "default": 0.038
+      },
+      "gap": {
+        "min": 0.038,
+        "max": 0.038,
+        "default": 0.038
+      },
       "source": "S0869",
       "confidence": "verified"
     },
     {
       "id": "ADA 2010 604.5.2",
       "description": "Rear-wall grab bar at least 36 in (915 mm) long, from 12 in (305 mm) on the side-wall side of the WC centreline to 24 in (610 mm) on the open side; top 33–36 in, 1¼–2 in round, 1½ in from the wall (609)",
-      "fixtures": ["water_closet"],
+      "fixtures": [
+        "water_closet"
+      ],
       "wall": "rear",
-      "covers": [["centre", -0.305], ["centre", 0.61]],
+      "covers": [
+        [
+          "centre",
+          -0.305
+        ],
+        [
+          "centre",
+          0.61
+        ]
+      ],
       "length_min": 0.915,
-      "top": {"min": 0.84, "max": 0.915, "default": 0.865},
-      "diameter": {"min": 0.032, "max": 0.051, "default": 0.038},
-      "gap": {"min": 0.038, "max": 0.038, "default": 0.038},
+      "top": {
+        "min": 0.84,
+        "max": 0.915,
+        "default": 0.865
+      },
+      "diameter": {
+        "min": 0.032,
+        "max": 0.051,
+        "default": 0.038
+      },
+      "gap": {
+        "min": 0.038,
+        "max": 0.038,
+        "default": 0.038
+      },
       "source": "S0869",
       "confidence": "verified"
     }
-  ]
+  ],
+  "spa_access": {
+    "id": "ADA 2010 §241, §242.4, §612, §903, §1009",
+    "description": "A sauna or steam room has a 60 in (1525 mm) turning space (§304) and, where it has seating, at least one bench to §903: 17–19 in (430–485 mm) high, 20–24 in (510–610 mm) deep, at least 42 in (1065 mm) long. A spa has at least one accessible means of entry: a pool lift (§1009.2), a transfer wall (§1009.4: 16–19 in high, 12–16 in deep, at least 60 in long, with a 60 × 60 in clear deck) or a transfer system (§1009.5); sloped entries and stairs do not count",
+    "turning_diameter": 1.525,
+    "bench_height": [
+      0.43,
+      0.485
+    ],
+    "bench_depth": [
+      0.51,
+      0.61
+    ],
+    "bench_length": 1.065,
+    "entries": [
+      "Pool Lift",
+      "Spa Transfer Wall",
+      "Spa Transfer System"
+    ],
+    "entry_reach": 1.0,
+    "transfer_wall_height": [
+      0.405,
+      0.485
+    ],
+    "transfer_wall_depth": [
+      0.305,
+      0.405
+    ],
+    "transfer_wall_length": 1.525,
+    "source": "S1119 S1120 S1121 S1122 S1123",
+    "confidence": "verified"
+  }
 }
