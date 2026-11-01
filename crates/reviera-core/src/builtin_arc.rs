@@ -550,6 +550,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(BathLockerRoom),
         registry.add(BathShowerFalls),
         registry.add(BathWaterproofing),
+        registry.add(BathSauna),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -7007,4 +7008,22 @@ read_command!(
     crate::bath_rules::WaterproofingParams,
     crate::bath_rules::WaterproofingSchedule,
     crate::bath_rules::waterproofing_schedule
+);
+
+edit_command!(
+    BathSauna,
+    "bath.sauna",
+    "Lay out a sauna",
+    "Lays out a sauna in the room around `point`, closed by walls (ARC-BATH-014): bench modules 600 mm long \
+     along the bench wall in one or two tiers (upper 600 mm deep about 1.15 m below the ceiling, lower 450 mm \
+     deep 450 mm below it) and a wall heater on the start end wall, sized from the room's volume by the heater \
+     table in the rule packs (1.2 m³ added per m² of uninsulated surface, × 1.5 for log walls) unless \
+     `heater_kw` is given. The heater's safety distances come from its product data and are kept clear; \
+     `bath.check` reports a heater too small or too large for the room, too little ceiling above it, a room \
+     height outside 2.1–2.44 m and a door opening into the sauna. Too narrow a room is reported with the \
+     shortfall.",
+    "Sauna",
+    crate::bath_layouts::SaunaParams,
+    crate::bath_layouts::Sauna,
+    crate::bath_layouts::sauna
 );

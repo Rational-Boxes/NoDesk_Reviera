@@ -47,6 +47,7 @@ pub const UI_ACTIONS: &[&str] = &[
     "ui.fixture_count",
     "ui.toilet_core",
     "ui.locker_room",
+    "ui.sauna",
     "ui.shower_falls",
     "ui.waterproofing",
     "ui.product_documents",

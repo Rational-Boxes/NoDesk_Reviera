@@ -1,7 +1,7 @@
 {
   "format": "reviera.bath-rules-1",
   "id": "us_spa",
-  "title": "Hot tubs and spas: NEC Article 680 Part IV and manufacturer guidance",
+  "title": "Hot tubs, spas and saunas: NEC Article 680 Part IV, IRC M1902 and manufacturer guidance",
   "jurisdiction": "US",
   "edition": "NEC 2017–2023 Article 680 Part IV (secondary summaries); manufacturer installation guides",
   "layer": "minimum",
@@ -48,6 +48,70 @@
     "floor_live_load": 1.92,
     "pad_thickness": 0.1,
     "source": "S1137 S1138 S1139 S1140 S1504",
+    "confidence": "advisory"
+  },
+  "sauna": {
+    "id": "IRC M1902 sauna; heater makers' sizing",
+    "description": "A heater listed to UL 875 with a guard, a thermostat limiting the room to 194 °F (90 °C) with its sensor within 6 in (152 mm) of the ceiling (IRC M1902); heaters sized by room volume from one maker's table, 1.2 m³ added per m² of uninsulated surface and ×1.5 for log walls; clear height 2.1–2.44 m; about 1.15 m from the upper bench to the ceiling; the door opening outward without a lock (industry practice)",
+    "heaters": [
+      [
+        3,
+        2,
+        4.5
+      ],
+      [
+        4.5,
+        3,
+        6
+      ],
+      [
+        6,
+        5,
+        8
+      ],
+      [
+        8,
+        7,
+        12
+      ],
+      [
+        9,
+        8,
+        14
+      ],
+      [
+        10.5,
+        9,
+        15
+      ],
+      [
+        13.5,
+        10,
+        18
+      ],
+      [
+        15,
+        15,
+        26
+      ],
+      [
+        20,
+        18,
+        30
+      ],
+      [
+        26,
+        30,
+        66
+      ]
+    ],
+    "uninsulated_volume": 1.2,
+    "log_factor": 1.5,
+    "ceiling_min": 2.1,
+    "ceiling_max": 2.44,
+    "upper_bench_headroom": 1.15,
+    "sensor_below_ceiling": 0.152,
+    "source": "S1145 S1147 S1148 S1149 S1150 S1151",
     "confidence": "advisory"
   }
 }

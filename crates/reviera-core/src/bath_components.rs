@@ -278,6 +278,36 @@ pub fn catalogue() -> Vec<Component> {
             shape: || Shape::default().prism(&rounded([0.0, 0.0], 2.3, 2.3, 0.25), 0.0, 0.95),
             connectors: none,
         },
+        // Saunas (ARC-BATH-014): a wall heater and bench modules, 600 mm along the wall.
+        Component {
+            name: "Sauna heater, wall",
+            category: C::SpaceHeater,
+            predefined: "USERDEFINED",
+            element_type: Some("Sauna Heater"),
+            color: STEEL,
+            // A 400 × 300 mm heater 150–750 mm up, its stones heaped on top.
+            shape: || Shape::default().cuboid([-0.2, 0.2], [-0.15, 0.15], [0.15, 0.65]).cuboid([-0.17, 0.17], [-0.12, 0.12], [0.65, 0.75]),
+            connectors: none,
+        },
+        Component {
+            name: "Sauna bench, upper 600",
+            category: C::Furniture,
+            predefined: "USERDEFINED",
+            element_type: Some("Sauna Bench"),
+            color: WOOD,
+            // A 600 × 600 mm board, its top 450 mm up, skirted in front; raised by its offset.
+            shape: || Shape::default().cuboid([-0.3, 0.3], [-0.3, 0.3], [0.41, 0.45]).cuboid([-0.3, 0.3], [-0.3, -0.28], [0.0, 0.41]),
+            connectors: none,
+        },
+        Component {
+            name: "Sauna bench, lower 600",
+            category: C::Furniture,
+            predefined: "USERDEFINED",
+            element_type: Some("Sauna Bench"),
+            color: WOOD,
+            shape: || Shape::default().cuboid([-0.3, 0.3], [-0.225, 0.225], [0.41, 0.45]).cuboid([-0.3, 0.3], [-0.225, -0.205], [0.0, 0.41]),
+            connectors: none,
+        },
         // Accessories (IfcFurniture USERDEFINED, as research/13 E3 maps them).
         Component {
             name: "Mirror, 600 × 800",
@@ -512,6 +542,14 @@ pub(crate) fn load(txn: &mut Transaction<'_>, p: LoadParams) -> Result<BTreeMap<
                     e.params.insert(MARK.into(), true.into());
                     if let Some(t) = element_type {
                         e.params.insert("@ElementType".into(), t.into());
+                    }
+                    if c.name == "Sauna heater, wall" {
+                        // A 6 kW wall heater's typical distances (research/13 D3.3); a product's
+                        // replace them.
+                        e.params.insert(crate::bath_rules::HEATER_POWER.into(), serde_json::json!({ "type": "IfcPowerMeasure", "value": 6000.0 }));
+                        e.params.insert(crate::bath_rules::HEATER_SIDE.into(), serde_json::json!({ "type": "IfcPositiveLengthMeasure", "value": 0.08 }));
+                        e.params.insert(crate::bath_rules::HEATER_FRONT.into(), serde_json::json!({ "type": "IfcPositiveLengthMeasure", "value": 0.08 }));
+                        e.params.insert(crate::bath_rules::HEATER_CEILING.into(), serde_json::json!({ "type": "IfcPositiveLengthMeasure", "value": 1.1 }));
                     }
                     if let Some((kg, seats)) = spa_props(c.name) {
                         e.params.insert(crate::bath_rules::SPA_WEIGHT.into(), serde_json::json!({ "type": "IfcMassMeasure", "value": kg }));

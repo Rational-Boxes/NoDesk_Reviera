@@ -192,7 +192,7 @@ impl Gui {
     /// Lays out a bathroom where the Bathroom Layout tool was clicked, and reports the fit.
     pub(crate) fn layout_bathroom_at(&mut self, mut args: serde_json::Value) {
         let frame = self.frame;
-        // The Locker Room tool rides on the same click, with its own command.
+        // The Locker Room and Sauna tools ride on the same click, with their own commands.
         let command = args.as_object_mut().and_then(|o| o.remove("command")).and_then(|c| c.as_str().map(str::to_owned)).unwrap_or_else(|| "bath.layout".to_owned());
         match self.app.execute(&command, args, &super::user()) {
             Ok(out) => {
@@ -203,7 +203,8 @@ impl Gui {
                     .ok()
                     .and_then(|v| v.as_array().map(|a| a.iter().filter(|f| f["severity"] == "error").count()))
                     .unwrap_or(0);
-                frame.set_status_text(&format!("{placed} component(s) laid out; Check Bathrooms finds {problems} error(s)"), 0);
+                let heater = out.result["heater_kw"].as_f64().map(|k| format!(", the heater {k} kW for {:.1} m³", out.result["sizing"]["design_volume"].as_f64().unwrap_or(0.0))).unwrap_or_default();
+                frame.set_status_text(&format!("{placed} component(s) laid out{heater}; Check Bathrooms finds {problems} error(s)"), 0);
             }
             Err(e) => error(&frame, &format!("The layout was not made:\n{}", e.message)),
         }
@@ -539,6 +540,32 @@ impl Gui {
         if d.show_modal() == ID_YES {
             Clipboard::get().set_text(&csv.join("\n"));
             frame.set_status_text("The waterproofing schedule was copied as CSV", 0);
+        }
+    }
+
+    /// Architecture › Build › Sauna (ARC-BATH-014): tiers, surfaces and heater, then a click
+    /// inside a room closed by walls.
+    pub(crate) fn sauna(&mut self) {
+        let frame = self.frame;
+        let f = super::reinforcement_ui::Form::new(&frame, "Sauna");
+        let tiers = f.choice("Benches", &["Two tiers".to_owned(), "One tier".to_owned()], 0);
+        let glass = f.text("Uninsulated surface (m²)", "0", "Glass door, tile, brick or glass block: each m² sizes as 1.2 m³ more");
+        let logs = f.choice("Walls", &["Insulated, panelled".to_owned(), "Log (× 1.5)".to_owned()], 0);
+        let kw = f.text("Heater (kW)", "", "Empty to size it from the room");
+        let ok = f.show("Then click inside a room closed by walls, in a plan: benches run along its longer wall, the heater goes on an end wall.", "Choose Room");
+        let num = |t: &TextCtrl| t.get_value().trim().replace(',', ".").parse::<f64>().ok();
+        let mut args = json!({ "command": "bath.sauna", "tiers": if tiers.get_selection() == Some(1) { 1 } else { 2 }, "uninsulated_area": num(&glass).unwrap_or(0.0).max(0.0), "log_walls": logs.get_selection() == Some(1), "replace": true });
+        if let Some(k) = num(&kw) {
+            args["heater_kw"] = json!(k);
+        }
+        f.dialog.destroy();
+        if !ok {
+            return;
+        }
+        self.start_room_tool();
+        if let Some(tool) = self.room_tool.as_mut() {
+            tool.layout = Some(args);
+            frame.set_status_text("Sauna: click inside the room; Esc ends", 0);
         }
     }
 }

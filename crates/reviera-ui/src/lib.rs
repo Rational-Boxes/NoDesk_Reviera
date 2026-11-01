@@ -4778,6 +4778,10 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             g.locker_room();
             focus(g);
         }),
+        "ui.sauna" => with(gui, |g| {
+            g.sauna();
+            focus(g);
+        }),
         "ui.shower_falls" => with(gui, Gui::shower_falls),
         "ui.waterproofing" => with(gui, Gui::waterproofing),
         "ui.product_documents" => with(gui, Gui::product_documents),

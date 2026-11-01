@@ -663,10 +663,15 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
   `us_spa` pack keeps 0.9 m clear round them for service and checks NEC 680.43's indoor distances
   (receptacles 6 ft, switches 5 ft, lights 7 ft 6 in above the water; advisory), and Check
   Bathrooms reports the filled load on an upper floor against 40 psf, or asks for a pad.
+- **Saunas** (ARC-BATH-014): Sauna lays out bench modules in one or two tiers along a room's
+  longer wall and a wall heater sized from the room's volume by a maker's table (uninsulated
+  surfaces and log walls counted); the heater's own safety distances are kept clear, and Check
+  Bathrooms reports a heater that does not suit the room, too little ceiling over it, a room
+  height outside 2.1–2.44 m and a door opening inward (`bath.sauna`).
   **Not yet** (planned): living
   layouts that re-fit when the room changes, Jack-and-Jill and back-to-back wet walls,
   other packs' bars (Approved Document M's drop-down rails, shower and bath bars), room layouts, toilet cores and partitions, fixture counts,
-  locker rooms, wet areas, saunas, steam rooms, whirlpool baths, the generic bathroom component library and product swaps.
+  locker rooms, wet areas, steam rooms, whirlpool baths, the generic bathroom component library and product swaps.
 
 ### Structure (in development)
 

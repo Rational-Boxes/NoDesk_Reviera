@@ -32,7 +32,11 @@ fn model(app: &mut App) -> Value {
 }
 
 fn wall(app: &mut App, level: &Value, a: [f64; 2], b: [f64; 2]) -> u64 {
-    ok(app, "wall.create", json!({ "curve": { "line": { "start": a, "end": b } }, "base_level": level, "top_constraint": { "unconnected": 3.0 } })).as_u64().unwrap()
+    wall_h(app, level, a, b, 3.0)
+}
+
+fn wall_h(app: &mut App, level: &Value, a: [f64; 2], b: [f64; 2], h: f64) -> u64 {
+    ok(app, "wall.create", json!({ "curve": { "line": { "start": a, "end": b } }, "base_level": level, "top_constraint": { "unconnected": h } })).as_u64().unwrap()
 }
 
 /// A starter fixture on the rear wall, its centreline at `x`.
@@ -299,6 +303,11 @@ fn generic_components_load_place_and_save() {
 /// A room closed by four walls whose inner faces are `w` × `l` (x by y), its corner at the origin;
 /// returns the level and the walls (south, east, north, west).
 fn room(app: &mut App, w: f64, l: f64) -> (Value, [u64; 4]) {
+    room_h(app, w, l, 3.0)
+}
+
+/// As `room`, its walls `h` high.
+fn room_h(app: &mut App, w: f64, l: f64, height: f64) -> (Value, [u64; 4]) {
     ok(app, "file.new", json!({}));
     let level = ok(app, "level.list", json!({}))[0]["id"].clone();
     // The wall thickness, from a probe room's fit.
@@ -308,10 +317,10 @@ fn room(app: &mut App, w: f64, l: f64) -> (Value, [u64; 4]) {
     ok(app, "element.delete", json!({ "element_ids": probe }));
     let h = t / 2.0;
     let (x0, y0, x1, y1) = (-h, -h, w + h, l + h);
-    let s = wall(app, &level, [x0, y0], [x1, y0]);
-    let e = wall(app, &level, [x1, y0], [x1, y1]);
-    let n = wall(app, &level, [x1, y1], [x0, y1]);
-    let wst = wall(app, &level, [x0, y1], [x0, y0]);
+    let s = wall_h(app, &level, [x0, y0], [x1, y0], height);
+    let e = wall_h(app, &level, [x1, y0], [x1, y1], height);
+    let n = wall_h(app, &level, [x1, y1], [x0, y1], height);
+    let wst = wall_h(app, &level, [x0, y1], [x0, y0], height);
     (level, [s, e, n, wst])
 }
 
@@ -730,4 +739,37 @@ fn a_hot_tub_its_service_space_electrics_and_load() {
     assert!((l["measured"].as_f64().unwrap() - 5.4).abs() < 0.05, "{l:#}");
     ok(&mut app, "pset.set", json!({ "element_id": upper, "pset_name": "SpaProperties", "property_name": "FilledWeight", "value": 300.0 }));
     assert!(load(&mut app, upper).is_none());
+}
+
+#[test]
+fn a_sauna_its_benches_heater_and_door() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = new_app(dir.path());
+    // 2.4 × 2.0 m, 2.2 m high: 10.6 m³, an 8 kW heater; two tiers, the upper 1.15 m below the
+    // ceiling.
+    let (level, [south, ..]) = room_h(&mut app, 2.4, 2.0, 2.2);
+    let s = ok(&mut app, "bath.sauna", json!({ "point": [1.2, 1.0], "level": level }));
+    assert!((s["sizing"]["volume"].as_f64().unwrap() - 10.56).abs() < 0.05 && s["heater_kw"] == 8.0, "{s:#}");
+    assert_eq!(s["benches"], 8, "{s:#}");
+    assert!((s["bench_tops"][0].as_f64().unwrap() - 1.05).abs() < 1e-6 && (s["bench_tops"][1].as_f64().unwrap() - 0.6).abs() < 1e-6);
+    let heater = s["heater"].as_u64().unwrap();
+    let sauna = |app: &mut App| findings(app).into_iter().filter(|f| f["kind"] == "sauna" || (f["element"] == heater && f["kind"] == "intrusion")).collect::<Vec<_>>();
+    assert_eq!(sauna(&mut app), Vec::<Value>::new());
+    let list = ok(&mut app, "clearance.list", json!({ "element_ids": [heater] }));
+    assert!(list.as_array().unwrap().iter().any(|c| c["rule"] == "Heater safety distances"), "{list:#}");
+    // A 3 kW heater is too small for the room.
+    ok(&mut app, "pset.set", json!({ "element_id": heater, "pset_name": "SaunaHeater", "property_name": "Power", "value": 3000.0 }));
+    let f = sauna(&mut app);
+    assert!(f.len() == 1 && f[0]["message"].as_str().unwrap().contains("suits 2–4.5"), "{f:#?}");
+    ok(&mut app, "pset.set", json!({ "element_id": heater, "pset_name": "SaunaHeater", "property_name": "Power", "value": 8000.0 }));
+    // A door in the south wall: inward is reported, outward is not.
+    let door = ok(&mut app, "door.place", json!({ "host_wall_id": south, "point_along": 1.8 })).as_u64().unwrap();
+    let into = |app: &mut App| sauna(app).iter().any(|f| f["other"] == door);
+    let first = into(&mut app);
+    ok(&mut app, "insert.flip_facing", json!({ "element_ids": [door] }));
+    assert_ne!(first, into(&mut app), "flipping the door changes the finding");
+    // Too narrow for two tiers and a walkway.
+    let (level, _) = room_h(&mut app, 2.4, 1.5, 2.2);
+    let e = run(&mut app, "bath.sauna", json!({ "point": [1.2, 0.75], "level": level })).unwrap_err();
+    assert_eq!(e.code, "bath.no_fit", "{e:?}");
 }

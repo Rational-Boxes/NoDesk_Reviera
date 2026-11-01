@@ -89,6 +89,8 @@ pub enum FixtureKind {
     Bench,
     /// A hot tub or portable spa (ARC-BATH-013), by its ObjectType.
     Spa,
+    /// A sauna heater (ARC-BATH-014), by its ObjectType.
+    SaunaHeater,
 }
 
 impl FixtureKind {
@@ -98,6 +100,7 @@ impl FixtureKind {
             "Locker" => Self::Locker,
             "Bench" => Self::Bench,
             "Hot Tub" => Self::Spa,
+            "Sauna Heater" => Self::SaunaHeater,
             _ => return None,
         })
     }
@@ -126,6 +129,7 @@ impl FixtureKind {
             Self::Locker => "locker",
             Self::Bench => "bench",
             Self::Spa => "hot tub",
+            Self::SaunaHeater => "sauna heater",
         }
     }
 }
@@ -323,6 +327,8 @@ pub struct Pack {
     pub waterproofing: Vec<Waterproofing>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub spa: Option<SpaRules>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sauna: Option<SaunaRules>,
 }
 
 fn validator() -> &'static jsonschema::Validator {
@@ -541,7 +547,7 @@ fn ray_segment(p: [f64; 2], d: [f64; 2], a: [f64; 2], b: [f64; 2]) -> Option<f64
 pub fn fixture(store: &Store, e: &crate::element::Element) -> Option<Fixture> {
     let kind = match e.class.as_str() {
         "IfcSanitaryTerminal" => e.param("@ObjectType").and_then(|v| v.as_str()).and_then(FixtureKind::from_object_type),
-        "IfcFurniture" => Some(FixtureKind::from_object_type(e.param("@ObjectType")?.as_str()?)?),
+        "IfcFurniture" | "IfcSpaceHeater" => Some(FixtureKind::from_object_type(e.param("@ObjectType")?.as_str()?)?),
         _ => return None,
     };
     let g = mesh_objects::regenerate(store, e).ok()?;
@@ -654,6 +660,7 @@ pub fn spaces_of(store: &Store, f: &Fixture, packs: &[Pack]) -> Vec<Space> {
             });
         }
     }
+    out.extend(heater_space(store, f));
     out
 }
 
@@ -1828,6 +1835,158 @@ pub fn outline(f: &Fixture) -> Vec<[f64; 2]> {
             [w[0], w[1]]
         })
         .collect()
+}
+
+// ---- Saunas (ARC-BATH-014) ----
+
+/// A pack's sauna rules: heater sizing, room height, the door and the thermostat's sensor.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct SaunaRules {
+    pub id: String,
+    pub description: String,
+    /// Heaters by power: (kW, least and most room volume in m³), smallest first.
+    pub heaters: Vec<[f64; 3]>,
+    /// m³ added to the design volume for each m² of uninsulated surface (glass, tile, brick).
+    pub uninsulated_volume: f64,
+    /// The design volume is multiplied by this for log walls.
+    pub log_factor: f64,
+    /// The room's clear height.
+    pub ceiling_min: f64,
+    pub ceiling_max: f64,
+    /// From the upper bench to the ceiling.
+    pub upper_bench_headroom: f64,
+    /// A non-integral thermostat sensor within this of the ceiling (IRC M1902).
+    pub sensor_below_ceiling: f64,
+    pub source: String,
+    pub confidence: Confidence,
+}
+
+/// The sizing of a sauna's heater.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct HeaterSizing {
+    /// m³: the room, and the design volume with uninsulated surfaces and log walls counted.
+    pub volume: f64,
+    pub design_volume: f64,
+    /// The smallest heater in the table for the design volume, and the volumes it suits.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kw: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub range: Option<[f64; 2]>,
+}
+
+pub fn size_heater(r: &SaunaRules, volume: f64, uninsulated: f64, log: bool) -> HeaterSizing {
+    let design_volume = (volume + uninsulated * r.uninsulated_volume) * if log { r.log_factor } else { 1.0 };
+    let pick = r.heaters.iter().find(|h| design_volume >= h[1] - 1e-9 && design_volume <= h[2] + 1e-9);
+    HeaterSizing { volume, design_volume, kw: pick.map(|h| h[0]), range: pick.map(|h| [h[1], h[2]]) }
+}
+
+/// The sauna rules in use, else the shipped ones.
+pub fn sauna_rules(store: &Store) -> SaunaRules {
+    active(store).into_iter().find_map(|p| p.sauna).or_else(|| shipped().iter().find_map(|p| p.sauna.clone())).expect("a shipped pack has sauna rules")
+}
+
+/// A heater's properties: on the copy, else its type.
+pub const HEATER_POWER: &str = "SaunaHeater.Power";
+pub const HEATER_SIDE: &str = "SaunaHeater.SideClearance";
+pub const HEATER_FRONT: &str = "SaunaHeater.FrontClearance";
+pub const HEATER_CEILING: &str = "SaunaHeater.CeilingClearance";
+/// What the Sauna tool sized the room with: `{uninsulated, log}`.
+pub const SAUNA_KEY: &str = "rxd:sauna";
+
+pub fn product_number(store: &Store, e: &crate::element::Element, key: &str) -> Option<f64> {
+    let num = |x: &crate::element::Element| {
+        let v = x.param(key)?;
+        v.as_f64().or_else(|| v.get("value")?.as_f64()).or_else(|| v.as_str()?.trim().parse().ok())
+    };
+    num(e).or_else(|| mesh_objects::type_of(store, e).and_then(|(t, _)| num(store.get(t)?)))
+}
+
+/// The room round a fixture standing against a wall: rays along its frame from 0.5 m in front
+/// of it, at 0.6 m up.
+#[derive(Debug, Clone)]
+pub struct RoomAround {
+    pub outline: Vec<[f64; 2]>,
+    pub area: f64,
+    /// The walls' lowest top above the fixture's floor.
+    pub height: f64,
+}
+
+pub fn room_around(store: &Store, f: &Fixture) -> Option<RoomAround> {
+    let local = |q: [f64; 2]| {
+        let w = f.frame.apply([q[0], q[1], 0.0]);
+        [w[0], w[1]]
+    };
+    let o = local([0.0, 0.0]);
+    let dir = |q: [f64; 2]| {
+        let w = local(q);
+        [w[0] - o[0], w[1] - o[1]]
+    };
+    let c = local([(f.x[0] + f.x[1]) / 2.0, f.front - 0.5]);
+    let z = f.floor + 0.6;
+    let mut hits = Vec::new();
+    for d in [[-1.0, 0.0], [1.0, 0.0], [0.0, -1.0], [0.0, 1.0]] {
+        hits.push(ray_to_walls(store, c, dir(d), z, 30.0)?);
+    }
+    let [l, r, fr, bk] = [hits[0].0, hits[1].0, hits[2].0, hits[3].0];
+    let mid = [(f.x[0] + f.x[1]) / 2.0, f.front - 0.5];
+    let outline: Vec<[f64; 2]> = [[mid[0] - l, mid[1] - fr], [mid[0] + r, mid[1] - fr], [mid[0] + r, mid[1] + bk], [mid[0] - l, mid[1] + bk]].into_iter().map(local).collect();
+    let height = hits
+        .iter()
+        .filter_map(|(_, w)| crate::walls::regenerate(store, store.get(*w)?).ok())
+        .map(|g| g.base_z + g.height - f.floor)
+        .fold(f64::MAX, f64::min);
+    Some(RoomAround { outline, area: (l + r) * (fr + bk), height })
+}
+
+/// The pack standing for a product's own rules (its installation manual).
+pub fn product_pack() -> Pack {
+    Pack {
+        format: "reviera.bath-rules-1".into(),
+        id: "product".into(),
+        title: "The product's installation manual".into(),
+        jurisdiction: String::new(),
+        edition: "the product's data".into(),
+        layer: Layer::Minimum,
+        notes: None,
+        zones: Vec::new(),
+        distances: Vec::new(),
+        bars: Vec::new(),
+        counts: Vec::new(),
+        electrical: None,
+        falls: None,
+        waterproofing: Vec::new(),
+        spa: None,
+        sauna: None,
+    }
+}
+
+/// A sauna heater's safety distances, from the product, as a zone kept clear.
+fn heater_space(store: &Store, f: &Fixture) -> Option<Space> {
+    if f.kind != FixtureKind::SaunaHeater {
+        return None;
+    }
+    let e = store.get(f.element)?;
+    let side = product_number(store, e, HEATER_SIDE)?;
+    let front = product_number(store, e, HEATER_FRONT).unwrap_or(side);
+    let g = mesh_objects::regenerate(store, e).ok()?;
+    let top = g.placement.origin[2] + g.mesh.positions.iter().map(|q| f64::from(q[2]) * g.placement.scale).fold(f64::MIN, f64::max);
+    let zone = Zone {
+        id: "Heater safety distances".into(),
+        description: format!("The heater's own distances to combustible material: {:.0} mm to the sides and {:.0} mm in front", side * 1000.0, front * 1000.0),
+        fixtures: vec![FixtureKind::SaunaHeater],
+        occupancy: RuleOccupancy::default(),
+        source: String::new(),
+        confidence: Confidence::Verified,
+        across: [(AcrossFrom::NearEdge, -side), (AcrossFrom::FarEdge, side)],
+        out: [(OutFrom::Wall, 0.0), (OutFrom::Front, front)],
+        height: Some((top - f.floor).max(0.1)),
+        door_swing: None,
+    };
+    Some(Space {
+        clearance: Clearance { element: f.element, kind: ClearanceKind::FixtureSpace, rule: zone.id.clone(), mesh: f.zone_mesh(&zone, 0.0), door_swing_forbidden: false },
+        pack: "product".into(),
+        zone,
+    })
 }
 
 #[cfg(test)]

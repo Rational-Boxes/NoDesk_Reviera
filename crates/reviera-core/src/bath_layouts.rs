@@ -546,3 +546,146 @@ pub(crate) fn locker_room(txn: &mut Transaction<'_>, p: LockerRoomParams) -> Res
     Ok(LockerRoom { placed, lockers: columns * tiers, accessible_lockers, fit })
 }
 
+
+// ---- Saunas (ARC-BATH-014) ----
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SaunaParams {
+    /// A point inside the room, in plan.
+    pub point: [f64; 2],
+    pub level: ElementRef,
+    /// The wall the benches run along; default the longer side.
+    pub bench_wall_id: Option<ElementRef>,
+    /// The end the heater goes at, as you face the bench wall.
+    #[serde(default)]
+    pub start: Start,
+    /// Bench tiers: 1 or 2 (default 2).
+    pub tiers: Option<u32>,
+    /// The clear height (metres); default the walls' height.
+    pub height: Option<f64>,
+    /// Uninsulated surface (glass door, tile, brick) in m², sized as extra volume.
+    #[serde(default)]
+    pub uninsulated_area: f64,
+    /// Log walls (the design volume × 1.5).
+    #[serde(default)]
+    pub log_walls: bool,
+    /// The heater's power (kW); default sized from the room.
+    pub heater_kw: Option<f64>,
+    #[serde(default)]
+    pub replace: bool,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct Sauna {
+    pub placed: Vec<ElementId>,
+    pub heater: ElementId,
+    pub heater_kw: f64,
+    pub sizing: bath_rules::HeaterSizing,
+    /// The room: its plan size and clear height (metres).
+    pub length: f64,
+    pub depth: f64,
+    pub height: f64,
+    /// Bench modules and the benches' tops.
+    pub benches: u32,
+    pub bench_tops: Vec<f64>,
+}
+
+/// Lays out a sauna (`bath.sauna`): benches in tiers along one wall and a heater sized from
+/// the room.
+pub(crate) fn sauna(txn: &mut Transaction<'_>, p: SaunaParams) -> Result<Sauna> {
+    const MODULE: f64 = 0.6;
+    const UPPER: f64 = 0.6;
+    const LOWER: f64 = 0.45;
+    const WALKWAY: f64 = 0.7;
+    let tiers = p.tiers.unwrap_or(2).clamp(1, 2);
+    let store = txn.store().clone();
+    let level = store.resolve(&p.level).and_then(|l| store.get(l)).filter(|l| l.class == crate::levels::CLASS).ok_or_else(|| bad("bath.no_level", "no such level"))?;
+    let floor = crate::levels::elevation(level);
+    let lp = LayoutParams { template: String::new(), point: p.point, level: p.level.clone(), wet_wall_id: p.bench_wall_id.clone(), start: p.start, replace: false, fit_only: false };
+    let room = find_room(&store, &lp, floor + 0.3)?;
+    let height = match p.height {
+        Some(h) => h,
+        None => {
+            let g = crate::walls::regenerate(&store, store.get(room.wet).expect("found"))?;
+            g.base_z + g.height - floor
+        }
+    };
+    let rules = bath_rules::sauna_rules(&store);
+    let sizing = bath_rules::size_heater(&rules, room.length * room.depth * height, p.uninsulated_area.max(0.0), p.log_walls);
+    let heater_kw = match (p.heater_kw, sizing.kw) {
+        (Some(k), _) if k > 0.0 => k,
+        (Some(_), _) => return Err(bad("bath.invalid_input", "a heater's power is above zero")),
+        (None, Some(k)) => k,
+        (None, None) => {
+            let (lo, hi) = rules.heaters.iter().fold((f64::MAX, 0.0f64), |(a, b), h| (a.min(h[1]), b.max(h[2])));
+            return Err(bad("bath.no_fit", format!("the design volume, {:.1} m³, is outside the heater table ({lo}–{hi} m³); give heater_kw", sizing.design_volume)).with_details(serde_json::to_value(&sizing).expect("serialises")));
+        }
+    };
+    let benches_deep = if tiers == 2 { UPPER + LOWER } else { UPPER };
+    if room.depth < benches_deep + WALKWAY - 1e-6 {
+        return Err(bad("bath.no_fit", format!("the room is {:.0} mm too narrow for {tiers} bench tier(s) ({:.0} mm deep) and a {:.0} mm walkway", (benches_deep + WALKWAY - room.depth) * 1000.0, benches_deep * 1000.0, WALKWAY * 1000.0)));
+    }
+    let modules = ((room.length / MODULE) + 1e-9).floor() as u32;
+    if modules == 0 {
+        return Err(bad("bath.no_fit", "the room is shorter than one 600 mm bench module"));
+    }
+    // The upper bench a headroom below the ceiling, the lower 450 mm below it.
+    let upper_top = (height - rules.upper_bench_headroom).clamp(0.45, 1.2);
+    let bench_tops = if tiers == 2 { vec![upper_top, (upper_top - 0.45).max(0.4)] } else { vec![upper_top.min(0.9)] };
+
+    if p.replace {
+        let old: Vec<ElementId> = txn.store().iter().filter(|e| e.param(LAYOUT_KEY).and_then(|v| v.get("room")).and_then(|v| v.as_str()) == Some(room.key.as_str())).map(crate::element::Element::id).collect();
+        for id in old {
+            if txn.store().get(id).is_some() {
+                txn.delete(id)?;
+            }
+        }
+    }
+    let names = ["Sauna heater, wall", "Sauna bench, upper 600", "Sauna bench, lower 600"];
+    let types = crate::bath_components::load(txn, crate::bath_components::LoadParams { names: names.iter().map(|n| (*n).to_owned()).collect() })?;
+    let tag = json!({ "template": "sauna", "room": room.key });
+    let mut placed = Vec::new();
+    let (w, run, start) = (room.w, room.run, room.start);
+    let at = |a: f64, b: f64| [start[0] + run[0] * a - w[0] * b, start[1] + run[1] * a - w[1] * b];
+    // Benches face away from the bench wall: their back (local +y) toward it.
+    let facing = (-w[0]).atan2(w[1]);
+    let mut put = |txn: &mut Transaction<'_>, name: &str, host: Option<ElementId>, q: [f64; 2], rotation: f64, offset: Option<f64>| -> Result<ElementId> {
+        let id = crate::bath_components::place(
+            txn,
+            crate::mep_controls::PlaceParams {
+                type_id: ElementRef::Id(types[name]),
+                point: q,
+                level: p.level.clone(),
+                offset,
+                rotation,
+                host_wall: host.map(ElementRef::Id),
+                side: None,
+                work_plane: host.is_none(),
+                controlled_ids: Vec::new(),
+            },
+        )?;
+        let tag = tag.clone();
+        txn.modify(id, |e| {
+            e.params.insert(LAYOUT_KEY.into(), tag);
+        })?;
+        placed.push(id);
+        Ok(id)
+    };
+    let a0 = (room.length - f64::from(modules) * MODULE) / 2.0;
+    for k in 0..modules {
+        let a = a0 + MODULE * (f64::from(k) + 0.5);
+        put(txn, names[1], None, at(a, UPPER / 2.0), facing, Some(bench_tops[0] - 0.45))?;
+        if tiers == 2 {
+            put(txn, names[2], None, at(a, UPPER + LOWER / 2.0), facing, Some(bench_tops[1] - 0.45))?;
+        }
+    }
+    // The heater on the start wall, toward the far side from the benches.
+    let heater = put(txn, names[0], Some(room.start_wall), at(0.1, room.depth - 0.4), 0.0, None)?;
+    let settings = json!({ "uninsulated": p.uninsulated_area.max(0.0), "log": p.log_walls });
+    txn.modify(heater, |e| {
+        e.params.insert(bath_rules::HEATER_POWER.into(), json!({ "type": "IfcPowerMeasure", "value": heater_kw * 1000.0 }));
+        e.params.insert(bath_rules::SAUNA_KEY.into(), settings);
+    })?;
+    Ok(Sauna { placed, heater, heater_kw, sizing, length: room.length, depth: room.depth, height, benches: modules * tiers, bench_tops })
+}

@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Reviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Reviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 855 numbered requirements (320 P0 · 326 P1 · 202 P2 · 7 P3), 2,283 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 856 numbered requirements (320 P0 · 326 P1 · 203 P2 · 7 P3), 2,284 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,283 commands; 855 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,284 commands; 856 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -14622,6 +14622,47 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 
 *Built (2026-10-31):* the hot tub components with their `SpaProperties`, the `us_spa` pack (zones and the `spa` section of the pack schema), the electrical and load checks in `bath.check` (kind `load` for the floor load), and fixture zones that go round a free-standing fixture with no wall behind it. Not yet: outdoor spas (barriers, ISPSC 305, ASTM F1346 covers, NEC 680.42), steps and handrails, a deck, the floor load checked against a slab's own design load, UK and European rules (HSG282, EN 17125), swim spas, and the rest of §7 (whirlpool baths, saunas, steam rooms, accessibility).
 
+### 3.9a.14 Saunas
+**ID:** ARC-BATH-014 · **Priority:** P2 · **Ref:** `BATHROOMS_PLAN.md` §7; research/13 D3
+
+**Purpose.** Lay out a sauna in a room in one step, with the heater sized from the room's volume, and check the heater, the room's height and its door.
+
+**Behaviour & rules.**
+- **Rules.** A pack's `sauna` section holds:
+  - a heater table: power against the room volumes it suits;
+  - the volume added per m² of uninsulated surface (glass, tile, brick), and the factor for log walls;
+  - the room's clear height range;
+  - the headroom over the upper bench;
+  - the thermostat sensor's distance below the ceiling.
+  
+  `us_spa` carries IRC M1902 (a guarded, listed heater; a thermostat limiting the room to 90 °C, its sensor within 152 mm of the ceiling) and one maker's sizing table: 3 kW for 2–4.5 m³ up to 26 kW for 30–66 m³, 1.2 m³ added per m² of uninsulated surface, ×1.5 for log walls. It also gives 2.1–2.44 m clear height and about 1.15 m over the upper bench. The values are advisory, from makers' and an industry association's guidance. A project without a pack that has sauna rules uses the shipped ones.
+- **Components.**
+  - `Sauna heater, wall` is an `IfcSpaceHeater`, USERDEFINED, ObjectType `Sauna Heater`. Its power and safety distances are product properties: `SaunaHeater.Power` in W, and `SideClearance`, `FrontClearance` and `CeilingClearance`. The defaults are a 6 kW heater with 80 mm to the sides and front and 1.1 m to the ceiling.
+  - Sauna bench modules are 600 mm long: an upper one 600 mm deep and a lower one 450 mm deep. They are `IfcFurniture`, ObjectType `Sauna Bench`.
+- **`bath.sauna`** works on the room closed by walls around a point. It lays bench modules along the bench wall (default the longer side), in one tier or two:
+  - the upper bench's top sits the headroom below the ceiling (1.05 m in a 2.2 m room);
+  - the lower bench's top sits 450 mm below the upper.
+  
+  It places the heater on the start end wall toward the far side, with its power sized from the room unless one is given. The ceiling is the walls' height unless given. A room too narrow for the benches and a 700 mm walkway is reported with the shortfall, as is a design volume outside the table. With `replace` set, it removes an earlier layout in the room first.
+- **The heater's safety distances** are a fixture zone (ARC-BATH-002) taken from its product data, so a bench or anything else standing in it is reported.
+- **Checks** in `bath.check`, for each sauna heater, of kind `sauna`:
+  - a heater whose power is in the table but does not suit the room's design volume;
+  - less ceiling above the heater than its product asks;
+  - a room height outside the range;
+  - a door that swings into the room. Sauna doors open outward with no lock (industry practice, advisory).
+
+**Data (IFC mapping).** The heater as `IfcSpaceHeater` with its properties in `SaunaHeater`; benches as `IfcFurniture`. The tool's settings are on the heater (`rxd:sauna`).
+
+**Commands.** See the catalog: `bath.sauna`.
+
+**Acceptance criteria.**
+- [x] A 2.4 × 2.0 m room 2.2 m high (10.6 m³) gets an 8 kW heater and two tiers of four modules, the upper top at 1.05 m.
+- [x] A 3 kW heater in it is reported as suiting 2–4.5 m³.
+- [x] A door opening into the sauna is reported, and not once flipped to open outward.
+- [x] A room 1.5 m deep is reported as too narrow for two tiers and a walkway.
+
+*Built (2026-10-31):* the `sauna` section of the pack schema and its `us_spa` values, the heater and bench components, `bath.sauna` (Architecture › Build › Sauna, then a click in the room), the heater's product zone and the checks. Not yet: vent presets (the makers' patterns differ: a low inlet near the heater and a high outlet across, or the IMC's 4 × 8 in vent at the door's top), the thermostat sensor placed and checked, gas and wood heaters, infrared cabins, BS 7671 Section 703's temperature zones, the heater's guard, rooms other than rectangles, and the door's lock (doors carry no hardware data yet).
+
 ### 3.10.1 Model In-Place
 **ID:** ARC-INPL-001 · **Priority:** P1 · **Ref:** research/02 §11.1
 
@@ -15881,6 +15922,7 @@ All commands below are registered once in the command registry and exposed autom
 | `bath.locker_room` | point, level, lockers, tiers?, showers?, accessible?, replace? | {placed, lockers, accessible_lockers, fit} | Yes | ARC-BATH-009 |
 | `bath.shower_falls` | element_ids, fall?, drain?: centre\|linear | {drains, floors} | Yes | ARC-BATH-011 |
 | `bath.waterproofing` | element_ids? | {extents, wall_area, floor_area} | No | ARC-BATH-012 |
+| `bath.sauna` | point, level, bench_wall_id?, start?, tiers?, height?, uninsulated_area?, log_walls?, heater_kw?, replace? | {placed, heater, heater_kw, sizing, length, depth, height, benches, bench_tops} | Yes | ARC-BATH-014 |
 | `unit.create_type` | room_ids \| element_ids, name, bay? | {type_id, members, left_out} | Yes | ARC-GRP-004 |
 | `unit.set_connection_points` | type_id, points | — | Yes | ARC-GRP-004 |
 | `unit.array_path` | type_id, path, count \| pitch, handing?, numbering? | array_id | Yes | ARC-GRP-004 |
@@ -29022,14 +29064,14 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 39 | 8 | 0 | 123 |
 | DM | 91 | 65 | 34 | 3 | 193 |
-| ARC | 77 | 86 | 15 | 1 | 179 |
+| ARC | 77 | 86 | 16 | 1 | 180 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 28 | 0 | 29 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
 | COL | 8 | 50 | 11 | 1 | 70 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **326** | **202** | **7** | **855** |
+| **Total** | **320** | **326** | **203** | **7** | **856** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -29225,7 +29267,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2283 unique commands** in 427 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2284 unique commands** in 427 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -29261,7 +29303,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `array` | 6 |
 | `assembly` | 16 |
 | `assemblytemplate` | 1 |
-| `bath` | 19 |
+| `bath` | 20 |
 | `bcf` | 33 |
 | `beam` | 6 |
 | `beam_system` | 5 |
@@ -29781,6 +29823,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `bath.place_grab_bars` | 3 | element_ids? | {placed, skipped} | Yes | ARC-BATH-003 |
 | `bath.remove_rule_pack` | 3 | id | — | Yes | ARC-BATH-001 |
 | `bath.rule_packs` | 3 | — | [{id, title, layer, jurisdiction, edition, in_use, shipped, zones, distances}] | No (query) | ARC-BATH-001 |
+| `bath.sauna` | 3 | point, level, bench_wall_id?, start?, tiers?, height?, uninsulated_area?, log_walls?, heater_kw?, replace? | {placed, heater, heater_kw, sizing, length, depth, height, benches, bench_tops} | Yes | ARC-BATH-014 |
 | `bath.set_accessible` | 3 | element_ids, accessible | — | Yes | ARC-BATH-002 |
 | `bath.set_hand` | 3 | element_ids, hand: auto\ | left\ | right | — |
 | `bath.set_rule_packs` | 3 | packs? (none for automatic) | — | Yes | ARC-BATH-001 |

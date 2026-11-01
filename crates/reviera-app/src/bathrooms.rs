@@ -52,6 +52,8 @@ pub enum FindingKind {
     Falls,
     /// A hot tub's load on the floor, or the pad it needs (ARC-BATH-013).
     Load,
+    /// A sauna's heater, height or door (ARC-BATH-014).
+    Sauna,
 }
 
 /// One thing the check found.
@@ -168,8 +170,9 @@ pub(crate) fn check(app: &mut App, p: CheckParams) -> Result<Vec<Finding>> {
                 min: None,
                 max: None,
             };
+            let product = bath_rules::product_pack();
             for space in bath_rules::spaces_of(store, f, &packs) {
-                let pack = packs.iter().find(|p| p.id == space.pack).expect("from these packs");
+                let pack = packs.iter().find(|p| p.id == space.pack).unwrap_or(&product);
                 let z = &space.zone;
                 let skip = |a: ElementId, b: ElementId| {
                     let other = if a == f.element { b } else { a };
@@ -291,6 +294,7 @@ pub(crate) fn check(app: &mut App, p: CheckParams) -> Result<Vec<Finding>> {
         out.extend(electrical_findings(store, only.as_deref()));
         out.extend(falls_findings(store, only.as_deref()));
         out.extend(spa_findings(store, only.as_deref()));
+        out.extend(sauna_findings(store, only.as_deref()));
         out.sort_by(|a, b| a.severity.cmp(&b.severity).then(a.element.0.cmp(&b.element.0)));
         Ok(out)
     }
@@ -651,6 +655,78 @@ fn spa_findings(store: &reviera_core::Store, only: Option<&[ElementId]>) -> Vec<
                 } else {
                     out.push(base(FindingKind::Load, format!("{what} ({kpa:.1} kPa filled) needs a pad of at least {} of reinforced concrete", mm(rules.pad_thickness)), None, Some(kpa), None, None));
                 }
+            }
+        }
+    }
+    out
+}
+
+/// Saunas: the heater's power for the room, the ceiling over it, the room's height and its
+/// door (ARC-BATH-014).
+fn sauna_findings(store: &reviera_core::Store, only: Option<&[ElementId]>) -> Vec<Finding> {
+    let heaters: Vec<bath_rules::Fixture> = bath_rules::fixtures(store).into_iter().filter(|f| f.kind == FixtureKind::SaunaHeater && !only.is_some_and(|ids| !ids.contains(&f.element))).collect();
+    if heaters.is_empty() {
+        return Vec::new();
+    }
+    let rules = bath_rules::sauna_rules(store);
+    let pack = bath_rules::active(store).into_iter().find(|p| p.sauna.is_some()).or_else(|| bath_rules::shipped().iter().find(|p| p.sauna.is_some()).cloned()).expect("a pack has sauna rules");
+    let swings: Vec<_> = reviera_core::clearances::all(store).into_iter().filter(|c| c.kind == reviera_core::clearances::ClearanceKind::DoorSwing).collect();
+    let mut out = Vec::new();
+    for f in &heaters {
+        let Some(el) = store.get(f.element) else { continue };
+        let what = format!("Sauna heater {}", f.element.0);
+        let base = |message: String, other: Option<ElementId>, measured: Option<f64>, min: Option<f64>, max: Option<f64>| Finding {
+            severity: if pack.layer == Layer::Recommended || rules.confidence == Confidence::Advisory { Severity::Note } else { Severity::Error },
+            kind: FindingKind::Sauna,
+            element: f.element,
+            fixture: f.kind,
+            pack: pack.id.clone(),
+            edition: pack.edition.clone(),
+            layer: pack.layer,
+            rule: rules.id.clone(),
+            description: rules.description.clone(),
+            confidence: rules.confidence,
+            source: rules.source.clone(),
+            message,
+            other,
+            depth: None,
+            centroid: None,
+            measured,
+            min,
+            max,
+        };
+        let Some(room) = bath_rules::room_around(store, f) else { continue };
+        // The room's height and the heater's power for its volume.
+        if room.height < rules.ceiling_min - 1e-6 || room.height > rules.ceiling_max + 1e-6 {
+            out.push(base(format!("The sauna round {what} is {} high; {} gives {}–{}", mm(room.height), rules.id, mm(rules.ceiling_min), mm(rules.ceiling_max)), None, Some(room.height), Some(rules.ceiling_min), Some(rules.ceiling_max)));
+        }
+        let settings = el.param(bath_rules::SAUNA_KEY).cloned().unwrap_or_default();
+        let sizing = bath_rules::size_heater(&rules, room.area * room.height, settings["uninsulated"].as_f64().unwrap_or(0.0), settings["log"].as_bool().unwrap_or(false));
+        if let Some(kw) = bath_rules::product_number(store, el, bath_rules::HEATER_POWER).map(|w| w / 1000.0) {
+            let suits: Vec<&[f64; 3]> = rules.heaters.iter().filter(|h| (h[0] - kw).abs() < 1e-6).collect();
+            let fits = suits.iter().any(|h| sizing.design_volume >= h[1] - 1e-9 && sizing.design_volume <= h[2] + 1e-9);
+            if !suits.is_empty() && !fits {
+                let h = suits[0];
+                out.push(base(format!("{what} ({kw} kW) suits {}–{} m³; the room's design volume is {:.1} m³{}", h[1], h[2], sizing.design_volume, sizing.kw.map(|k| format!(" (a {k} kW heater)")).unwrap_or_default()), None, Some(sizing.design_volume), Some(h[1]), Some(h[2])));
+            }
+        }
+        // The ceiling over the heater.
+        if let (Some(need), Ok(g)) = (bath_rules::product_number(store, el, bath_rules::HEATER_CEILING), reviera_core::mesh_objects::regenerate(store, el)) {
+            let top = g.placement.origin[2] + g.mesh.positions.iter().map(|q| f64::from(q[2]) * g.placement.scale).fold(f64::MIN, f64::max) - f.floor;
+            if room.height - top < need - 1e-6 {
+                out.push(base(format!("{what} has {} above it to the ceiling; its maker asks for {}", mm(room.height - top), mm(need)), None, Some(room.height - top), Some(need), None));
+            }
+        }
+        // Doors swinging into the room.
+        for s in &swings {
+            let (mut c, mut n) = ([0.0, 0.0], 0.0);
+            for q in &s.mesh.0 {
+                c[0] += q[0];
+                c[1] += q[1];
+                n += 1.0;
+            }
+            if n > 0.0 && bath_rules::plan_distance(&room.outline, [c[0] / n, c[1] / n]) == 0.0 {
+                out.push(base(format!("Door {} opens into the sauna round {what}; sauna doors open outward, with no lock", s.element.0), Some(s.element), None, None, None));
             }
         }
     }
