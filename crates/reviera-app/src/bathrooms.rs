@@ -750,6 +750,72 @@ fn sauna_findings(store: &reviera_core::Store, only: Option<&[ElementId]>) -> Ve
                 out.push(base(format!("{what} has {} above it to the ceiling; its maker asks for {}", mm(room.height - top), mm(need)), None, Some(room.height - top), Some(need), None));
             }
         }
+        // The doors' vents and the notices outside them (IMC 914).
+        if let Some(rule) = &rules.door {
+            let door_base = |message: String, other: Option<ElementId>, measured: Option<f64>, min: Option<f64>| Finding {
+                severity: if pack.layer == Layer::Recommended || rule.confidence == Confidence::Advisory { Severity::Note } else { Severity::Error },
+                rule: rule.id.clone(),
+                description: rule.description.clone(),
+                confidence: rule.confidence,
+                source: rule.source.clone(),
+                ..base(message, other, measured, min, None)
+            };
+            let boxes = |kind: &str| -> Vec<(ElementId, [f64; 3], [f64; 3])> {
+                store
+                    .iter()
+                    .filter(|e| e.param("@ObjectType").and_then(serde_json::Value::as_str) == Some(kind))
+                    .filter_map(|e| {
+                        let g = reviera_core::mesh_objects::regenerate(store, e).ok()?;
+                        let (mut lo, mut hi) = ([f64::MAX; 3], [f64::MIN; 3]);
+                        for (_, (pts, _)) in g.slot_meshes() {
+                            for q in pts {
+                                for k in 0..3 {
+                                    lo[k] = lo[k].min(q[k]);
+                                    hi[k] = hi[k].max(q[k]);
+                                }
+                            }
+                        }
+                        (lo[0] <= hi[0]).then_some((e.id(), lo, hi))
+                    })
+                    .collect()
+            };
+            let (vents, notices) = (boxes(bath_rules::SAUNA_DOOR_VENT), boxes(bath_rules::SAUNA_NOTICE));
+            let dwelling = reviera_core::codes::settings(store).occupancy == reviera_core::codes::Occupancy::Dwelling;
+            for d in bath_rules::doors_into(store, &room.outline, &room.walls) {
+                // A vent in the door's leaf: within its width and the wall's thickness, its top
+                // near the head; the largest such vent's width and height.
+                let (u, head) = (d.wall.direction(), d.z0 + d.ty.height);
+                let c = d.world([0.0, 0.0, 0.0]);
+                let local = |q: [f64; 3]| ((q[0] - c[0]) * u[0] + (q[1] - c[1]) * u[1], ((q[0] - c[0]) * u[1] - (q[1] - c[1]) * u[0]).abs());
+                let found = vents
+                    .iter()
+                    .filter(|(_, lo, hi)| {
+                        let (a, b) = (local(*lo), local(*hi));
+                        let mid = [(lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0, 0.0];
+                        a.0.min(b.0) >= -d.ty.width / 2.0 - 1e-6 && a.0.max(b.0) <= d.ty.width / 2.0 + 1e-6 && local(mid).1 <= d.wall.width / 2.0 + 0.05 && hi[2] <= head + 1e-6 && head - hi[2] <= rule.vent_below_head + 1e-6
+                    })
+                    .map(|(id, lo, hi)| {
+                        let (a, b) = (local(*lo), local(*hi));
+                        (*id, (a.0 - b.0).abs(), hi[2] - lo[2])
+                    })
+                    .max_by(|x, y| (x.1 * x.2).total_cmp(&(y.1 * y.2)));
+                match found {
+                    None => out.push(door_base(format!("Door {} into the sauna round {what} has no vent near its top; {} asks for one at least {} × {} within {} of the head", d.id.0, rule.id, mm(rule.vent[0]), mm(rule.vent[1]), mm(rule.vent_below_head)), Some(d.id), None, None)),
+                    Some((v, w, h)) if w < rule.vent[0] - 1e-3 || h < rule.vent[1] - 1e-3 => out.push(door_base(format!("The vent {} in door {} is {} × {}; {} asks for at least {} × {}", v.0, d.id.0, mm(w), mm(h), rule.id, mm(rule.vent[0]), mm(rule.vent[1])), Some(v), Some(w * h), Some(rule.vent[0] * rule.vent[1]))),
+                    _ => {}
+                }
+                // Outside a dwelling, the notice outside the door.
+                if let (Some(reach), false) = (rule.notice_reach, dwelling) {
+                    let near = notices.iter().any(|(_, lo, hi)| {
+                        let mid = [(lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0];
+                        bath_rules::plan_distance(&room.outline, mid) > 0.0 && (mid[0] - c[0]).hypot(mid[1] - c[1]) <= reach + 1e-6
+                    });
+                    if !near {
+                        out.push(door_base(format!("Door {} into the sauna round {what} has no warning notice outside it; {} asks for one outside buildings other than dwellings", d.id.0, rule.id), Some(d.id), None, None));
+                    }
+                }
+            }
+        }
         // Doors swinging into the room.
         for s in &swings {
             let (mut c, mut n) = ([0.0, 0.0], 0.0);

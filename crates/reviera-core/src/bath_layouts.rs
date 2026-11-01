@@ -584,6 +584,9 @@ pub struct SaunaParams {
     /// wall) or `none`.
     #[serde(default)]
     pub vents: Vents,
+    /// In each door into the room, a 4 × 8 in vent near its top, and outside it, where the
+    /// building is not a dwelling, the warning notice (IMC 914); default true.
+    pub door_fittings: Option<bool>,
     #[serde(default)]
     pub replace: bool,
 }
@@ -610,6 +613,8 @@ pub struct Sauna {
     /// Bench modules and the benches' tops.
     pub benches: u32,
     pub bench_tops: Vec<f64>,
+    /// The doors into the room that took a vent (and a notice).
+    pub doors: Vec<ElementId>,
 }
 
 /// Lays out a sauna (`bath.sauna`): benches in tiers along one wall and a heater sized from
@@ -672,7 +677,7 @@ pub(crate) fn sauna(txn: &mut Transaction<'_>, p: SaunaParams) -> Result<Sauna> 
         }
     }
     let names = ["Sauna heater, wall", "Sauna bench, upper 600", if p.accessible { "Sauna bench, accessible 600" } else { "Sauna bench, lower 600" }];
-    let extras = ["Sauna vent 100", "Sauna vent 200", "Sauna thermostat sensor"];
+    let extras = ["Sauna vent 100", "Sauna vent 200", "Sauna thermostat sensor", "Sauna door vent 4 × 8 in", "Sauna notice"];
     let types = crate::bath_components::load(txn, crate::bath_components::LoadParams { names: names.iter().chain(&extras).map(|n| (*n).to_owned()).collect() })?;
     let tag = json!({ "template": "sauna", "room": room.key });
     let mut placed = Vec::new();
@@ -732,12 +737,35 @@ pub(crate) fn sauna(txn: &mut Transaction<'_>, p: SaunaParams) -> Result<Sauna> 
         }
         Vents::None => {}
     }
+    // The doors: a vent near each one's top, and outside it the notice where the building is not
+    // a dwelling (IMC 914).
+    let mut doors = Vec::new();
+    if p.door_fittings.unwrap_or(true) {
+        let outline = [at(0.0, 0.0), at(room.length, 0.0), at(room.length, room.depth), at(0.0, room.depth)];
+        let notice = crate::codes::settings(&store).occupancy != crate::codes::Occupancy::Dwelling;
+        for d in bath_rules::doors_into(txn.store(), &outline, &[room.wet, room.start_wall, room.opposite, room.end_wall]) {
+            let n = d.wall.normal();
+            let top = d.world([0.0, 0.0, d.ty.height - 0.15]);
+            let vent = put(txn, extras[3], None, [top[0], top[1]], (-n[0]).atan2(n[1]), Some(top[2] - floor))?;
+            let door = txn.store().get(d.id).map(|e| e.guid().to_string());
+            txn.modify(vent, |e| {
+                e.params.insert(bath_rules::IN_DOOR_KEY.into(), json!(door));
+            })?;
+            if notice {
+                // Beside the door on the face outside the room, 1.5 m up, its back to the wall.
+                let s = if bath_rules::plan_distance(&outline, { let c = d.world([0.0, 0.3 + d.wall.width / 2.0, 0.0]); [c[0], c[1]] }) > 0.0 { 1.0 } else { -1.0 };
+                let q = d.world([d.ty.width / 2.0 + 0.25, s * d.wall.width / 2.0, 0.0]);
+                put(txn, extras[4], None, [q[0], q[1]], (s * n[0]).atan2(-s * n[1]), Some(d.z0 - floor + 1.5))?;
+            }
+            doors.push(d.id);
+        }
+    }
     let settings = json!({ "uninsulated": p.uninsulated_area.max(0.0), "log": p.log_walls });
     txn.modify(heater, |e| {
         e.params.insert(bath_rules::HEATER_POWER.into(), json!({ "type": "IfcPowerMeasure", "value": heater_kw * 1000.0 }));
         e.params.insert(bath_rules::SAUNA_KEY.into(), settings);
     })?;
-    Ok(Sauna { placed, heater, heater_kw, sizing, length: room.length, depth: room.depth, height, benches: modules * tiers, bench_tops })
+    Ok(Sauna { placed, heater, heater_kw, sizing, length: room.length, depth: room.depth, height, benches: modules * tiers, bench_tops, doors })
 }
 
 // ---- Steam rooms (ARC-BATH-015) ----

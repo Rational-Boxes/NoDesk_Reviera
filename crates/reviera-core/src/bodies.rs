@@ -646,6 +646,10 @@ pub fn related(store: &Store, a: ElementId, b: ElementId) -> bool {
         if let Some(d) = e.param(crate::bath_rules::DRAIN_KEY) {
             hosts.extend(["floor", "shower"].iter().filter_map(|k| d[*k].as_str().map(str::to_owned)));
         }
+        // A sauna door's vent is set in the door's leaf.
+        if let Some(d) = e.param(crate::bath_rules::IN_DOOR_KEY).and_then(serde_json::Value::as_str) {
+            hosts.push(d.to_owned());
+        }
         // A grab bar is fixed to its wall.
         if let Some(r) = crate::grab_bars::recipe(e) {
             hosts.push(r.wall);

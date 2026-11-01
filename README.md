@@ -667,7 +667,9 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
   longer wall and a wall heater sized from the room's volume by a maker's table (uninsulated
   surfaces and log walls counted); the heater's own safety distances are kept clear, and Check
   Bathrooms reports a heater that does not suit the room, too little ceiling over it, a room
-  height outside 2.1–2.44 m and a door opening inward (`bath.sauna`).
+  height outside 2.1–2.44 m and a door opening inward (`bath.sauna`). Each door into the room
+  takes IMC 914's 4 × 8 in vent near its top and, outside dwellings, the warning notice outside
+  it; Check Bathrooms reports a door missing either.
 - **Steam rooms** (ARC-BATH-015): Steam Room lays out a ceiling sloped 2 in per ft so
   condensate runs to the walls, a tiled bench, the steam head and its control, and the floor's
   falls to a drain, and gives the generator's design volume from the walls' finish; Check

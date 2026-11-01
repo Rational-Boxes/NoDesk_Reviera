@@ -780,7 +780,7 @@ fn a_sauna_its_benches_heater_and_door() {
     ok(&mut app, "pset.set", json!({ "element_id": heater, "pset_name": "SaunaHeater", "property_name": "Power", "value": 8000.0 }));
     // A door in the south wall: inward is reported, outward is not.
     let door = ok(&mut app, "door.place", json!({ "host_wall_id": south, "point_along": 1.8 })).as_u64().unwrap();
-    let into = |app: &mut App| sauna(app).iter().any(|f| f["other"] == door);
+    let into = |app: &mut App| sauna(app).iter().any(|f| f["other"] == door && f["message"].as_str().unwrap().contains("opens into"));
     let first = into(&mut app);
     ok(&mut app, "insert.flip_facing", json!({ "element_ids": [door] }));
     assert_ne!(first, into(&mut app), "flipping the door changes the finding");
@@ -1091,4 +1091,33 @@ fn a_saunas_vents_and_thermostat_sensor() {
     ok(&mut app, "element.delete", json!({ "element_ids": [sensor.0] }));
     let f = sauna(&mut app);
     assert!(f.len() == 1 && f[0].contains("thermostat sensor"), "{f:#?}");
+}
+
+#[test]
+fn a_sauna_doors_vent_and_notice() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = new_app(dir.path());
+    let (level, [south, ..]) = room_h(&mut app, 2.4, 2.0, 2.2);
+    ok(&mut app, "code.set", json!({ "code": "ibc", "occupancy": "other" }));
+    let door = ok(&mut app, "door.place", json!({ "host_wall_id": south, "point_along": 1.8 })).as_u64().unwrap();
+    // IMC 914: a 4 × 8 in vent near the door's top and, outside a dwelling, the notice outside.
+    let s = ok(&mut app, "bath.sauna", json!({ "point": [1.2, 1.0], "level": level }));
+    assert_eq!(s["doors"], json!([door]), "{s:#}");
+    let at_door = |app: &mut App| findings(app).into_iter().filter(|f| f["kind"] == "sauna" && !f["message"].as_str().unwrap().contains("opens into")).map(|f| f["message"].as_str().unwrap().to_owned()).collect::<Vec<_>>();
+    assert_eq!(at_door(&mut app), Vec::<String>::new());
+    let store = app.document(app.active().unwrap()).unwrap().doc.store().clone();
+    let of = |t: &str| store.iter().find(|e| e.param("@ObjectType").and_then(Value::as_str) == Some(t)).unwrap().id().0;
+    let (vent, notice) = (of("Sauna Door Vent"), of("Sauna Notice"));
+    ok(&mut app, "element.delete", json!({ "element_ids": [vent] }));
+    let f = at_door(&mut app);
+    assert!(f.len() == 1 && f[0].contains("no vent"), "{f:#?}");
+    ok(&mut app, "element.delete", json!({ "element_ids": [notice] }));
+    assert_eq!(at_door(&mut app).len(), 2);
+    // In a dwelling the notice is not asked for, nor placed.
+    ok(&mut app, "code.set", json!({ "code": "irc", "occupancy": "dwelling" }));
+    assert_eq!(at_door(&mut app).len(), 1);
+    ok(&mut app, "bath.sauna", json!({ "point": [1.2, 1.0], "level": level, "replace": true }));
+    assert_eq!(at_door(&mut app), Vec::<String>::new());
+    let store = app.document(app.active().unwrap()).unwrap().doc.store().clone();
+    assert!(!store.iter().any(|e| e.param("@ObjectType").and_then(Value::as_str) == Some("Sauna Notice")));
 }

@@ -112,7 +112,16 @@
     "upper_bench_headroom": 1.15,
     "sensor_below_ceiling": 0.152,
     "source": "S1145 S1147 S1148 S1149 S1150 S1151",
-    "confidence": "advisory"
+    "confidence": "advisory",
+    "door": {
+      "id": "IMC 914 / IFGC 615",
+      "description": "A vent opening into the sauna at least 4 × 8 in (102 × 203 mm) near the top of the door; outside the door, except in one- and two-family dwellings, a permanent notice in ¼ in letters warning bathers not to stay longer than 30 minutes, with its health cautions",
+      "vent": [0.203, 0.102],
+      "vent_below_head": 0.3,
+      "notice_reach": 1.5,
+      "source": "S1146",
+      "confidence": "secondary"
+    }
   },
   "steam": {
     "id": "Steam room practice (TCNA SR614, makers)",

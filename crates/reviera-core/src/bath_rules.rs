@@ -1930,6 +1930,43 @@ pub struct SaunaRules {
     pub sensor_below_ceiling: f64,
     pub source: String,
     pub confidence: Confidence,
+    /// The door's vent and the warning notice outside it (IMC 914), with their own source.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub door: Option<SaunaDoor>,
+}
+
+/// A sauna door's vent and notice (IMC 914 / IFGC 615).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct SaunaDoor {
+    pub id: String,
+    pub description: String,
+    /// The vent's least width and height (metres): 4 × 8 in is [0.203, 0.102].
+    pub vent: [f64; 2],
+    /// The vent's top within this of the door's head ("near the top of the door").
+    pub vent_below_head: f64,
+    /// Outside dwellings, a warning notice outside the door, within this of it in plan.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub notice_reach: Option<f64>,
+    pub source: String,
+    pub confidence: Confidence,
+}
+
+/// The ObjectTypes of a sauna door's vent and its notice.
+pub const SAUNA_DOOR_VENT: &str = "Sauna Door Vent";
+pub const SAUNA_NOTICE: &str = "Sauna Notice";
+/// On a fitting set in a door's leaf (a sauna door's vent): the door's GlobalId.
+pub const IN_DOOR_KEY: &str = "rxd:in_door";
+
+/// The doors into a room: hosted by one of its walls, their middle on its outline.
+pub fn doors_into(store: &Store, outline: &[[f64; 2]], walls: &[ElementId]) -> Vec<crate::inserts::Placed> {
+    crate::inserts::placed(store)
+        .into_iter()
+        .filter(|d| d.kind == crate::inserts::Kind::Door && walls.contains(&d.host))
+        .filter(|d| {
+            let c = d.world([0.0, 0.0, 0.0]);
+            plan_distance(outline, [c[0], c[1]]) <= d.wall.width / 2.0 + 0.05
+        })
+        .collect()
 }
 
 /// The sizing of a sauna's heater.

@@ -390,7 +390,22 @@
         "upper_bench_headroom": {"type": "number", "exclusiveMinimum": 0, "description": "From the upper bench's top to the ceiling."},
         "sensor_below_ceiling": {"type": "number", "minimum": 0, "description": "A thermostat sensor within this of the ceiling."},
         "source": {"type": "string", "pattern": "^S[0-9]{4}( S[0-9]{4})*$"},
-        "confidence": {"enum": ["verified", "secondary", "advisory"]}
+        "confidence": {"enum": ["verified", "secondary", "advisory"]},
+        "door": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "description", "vent", "vent_below_head", "source", "confidence"],
+          "description": "The door's vent and, outside dwellings, the warning notice outside it (IMC 914).",
+          "properties": {
+            "id": {"type": "string", "minLength": 1},
+            "description": {"type": "string", "minLength": 1},
+            "vent": {"$ref": "#/$defs/pair", "description": "The vent's least width and height in metres."},
+            "vent_below_head": {"type": "number", "minimum": 0, "description": "The vent's top within this of the door's head."},
+            "notice_reach": {"type": "number", "exclusiveMinimum": 0, "description": "A notice outside the door within this of it in plan, where the building is not a dwelling."},
+            "source": {"type": "string", "pattern": "^S[0-9]{4}( S[0-9]{4})*$"},
+            "confidence": {"enum": ["verified", "secondary", "advisory"]}
+          }
+        }
       }
     },
     "steam": {

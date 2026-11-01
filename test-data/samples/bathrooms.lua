@@ -63,11 +63,12 @@ floor(10, 0, 5, 4)
 reviera.bath.place_component{ type_id = t["Hot tub, 2.0 × 2.0 m"], point = {12.5, 2.0}, level = l1, work_plane = true }
 
 -- 5. A sauna, 2.4 × 2.0 m and 2.2 m high (10.6 m³): two bench tiers along the south wall and an
---    8 kW wall heater sized from the room (`bath.sauna`); its door, in the north wall, opens
---    outward.
+--    8 kW wall heater sized from the room (`bath.sauna`); its door, in the north wall, takes a
+--    4 × 8 in vent near its top (IMC 914) and opens outward. A house needs no warning notice
+--    outside it.
 local sauna_walls = room(17, 0, 2.4, 2.0, 2.2)
-reviera.bath.sauna{ point = {18.2, 1.0}, level = l1, bench_wall_id = sauna_walls[1] }
 local door = reviera.door.place{ host_wall_id = sauna_walls[3], point_along = 1.3 }
+reviera.bath.sauna{ point = {18.2, 1.0}, level = l1, bench_wall_id = sauna_walls[1] }
 for _, f in ipairs(reviera.bath.check{}) do
   if f.kind == "sauna" and f.other == door then
     reviera.insert.flip_facing{ element_ids = { door } }

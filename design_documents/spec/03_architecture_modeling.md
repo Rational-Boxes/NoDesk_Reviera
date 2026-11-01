@@ -4423,7 +4423,11 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
   It places the heater on the start end wall toward the far side, with its power sized from the room unless one is given. The ceiling is the walls' height unless given. The thermostat's sensor goes over the heater 100 mm below the ceiling (`Sauna thermostat sensor`, an `IfcSensor`). The vents follow `vents`, as makers' patterns differ:
   - `high_outlet` (the default): an inlet 100 mm up beside the heater, clear of its safety distances, and an outlet 150 mm below the ceiling on the far wall;
   - `low_outlet`: the inlet beside the heater and an outlet twice its size, 200 mm, low on the far wall;
-  - `none`. A room too narrow for the benches and a 700 mm walkway is reported with the shortfall, as is a design volume outside the table. With `replace` set, it removes an earlier layout in the room first.
+  - `none`.
+
+  A room too narrow for the benches and a 700 mm walkway is reported with the shortfall, as is a design volume outside the table. With `replace` set, it removes an earlier layout in the room first.
+
+  With `door_fittings` (default on), each door into the room (hosted by one of its walls) takes a `Sauna door vent 4 × 8 in` in its leaf, centred 150 mm below its head. Where the building code settings' occupancy is not a dwelling, a `Sauna notice` also goes on the wall outside the door, beside it and 1.5 m up. The vent records its door (`rxd:in_door`), so the overlap checks pass it. The result lists the doors fitted.
 - **The heater's safety distances** are a fixture zone (ARC-BATH-002) taken from its product data, so a bench or anything else standing in it is reported.
 - **Checks** in `bath.check`, for each sauna heater, of kind `sauna`:
   - a heater whose power is in the table but does not suit the room's design volume;
@@ -4431,8 +4435,9 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
   - a room height outside the range;
   - a door that swings into the room. Sauna doors open outward with no lock (industry practice, advisory);
   - no thermostat sensor in the room, or one further below the ceiling than the rules' 152 mm (IRC M1902).
+  - where the rules have a `door` section, for each door into the room: no vent within the door's width and the wall's thickness whose top is within `vent_below_head` of the head, or one smaller than `vent`; and, outside dwellings, no notice outside the room within `notice_reach` of the door. `us_spa` carries IMC 914 / IFGC 615 (secondary): a vent at least 4 × 8 in (203 × 102 mm) near the top of the door, and outside the door, except in one- and two-family dwellings, a permanent notice in ¼ in letters warning bathers of the 30-minute limit and its health cautions. "Near the top" is taken as within 300 mm of the head, and the notice within 1.5 m of the door (EXPERT_REVIEW E-80). These findings take the section's own source and confidence.
 
-**Data (IFC mapping).** The heater as `IfcSpaceHeater` with its properties in `SaunaHeater`; benches as `IfcFurniture`. The tool's settings are on the heater (`rxd:sauna`).
+**Data (IFC mapping).** The heater as `IfcSpaceHeater` with its properties in `SaunaHeater`; benches as `IfcFurniture`; the door's vent as `IfcAirTerminal`, ObjectType `Sauna Door Vent`; the notice as `IfcBuildingElementProxy`, ObjectType `Sauna Notice`. The tool's settings are on the heater (`rxd:sauna`).
 
 **Commands.** See the catalog: `bath.sauna`.
 
@@ -4442,8 +4447,9 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 - [x] A door opening into the sauna is reported, and not once flipped to open outward.
 - [x] A room 1.5 m deep is reported as too narrow for two tiers and a walkway.
 - [x] The default vents are two 100 mm vents; `low_outlet` gives a 100 mm inlet and a 200 mm outlet; neither stands in the heater's distances. Without its sensor, the sauna is reported.
+- [x] Outside a dwelling, a sauna laid out after its door is placed has the door's vent and the notice, and nothing is reported; without the vent the door is reported, and without the notice too. In a dwelling the notice is neither asked for nor placed.
 
-*Built (2026-10-31):* the `sauna` section of the pack schema and its `us_spa` values, the heater and bench components, `bath.sauna` (Architecture › Build › Sauna, then a click in the room), the heater's product zone and the checks. Not yet: the IMC's 4 × 8 in vent near the door's top, mechanical exhaust, gas and wood heaters, infrared cabins, BS 7671 Section 703's temperature zones, the heater's guard, rooms other than rectangles, and the door's lock (doors carry no hardware data yet).
+*Built (2026-10-31):* the `sauna` section of the pack schema and its `us_spa` values, the heater and bench components, `bath.sauna` (Architecture › Build › Sauna, then a click in the room), the heater's product zone and the checks. *Built (2026-11-01):* the `door` section (IMC 914's vent and notice), the two components, `door_fittings` (the dialog's *Door* choice) and the door checks. Not yet: a vent cut through the door's leaf in its geometry, the notice's text, mechanical exhaust, gas and wood heaters, infrared cabins, BS 7671 Section 703's temperature zones, the heater's guard, rooms other than rectangles, and the door's lock (doors carry no hardware data yet).
 
 ### 3.9a.15 Steam rooms
 **ID:** ARC-BATH-015 · **Priority:** P2 · **Ref:** `BATHROOMS_PLAN.md` §7; research/13 D4

@@ -328,6 +328,27 @@ pub fn catalogue() -> Vec<Component> {
             shape: || Shape::default().cuboid([-0.03, 0.03], [-0.04, 0.0], [-0.03, 0.0]),
             connectors: none,
         },
+        // The door's vent and the notice outside it (IMC 914).
+        Component {
+            name: "Sauna door vent 4 × 8 in",
+            category: C::AirTerminal,
+            predefined: "USERDEFINED",
+            element_type: Some("Sauna Door Vent"),
+            color: WOOD,
+            // A 203 × 102 mm grille through a 40 mm door leaf, its centre at its insertion height.
+            shape: || Shape::default().cuboid([-0.1015, 0.1015], [-0.02, 0.02], [-0.051, 0.051]),
+            connectors: none,
+        },
+        Component {
+            name: "Sauna notice",
+            category: C::GenericModel,
+            predefined: "USERDEFINED",
+            element_type: Some("Sauna Notice"),
+            color: WHITE,
+            // A 300 × 200 mm plate on the wall, its centre at its insertion height.
+            shape: || Shape::default().cuboid([-0.15, 0.15], [-0.005, 0.0], [-0.1, 0.1]),
+            connectors: none,
+        },
         Component {
             name: "Sauna bench, upper 600",
             category: C::Furniture,

@@ -39,15 +39,18 @@ the sizes given are inside the walls, from the inside corner named.
       the note asks for a 100 mm reinforced concrete pad. Upstairs, the same load would be
       reported against the 40 psf floors are commonly designed for.
 5. **A sauna.** Walls 2.2 m high round 2.4 × 2.0 m from (17, 0).
-   1. **Architecture › Build › Sauna**: two tiers, no uninsulated surface, insulated walls, and
-      the heater left empty. Click inside the room.
+   1. Put a door in the north wall (**Architecture › Door**). **Architecture › Build › Sauna**:
+      two tiers, no uninsulated surface, insulated walls, and the heater left empty. Click inside
+      the room.
    2. Bench modules 600 mm long go along a long wall in two tiers. The upper tops are 1.05 m up,
       1.15 m below the ceiling; the lower tops are 0.6 m. An 8 kW wall heater, sized for the
       room's 10.6 m³, goes on an end wall. The status bar gives the power. The script names the
       south wall as the bench wall (`bench_wall_id`), so the benches run along it.
-   3. Put a door in the north wall (**Architecture › Door**). If Check Bathrooms says it opens
-      into the sauna, select it and flip it (**Modify › Doors › Flip Facing**): sauna doors
-      open outward, with no lock.
+   3. With *Door* left at *Vent near its top*, the tool puts a 4 × 8 in (203 × 102 mm) vent in
+      the door's leaf 150 mm below its head (IMC 914). In a building other than a dwelling a
+      warning notice would go on the wall outside it too; this is a house. If Check Bathrooms says the door
+      opens into the sauna, select it and flip it (**Modify › Doors › Flip Facing**): sauna
+      doors open outward, with no lock.
 
 6. **A steam room.** Walls 2.4 m high round 2.4 × 1.8 m from (21, 0), and a floor.
    1. **Architecture › Build › Steam Room**: the ceiling's high side 2130 mm, ceramic tile, no

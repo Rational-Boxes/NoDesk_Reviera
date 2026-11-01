@@ -572,10 +572,11 @@ impl Gui {
         let kw = f.text("Heater (kW)", "", "Empty to size it from the room");
         let acc = f.choice("Lowest bench", &["Standard".to_owned(), "Accessible (ADA §903: 24 in deep, 18 in high)".to_owned()], 0);
         let vents = f.choice("Vents", &["Inlet low by the heater, outlet high on the far wall".to_owned(), "Inlet low by the heater, larger outlet low on the far wall".to_owned(), "None".to_owned()], 0);
-        let ok = f.show("Then click inside a room closed by walls, in a plan: benches run along its longer wall, the heater goes on an end wall.", "Choose Room");
+        let door = f.choice("Door", &["Vent near its top; notice outside (IMC 914)".to_owned(), "Leave the door as it is".to_owned()], 0);
+        let ok = f.show("Then click inside a room closed by walls, in a plan: benches run along its longer wall, the heater goes on an end wall. The notice goes outside the door only where the building is not a dwelling (Manage › Model Properties).", "Choose Room");
         let num = |t: &TextCtrl| t.get_value().trim().replace(',', ".").parse::<f64>().ok();
         let vents = ["high_outlet", "low_outlet", "none"][vents.get_selection().unwrap_or(0) as usize];
-        let mut args = json!({ "command": "bath.sauna", "tiers": if tiers.get_selection() == Some(1) { 1 } else { 2 }, "uninsulated_area": num(&glass).unwrap_or(0.0).max(0.0), "log_walls": logs.get_selection() == Some(1), "accessible": acc.get_selection() == Some(1), "vents": vents, "replace": true });
+        let mut args = json!({ "command": "bath.sauna", "tiers": if tiers.get_selection() == Some(1) { 1 } else { 2 }, "uninsulated_area": num(&glass).unwrap_or(0.0).max(0.0), "log_walls": logs.get_selection() == Some(1), "accessible": acc.get_selection() == Some(1), "vents": vents, "door_fittings": door.get_selection() != Some(1), "replace": true });
         if let Some(k) = num(&kw) {
             args["heater_kw"] = json!(k);
         }

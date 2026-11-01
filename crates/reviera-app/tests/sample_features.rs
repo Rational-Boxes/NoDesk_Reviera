@@ -970,6 +970,9 @@ fn the_bathrooms_sample_keeps_its_rooms() {
     assert_eq!(benches, 8);
     let heater = s.iter().find(|e| e.param("@ObjectType").and_then(Value::as_str) == Some("Sauna Heater")).unwrap();
     assert!(near(reviera_core::bath_rules::product_number(&s, heater, reviera_core::bath_rules::HEATER_POWER).unwrap(), 8000.0, 1e-6));
+    // Its door's vent, and no notice in a house.
+    let count = |t: &str| s.iter().filter(|e| e.param("@ObjectType").and_then(Value::as_str) == Some(t)).count();
+    assert_eq!((count("Sauna Door Vent"), count("Sauna Notice")), (1, 0));
     // The steam room's ceiling slopes 2 in per ft.
     let head = reviera_core::bath_rules::fixtures(&s).into_iter().find(|f| f.kind == reviera_core::bath_rules::FixtureKind::SteamHead).unwrap();
     let room = reviera_core::bath_rules::room_around(&s, &head).unwrap();
