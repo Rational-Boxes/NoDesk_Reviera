@@ -718,6 +718,22 @@ fn sauna_findings(store: &reviera_core::Store, only: Option<&[ElementId]>) -> Ve
                 out.push(base(format!("{what} ({kw} kW) suits {}–{} m³; the room's design volume is {:.1} m³{}", h[1], h[2], sizing.design_volume, sizing.kw.map(|k| format!(" (a {k} kW heater)")).unwrap_or_default()), None, Some(sizing.design_volume), Some(h[1]), Some(h[2])));
             }
         }
+        // The thermostat's sensor: in the room, within its distance of the ceiling (IRC M1902).
+        let sensors: Vec<f64> = store
+            .iter()
+            .filter(|e| e.param("@ObjectType").and_then(serde_json::Value::as_str) == Some("Sauna Sensor"))
+            .filter_map(|e| bath_rules::piece(store, e, f.floor))
+            .filter(|p| {
+                let n = p.outline.len() as f64;
+                bath_rules::plan_distance(&room.outline, [p.outline.iter().map(|q| q[0]).sum::<f64>() / n, p.outline.iter().map(|q| q[1]).sum::<f64>() / n]) == 0.0
+            })
+            .map(|p| room.height - p.top)
+            .collect();
+        match sensors.iter().copied().fold(None, |a: Option<f64>, d| Some(a.map_or(d, |a| a.min(d)))) {
+            None => out.push(base(format!("The sauna round {what} has no thermostat sensor; {} wants one within {} of the ceiling", rules.id, mm(rules.sensor_below_ceiling)), None, None, None, Some(rules.sensor_below_ceiling))),
+            Some(d) if d > rules.sensor_below_ceiling + 1e-6 => out.push(base(format!("The sauna's thermostat sensor is {} below the ceiling; {} wants it within {}", mm(d), rules.id, mm(rules.sensor_below_ceiling)), None, Some(d), None, Some(rules.sensor_below_ceiling))),
+            _ => {}
+        }
         // The ceiling over the heater.
         if let (Some(need), Ok(g)) = (bath_rules::product_number(store, el, bath_rules::HEATER_CEILING), reviera_core::mesh_objects::regenerate(store, el)) {
             let top = g.placement.origin[2] + g.mesh.positions.iter().map(|q| f64::from(q[2]) * g.placement.scale).fold(f64::MIN, f64::max) - f.floor;

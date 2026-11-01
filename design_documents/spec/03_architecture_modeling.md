@@ -4420,13 +4420,17 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
   - the upper bench's top sits the headroom below the ceiling (1.05 m in a 2.2 m room);
   - the lower bench's top sits 450 mm below the upper.
   
-  It places the heater on the start end wall toward the far side, with its power sized from the room unless one is given. The ceiling is the walls' height unless given. A room too narrow for the benches and a 700 mm walkway is reported with the shortfall, as is a design volume outside the table. With `replace` set, it removes an earlier layout in the room first.
+  It places the heater on the start end wall toward the far side, with its power sized from the room unless one is given. The ceiling is the walls' height unless given. The thermostat's sensor goes over the heater 100 mm below the ceiling (`Sauna thermostat sensor`, an `IfcSensor`). The vents follow `vents`, as makers' patterns differ:
+  - `high_outlet` (the default): an inlet 100 mm up beside the heater, clear of its safety distances, and an outlet 150 mm below the ceiling on the far wall;
+  - `low_outlet`: the inlet beside the heater and an outlet twice its size, 200 mm, low on the far wall;
+  - `none`. A room too narrow for the benches and a 700 mm walkway is reported with the shortfall, as is a design volume outside the table. With `replace` set, it removes an earlier layout in the room first.
 - **The heater's safety distances** are a fixture zone (ARC-BATH-002) taken from its product data, so a bench or anything else standing in it is reported.
 - **Checks** in `bath.check`, for each sauna heater, of kind `sauna`:
   - a heater whose power is in the table but does not suit the room's design volume;
   - less ceiling above the heater than its product asks;
   - a room height outside the range;
-  - a door that swings into the room. Sauna doors open outward with no lock (industry practice, advisory).
+  - a door that swings into the room. Sauna doors open outward with no lock (industry practice, advisory);
+  - no thermostat sensor in the room, or one further below the ceiling than the rules' 152 mm (IRC M1902).
 
 **Data (IFC mapping).** The heater as `IfcSpaceHeater` with its properties in `SaunaHeater`; benches as `IfcFurniture`. The tool's settings are on the heater (`rxd:sauna`).
 
@@ -4437,8 +4441,9 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 - [x] A 3 kW heater in it is reported as suiting 2–4.5 m³.
 - [x] A door opening into the sauna is reported, and not once flipped to open outward.
 - [x] A room 1.5 m deep is reported as too narrow for two tiers and a walkway.
+- [x] The default vents are two 100 mm vents; `low_outlet` gives a 100 mm inlet and a 200 mm outlet; neither stands in the heater's distances. Without its sensor, the sauna is reported.
 
-*Built (2026-10-31):* the `sauna` section of the pack schema and its `us_spa` values, the heater and bench components, `bath.sauna` (Architecture › Build › Sauna, then a click in the room), the heater's product zone and the checks. Not yet: vent presets (the makers' patterns differ: a low inlet near the heater and a high outlet across, or the IMC's 4 × 8 in vent at the door's top), the thermostat sensor placed and checked, gas and wood heaters, infrared cabins, BS 7671 Section 703's temperature zones, the heater's guard, rooms other than rectangles, and the door's lock (doors carry no hardware data yet).
+*Built (2026-10-31):* the `sauna` section of the pack schema and its `us_spa` values, the heater and bench components, `bath.sauna` (Architecture › Build › Sauna, then a click in the room), the heater's product zone and the checks. Not yet: the IMC's 4 × 8 in vent near the door's top, mechanical exhaust, gas and wood heaters, infrared cabins, BS 7671 Section 703's temperature zones, the heater's guard, rooms other than rectangles, and the door's lock (doors carry no hardware data yet).
 
 ### 3.9a.15 Steam rooms
 **ID:** ARC-BATH-015 · **Priority:** P2 · **Ref:** `BATHROOMS_PLAN.md` §7; research/13 D4

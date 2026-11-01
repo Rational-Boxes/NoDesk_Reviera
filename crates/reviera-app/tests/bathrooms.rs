@@ -1038,3 +1038,29 @@ fn nec_bathroom_receptacles() {
     let f = nec(&mut app);
     assert!(f.iter().any(|x| x["element"] == lav && x["message"].as_str().unwrap().contains("No receptacle")), "{f:#?}");
 }
+
+#[test]
+fn a_saunas_vents_and_thermostat_sensor() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = new_app(dir.path());
+    let (level, _) = room_h(&mut app, 2.4, 2.0, 2.2);
+    let count = |app: &mut App, name: &str| {
+        let types = ok(app, "mesh_object.types", json!({}));
+        types.as_array().unwrap().iter().find(|t| t["name"] == name).map_or(0, |t| t["copies"].as_u64().unwrap())
+    };
+    // The default: two 100 mm vents, and the sensor 100 mm below the ceiling.
+    ok(&mut app, "bath.sauna", json!({ "point": [1.2, 1.0], "level": level }));
+    assert_eq!((count(&mut app, "Sauna vent 100"), count(&mut app, "Sauna vent 200"), count(&mut app, "Sauna thermostat sensor")), (2, 0, 1));
+    let sauna = |app: &mut App| findings(app).into_iter().filter(|f| f["kind"] == "sauna" || f["kind"] == "intrusion").map(|f| f["message"].as_str().unwrap().to_owned()).collect::<Vec<_>>();
+    assert_eq!(sauna(&mut app), Vec::<String>::new());
+    // The other maker's pattern: a 200 mm outlet low on the far wall.
+    ok(&mut app, "bath.sauna", json!({ "point": [1.2, 1.0], "level": level, "vents": "low_outlet", "replace": true }));
+    assert_eq!((count(&mut app, "Sauna vent 100"), count(&mut app, "Sauna vent 200")), (1, 1));
+    assert_eq!(sauna(&mut app), Vec::<String>::new());
+    // No sensor: IRC M1902 wants one near the ceiling.
+    let store = app.document(app.active().unwrap()).unwrap().doc.store().clone();
+    let sensor = store.iter().find(|e| e.param("@ObjectType").and_then(Value::as_str) == Some("Sauna Sensor")).unwrap().id();
+    ok(&mut app, "element.delete", json!({ "element_ids": [sensor.0] }));
+    let f = sauna(&mut app);
+    assert!(f.len() == 1 && f[0].contains("thermostat sensor"), "{f:#?}");
+}

@@ -578,8 +578,23 @@ pub struct SaunaParams {
     /// has seats (ARC-BATH-016).
     #[serde(default)]
     pub accessible: bool,
+    /// Where the vents go (makers disagree): `high_outlet` (default; an inlet 100 mm up beside
+    /// the heater, clear of its safety distances, and an outlet 150 mm below the ceiling on the far
+    /// wall), `low_outlet` (the inlet beside the heater, an outlet twice its size low on the far
+    /// wall) or `none`.
+    #[serde(default)]
+    pub vents: Vents,
     #[serde(default)]
     pub replace: bool,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Vents {
+    #[default]
+    HighOutlet,
+    LowOutlet,
+    None,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -657,7 +672,8 @@ pub(crate) fn sauna(txn: &mut Transaction<'_>, p: SaunaParams) -> Result<Sauna> 
         }
     }
     let names = ["Sauna heater, wall", "Sauna bench, upper 600", if p.accessible { "Sauna bench, accessible 600" } else { "Sauna bench, lower 600" }];
-    let types = crate::bath_components::load(txn, crate::bath_components::LoadParams { names: names.iter().map(|n| (*n).to_owned()).collect() })?;
+    let extras = ["Sauna vent 100", "Sauna vent 200", "Sauna thermostat sensor"];
+    let types = crate::bath_components::load(txn, crate::bath_components::LoadParams { names: names.iter().chain(&extras).map(|n| (*n).to_owned()).collect() })?;
     let tag = json!({ "template": "sauna", "room": room.key });
     let mut placed = Vec::new();
     let (w, run, start) = (room.w, room.run, room.start);
@@ -702,6 +718,20 @@ pub(crate) fn sauna(txn: &mut Transaction<'_>, p: SaunaParams) -> Result<Sauna> 
     }
     // The heater on the start wall, toward the far side from the benches.
     let heater = put(txn, names[0], Some(room.start_wall), at(0.1, room.depth - 0.4), 0.0, None)?;
+    // The thermostat's sensor over the heater, 100 mm below the ceiling (IRC M1902: within 6 in).
+    put(txn, extras[2], Some(room.start_wall), at(0.1, room.depth - 0.4), 0.0, Some(height - 0.1))?;
+    // The vents: one maker's pattern or the other's.
+    match p.vents {
+        Vents::HighOutlet => {
+            put(txn, extras[0], Some(room.start_wall), at(0.1, (room.depth - 0.85).max(0.1)), 0.0, Some(0.1))?;
+            put(txn, extras[0], Some(room.end_wall), at(room.length - 0.1, room.depth - 0.4), 0.0, Some(height - 0.15))?;
+        }
+        Vents::LowOutlet => {
+            put(txn, extras[0], Some(room.start_wall), at(0.1, (room.depth - 0.85).max(0.1)), 0.0, Some(0.15))?;
+            put(txn, extras[1], Some(room.end_wall), at(room.length - 0.1, room.depth - 0.4), 0.0, Some(0.15))?;
+        }
+        Vents::None => {}
+    }
     let settings = json!({ "uninsulated": p.uninsulated_area.max(0.0), "log": p.log_walls });
     txn.modify(heater, |e| {
         e.params.insert(bath_rules::HEATER_POWER.into(), json!({ "type": "IfcPowerMeasure", "value": heater_kw * 1000.0 }));

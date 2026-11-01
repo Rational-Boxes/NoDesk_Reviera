@@ -300,6 +300,35 @@ pub fn catalogue() -> Vec<Component> {
             connectors: none,
         },
         Component {
+            name: "Sauna vent 100",
+            category: C::AirTerminal,
+            predefined: "USERDEFINED",
+            element_type: Some("Sauna Vent"),
+            color: WOOD,
+            // A 100 mm round wooden vent with a slide, its centre at its insertion height.
+            shape: || Shape::default().prism(&rounded([0.0, -0.01], 0.14, 0.02, 0.0), -0.07, 0.07),
+            connectors: none,
+        },
+        Component {
+            name: "Sauna vent 200",
+            category: C::AirTerminal,
+            predefined: "USERDEFINED",
+            element_type: Some("Sauna Vent"),
+            color: WOOD,
+            shape: || Shape::default().prism(&rounded([0.0, -0.01], 0.24, 0.02, 0.0), -0.12, 0.12),
+            connectors: none,
+        },
+        Component {
+            name: "Sauna thermostat sensor",
+            category: C::Sensor,
+            predefined: "USERDEFINED",
+            element_type: Some("Sauna Sensor"),
+            color: GREY,
+            // A 60 × 30 × 40 mm sensor, its top at its insertion height.
+            shape: || Shape::default().cuboid([-0.03, 0.03], [-0.04, 0.0], [-0.03, 0.0]),
+            connectors: none,
+        },
+        Component {
             name: "Sauna bench, upper 600",
             category: C::Furniture,
             predefined: "USERDEFINED",
