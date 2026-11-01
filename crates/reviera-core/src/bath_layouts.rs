@@ -169,6 +169,9 @@ struct Room {
     start: [f64; 2],
     run: [f64; 2],
     start_wall: ElementId,
+    /// The wall across the room from the wet wall, and the one at the far end of the run.
+    opposite: ElementId,
+    end_wall: ElementId,
     length: f64,
     depth: f64,
     key: String,
@@ -214,15 +217,15 @@ fn find_room(store: &Store, p: &LayoutParams, z: f64) -> Result<Room> {
         (a.0, a.1, b.0, b.1)
     };
     let opposite = look([-w[0], -w[1]], "opposite the wet wall")?;
-    let (start, run, start_wall) = match p.start {
-        Start::Left => ([p.point[0] + left[0] * t_left, p.point[1] + left[1] * t_left], [-left[0], -left[1]], wall_left),
-        Start::Right => ([p.point[0] - left[0] * t_right, p.point[1] - left[1] * t_right], left, wall_right),
+    let (start, run, start_wall, end_wall) = match p.start {
+        Start::Left => ([p.point[0] + left[0] * t_left, p.point[1] + left[1] * t_left], [-left[0], -left[1]], wall_left, wall_right),
+        Start::Right => ([p.point[0] - left[0] * t_right, p.point[1] - left[1] * t_right], left, wall_right, wall_left),
     };
     // Onto the wet wall's line: the run's start at the wet face.
     let start = [start[0] + w[0] * tw, start[1] + w[1] * tw];
     let mut walls = [wet, wall_left, wall_right, opposite.1].map(|id| store.get(id).expect("found").guid().to_string());
     walls.sort();
-    Ok(Room { wet, w, start, run, start_wall, length: t_left + t_right, depth: tw + opposite.0, key: walls.join("|") })
+    Ok(Room { wet, w, start, run, start_wall, opposite: opposite.1, end_wall, length: t_left + t_right, depth: tw + opposite.0, key: walls.join("|") })
 }
 
 /// Lays out a bathroom (`bath.layout`).
@@ -370,3 +373,176 @@ pub(crate) fn layout(txn: &mut Transaction<'_>, p: LayoutParams) -> Result<Layou
     let grab_bars = if t.grab_bars { Some(bath_rules::place_grab_bars(txn, bath_rules::PlaceBarsParams { element_ids: Some(placed.iter().map(|id| ElementRef::Id(*id)).collect()) })?) } else { None };
     Ok(Layout { placed, fit, grab_bars })
 }
+
+// ---- Locker rooms (ARC-BATH-009) ----
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct LockerRoomParams {
+    /// A point inside the room, in plan.
+    pub point: [f64; 2],
+    pub level: ElementRef,
+    /// How many lockers (compartments).
+    pub lockers: u32,
+    /// Compartments per locker column: 1 (full height) or 2 (two tier); default 1.
+    pub tiers: Option<u32>,
+    /// Gang shower heads along the start end wall (default none).
+    #[serde(default)]
+    pub showers: u32,
+    /// An accessible bench and accessible lockers (default true).
+    pub accessible: Option<bool>,
+    /// The wall the first locker run is along; default the longer side.
+    pub wet_wall_id: Option<ElementRef>,
+    #[serde(default)]
+    pub start: Start,
+    #[serde(default)]
+    pub replace: bool,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct LockerFit {
+    /// Lockers asked for, and how many the runs hold.
+    pub lockers: u32,
+    pub capacity: u32,
+    /// Across the room: needed for two runs, their aisles and the bench, and there.
+    pub depth_needed: f64,
+    pub depth: f64,
+    pub aisle: f64,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct LockerRoom {
+    pub placed: Vec<ElementId>,
+    pub lockers: u32,
+    pub accessible_lockers: u32,
+    pub fit: LockerFit,
+}
+
+/// The aisle the packs ask for in front of a locker (the deepest locker front space), if any.
+fn locker_aisle(packs: &[Pack], occupancy: crate::codes::Occupancy) -> Option<f64> {
+    packs
+        .iter()
+        .flat_map(|p| &p.zones)
+        .filter(|z| z.fixtures.contains(&FixtureKind::Locker) && z.occupancy.applies(occupancy) && z.out.iter().all(|o| o.0 == OutFrom::Front))
+        .map(|z| z.out.iter().map(|o| o.1).fold(0.0, f64::max))
+        .fold(None, |a: Option<f64>, v| Some(a.map_or(v, |a| a.max(v))))
+}
+
+/// Lays out a locker room (`bath.locker_room`).
+pub(crate) fn locker_room(txn: &mut Transaction<'_>, p: LockerRoomParams) -> Result<LockerRoom> {
+    const LOCKER: [f64; 2] = [0.381, 0.457];
+    const BENCH: [f64; 2] = [1.83, 0.305];
+    const ACC_BENCH: [f64; 2] = [1.065, 0.61];
+    const GANG: f64 = 0.75;
+    const DRYING: f64 = 1.2;
+    const DEFAULT_AISLE: f64 = 0.9;
+    let tiers = p.tiers.unwrap_or(1).clamp(1, 2);
+    let accessible = p.accessible.unwrap_or(true);
+    let store = txn.store().clone();
+    let level = store.resolve(&p.level).and_then(|l| store.get(l)).filter(|l| l.class == crate::levels::CLASS).ok_or_else(|| bad("bath.no_level", "no such level"))?;
+    let z = crate::levels::elevation(level) + 0.3;
+    let lp = LayoutParams { template: String::new(), point: p.point, level: p.level.clone(), wet_wall_id: p.wet_wall_id.clone(), start: p.start, replace: false, fit_only: false };
+    let room = find_room(&store, &lp, z)?;
+    let packs = bath_rules::active(&store);
+    let occupancy = crate::codes::settings(&store).occupancy;
+    let aisle = locker_aisle(&packs, occupancy).unwrap_or(DEFAULT_AISLE);
+
+    // Along the runs: from the showers' drying zone to the far end.
+    let s0 = if p.showers > 0 { 0.15 + DRYING } else { 0.0 };
+    let per_run = ((room.length - s0) / LOCKER[0] + 1e-9).floor().max(0.0) as u32;
+    let capacity = per_run * 2 * tiers;
+    let depth_needed = 2.0 * LOCKER[1] + 2.0 * aisle + BENCH[1];
+    let fit = LockerFit { lockers: p.lockers, capacity, depth_needed, depth: room.depth, aisle };
+    if depth_needed > room.depth + 1e-6 {
+        return Err(bad("bath.no_fit", format!("the room is {:.0} mm too narrow for two locker runs with {:.0} mm in front of each and a bench ({:.0} mm needed, {:.0} mm there)", (depth_needed - room.depth) * 1000.0, aisle * 1000.0, depth_needed * 1000.0, room.depth * 1000.0)).with_details(serde_json::to_value(&fit).expect("serialises")));
+    }
+    if p.lockers > capacity {
+        let short = f64::from((p.lockers - capacity).div_ceil(2 * tiers)) * LOCKER[0];
+        return Err(bad("bath.no_fit", format!("{capacity} lockers fit the runs, not {}; the room would need to be about {:.0} mm longer", p.lockers, short * 1000.0)).with_details(serde_json::to_value(&fit).expect("serialises")));
+    }
+    if (f64::from(p.showers) * GANG) > room.depth + 1e-6 {
+        return Err(bad("bath.no_fit", format!("{} gang showers at {:.0} mm need {:.0} mm of end wall; there are {:.0} mm", p.showers, GANG * 1000.0, f64::from(p.showers) * GANG * 1000.0, room.depth * 1000.0)));
+    }
+
+    if p.replace {
+        let old: Vec<ElementId> = txn.store().iter().filter(|e| e.param(LAYOUT_KEY).and_then(|v| v.get("room")).and_then(|v| v.as_str()) == Some(room.key.as_str())).map(crate::element::Element::id).collect();
+        for id in old {
+            if txn.store().get(id).is_some() {
+                txn.delete(id)?;
+            }
+        }
+    }
+    let names = vec![
+        if tiers == 2 { "Locker, two tier" } else { "Locker, full height" }.to_owned(),
+        "Bench, locker room".to_owned(),
+        "Bench, accessible".to_owned(),
+        "Shower head, gang".to_owned(),
+    ];
+    let types = crate::bath_components::load(txn, crate::bath_components::LoadParams { names: names.clone() })?;
+    let tag = json!({ "template": "locker_room", "room": room.key });
+    let mut placed = Vec::new();
+    let w = room.w;
+    let (run, start) = (room.run, room.start);
+    // A point `a` along the run from the start end, `b` out from the wet wall's face.
+    let at = |a: f64, b: f64| [start[0] + run[0] * a - w[0] * b, start[1] + run[1] * a - w[1] * b];
+    let mut put = |txn: &mut Transaction<'_>, name: &str, host: Option<ElementId>, q: [f64; 2], rotation: f64| -> Result<ElementId> {
+        let id = crate::bath_components::place(
+            txn,
+            crate::mep_controls::PlaceParams {
+                type_id: ElementRef::Id(types[name]),
+                point: q,
+                level: p.level.clone(),
+                offset: None,
+                rotation,
+                host_wall: host.map(ElementRef::Id),
+                side: None,
+                work_plane: host.is_none(),
+                controlled_ids: Vec::new(),
+            },
+        )?;
+        let tag = tag.clone();
+        txn.modify(id, |e| {
+            e.params.insert(LAYOUT_KEY.into(), tag);
+        })?;
+        placed.push(id);
+        Ok(id)
+    };
+    // Showers along the start end wall, centred across the room.
+    let s_left = (room.depth - f64::from(p.showers) * GANG) / 2.0;
+    for k in 0..p.showers {
+        put(txn, &names[3], Some(room.start_wall), at(0.1, s_left + GANG * (f64::from(k) + 0.5)), 0.0)?;
+    }
+    // Locker runs: the wet wall's, then the opposite wall's.
+    let columns = p.lockers.div_ceil(tiers);
+    let accessible_lockers = if accessible { ((f64::from(p.lockers) * 0.05).ceil() as u32).max(1) } else { 0 };
+    let mut not_accessible = Vec::new();
+    for c in 0..columns {
+        let (side, k) = if c < per_run { (0, c) } else { (1, c - per_run) };
+        let a = s0 + LOCKER[0] * (f64::from(k) + 0.5);
+        let (host, b) = if side == 0 { (room.wet, 0.1) } else { (room.opposite, room.depth - 0.1) };
+        let id = put(txn, &names[0], Some(host), at(a, b), 0.0)?;
+        // The first of each run, as many as are needed, are kept accessible.
+        let acc_index = if side == 0 { k * 2 } else { k * 2 + 1 };
+        if acc_index >= accessible_lockers {
+            not_accessible.push(id);
+        }
+    }
+    // Benches down the middle, stopping short of the accessible bench's space.
+    let bench_end = room.length - if accessible { ACC_BENCH[1] + 1.22 + 0.3 } else { 0.3 };
+    let bench_start = s0 + 0.3;
+    let n_bench = (((bench_end - bench_start) / BENCH[0]) + 1e-9).floor().max(0.0) as u32;
+    let angle = run[1].atan2(run[0]);
+    for k in 0..n_bench {
+        let id = put(txn, &names[1], None, at(bench_start + BENCH[0] * (f64::from(k) + 0.5), room.depth / 2.0), angle)?;
+        not_accessible.push(id);
+    }
+    // The accessible bench against the far end wall, centred.
+    if accessible {
+        put(txn, &names[2], Some(room.end_wall), at(room.length - 0.1, room.depth / 2.0), 0.0)?;
+    }
+    if !not_accessible.is_empty() {
+        bath_rules::set_accessible(txn, bath_rules::SetAccessibleParams { element_ids: not_accessible.iter().map(|id| ElementRef::Id(*id)).collect(), accessible: false })?;
+    }
+    Ok(LockerRoom { placed, lockers: columns * tiers, accessible_lockers, fit })
+}
+

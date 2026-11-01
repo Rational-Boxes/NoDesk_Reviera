@@ -12,6 +12,7 @@ it, and whether a WC is the right distance from its side wall.</p>
   <a href="#products">Products in place of placeholders</a>
   <a href="#counts">Fixture counts</a>
   <a href="#cores">Toilet cores</a>
+  <a href="#lockers">Locker rooms</a>
   <a href="#packs">Rule packs</a>
   <a href="#zones">Clear spaces</a>
   <a href="#check">Check Bathrooms</a>
@@ -97,6 +98,17 @@ panel, swinging out. Only the accessible compartment, one urinal and one lavator
 accessibility pack (<code>bath.set_accessible</code> marks the others); the plumbing code's
 spacing applies to all. Laying out again replaces the earlier core on that wall, and too short a
 wall is reported with the shortfall.</p>
+
+<h2 id="lockers">Locker rooms</h2>
+<p><b>Locker Room</b> (Architecture › Build) lays out a changing room. Give the number of lockers,
+full height or two tier, the number of gang showers and whether to provide an accessible bench and
+lockers, then click inside a room closed by walls in a plan. Showers go along one end wall, 750 mm
+apart, with a 1200 mm drying zone in front; lockers run along both long walls (15 × 18 in, 72 in
+tall on a 6 in base); 1830 mm benches go down the middle with the aisle the rule packs ask for in
+front of a locker (760 mm under the ADA, 1500 mm under Approved Document M, else 900 mm); and a
+42 × 24 in accessible bench stands against the far end wall with its 30 × 48 in end space clear.
+At least 5 % of the lockers (at least one) are kept accessible. If they do not all fit, nothing is
+placed and the message says how many would.</p>
 
 <h2 id="packs">Rule packs</h2>
 <p>Four packs ship with Reviera. Each rule names its clause, its source and how sure the reading
@@ -191,7 +203,7 @@ brings the shipped one back. Project packs are saved with the model.</p>
 <code>bath.add_rule_pack</code>, <code>bath.remove_rule_pack</code>, <code>bath.set_hand</code>,
 <code>bath.check</code>, <code>bath.load_components</code>, <code>bath.place_component</code>,
 <code>bath.layouts</code>, <code>bath.layout</code>, <code>bath.make_product</code>,
-<code>bath.swap_product</code>, <code>bath.fixture_count</code>, <code>bath.toilet_core</code>, <code>bath.set_accessible</code>,
+<code>bath.swap_product</code>, <code>bath.fixture_count</code>, <code>bath.toilet_core</code>, <code>bath.set_accessible</code>, <code>bath.locker_room</code>,
 <code>bath.place_grab_bars</code>, <code>grab_bar.create</code> and
 <code>grab_bar.set</code>; <code>clearance.list</code> and <code>clearance.check</code> include
 fixture spaces. Lua scripts and AI agents (MCP, the <i>modeling</i> toolset) can use them.</p>

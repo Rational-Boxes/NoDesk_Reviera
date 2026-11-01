@@ -4774,6 +4774,10 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "ui.make_product" => with(gui, Gui::make_product),
         "ui.fixture_count" => with(gui, Gui::fixture_count),
         "ui.toilet_core" => with(gui, Gui::toilet_core),
+        "ui.locker_room" => with(gui, |g| {
+            g.locker_room();
+            focus(g);
+        }),
         "ui.product_documents" => with(gui, Gui::product_documents),
         "ui.swap_for_product" => with(gui, Gui::swap_for_product),
         "ui.bathroom_layout" => with(gui, |g| {

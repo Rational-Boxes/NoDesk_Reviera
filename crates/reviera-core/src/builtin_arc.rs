@@ -547,6 +547,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(BathFixtureCount),
         registry.add(BathToiletCore),
         registry.add(BathSetAccessible),
+        registry.add(BathLockerRoom),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -6958,4 +6959,20 @@ edit_command!(
     crate::bath_rules::SetAccessibleParams,
     (),
     crate::bath_rules::set_accessible
+);
+
+edit_command!(
+    BathLockerRoom,
+    "bath.locker_room",
+    "Lay out a locker room",
+    "Lays out a changing room in the room around `point`, closed by walls (ARC-BATH-009): gang showers along the \
+     start end wall with a drying zone in front, locker runs along both long walls (full height or two tier), \
+     benches down the middle with the aisle the rule packs ask for in front of lockers (760 mm under the ADA, \
+     1500 mm under Approved Document M, else 900 mm), and an accessible bench against the far end; at least \
+     5 % of the lockers (at least one) kept accessible. If the lockers do not fit, nothing is placed and the \
+     result says how many fit; too narrow a room is reported with the shortfall.",
+    "Locker Room",
+    crate::bath_layouts::LockerRoomParams,
+    crate::bath_layouts::LockerRoom,
+    crate::bath_layouts::locker_room
 );

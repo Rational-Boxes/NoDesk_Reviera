@@ -4,8 +4,8 @@
 bathroom related features"), on the defaults proposed in §11 until the owner says otherwise.
 Built so far (2026-10-31): rule packs and fixture clearance zones (ARC-BATH-001/002), grab bars by
 rule (ARC-BATH-003), the generic component catalogue (ARC-BATH-004) and layout templates
-(ARC-BATH-005): §10 steps 1–5. Next: product types with documents and the generic-to-specific
-swap (step 6).
+(ARC-BATH-005), products and their documents (ARC-BATH-006), fixture counts (ARC-BATH-007),
+toilet cores (ARC-BATH-008) and locker rooms (ARC-BATH-009): §10 steps 1–8. Next: wet areas (step 9).
 **Owner's requests (2026-10-31):**
 - "deeper research into bathroom features, standards, and common components";
 - "review clearance rules, accessibility rules, rails, etc.";

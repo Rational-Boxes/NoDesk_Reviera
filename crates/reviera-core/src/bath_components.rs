@@ -347,6 +347,56 @@ pub fn catalogue() -> Vec<Component> {
             shape: || Shape::default().cuboid([-0.2, 0.2], [-0.2, 0.2], [0.42, 0.46]).cuboid([-0.2, 0.2], [0.17, 0.2], [0.46, 0.6]),
             connectors: none,
         },
+        // Locker rooms (ARC-BATH-009).
+        Component {
+            name: "Locker, full height",
+            category: C::Furniture,
+            predefined: "USERDEFINED",
+            element_type: Some("Locker"),
+            color: GREY,
+            // 15 × 18 in, 72 in tall on a 6 in base (US federal modules).
+            shape: || Shape::default().cuboid([-0.18, 0.18], [-0.21, 0.2285], [0.0, 0.152]).cuboid([-0.1905, 0.1905], [-0.2285, 0.2285], [0.152, 1.981]),
+            connectors: none,
+        },
+        Component {
+            name: "Locker, two tier",
+            category: C::Furniture,
+            predefined: "USERDEFINED",
+            element_type: Some("Locker"),
+            color: GREY,
+            shape: || Shape::default().cuboid([-0.18, 0.18], [-0.21, 0.2285], [0.0, 0.152]).cuboid([-0.1905, 0.1905], [-0.2285, 0.2285], [0.152, 1.06]).cuboid([-0.1905, 0.1905], [-0.2285, 0.2285], [1.073, 1.981]),
+            connectors: none,
+        },
+        Component {
+            name: "Bench, locker room",
+            category: C::Furniture,
+            predefined: "USERDEFINED",
+            element_type: Some("Bench"),
+            color: WOOD,
+            // 1830 × 305 mm top at 445 mm (17½ in), on two pedestals.
+            shape: || Shape::default().cuboid([-0.915, 0.915], [-0.1525, 0.1525], [0.415, 0.445]).cuboid([-0.75, -0.69], [-0.06, 0.06], [0.0, 0.415]).cuboid([0.69, 0.75], [-0.06, 0.06], [0.0, 0.415]),
+            connectors: none,
+        },
+        Component {
+            name: "Bench, accessible",
+            category: C::Furniture,
+            predefined: "USERDEFINED",
+            element_type: Some("Bench"),
+            color: WOOD,
+            // 42 × 24 in seat at 18 in, fixed to the wall that backs it (ADA 903).
+            shape: || Shape::default().cuboid([-0.5325, 0.5325], [-0.305, 0.305], [0.42, 0.46]).cuboid([-0.5325, 0.5325], [0.28, 0.305], [0.51, 0.9]),
+            connectors: none,
+        },
+        Component {
+            name: "Shower head, gang",
+            category: C::PlumbingFixture,
+            predefined: "SHOWER",
+            element_type: None,
+            color: STEEL,
+            // A wall-mounted head and valve, the head at 2.0 m.
+            shape: || Shape::default().cuboid([-0.06, 0.06], [-0.04, 0.04], [1.0, 1.15]).cuboid([-0.05, 0.05], [-0.15, 0.04], [1.95, 2.0]),
+            connectors: || vec![pipe("Cold", [-0.03, 0.04, 1.1], [0.0, 1.0, 0.0], K::DomesticColdWater, 0.015, 2.0), pipe("Hot", [0.03, 0.04, 1.1], [0.0, 1.0, 0.0], K::DomesticHotWater, 0.015, 2.0)],
+        },
         Component {
             name: "Heated towel rail, 500 × 800",
             category: C::SpaceHeater,

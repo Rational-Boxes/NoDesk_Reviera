@@ -82,9 +82,21 @@ pub enum FixtureKind {
     Bidet,
     Bath,
     Shower,
+    /// Locker-room furniture (ARC-BATH-009), by its ElementType.
+    Locker,
+    Bench,
 }
 
 impl FixtureKind {
+    /// From a furniture copy's ObjectType: lockers and benches.
+    pub fn from_object_type(o: &str) -> Option<Self> {
+        Some(match o {
+            "Locker" => Self::Locker,
+            "Bench" => Self::Bench,
+            _ => return None,
+        })
+    }
+
     /// From an `IfcSanitaryTerminal` predefined type; a kitchen sink is not a bathroom fixture.
     pub fn from_predefined(p: &str) -> Option<Self> {
         Some(match p {
@@ -106,6 +118,8 @@ impl FixtureKind {
             Self::Bidet => "bidet",
             Self::Bath => "bath",
             Self::Shower => "shower",
+            Self::Locker => "locker",
+            Self::Bench => "bench",
         }
     }
 }
@@ -504,11 +518,16 @@ fn ray_segment(p: [f64; 2], d: [f64; 2], a: [f64; 2], b: [f64; 2]) -> Option<f64
 
 /// A sanitary fixture's frame, extents and side wall, if it is a bathroom fixture.
 pub fn fixture(store: &Store, e: &crate::element::Element) -> Option<Fixture> {
-    if e.class != "IfcSanitaryTerminal" {
-        return None;
-    }
+    let kind = match e.class.as_str() {
+        "IfcSanitaryTerminal" => None,
+        "IfcFurniture" => Some(FixtureKind::from_object_type(e.param("@ObjectType")?.as_str()?)?),
+        _ => return None,
+    };
     let g = mesh_objects::regenerate(store, e).ok()?;
-    let kind = FixtureKind::from_predefined(g.ty.predefined_type())?;
+    let kind = match kind {
+        Some(k) => k,
+        None => FixtureKind::from_predefined(g.ty.predefined_type())?,
+    };
     let s = g.placement.scale;
     let (mut x, mut y) = ([f64::MAX, f64::MIN], [f64::MAX, f64::MIN]);
     for p in &g.mesh.positions {

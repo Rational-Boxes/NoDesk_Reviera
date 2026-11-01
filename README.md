@@ -643,6 +643,10 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
   count; partitions are raised walls of a Toilet Partition type and doors ordinary doors; only
   the accessible fixtures are held to the accessibility pack (`bath.toilet_core`,
   `bath.set_accessible`).
+- **Locker rooms** (ARC-BATH-009): Locker Room lays out lockers along the long walls, benches
+  down the middle with the aisles the packs ask for, gang showers along one end and an
+  accessible bench, keeping 5 % of the lockers accessible; lockers and benches have their ADA
+  and Approved Document M clear spaces (`bath.locker_room`).
   **Not yet** (planned): living
   layouts that re-fit when the room changes, Jack-and-Jill and back-to-back wet walls,
   other packs' bars (Approved Document M's drop-down rails, shower and bath bars), room layouts, toilet cores and partitions, fixture counts,

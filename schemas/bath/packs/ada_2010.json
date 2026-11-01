@@ -3,7 +3,7 @@
   "id": "ada_2010",
   "title": "2010 ADA Standards for Accessible Design",
   "jurisdiction": "US",
-  "edition": "2010 ADA Standards §§305, 603–608",
+  "edition": "2010 ADA Standards §§225, 305, 603–608, 811, 903",
   "layer": "accessible",
   "notes": "Clear floor spaces may overlap each other and the turning space (305.2, 603.2.1); doors may not swing into any fixture's clear floor space or clearance (603.2.3), with exceptions for single-user rooms that this pack does not apply. Showers are taken as standard roll-in showers; a transfer shower's 36 × 48 in clearance differs.",
   "zones": [
@@ -54,6 +54,24 @@
       "across": [["near_edge", 0.0], ["far_edge", 0.0]],
       "out": [["front", 0.0], ["front", 0.76]],
       "door_swing": "forbidden",
+      "source": "S0869",
+      "confidence": "verified"
+    },
+    {
+      "id": "ADA 2010 811.3",
+      "description": "48 × 30 in (1220 × 760 mm) clear floor space for a parallel approach in front of an accessible locker (225.2.1: at least 5 %, and at least one, of each type)",
+      "fixtures": ["locker"],
+      "across": [["centre", -0.61], ["centre", 0.61]],
+      "out": [["front", 0.0], ["front", 0.76]],
+      "source": "S0869",
+      "confidence": "verified"
+    },
+    {
+      "id": "ADA 2010 903.2",
+      "description": "30 × 48 in (760 × 1220 mm) clear floor space at the end of an accessible bench, parallel to its short axis",
+      "fixtures": ["bench"],
+      "across": [["far_edge", 0.0], ["far_edge", 0.76]],
+      "out": [["wall", 0.0], ["wall", 1.22]],
       "source": "S0869",
       "confidence": "verified"
     }

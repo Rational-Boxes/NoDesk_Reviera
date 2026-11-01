@@ -31,7 +31,7 @@
     "counts": {"type": "array", "items": {"$ref": "#/$defs/count"}}
   },
   "$defs": {
-    "fixture": {"enum": ["water_closet", "urinal", "lavatory", "bidet", "bath", "shower"]},
+    "fixture": {"enum": ["water_closet", "urinal", "lavatory", "bidet", "bath", "shower", "locker", "bench"]},
     "rule": {
       "type": "object",
       "required": ["id", "description", "fixtures", "source", "confidence"],

@@ -532,3 +532,36 @@ fn a_toilet_core_counted_for_its_occupancy() {
     let core = ok(&mut app, "bath.toilet_core", json!({ "wall_id": walls[2], "start": [0.0, 3.9], "end": [9.0, 3.9], "level": level, "occupancy": "B", "occupant_load": 360, "sex": "male", "urinals_for_wcs": true }));
     assert_eq!((core["wcs"].as_u64(), core["urinals"].as_u64(), core["lavatories"].as_u64()), (Some(3), Some(2), Some(4)), "{core:#}");
 }
+
+#[test]
+fn a_locker_room() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = new_app(dir.path());
+    let (level, _) = room(&mut app, 6.0, 5.0);
+    ok(&mut app, "bath.set_rule_packs", json!({ "packs": ["us_plumbing", "ada_2010"] }));
+    let out = ok(&mut app, "bath.locker_room", json!({ "point": [3.0, 2.5], "level": level, "lockers": 40, "tiers": 2, "showers": 6 }));
+    assert_eq!((out["lockers"].as_u64(), out["accessible_lockers"].as_u64()), (Some(40), Some(2)), "{out:#}");
+    assert!((out["fit"]["aisle"].as_f64().unwrap() - 0.76).abs() < 1e-9, "the ADA's 30 in in front of a locker");
+    let types = ok(&mut app, "mesh_object.types", json!({}));
+    let copies = |name: &str| types.as_array().unwrap().iter().find(|t| t["name"] == name).map_or(0, |t| t["copies"].as_u64().unwrap());
+    assert_eq!((copies("Locker, two tier"), copies("Shower head, gang"), copies("Bench, accessible")), (20, 6, 1));
+    assert!(copies("Bench, locker room") >= 1);
+    let f = findings(&mut app);
+    let errors: Vec<&Value> = f.iter().filter(|x| x["severity"] == "error").collect();
+    assert!(errors.is_empty(), "{errors:#?}");
+    // Too many lockers: how many fit.
+    let e = run(&mut app, "bath.locker_room", json!({ "point": [3.0, 2.5], "level": level, "lockers": 200, "tiers": 2, "showers": 6, "replace": true })).unwrap_err();
+    assert_eq!(e.code, "bath.no_fit");
+    assert!(e.message.contains("lockers fit"), "{}", e.message);
+}
+
+#[test]
+fn a_locker_room_too_narrow_for_approved_document_m() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = new_app(dir.path());
+    let (level, _) = room(&mut app, 6.0, 4.0);
+    ok(&mut app, "code.set", json!({ "code": "uk_adk", "occupancy": "other" }));
+    let e = run(&mut app, "bath.locker_room", json!({ "point": [3.0, 2.0], "level": level, "lockers": 20 })).unwrap_err();
+    assert_eq!(e.code, "bath.no_fit");
+    assert!((e.details["depth_needed"].as_f64().unwrap() - 4.219).abs() < 0.001, "{}", e.details);
+}

@@ -4242,6 +4242,43 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 
 *Built (2026-10-31):* `reviera_core::bath_cores` and `bath.toilet_core`, the *Toilet Partition* wall type (25 mm, PARTITIONING), doors swung out of their compartments, `bath.set_accessible` (the core marks all but the accessible compartment, one urinal and one lavatory), the side-wall search raised to 600 mm so raised partitions count as side walls, and Architecture › Build › Toilet Core (on the selected wall, from numbers or an occupancy). Not yet: ambulatory grab bars (ADA 604.8.2, both sides), toe clearance at the accessible compartment's partitions, family or assisted-use rooms, partition-system types from manufacturers, and cores in two rows facing each other.
 
+### 3.9a.9 Locker rooms
+**ID:** ARC-BATH-009 · **Priority:** P1 · **Ref:** `BATHROOMS_PLAN.md` §6.3; research/13 C2–C7
+
+**Purpose.** Lay out a changing room in one step (lockers, benches, showers) with the aisles and accessible provision the rules ask for, and say how many lockers fit when they do not all fit.
+
+**Behaviour & rules.**
+- **Components** (added to ARC-BATH-004's catalogue, `IfcFurniture` USERDEFINED):
+  - *Locker, full height*: 15 × 18 in (381 × 457 mm), 72 in (1830 mm) tall on a 6 in base, one tier;
+  - *Locker, two tier*: the same box in two compartments;
+  - *Bench, locker room*: 1830 × 305 mm top at 445 mm (17½ in), on brackets;
+  - *Bench, accessible*: 42 × 24 in (1065 × 610 mm) seat at 460 mm (18 in; ADA 903.3–903.5 17–19 in), fixed to the wall, which gives its back support;
+  - *Shower head, gang*: a wall-mounted shower (`IfcSanitaryTerminal` SHOWER) at 2.0 m, for gang showers at 750 mm centres (Sport England pool guidance; US spacing is judgement).
+- **Lockers and benches are fixtures** for the rule packs: kinds `locker` and `bench`, found from the furniture's ElementType. The packs gain:
+  - `ada_2010`: 811.3 a 48 × 30 in (1220 × 760 mm) parallel-approach clear floor space in front of an accessible locker; 903.2 a 30 × 48 in clear floor space at the end of an accessible bench, parallel to its short axis;
+  - `england_adm`: Vol 2 §5.18 a 1500 mm deep manoeuvring space in front of lockers.
+  
+  As for sanitary fixtures, the accessibility packs apply only to lockers and benches not marked otherwise (`bath.set_accessible`).
+- **`bath.locker_room`** lays out the room around a point, closed by walls (as ARC-BATH-005):
+  - showers along the start end wall, gang heads at their spacing, with a 1200 mm drying zone in front of them;
+  - lockers in runs along both long walls from the drying zone to the far end, with a bench run in the middle of the room in 1830 mm lengths, leaving an aisle on each side;
+  - an accessible bench against the far end wall, with its end space clear;
+  - at least 5 % (at least one) of the lockers kept accessible (ADA 225.2.1): the first of each run, marked so; the others marked not accessible.
+  
+  The aisle between a locker run and the bench is the largest the packs ask for in front of a locker (760 mm under the ADA, 1500 mm under Approved Document M), else 900 mm (judgement, E-68).
+- **Fit.** The number of lockers is given; if they do not fit the runs, nothing is placed and the result says how many fit and how much longer the room would need to be. If the room is too narrow for two runs, their aisles and the bench, the shortfall in millimetres is reported.
+
+**Data (IFC mapping).** Lockers and benches as ARC-BATH-004's furniture (ObjectType "Locker", "Bench"); gang heads `IfcSanitaryTerminal` SHOWER. The layout tag is `rxd:bath_layout`.
+
+**Commands.** See the catalog: `bath.locker_room`.
+
+**Acceptance criteria.**
+- [x] A 6 × 5 m room with 40 two-tier lockers and 6 showers, under `us_plumbing` and `ada_2010`, gets two locker runs, benches between them, six gang heads, an accessible bench and two accessible lockers (5 % of 40), with no `bath.check` errors.
+- [x] Under `england_adm` a 6 × 4 m room is too narrow for two runs with 1500 mm in front of each (4.22 m needed) and the shortfall is reported.
+- [x] Asking for more lockers than fit reports how many fit.
+
+*Built (2026-10-31):* the five components, `locker` and `bench` fixture kinds (from the furniture's ObjectType), the ADA 811.3 and 903.2 zones and Approved Document M §5.18 zone in the packs, `bath.locker_room` (in `reviera_core::bath_layouts`), and Architecture › Build › Locker Room (its numbers, then a click in a plan). Defaults are E-68 in `EXPERT_REVIEW.md`. Not yet: individual shower cubicles and the accessible shower room, the drying area's towel rails, grooming counters, lobbies and screens against sightlines, pool changing villages, team rooms, and lockers in island runs.
+
 ---
 
 ## 3.10 In-place models, model text and model lines
@@ -5502,6 +5539,7 @@ All commands below are registered once in the command registry and exposed autom
 | `bath.fixture_count` | occupancy, occupant_load, male_share?, units?, all_gender?, pack?, level_id? | {pack, row, required, urinals_may_replace, modelled, short} | No (query) | ARC-BATH-007 |
 | `bath.toilet_core` | wall_id, start, end, level, wcs?, urinals?, lavatories?, accessible?, ambulatory?, occupancy?, occupant_load?, urinals_for_wcs?, replace? | {placed, partitions, doors, fit} | Yes | ARC-BATH-008 |
 | `bath.set_accessible` | element_ids, accessible | — | Yes | ARC-BATH-002 |
+| `bath.locker_room` | point, level, lockers, tiers?, showers?, accessible?, replace? | {placed, lockers, accessible_lockers, fit} | Yes | ARC-BATH-009 |
 | `unit.create_type` | room_ids \| element_ids, name, bay? | {type_id, members, left_out} | Yes | ARC-GRP-004 |
 | `unit.set_connection_points` | type_id, points | — | Yes | ARC-GRP-004 |
 | `unit.array_path` | type_id, path, count \| pitch, handing?, numbering? | array_id | Yes | ARC-GRP-004 |

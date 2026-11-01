@@ -190,9 +190,11 @@ impl Gui {
     }
 
     /// Lays out a bathroom where the Bathroom Layout tool was clicked, and reports the fit.
-    pub(crate) fn layout_bathroom_at(&mut self, args: serde_json::Value) {
+    pub(crate) fn layout_bathroom_at(&mut self, mut args: serde_json::Value) {
         let frame = self.frame;
-        match self.app.execute("bath.layout", args, &super::user()) {
+        // The Locker Room tool rides on the same click, with its own command.
+        let command = args.as_object_mut().and_then(|o| o.remove("command")).and_then(|c| c.as_str().map(str::to_owned)).unwrap_or_else(|| "bath.layout".to_owned());
+        match self.app.execute(&command, args, &super::user()) {
             Ok(out) => {
                 let placed = out.result["placed"].as_array().map_or(0, Vec::len);
                 self.refresh_scene(&frame);
@@ -454,6 +456,29 @@ impl Gui {
                 frame.set_status_text(&format!("Toilet core: {} WC(s), {} urinal(s), {} lavatory(ies)", c["wcs"], c["urinals"], c["lavatories"]), 0);
             }
             Err(e) => error(&frame, &format!("The core was not laid out:\n{e}")),
+        }
+    }
+
+    /// Architecture › Build › Locker Room (ARC-BATH-009): lockers, tiers, showers, then a click
+    /// inside a room closed by walls.
+    pub(crate) fn locker_room(&mut self) {
+        let frame = self.frame;
+        let f = super::reinforcement_ui::Form::new(&frame, "Locker Room");
+        let lockers = f.text("Lockers", "40", "Compartments");
+        let tiers = f.choice("Lockers", &["Full height".to_owned(), "Two tier".to_owned()], 1);
+        let showers = f.text("Gang showers", "6", "Heads along the end wall, 750 mm apart (0 for none)");
+        let acc = f.choice("Accessible bench and lockers", &["Yes".to_owned(), "No".to_owned()], 0);
+        let ok = f.show("Then click inside a room closed by walls, in a plan: lockers run along its long walls, benches down the middle, showers along one end.", "Choose Room");
+        let num = |t: &TextCtrl| t.get_value().trim().parse::<f64>().ok().unwrap_or(0.0).max(0.0) as u32;
+        let args = json!({ "command": "bath.locker_room", "lockers": num(&lockers), "tiers": if tiers.get_selection() == Some(1) { 2 } else { 1 }, "showers": num(&showers), "accessible": acc.get_selection() != Some(1), "replace": true });
+        f.dialog.destroy();
+        if !ok {
+            return;
+        }
+        self.start_room_tool();
+        if let Some(tool) = self.room_tool.as_mut() {
+            tool.layout = Some(args);
+            frame.set_status_text("Locker Room: click inside the room; Esc ends", 0);
         }
     }
 }

@@ -26,6 +26,16 @@
       "out": [["wall", 0.0], ["wall", 0.75]],
       "source": "S0905",
       "confidence": "secondary"
+    },
+    {
+      "id": "AD M Vol 2 5.18 lockers",
+      "description": "A 1500 mm deep manoeuvring space in front of lockers in changing facilities",
+      "fixtures": ["locker"],
+      "occupancy": "other",
+      "across": [["near_edge", 0.0], ["far_edge", 0.0]],
+      "out": [["front", 0.0], ["front", 1.5]],
+      "source": "S1034",
+      "confidence": "verified"
     }
   ],
   "distances": [
