@@ -548,6 +548,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(BathToiletCore),
         registry.add(BathSetAccessible),
         registry.add(BathLockerRoom),
+        registry.add(BathShowerFalls),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -6975,4 +6976,19 @@ edit_command!(
     crate::bath_layouts::LockerRoomParams,
     crate::bath_layouts::LockerRoom,
     crate::bath_layouts::locker_room
+);
+
+edit_command!(
+    BathShowerFalls,
+    "bath.shower_falls",
+    "Lay a shower's falls to a drain",
+    "Lays the falls of level-access showers (a roll-in former, a gang head: no raised tray) to a new floor drain \
+     (ARC-BATH-011): a drain at the shower area's centre, or a linear drain along its back, and the floor's top \
+     warped (ARC-SHAPE-001) so the area falls to it, its edge kept at the floor's level. The fall is the one \
+     given (a gradient: 0.02 is 2 %), else the rule packs' default, kept no steeper than their steepest. \
+     `bath.check` then reports showers that fall too little, too much, or not at all.",
+    "Shower Falls",
+    crate::bath_rules::ShowerFallsParams,
+    crate::bath_rules::ShowerFallsOut,
+    crate::bath_rules::shower_falls
 );

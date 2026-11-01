@@ -431,6 +431,49 @@ pub(crate) fn add_split_line(txn: &mut Transaction<'_>, p: AddLineParams) -> Res
     Ok(key)
 }
 
+/// Removes the points and split lines lying wholly within an area (its edge included).
+pub(crate) fn clear_within(txn: &mut Transaction<'_>, id: ElementId, area: &[[f64; 2]]) -> Result<()> {
+    let store = txn.store().clone();
+    let mut s = shape_now(&store, id);
+    let n = area.len();
+    let within = |p: [f64; 2]| {
+        inside(p, area)
+            || (0..n).any(|i| {
+                let (a, b) = (area[i], area[(i + 1) % n]);
+                let d = [b[0] - a[0], b[1] - a[1]];
+                let t = (((p[0] - a[0]) * d[0] + (p[1] - a[1]) * d[1]) / (d[0] * d[0] + d[1] * d[1]).max(1e-18)).clamp(0.0, 1.0);
+                (p[0] - a[0] - d[0] * t).hypot(p[1] - a[1] - d[1] * t) < 1e-4
+            })
+    };
+    let before = (s.points.len(), s.lines.len());
+    s.points.retain(|q| !within(q.xy));
+    s.lines.retain(|l| !l.points.iter().all(|q| within(*q)));
+    if (s.points.len(), s.lines.len()) != before {
+        write(txn, id, &s)?;
+    }
+    Ok(())
+}
+
+/// Adds a point (one plan point) or a split line, each point an offset from the surface there.
+pub(crate) fn add_offsets(txn: &mut Transaction<'_>, id: ElementId, points: Vec<[f64; 2]>, offsets: &[f64]) -> Result<String> {
+    let store = txn.store().clone();
+    let (id, profile, _) = floor_of(&store, &ElementRef::Id(id))?;
+    let mut s = shape_now(&store, id);
+    let heights: Vec<f64> = points.iter().zip(offsets).map(|(q, o)| surface_offset(&profile, &s, *q) + o).collect();
+    s.next += 1;
+    let key = if points.len() == 1 {
+        let key = format!("p{}", s.next);
+        s.points.push(ShapePoint { key: key.clone(), xy: points[0], z: heights[0] });
+        key
+    } else {
+        let key = format!("l{}", s.next);
+        s.lines.push(SplitLine { key: key.clone(), points, heights });
+        key
+    };
+    write(txn, id, &s)?;
+    Ok(key)
+}
+
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct MoveParams {

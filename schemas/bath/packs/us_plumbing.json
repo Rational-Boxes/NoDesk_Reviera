@@ -244,5 +244,13 @@
       "confidence": "verified",
       "urinal_substitution": 0.5
     }
-  ]
+  ],
+  "falls": {
+    "id": "IPC 417.4 shower floor",
+    "description": "A shower floor slopes ¼ in per foot (2 %) toward its drain",
+    "min": 0.0208,
+    "default": 0.0208,
+    "source": "S0873",
+    "confidence": "verified"
+  }
 }

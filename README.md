@@ -651,10 +651,14 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
   and showers (a new `uk_bs7671` pack), shown as virtual volumes; Check Bathrooms reports sockets
   in the zones or within 2.5 m of zone 1, and devices whose IP rating
   (`Pset_ElectricalDeviceCommon.IP_Code`) is below their zone's.
+- **Shower falls** (ARC-BATH-011): Shower Falls places a floor drain in a level-access shower
+  (centre or linear) and warps the floor so the shower area falls to it, by the rule packs'
+  default (IPC ¼ in per foot; 1:60 under Approved Document M) or a given fall; Check Bathrooms
+  reports showers that fall too little, too steeply or not at all (`bath.shower_falls`).
   **Not yet** (planned): living
   layouts that re-fit when the room changes, Jack-and-Jill and back-to-back wet walls,
   other packs' bars (Approved Document M's drop-down rails, shower and bath bars), room layouts, toilet cores and partitions, fixture counts,
-  locker rooms, wet areas, spas, the generic bathroom component library and product swaps.
+  locker rooms, waterproofing, spas, the generic bathroom component library and product swaps.
 
 ### Structure (in development)
 

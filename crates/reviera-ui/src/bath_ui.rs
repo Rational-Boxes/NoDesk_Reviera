@@ -481,4 +481,33 @@ impl Gui {
             frame.set_status_text("Locker Room: click inside the room; Esc ends", 0);
         }
     }
+
+    /// Architecture › Build › Shower Falls (ARC-BATH-011): the fall and the drain, for the
+    /// selected level-access showers.
+    pub(crate) fn shower_falls(&mut self) {
+        let frame = self.frame;
+        let selected: Vec<serde_json::Value> = self.selection().into_iter().map(|id| json!(id.0)).collect();
+        if selected.is_empty() {
+            return error(&frame, "Select level-access showers first: a roll-in shower or a gang shower head standing on a floor.");
+        }
+        let f = super::reinforcement_ui::Form::new(&frame, "Shower Falls");
+        let fall = f.text("Fall (%)", "", "Empty for the rule packs' default (2 % under the IPC, 1:60 under Approved Document M)");
+        let drain = f.choice("Drain", &["Centre".to_owned(), "Linear, along the back".to_owned()], 0);
+        let ok = f.show("A floor drain is placed and the floor under each shower warps to fall to it.", "Lay Falls");
+        let mut args = json!({ "element_ids": selected, "drain": if drain.get_selection() == Some(1) { "linear" } else { "centre" } });
+        if let Ok(p) = fall.get_value().trim().trim_end_matches('%').trim().parse::<f64>() {
+            args["fall"] = json!(p / 100.0);
+        }
+        f.dialog.destroy();
+        if !ok {
+            return;
+        }
+        match self.run("bath.shower_falls", args) {
+            Ok(out) => {
+                self.refresh_scene(&frame);
+                frame.set_status_text(&format!("Shower falls: {} drain(s) placed, {} floor(s) warped", out["drains"].as_array().map_or(0, Vec::len), out["floors"].as_array().map_or(0, Vec::len)), 0);
+            }
+            Err(e) => error(&frame, &format!("The falls were not laid:\n{e}")),
+        }
+    }
 }

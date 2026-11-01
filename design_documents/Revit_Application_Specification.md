@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Reviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Reviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 852 numbered requirements (320 P0 · 324 P1 · 201 P2 · 7 P3), 2,281 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 853 numbered requirements (320 P0 · 325 P1 · 201 P2 · 7 P3), 2,282 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,281 commands; 852 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,282 commands; 853 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -14529,6 +14529,35 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 
 *Built (2026-10-31):* the `electrical` section of the pack schema, the `uk_bs7671` pack (chosen with England's code), zones as virtual volumes in `clearances::all` (yellow, passed by `clearance.check`), and the device checks in `bath.check`. Not yet: NEC rules for the US (410.10(D) luminaires near tubs, 406.9(C) receptacles; their wording was not read), shaver units and SELV equipment told apart, zones clipped by walls and screens (DIN VDE 0100-701's "string" round a partial wall), and IP ratings in the component catalogue.
 
+### 3.9a.11 Shower falls
+**ID:** ARC-BATH-011 · **Priority:** P1 · **Ref:** `BATHROOMS_PLAN.md` §6.5; research/13 A4, A9
+
+**Purpose.** Lay the falls of a level-access shower's floor to its drain in one step, and check that showers fall enough, and not too much.
+
+**Behaviour & rules.**
+- **Fall rules** are part of a rule pack (`falls`): the least fall, the steepest if any, and the fall laid by default, as gradients. `us_plumbing`: IPC 417.4, ¼ in per foot (2 %, verified). `england_adm`: wet-room practice after BS 5385-4, at least 1:80, 1:60 by default, at most 1:40 outside the drain's collar (advisory: from secondary sources).
+- **`bath.shower_falls`** works on a level-access shower (a shower with no raised tray: a roll-in former, a gang head, a wet-room area) standing on a floor:
+  - it places a floor drain (`IfcWasteTerminal` FLOORTRAP) at the shower area's centre, or along the back wall for a linear drain;
+  - it warps the floor's top (ARC-SHAPE-001): a split line round the shower area, kept at the floor's level, and the drain lowered by the fall times the longest run from the drain square to the area's edge, so every face falls at least that much; for a linear drain, the front stays level and the back drops by the fall times the area's depth.
+  
+  The fall is the one given, else the pack's default; the default is kept no steeper than the pack's steepest over the shortest run. The rest of the floor stays level. Run again on a shower, it replaces its earlier drain and falls.
+- **Checks.** `bath.check` measures, for each level-access shower, the fall of the floor's top within its area toward its drain (the least slope of the triangles there): below the pack's least fall, or steeper than its steepest, is reported; a level-access shower with no drain under it, or on a floor that is not warped, is reported as having no fall.
+
+**Data (IFC mapping).** The floor's warped top as ARC-SHAPE-001; the drain as MEP-PIPE-006's waste terminals.
+
+**Commands.** See the catalog: `bath.shower_falls`.
+
+**Acceptance criteria.**
+- [x] A 1525 × 760 mm roll-in shower on a floor gets a drain at its centre and falls of 2 % under `us_plumbing`, and `bath.check` finds them sufficient.
+- [x] A level shower on a flat floor is reported as having no fall.
+- [x] Under `england_adm`, falls of 1:20 are reported as too steep.
+
+*Built (2026-10-31):* the `falls` section of the pack schema with `us_plumbing` and `england_adm` values, `bath.shower_falls` (centre or linear drain; Architecture › Build › Shower Falls on the selected showers), and the falls check in `bath.check`. Not yet: the floor's build-up (screed, tanking) shown in section, drains sized or connected to waste pipes, falls for showers on toposolids or on floors other than Reviera floors, and the floor beside a linear drain's ends, which slopes down to it outside the shower area.
+
+---
+
+## 3.10 In-place models, model text and model lines
+
 ### 3.10.1 Model In-Place
 **ID:** ARC-INPL-001 · **Priority:** P1 · **Ref:** research/02 §11.1
 
@@ -15786,6 +15815,7 @@ All commands below are registered once in the command registry and exposed autom
 | `bath.toilet_core` | wall_id, start, end, level, wcs?, urinals?, lavatories?, accessible?, ambulatory?, occupancy?, occupant_load?, urinals_for_wcs?, replace? | {placed, partitions, doors, fit} | Yes | ARC-BATH-008 |
 | `bath.set_accessible` | element_ids, accessible | — | Yes | ARC-BATH-002 |
 | `bath.locker_room` | point, level, lockers, tiers?, showers?, accessible?, replace? | {placed, lockers, accessible_lockers, fit} | Yes | ARC-BATH-009 |
+| `bath.shower_falls` | element_ids, fall?, drain?: centre\|linear | {drains, floors} | Yes | ARC-BATH-011 |
 | `unit.create_type` | room_ids \| element_ids, name, bay? | {type_id, members, left_out} | Yes | ARC-GRP-004 |
 | `unit.set_connection_points` | type_id, points | — | Yes | ARC-GRP-004 |
 | `unit.array_path` | type_id, path, count \| pitch, handing?, numbering? | array_id | Yes | ARC-GRP-004 |
@@ -28927,14 +28957,14 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 39 | 8 | 0 | 123 |
 | DM | 91 | 65 | 34 | 3 | 193 |
-| ARC | 77 | 84 | 14 | 1 | 176 |
+| ARC | 77 | 85 | 14 | 1 | 177 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 28 | 0 | 29 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
 | COL | 8 | 50 | 11 | 1 | 70 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **324** | **201** | **7** | **852** |
+| **Total** | **320** | **325** | **201** | **7** | **853** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -29130,7 +29160,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2281 unique commands** in 427 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2282 unique commands** in 427 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -29166,7 +29196,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `array` | 6 |
 | `assembly` | 16 |
 | `assemblytemplate` | 1 |
-| `bath` | 17 |
+| `bath` | 18 |
 | `bcf` | 33 |
 | `beam` | 6 |
 | `beam_system` | 5 |
@@ -29689,6 +29719,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `bath.set_accessible` | 3 | element_ids, accessible | — | Yes | ARC-BATH-002 |
 | `bath.set_hand` | 3 | element_ids, hand: auto\ | left\ | right | — |
 | `bath.set_rule_packs` | 3 | packs? (none for automatic) | — | Yes | ARC-BATH-001 |
+| `bath.shower_falls` | 3 | element_ids, fall?, drain?: centre\ | linear | {drains, floors} | Yes |
 | `bath.swap_product` | 3 | element_ids, type_id | [{element, size_before, size_after, connectors_moved, findings_new, findings_gone}] | Yes | ARC-BATH-006 |
 | `bath.toilet_core` | 3 | wall_id, start, end, level, wcs?, urinals?, lavatories?, accessible?, ambulatory?, occupancy?, occupant_load?, urinals_for_wcs?, replace? | {placed, partitions, doors, fit} | Yes | ARC-BATH-008 |
 | `bcf.add_comment` | 6 | topic_id, text, viewpoint?: current\ | none | comment_id | Yes |

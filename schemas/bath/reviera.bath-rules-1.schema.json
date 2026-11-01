@@ -29,7 +29,8 @@
     "distances": {"type": "array", "items": {"$ref": "#/$defs/distance"}},
     "bars": {"type": "array", "items": {"$ref": "#/$defs/bar"}},
     "counts": {"type": "array", "items": {"$ref": "#/$defs/count"}},
-    "electrical": {"$ref": "#/$defs/electrical"}
+    "electrical": {"$ref": "#/$defs/electrical"},
+    "falls": {"$ref": "#/$defs/falls"}
   },
   "$defs": {
     "fixture": {"enum": ["water_closet", "urinal", "lavatory", "bidet", "bath", "shower", "locker", "bench"]},
@@ -289,6 +290,33 @@
             "zone1": {"type": "string", "pattern": "^IP[0-9X][0-9X]$"},
             "zone2": {"type": "string", "pattern": "^IP[0-9X][0-9X]$"}
           }
+        },
+        "source": {"type": "string", "pattern": "^S[0-9]{4}( S[0-9]{4})*$"},
+        "confidence": {"enum": ["verified", "secondary", "advisory"]}
+      }
+    },
+    "falls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description", "min", "source", "confidence"],
+      "description": "The fall of a level-access shower's floor toward its drain.",
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "description": {"type": "string", "minLength": 1},
+        "min": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "The least fall, as a gradient (0.02 is 2 %, 1:50)."
+        },
+        "max": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "The steepest fall allowed, if any."
+        },
+        "default": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "The fall bath.shower_falls lays when none is given."
         },
         "source": {"type": "string", "pattern": "^S[0-9]{4}( S[0-9]{4})*$"},
         "confidence": {"enum": ["verified", "secondary", "advisory"]}

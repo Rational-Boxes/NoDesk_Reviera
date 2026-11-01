@@ -50,5 +50,14 @@
       "source": "S0905",
       "confidence": "secondary"
     }
-  ]
+  ],
+  "falls": {
+    "id": "Wet-room practice (BS 5385-4)",
+    "description": "A wet room's shower area falls at least 1:80 to its drain, 1:60 commonly, 1:40 at most outside the drain's collar",
+    "min": 0.0125,
+    "max": 0.025,
+    "default": 0.0167,
+    "source": "S1044 S0925",
+    "confidence": "advisory"
+  }
 }

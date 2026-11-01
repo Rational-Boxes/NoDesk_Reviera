@@ -607,3 +607,53 @@ fn bathroom_electrical_zones() {
     ok(&mut app, "pset.set", json!({ "element_id": lum, "pset_name": "Pset_ElectricalDeviceCommon", "property_name": "IP_Code", "value": "IPX4" }));
     assert_eq!(state(&mut app), None);
 }
+
+/// A floor over a `room`'s inside.
+fn room_floor(app: &mut App, level: &Value, w: f64, l: f64) -> u64 {
+    let c = [[0.0, 0.0], [w, 0.0], [w, l], [0.0, l]];
+    let curves: Vec<Value> = (0..4).map(|i| json!({ "line": { "start": c[i], "end": c[(i + 1) % 4] } })).collect();
+    ok(app, "floor.create", json!({ "loops": [curves], "level_id": level })).as_u64().unwrap()
+}
+
+#[test]
+fn shower_falls_to_a_drain() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = new_app(dir.path());
+    // A roll-in shower on a flat floor under the IPC: reported as having no fall.
+    let (level, _) = room(&mut app, 3.0, 2.5);
+    let floor = room_floor(&mut app, &level, 3.0, 2.5);
+    let t = ok(&mut app, "bath.load_components", json!({ "names": ["Roll-in shower, 60 × 30 in", "Shower tray, 900 × 900"] }));
+    let shower = ok(&mut app, "bath.place_component", json!({ "type_id": t["Roll-in shower, 60 × 30 in"], "point": [1.0, 0.1], "level": level })).as_u64().unwrap();
+    let falls = |app: &mut App| findings(app).into_iter().filter(|f| f["kind"] == "falls" && f["element"] == shower).collect::<Vec<_>>();
+    let f = falls(&mut app);
+    assert!(f.len() == 1 && f[0]["message"].as_str().unwrap().contains("no fall"), "{f:#?}");
+    // A centre drain at the pack's 2 %: every face of the area falls at least that.
+    let out = ok(&mut app, "bath.shower_falls", json!({ "element_ids": [shower] }));
+    assert_eq!((out["drains"].as_array().unwrap().len(), out["floors"].clone()), (1, json!([floor])));
+    assert_eq!(falls(&mut app), Vec::<Value>::new());
+    let shape = ok(&mut app, "shape.get", json!({ "element_id": floor }));
+    let drop = shape["points"][0]["z"].as_f64().unwrap();
+    assert!((drop + 0.02 * 0.7625).abs() < 0.002, "{shape}");
+    // Laid again: the earlier drain and falls are replaced, not deepened.
+    let again = ok(&mut app, "bath.shower_falls", json!({ "element_ids": [shower] }));
+    let types = ok(&mut app, "mesh_object.types", json!({}));
+    let drains = types.as_array().unwrap().iter().find(|t| t["name"] == "Floor Drain").map_or(0, |t| t["copies"].as_u64().unwrap());
+    assert_eq!(drains, 1, "{types:#}");
+    let shape = ok(&mut app, "shape.get", json!({ "element_id": floor }));
+    assert_eq!((shape["points"].as_array().unwrap().len(), shape["lines"].as_array().unwrap().len()), (1, 1), "{shape} {again}");
+    assert!((shape["points"][0]["z"].as_f64().unwrap() - drop).abs() < 1e-6);
+    // A tray is not level access.
+    let tray = ok(&mut app, "bath.place_component", json!({ "type_id": t["Shower tray, 900 × 900"], "point": [2.4, 0.1], "level": level })).as_u64().unwrap();
+    let e = run(&mut app, "bath.shower_falls", json!({ "element_ids": [tray] })).unwrap_err();
+    assert_eq!(e.code, "bath.not_level_access");
+
+    // Approved Document M: 1 in 20 to a linear drain is steeper than its 1 in 40.
+    let (level, _) = room(&mut app, 3.0, 2.5);
+    room_floor(&mut app, &level, 3.0, 2.5);
+    ok(&mut app, "code.set", json!({ "code": "uk_adk", "occupancy": "dwelling" }));
+    let t = ok(&mut app, "bath.load_components", json!({ "names": ["Roll-in shower, 60 × 30 in"] }));
+    let shower = ok(&mut app, "bath.place_component", json!({ "type_id": t["Roll-in shower, 60 × 30 in"], "point": [1.0, 0.1], "level": level })).as_u64().unwrap();
+    ok(&mut app, "bath.shower_falls", json!({ "element_ids": [shower], "fall": 0.05, "drain": "linear" }));
+    let f: Vec<Value> = findings(&mut app).into_iter().filter(|f| f["kind"] == "falls").collect();
+    assert!(f.iter().any(|x| x["message"].as_str().unwrap().contains("steeper")), "{f:#?}");
+}

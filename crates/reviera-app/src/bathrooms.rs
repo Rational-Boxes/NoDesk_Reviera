@@ -48,6 +48,8 @@ pub enum FindingKind {
     Bar,
     /// Electrical equipment where a bathroom's electrical zones do not allow it (ARC-BATH-010).
     Electrical,
+    /// A level-access shower's floor falling too little, too much or not at all (ARC-BATH-011).
+    Falls,
 }
 
 /// One thing the check found.
@@ -285,6 +287,7 @@ pub(crate) fn check(app: &mut App, p: CheckParams) -> Result<Vec<Finding>> {
             }
         }
         out.extend(electrical_findings(store, only.as_deref()));
+        out.extend(falls_findings(store, only.as_deref()));
         out.sort_by(|a, b| a.severity.cmp(&b.severity).then(a.element.0.cmp(&b.element.0)));
         Ok(out)
     }
@@ -490,3 +493,59 @@ fn electrical_findings(store: &reviera_core::Store, only: Option<&[ElementId]>) 
     out
 }
 
+/// Level-access showers whose floor falls too little, too much or not at all (ARC-BATH-011).
+fn falls_findings(store: &reviera_core::Store, only: Option<&[ElementId]>) -> Vec<Finding> {
+    let packs: Vec<bath_rules::Pack> = bath_rules::active(store).into_iter().filter(|p| p.falls.is_some()).collect();
+    if packs.is_empty() {
+        return Vec::new();
+    }
+    let pct = |g: f64| format!("{:.1} %", g * 100.0);
+    let mut out = Vec::new();
+    for f in bath_rules::fixtures(store) {
+        if only.is_some_and(|ids| !ids.contains(&f.element)) || !bath_rules::level_access(store, &f) {
+            continue;
+        }
+        let area = bath_rules::shower_area(store, &f);
+        let n = area.len() as f64;
+        let centre = [area.iter().map(|q| q[0]).sum::<f64>() / n, area.iter().map(|q| q[1]).sum::<f64>() / n];
+        let Some(floor) = bath_rules::floor_under(store, &f.level, centre) else { continue };
+        let range = bath_rules::falls_in(store, floor, &area);
+        let what = format!("Shower {}", f.element.0);
+        for pack in &packs {
+            let rules = pack.falls.as_ref().expect("filtered");
+            let sev = if pack.layer == Layer::Recommended || rules.confidence == Confidence::Advisory { Severity::Note } else { Severity::Error };
+            let base = |message: String, measured: Option<f64>| Finding {
+                severity: sev,
+                kind: FindingKind::Falls,
+                element: f.element,
+                fixture: f.kind,
+                pack: pack.id.clone(),
+                edition: pack.edition.clone(),
+                layer: pack.layer,
+                rule: rules.id.clone(),
+                description: rules.description.clone(),
+                confidence: rules.confidence,
+                source: rules.source.clone(),
+                message,
+                other: Some(floor),
+                depth: None,
+                centroid: Some([centre[0], centre[1], f.floor]),
+                measured,
+                min: Some(rules.min),
+                max: rules.max,
+            };
+            match range {
+                None => out.push(base(format!("{what}'s floor has no fall to a drain; {} asks for at least {} (bath.shower_falls lays one)", rules.id, pct(rules.min)), None)),
+                Some((least, steepest)) => {
+                    if least < rules.min - 1e-4 {
+                        out.push(base(format!("{what}'s floor falls {} at its flattest; {} asks for at least {}", pct(least), rules.id, pct(rules.min)), Some(least)));
+                    }
+                    if let Some(max) = rules.max.filter(|m| steepest > m + 1e-4) {
+                        out.push(base(format!("{what}'s floor falls {}, steeper than the {} {} allows", pct(steepest), pct(max), rules.id), Some(steepest)));
+                    }
+                }
+            }
+        }
+    }
+    out
+}

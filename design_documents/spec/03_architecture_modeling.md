@@ -4305,6 +4305,35 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 
 *Built (2026-10-31):* the `electrical` section of the pack schema, the `uk_bs7671` pack (chosen with England's code), zones as virtual volumes in `clearances::all` (yellow, passed by `clearance.check`), and the device checks in `bath.check`. Not yet: NEC rules for the US (410.10(D) luminaires near tubs, 406.9(C) receptacles; their wording was not read), shaver units and SELV equipment told apart, zones clipped by walls and screens (DIN VDE 0100-701's "string" round a partial wall), and IP ratings in the component catalogue.
 
+### 3.9a.11 Shower falls
+**ID:** ARC-BATH-011 · **Priority:** P1 · **Ref:** `BATHROOMS_PLAN.md` §6.5; research/13 A4, A9
+
+**Purpose.** Lay the falls of a level-access shower's floor to its drain in one step, and check that showers fall enough, and not too much.
+
+**Behaviour & rules.**
+- **Fall rules** are part of a rule pack (`falls`): the least fall, the steepest if any, and the fall laid by default, as gradients. `us_plumbing`: IPC 417.4, ¼ in per foot (2 %, verified). `england_adm`: wet-room practice after BS 5385-4, at least 1:80, 1:60 by default, at most 1:40 outside the drain's collar (advisory: from secondary sources).
+- **`bath.shower_falls`** works on a level-access shower (a shower with no raised tray: a roll-in former, a gang head, a wet-room area) standing on a floor:
+  - it places a floor drain (`IfcWasteTerminal` FLOORTRAP) at the shower area's centre, or along the back wall for a linear drain;
+  - it warps the floor's top (ARC-SHAPE-001): a split line round the shower area, kept at the floor's level, and the drain lowered by the fall times the longest run from the drain square to the area's edge, so every face falls at least that much; for a linear drain, the front stays level and the back drops by the fall times the area's depth.
+  
+  The fall is the one given, else the pack's default; the default is kept no steeper than the pack's steepest over the shortest run. The rest of the floor stays level. Run again on a shower, it replaces its earlier drain and falls.
+- **Checks.** `bath.check` measures, for each level-access shower, the fall of the floor's top within its area toward its drain (the least slope of the triangles there): below the pack's least fall, or steeper than its steepest, is reported; a level-access shower with no drain under it, or on a floor that is not warped, is reported as having no fall.
+
+**Data (IFC mapping).** The floor's warped top as ARC-SHAPE-001; the drain as MEP-PIPE-006's waste terminals.
+
+**Commands.** See the catalog: `bath.shower_falls`.
+
+**Acceptance criteria.**
+- [x] A 1525 × 760 mm roll-in shower on a floor gets a drain at its centre and falls of 2 % under `us_plumbing`, and `bath.check` finds them sufficient.
+- [x] A level shower on a flat floor is reported as having no fall.
+- [x] Under `england_adm`, falls of 1:20 are reported as too steep.
+
+*Built (2026-10-31):* the `falls` section of the pack schema with `us_plumbing` and `england_adm` values, `bath.shower_falls` (centre or linear drain; Architecture › Build › Shower Falls on the selected showers), and the falls check in `bath.check`. Not yet: the floor's build-up (screed, tanking) shown in section, drains sized or connected to waste pipes, falls for showers on toposolids or on floors other than Reviera floors, and the floor beside a linear drain's ends, which slopes down to it outside the shower area.
+
+---
+
+## 3.10 In-place models, model text and model lines
+
 ### 3.10.1 Model In-Place
 **ID:** ARC-INPL-001 · **Priority:** P1 · **Ref:** research/02 §11.1
 
@@ -5562,6 +5591,7 @@ All commands below are registered once in the command registry and exposed autom
 | `bath.toilet_core` | wall_id, start, end, level, wcs?, urinals?, lavatories?, accessible?, ambulatory?, occupancy?, occupant_load?, urinals_for_wcs?, replace? | {placed, partitions, doors, fit} | Yes | ARC-BATH-008 |
 | `bath.set_accessible` | element_ids, accessible | — | Yes | ARC-BATH-002 |
 | `bath.locker_room` | point, level, lockers, tiers?, showers?, accessible?, replace? | {placed, lockers, accessible_lockers, fit} | Yes | ARC-BATH-009 |
+| `bath.shower_falls` | element_ids, fall?, drain?: centre\|linear | {drains, floors} | Yes | ARC-BATH-011 |
 | `unit.create_type` | room_ids \| element_ids, name, bay? | {type_id, members, left_out} | Yes | ARC-GRP-004 |
 | `unit.set_connection_points` | type_id, points | — | Yes | ARC-GRP-004 |
 | `unit.array_path` | type_id, path, count \| pitch, handing?, numbering? | array_id | Yes | ARC-GRP-004 |
