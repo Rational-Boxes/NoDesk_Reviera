@@ -554,6 +554,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(BathSteamRoom),
         registry.add(BathElevations),
         registry.add(BathSchedules),
+        registry.add(TileCreate),
+        registry.add(TileSummary),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -7073,4 +7075,34 @@ edit_command!(
     crate::bath_layouts::SchedulesParams,
     crate::bath_layouts::Schedules,
     crate::bath_layouts::schedules
+);
+
+edit_command!(
+    TileCreate,
+    "tile.create",
+    "Set out tiles on a wall or floor",
+    "Lays tiles on a wall's face (`wall_id`, the side `point` is on, default the interior; `from`/`to` along \
+     its location line and `bottom`/`top` above its level, default the whole face) or a floor's top \
+     (`floor_id`, square to its outline's first edge) (ARC-BATH-020). Tiles are `tile` wide and high \
+     (default 300 × 600 mm on walls, 600 × 600 on floors) with `joint` between them (3 mm, 5 mm), set out \
+     from `datum`: `centred` (a tile on the middle, equal cuts both ends), `corner` (a full tile at the start \
+     and bottom) or `end_corner`; `pattern` `stack` or `half_bond`. Pieces under 10 mm are left out. The \
+     layout is an IfcCovering (CLADDING or FLOORING) that follows its wall or floor; its full and cut tiles \
+     show in plans, elevations and 3D, and `tile.summary` counts them.",
+    "Tile Layout",
+    crate::tiles::CreateParams,
+    ElementId,
+    crate::tiles::create
+);
+
+read_command!(
+    TileSummary,
+    "tile.summary",
+    "Count tile layouts' tiles",
+    "For each tile layout (or those given): its tile and size, full and cut tiles, the tiles to order with \
+     its waste allowance (every piece takes a tile, then the allowance, rounded up) and the area tiled \
+     (ARC-BATH-020).",
+    crate::tiles::SummaryParams,
+    Vec<crate::tiles::SummaryRow>,
+    crate::tiles::summary
 );

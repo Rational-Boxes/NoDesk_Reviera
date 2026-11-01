@@ -686,6 +686,9 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
 - **Bathroom compliance report** (ARC-BATH-019): Check Bathrooms' findings written as an HTML
   report room by room, with each rule's pack, edition, measured value, confidence and sources,
   or made into BCF issues with viewpoints and snapshots (`bath.report`, `bcf.from_bath_check`).
+- **Tile set-out** (ARC-BATH-020): tiles on a wall face or a floor from the middle or a corner,
+  stack or half bond, drawn with their joints so cuts show in plans and elevations, and counted
+  (full, cut, to order with waste) (`tile.create`, `tile.summary`).
   **Not yet** (planned): living
   layouts that re-fit when the room changes, Jack-and-Jill and back-to-back wet walls,
   other packs' bars (Approved Document M's drop-down rails, shower and bath bars), room layouts, toilet cores and partitions, fixture counts,

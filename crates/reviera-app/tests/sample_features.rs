@@ -1032,6 +1032,11 @@ fn the_wet_room_sample_falls_and_is_tanked() {
     assert!(least >= 0.0125 - 1e-4 && steepest <= 0.025 + 1e-4, "{least} {steepest}");
     let w = ok(&mut app, "bath.waterproofing", json!({}));
     assert!(near(f(&w["floor_area"]), 2.6 * 2.4, 0.01), "{w}");
+    // Two tile layouts: the shower's wall to 1.8 m and the floor, each with full and cut tiles.
+    let t = ok(&mut app, "tile.summary", json!({}));
+    let rows = t.as_array().unwrap();
+    assert_eq!(rows.len(), 2, "{t:#}");
+    assert!(rows.iter().all(|r| r["full"].as_u64().unwrap() > 0 && r["to_order"].as_u64().unwrap() >= r["full"].as_u64().unwrap() + r["cut"].as_u64().unwrap()), "{t:#}");
     // Nothing for Check Bathrooms.
     assert_eq!(ok(&mut app, "bath.check", json!({})), json!([]));
 }

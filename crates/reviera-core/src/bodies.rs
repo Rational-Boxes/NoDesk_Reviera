@@ -349,6 +349,9 @@ pub fn all(store: &Store) -> Vec<Body> {
     for (id, g) in crate::grab_bars::all(store) {
         push(id, "IfcRailing:metal", g.mesh(), false);
     }
+    for (id, l) in crate::tiles::all(store) {
+        push(id, "IfcCovering", l.mesh(), false);
+    }
     for (id, parts) in crate::railings::all_gates(store) {
         for mesh in parts {
             push(id, "IfcDoor", mesh, false);
@@ -688,7 +691,11 @@ pub fn related(store: &Store, a: ElementId, b: ElementId) -> bool {
     // A mass is a conceptual volume, not a physical element: what is modelled in it or on its
     // faces belongs with it.
     let conceptual = |id: ElementId| store.get(id).and_then(crate::masses::recipe).is_some();
-    ha.contains(&gb)
+    // A tile layout is a finish: it runs under and behind what stands on its wall or floor.
+    let tiled = |id: ElementId| store.get(id).and_then(crate::tiles::recipe).is_some();
+    tiled(a)
+        || tiled(b)
+        || ha.contains(&gb)
         || hb.contains(&ga)
         || conceptual(a)
         || conceptual(b)

@@ -212,6 +212,7 @@ pub fn toolset_of(command: &str) -> String {
             | "growing"
             | "bath"
             | "grab_bar"
+            | "tile"
             | "vent"
             | "railing"
             | "deck"

@@ -37,6 +37,13 @@ inside the walls.
    - Move it within 1.2 m and set IP_Code to IP20: Check Bathrooms reports it. With no rating at
      all, it gives a note asking for one.
 
+4. **Tiles.** Select the wet room's south wall and use **Architecture › Build › Tiles**: 300 ×
+   600 mm, from the middle, half bond, up to 1800 mm. Click inside the room near that wall.
+   - The wall is tiled between the walls meeting it, with equal cuts at both ends.
+   - Tiles again, on the floor: 200 × 200 mm, 3 mm joints, from the start corner. Click on the
+     floor.
+   - The status bar gives each layout's full and cut tiles and those to order.
+
 Check Bathrooms on the finished model finds nothing.
 
 ## Gaps

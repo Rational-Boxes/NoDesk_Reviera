@@ -1410,6 +1410,10 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "bathroom" => format!(
             r#"<rect x="19" y="4" width="8" height="12" fill="{f}" {s}/><path d="M5 16h22v2c0 4-4 6-8 6h-2l-1 4H11l1-5c-4-1-7-3-7-7z" fill="{f}" {s}/><path d="M5 16h14" {sa}/>"#
         ),
+        // Tiles on a wall: a running bond of rectangles, one cut at the edge.
+        "tiles" => format!(
+            r#"<rect x="3" y="4" width="26" height="24" fill="{f}" {s}/><path d="M3 12h26M3 20h26M11 4v8M19 4v8M27 4v8M7 12v8M15 12v8M23 12v8M11 20v8M19 20v8M27 20v8" {s}/>"#
+        ),
         // A steam room in section: a ceiling sloped to one wall, a bench, and steam rising.
         "steam_room" => format!(
             r#"<path d="M3 6L29 10" {s}/><path d="M3 6v22h26V10" fill="none" {s}/><rect x="5" y="20" width="9" height="8" fill="{f}" {s}/><path d="M20 26c-2-3 2-5 0-8M24 26c-2-3 2-5 0-8" {sa}/>"#

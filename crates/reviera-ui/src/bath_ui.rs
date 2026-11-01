@@ -197,6 +197,14 @@ impl Gui {
         let command = args.as_object_mut().and_then(|o| o.remove("command")).and_then(|c| c.as_str().map(str::to_owned)).unwrap_or_else(|| "bath.layout".to_owned());
         match self.app.execute(&command, args, &super::user()) {
             Ok(out) => {
+                if out.result.is_u64() {
+                    // A tile layout: its counts.
+                    self.refresh_scene(&frame);
+                    let s = self.run("tile.summary", json!({ "element_ids": [out.result] })).ok();
+                    let row = s.as_ref().and_then(|v| v.get(0)).cloned().unwrap_or_default();
+                    frame.set_status_text(&format!("Tiles: {} full, {} cut, {} to order, {:.2} m²", row["full"], row["cut"], row["to_order"], row["area"].as_f64().unwrap_or(0.0)), 0);
+                    return;
+                }
                 if let Some(views) = out.result["views"].as_array() {
                     self.refresh_scene(&frame);
                     frame.set_status_text(&format!("{} elevations made{}; see Project Browser › Elevations", views.len(), if out.result["sheet"].is_null() { "" } else { " on a new A3 sheet" }), 0);
@@ -664,6 +672,51 @@ impl Gui {
                 frame.set_status_text(&format!("{made} BCF issue(s) made from Check Bathrooms' errors{}; see the Issues pane", if already > 0 { format!(", {already} already had one") } else { String::new() }), 0);
             }
             Err(e) => error(&frame, &e),
+        }
+    }
+
+    /// Architecture › Build › Tiles (ARC-BATH-020): the tile and its set-out, then a click on
+    /// the side of the selected wall to tile, or on a floor.
+    pub(crate) fn tiles(&mut self) {
+        let frame = self.frame;
+        let wall = self.selection().into_iter().find(|id| self.store_now().and_then(|s| s.get(*id).and_then(reviera_core::walls::wall_recipe)).is_some());
+        let f = super::reinforcement_ui::Form::new(&frame, "Tiles");
+        let surface = f.choice("Surface", &[if wall.is_some() { "The selected wall".to_owned() } else { "A wall (select it first)".to_owned() }, "The floor".to_owned()], if wall.is_some() { 0 } else { 1 });
+        let w = f.text("Tile width (mm)", "", "Default 300 on walls, 600 on floors");
+        let h = f.text("Tile height (mm)", "", "Default 600");
+        let joint = f.text("Joint (mm)", "", "Default 3 on walls, 5 on floors");
+        let datum = f.choice("Set out from", &["The middle (equal cuts)".to_owned(), "The start corner (full tile)".to_owned(), "The end corner (full tile)".to_owned()], 0);
+        let pattern = f.choice("Pattern", &["Stack".to_owned(), "Half bond".to_owned()], 0);
+        let top = f.text("Up to (mm, walls)", "", "Default the wall's top");
+        let ok = f.show("Then click in a plan: on the side of the wall to tile (its face between the walls meeting it), or on the floor.", "Pick");
+        let num = |t: &TextCtrl| t.get_value().trim().replace(',', ".").parse::<f64>().ok().map(|v| v / 1000.0);
+        let datum = ["centred", "corner", "end_corner"][datum.get_selection().unwrap_or(0) as usize];
+        let mut args = json!({ "command": "tile.create", "datum": datum, "pattern": if pattern.get_selection() == Some(1) { "half_bond" } else { "stack" } });
+        let on_wall = surface.get_selection() == Some(0);
+        if on_wall {
+            let Some(wall) = wall else {
+                f.dialog.destroy();
+                return error(&frame, "Select the wall to tile first.");
+            };
+            args["wall_id"] = json!(wall.0);
+            if let Some(t) = num(&top) {
+                args["top"] = json!(t);
+            }
+        }
+        if let (Some(a), Some(b)) = (num(&w), num(&h)) {
+            args["tile"] = json!([a, b]);
+        }
+        if let Some(j) = num(&joint) {
+            args["joint"] = json!(j);
+        }
+        f.dialog.destroy();
+        if !ok {
+            return;
+        }
+        self.start_room_tool();
+        if let Some(tool) = self.room_tool.as_mut() {
+            tool.layout = Some(args);
+            frame.set_status_text("Tiles: click on the side to tile, or on the floor; Esc ends", 0);
         }
     }
 }

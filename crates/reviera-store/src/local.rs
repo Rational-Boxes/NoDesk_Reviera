@@ -809,6 +809,7 @@ impl LocalProject {
             )?;
             self.write_railings(doc)?;
             self.write_grab_bars(doc)?;
+            self.write_tiles(doc)?;
             self.write_rooms(doc)?;
             self.write_spaces(doc)?;
             let owner_history = self.new_owner_history()?;
@@ -4201,6 +4202,41 @@ impl LocalProject {
                 .get(*id)
                 .and_then(reviera_core::grab_bars::recipe)
                 .and_then(|r| GlobalId::parse(&r.level))
+                .and_then(|g| store.find_by_guid(&g))
+                .and_then(|l| self.steps.get(&l).copied());
+            if let Some(storey) = storey {
+                geometry::contain(&mut self.ifc, step, storey, owner_history)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Tile layouts (ARC-BATH-020): each piece a faceted B-rep, in its level's storey.
+    fn write_tiles(&mut self, doc: &Document) -> Result<()> {
+        let store = doc.store();
+        let all = reviera_core::tiles::all(store);
+        if all.is_empty() {
+            return Ok(());
+        }
+        let contexts = geometry::Contexts::find(&self.ifc)?;
+        let owner_history = self.new_owner_history()?;
+        for (id, l) in &all {
+            let Some(&step) = self.steps.get(id) else {
+                continue;
+            };
+            // Each piece's eight corners and twelve triangles, as the layout's mesh gives them.
+            let (points, idx) = l.mesh();
+            let solids: Vec<geometry::Polyhedron> = points
+                .chunks(8)
+                .zip(idx.chunks(36))
+                .enumerate()
+                .map(|(k, (p, t))| geometry::Polyhedron { points: p.to_vec(), faces: t.chunks(3).map(|f| f.iter().map(|i| *i as usize - k * 8).collect()).collect() })
+                .collect();
+            geometry::write_breps(&mut self.ifc, step, geometry::BrepFrame::WORLD, &solids, self.length_scale, contexts)?;
+            let storey = store
+                .get(*id)
+                .and_then(|e| reviera_core::tiles::level_of(store, e))
+                .and_then(|g| GlobalId::parse(&g))
                 .and_then(|g| store.find_by_guid(&g))
                 .and_then(|l| self.steps.get(&l).copied());
             if let Some(storey) = storey {

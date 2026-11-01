@@ -2,7 +2,7 @@
 -- Copyright (C) 2026 Reviera contributors
 
 -- title: Family bathroom and wet room (England)
--- description: Two rooms of a house under England's Approved Documents: a family bathroom laid out from its template, and a wet room whose level-access shower falls 1:60 to a centre drain, its whole floor tanked, with the BS 7671 Section 701 electrical zones round the shower and a towel rail rated for zone 2.
+-- description: Two rooms of a house under England's Approved Documents: a family bathroom laid out from its template, and a wet room whose level-access shower falls 1:60 to a centre drain, its whole floor tanked and tiled, the shower's wall tiled to 1.8 m, with the BS 7671 Section 701 electrical zones round the shower and a towel rail rated for zone 2.
 --
 -- Reviera sample model (test-data/samples): the wet-area tools (ARC-BATH-010, 011, 012) under
 -- England's building code, which brings the `england_adm` pack (Approved Document M's spaces,
@@ -33,13 +33,13 @@ reviera.bath.layout{ template = "uk_family_bathroom", point = {1.0, 1.2}, level 
 --    1:40 at most is kept by sinking the drain no deeper than that over the shortest run
 --    (`bath.shower_falls`). A level shower makes the room a wet room: its whole floor and the
 --    shower's walls to 1.8 m are tanked (`bath.waterproofing`).
-room(4, 0, 2.6, 2.4)
+local wet = room(4, 0, 2.6, 2.4)
 local c = { {4, 0}, {6.6, 0}, {6.6, 2.4}, {4, 2.4} }
 local loop = {}
 for i = 1, 4 do
   loop[i] = { line = { start = c[i], ["end"] = c[i % 4 + 1] } }
 end
-reviera.floor.create{ loops = { loop }, level_id = l1 }
+local wet_floor = reviera.floor.create{ loops = { loop }, level_id = l1 }
 local t = reviera.bath.load_components{ names = { "Roll-in shower, 60 × 30 in", "Heated towel rail, 500 × 800" } }
 local shower = reviera.bath.place_component{ type_id = t["Roll-in shower, 60 × 30 in"], point = {5.3, 0.1}, level = l1 }
 reviera.bath.shower_falls{ element_ids = { shower } }
@@ -50,3 +50,9 @@ reviera.bath.shower_falls{ element_ids = { shower } }
 -- lower rating, Check Bathrooms would report it.
 local rail = reviera.bath.place_component{ type_id = t["Heated towel rail, 500 × 800"], point = {6.0, 2.3}, level = l1 }
 reviera.pset.set{ element_id = rail, pset_name = "Pset_ElectricalDeviceCommon", property_name = "IP_Code", value = "IPX4" }
+
+-- Tiles (`tile.create`): 300 × 600 mm on the shower's back wall to its 1.8 m tanking, set out
+-- from the middle in half bond between the walls meeting it, and 200 × 200 mm on the wet room's
+-- floor from its corner; `tile.summary` counts full and cut tiles and those to order.
+reviera.tile.create{ wall_id = wet[1], point = {5.3, 0.5}, top = 1.8, tile = {0.3, 0.6}, pattern = "half_bond" }
+reviera.tile.create{ floor_id = wet_floor, tile = {0.2, 0.2}, joint = 0.003, datum = "corner" }

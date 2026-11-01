@@ -942,3 +942,49 @@ fn a_compliance_report_and_bcf_issues() {
     let topics = ok(&mut app, "bcf.list", json!({}));
     assert!(topics.to_string().contains("Bathroom"), "{topics:#}");
 }
+
+#[test]
+fn tiles_set_out_on_a_wall_and_a_floor() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = new_app(dir.path());
+    // A 2.4 × 2.0 m room of 200 mm walls: the south wall's inside face runs 0.1–2.5 m along it.
+    let (level, walls) = room(&mut app, 2.4, 2.0);
+    let floor = room_floor(&mut app, &level, 2.4, 2.0);
+    // 300 × 600 tiles with 3 mm joints to 1.2 m from the start corner: 7 full columns and a cut,
+    // the second row cut: 7 full and 9 cut, 18 to order with 10 % waste.
+    let wall = ok(&mut app, "tile.create", json!({ "wall_id": walls[0], "point": [1.2, 1.0], "from": 0.1, "to": 2.5, "top": 1.2, "tile": [0.3, 0.6], "joint": 0.003, "datum": "corner" }));
+    let s = ok(&mut app, "tile.summary", json!({ "element_ids": [wall] }));
+    assert_eq!((s[0]["full"].as_u64(), s[0]["cut"].as_u64(), s[0]["to_order"].as_u64()), (Some(7), Some(9), Some(18)), "{s:#}");
+    assert!((s[0]["area"].as_f64().unwrap() - 2.4 * 1.2).abs() < 1e-6);
+    // Centred: equal cuts at both ends.
+    let centred = ok(&mut app, "tile.create", json!({ "wall_id": walls[1], "point": [1.2, 1.0], "from": 0.1, "to": 2.1, "top": 0.6, "tile": [0.3, 0.6], "joint": 0.003 }));
+    let store = app.document(app.active().unwrap()).unwrap().doc.store().clone();
+    let l = reviera_core::tiles::regenerate(&store, store.get(reviera_core::ElementId(centred.as_u64().unwrap())).unwrap()).unwrap();
+    let widths: Vec<f64> = l.pieces.iter().map(|p| p.max[0] - p.min[0]).collect();
+    assert!((widths[0] - widths[widths.len() - 1]).abs() < 1e-6 && widths[0] < 0.3, "{widths:?}");
+    // 600 × 600 on the floor with 5 mm joints: 3 × 3 full, 7 cut.
+    let fl = ok(&mut app, "tile.create", json!({ "floor_id": floor, "datum": "corner" }));
+    let s = ok(&mut app, "tile.summary", json!({ "element_ids": [fl] }));
+    assert_eq!((s[0]["full"].as_u64(), s[0]["cut"].as_u64()), (Some(9), Some(7)), "{s:#}");
+    // By a point only: the south wall's inside face between the walls meeting it, 2.4 m;
+    // and the floor under a point.
+    let by_point = ok(&mut app, "tile.create", json!({ "wall_id": walls[0], "point": [1.2, 0.5], "top": 0.6 }));
+    let s = ok(&mut app, "tile.summary", json!({ "element_ids": [by_point] }));
+    assert!((s[0]["area"].as_f64().unwrap() - 2.4 * 0.6).abs() < 1e-6, "{s:#}");
+    let floor2 = ok(&mut app, "tile.create", json!({ "point": [1.0, 1.0], "level": level }));
+    let s = ok(&mut app, "tile.summary", json!({ "element_ids": [floor2] }));
+    assert!((s[0]["area"].as_f64().unwrap() - 2.4 * 2.0).abs() < 1e-6, "{s:#}");
+    // Saved and reopened, the same.
+    let before = ok(&mut app, "tile.summary", json!({}));
+    let path = dir.path().join("tiles.ifc");
+    ok(&mut app, "file.save_as", json!({ "path": path }));
+    let mut again = new_app(dir.path());
+    ok(&mut again, "file.open", json!({ "path": path }));
+    assert_eq!(ok(&mut again, "tile.summary", json!({})), before);
+    // Each layout sits under its level in the model tree.
+    let tree = again.model_tree(again.active().unwrap()).unwrap();
+    assert!(!format!("{tree:?}").contains("Not on a level"), "{tree:#?}");
+    // No overlaps reported for the finishes.
+    let o = ok(&mut again, "overlap.find", json!({}));
+    assert_eq!(o["overlaps"], json!([]), "{o:#}");
+}

@@ -97,6 +97,14 @@ fn raw_parent(store: &Store, e: &Element, imported: &Imported) -> Option<Element
     if let Some((_, r)) = crate::floors::slab_recipe(e) {
         return by_guid(&r.level);
     }
+    // A grab bar on its level (ARC-BATH-003).
+    if let Some(r) = crate::grab_bars::recipe(e) {
+        return by_guid(&r.level);
+    }
+    // A tile layout on its wall's or floor's level (ARC-BATH-020).
+    if crate::tiles::recipe(e).is_some() {
+        return crate::tiles::level_of(store, e).as_deref().and_then(by_guid);
+    }
     if let Some(r) = crate::roofs::roof_recipe(e) {
         return by_guid(&r.level);
     }

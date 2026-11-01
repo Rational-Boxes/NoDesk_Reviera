@@ -4792,6 +4792,10 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         }),
         "ui.bathroom_schedules" => with(gui, Gui::bathroom_schedules),
         "ui.bath_report" => with(gui, Gui::bath_report),
+        "ui.tiles" => with(gui, |g| {
+            g.tiles();
+            focus(g);
+        }),
         "bcf.from_bath_check" => with(gui, Gui::bath_issues),
         "ui.shower_falls" => with(gui, Gui::shower_falls),
         "ui.waterproofing" => with(gui, Gui::waterproofing),

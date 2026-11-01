@@ -4597,6 +4597,46 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 
 *Built (2026-11-01):* both commands and their ribbon buttons. Not yet: a PDF report, per-room filtering, and closing topics whose findings are gone.
 
+### 3.9a.20 Tile set-out
+**ID:** ARC-BATH-020 · **Priority:** P2 · **Ref:** `BATHROOMS_PLAN.md` §6.6; research/13 F (software observations)
+
+**Purpose.** Set tiles out on walls and floors from a chosen datum, with the full and cut tiles drawn and counted. Tile set-out is weak in other tools: tile is often only a repeated texture.
+
+**Behaviour & rules.**
+- **A tile layout** is an `IfcCovering` that Reviera rebuilds from its recipe, so it follows its host:
+  - CLADDING on a wall's face: along the wall from `from` to `to`, from `bottom` to `top` above its level;
+  - FLOORING on a floor's top: the whole of it, square to its outline's first edge.
+- **Tiles**: `tile` wide and high, with `joint` between them, `thickness` off the surface.
+- **Datum**: `centred` puts a tile on the middle each way, so the cuts at both ends are equal. `corner` starts with a full tile at the start and bottom (on a floor, its first corner); `end_corner` at the end.
+- **Pattern**: `stack` or `half_bond` (each row moved half a tile).
+- **Cutting**: pieces narrower than 10 mm are left out. On a floor, a piece is kept where its middle falls on the floor and outside its holes.
+- **`tile.create`**:
+  - on a wall, `point` gives the side to tile; with no `from`/`to`, the face is tiled between the walls meeting it there;
+  - with only `point` and `level`, it tiles the floor under the point;
+  - defaults: 300 × 600 mm with 3 mm joints on walls, 600 × 600 mm with 5 mm on floors, 12 mm thick, 10 % waste.
+- **Counts**: `tile.summary` gives each layout's full and cut tiles, the tiles to order (every piece takes a tile, then the waste allowance, rounded up) and the area.
+- **Drawing**: the pieces are thin boxes with the joints left open, so full and cut tiles show in plans, elevations (ARC-BATH-018) and 3D.
+- **Overlaps**: a layout is a finish, so the overlap checks pass it with what stands on its wall or floor.
+- **UI**: Architecture › Build › Tiles, then a click on the side of the selected wall, or on a floor. The status bar gives the counts.
+
+**Data (IFC mapping).** `IfcCovering` CLADDING or FLOORING, one faceted B-rep per piece, contained in its level; the recipe as RXD element data (`rxd:tile_layout`).
+
+**Commands.** See the catalog: `tile.create`, `tile.summary`.
+
+**Acceptance criteria.**
+- [x] 300 × 600 mm tiles with 3 mm joints on a 2.4 m face to 1.2 m from its start corner: 7 full and 9 cut, 18 to order with 10 % waste; centred, the end cuts are equal.
+- [x] 600 × 600 mm on a 2.4 × 2.0 m floor from its corner: 9 full, 7 cut.
+- [x] A face found by a point runs between the walls meeting it; a floor is found under a point.
+- [x] Saved and reopened, the counts are the same; layouts sit under their level in the model tree and report no overlaps.
+
+*Built (2026-11-01):* the module, both commands, the IFC writer, the ribbon tool, and tiles in the wet room sample. Not yet:
+- tiles cut round doors, windows and fixtures;
+- floor tiles following a warped (fallen) floor;
+- tile and grout as types with their materials' documents (COL-FE-006);
+- a tile schedule as a schedule element;
+- diagonal (45°) and herringbone patterns;
+- a datum picked by clicking in an elevation.
+
 ### 3.10.1 Model In-Place
 **ID:** ARC-INPL-001 · **Priority:** P1 · **Ref:** research/02 §11.1
 
@@ -5862,6 +5902,8 @@ All commands below are registered once in the command registry and exposed autom
 | `bath.schedules` | sheet_id? | {fixtures, accessories} | Yes | ARC-BATH-018 |
 | `bath.report` | path, title? | {path, errors, notes, rooms} | No | ARC-BATH-019 |
 | `bcf.from_bath_check` | severity?: error\|all, margin?, fields?, author? | {topic_ids, already} | Yes | ARC-BATH-019 |
+| `tile.create` | wall_id? \| floor_id? \| point+level, point?, from?, to?, bottom?, top?, tile?, joint?, thickness?, datum?, pattern?, waste?, tile_name? | ElementId | Yes | ARC-BATH-020 |
+| `tile.summary` | element_ids? | [{element, tile, size, full, cut, to_order, area}] | No | ARC-BATH-020 |
 | `unit.create_type` | room_ids \| element_ids, name, bay? | {type_id, members, left_out} | Yes | ARC-GRP-004 |
 | `unit.set_connection_points` | type_id, points | — | Yes | ARC-GRP-004 |
 | `unit.array_path` | type_id, path, count \| pitch, handing?, numbering? | array_id | Yes | ARC-GRP-004 |
