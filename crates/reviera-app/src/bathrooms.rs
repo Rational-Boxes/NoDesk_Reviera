@@ -302,6 +302,7 @@ pub(crate) fn check(app: &mut App, p: CheckParams) -> Result<Vec<Finding>> {
         out.extend(sauna_findings(store, only.as_deref()));
         out.extend(steam_findings(store, only.as_deref()));
         out.extend(access_findings(store, only.as_deref()));
+        out.extend(receptacle_findings(store, only.as_deref()));
         out.sort_by(|a, b| a.severity.cmp(&b.severity).then(a.element.0.cmp(&b.element.0)));
         Ok(out)
     }
@@ -937,6 +938,90 @@ fn access_findings(store: &reviera_core::Store, only: Option<&[ElementId]>) -> V
             }
             if !fits {
                 out.push(base(format!("The {what} round {} {} has no {} turning space clear of its benches ({})", f.kind.label(), f.element.0, mm(r.turning_diameter), r.id), None, None, Some(r.turning_diameter), None));
+            }
+        }
+    }
+    out
+}
+
+/// US bathroom receptacles (ARC-BATH-021): none near a tub or shower, and in a dwelling one
+/// near each basin once any receptacle is modelled.
+fn receptacle_findings(store: &reviera_core::Store, only: Option<&[ElementId]>) -> Vec<Finding> {
+    use reviera_core::mesh_objects::{self as mo, Category};
+    let packs: Vec<bath_rules::Pack> = bath_rules::active(store).into_iter().filter(|p| p.receptacles.is_some()).collect();
+    if packs.is_empty() {
+        return Vec::new();
+    }
+    // Receptacles: their middle and a label.
+    let sockets: Vec<(ElementId, [f64; 3], String)> = store
+        .iter()
+        .filter(|e| mo::mesh_object_recipe(e).is_some())
+        .filter(|e| mo::type_of(store, e).is_some_and(|(_, t)| t.category == Category::ElectricalFixture && t.predefined_type() == "POWEROUTLET"))
+        .filter_map(|e| {
+            let g = mo::regenerate(store, e).ok()?;
+            let (mut lo, mut hi) = ([f64::MAX; 3], [f64::MIN; 3]);
+            for (_, (pts, _)) in g.slot_meshes() {
+                for q in pts {
+                    for k in 0..3 {
+                        lo[k] = lo[k].min(q[k]);
+                        hi[k] = hi[k].max(q[k]);
+                    }
+                }
+            }
+            let name = e.name.clone().or_else(|| store.get(mo::type_of(store, e)?.0)?.name.clone()).unwrap_or_else(|| e.class.clone());
+            (lo[0] <= hi[0]).then(|| (e.id(), [(lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0, (lo[2] + hi[2]) / 2.0], format!("{name} {}", e.id().0)))
+        })
+        .collect();
+    if sockets.is_empty() {
+        return Vec::new();
+    }
+    let dwelling = reviera_core::codes::settings(store).occupancy == reviera_core::codes::Occupancy::Dwelling;
+    let mut out = Vec::new();
+    for pack in &packs {
+        let r = pack.receptacles.as_ref().expect("filtered");
+        let sev = if pack.layer == Layer::Recommended || r.confidence == Confidence::Advisory { Severity::Note } else { Severity::Error };
+        for f in bath_rules::fixtures(store).iter().filter(|f| !only.is_some_and(|ids| !ids.contains(&f.element))) {
+            let base = |message: String, other: Option<ElementId>, measured: Option<f64>, min: Option<f64>, max: Option<f64>, at: Option<[f64; 3]>| Finding {
+                severity: sev,
+                kind: FindingKind::Electrical,
+                element: f.element,
+                fixture: f.kind,
+                pack: pack.id.clone(),
+                edition: pack.edition.clone(),
+                layer: pack.layer,
+                rule: r.id.clone(),
+                description: r.description.clone(),
+                confidence: r.confidence,
+                source: r.source.clone(),
+                message,
+                other,
+                depth: None,
+                centroid: at,
+                measured,
+                min,
+                max,
+            };
+            let outline = bath_rules::outline(f);
+            let what = format!("{} {}", f.kind.label(), f.element.0);
+            match f.kind {
+                FixtureKind::Bath | FixtureKind::Shower => {
+                    // Up from its rim, or from the floor for a shower with no tray.
+                    let top = store.get(f.element).and_then(|e| mo::regenerate(store, e).ok()).map_or(f.floor, |g| g.placement.origin[2] + g.mesh.positions.iter().map(|q| f64::from(q[2]) * g.placement.scale).fold(f64::MIN, f64::max));
+                    let rim = if bath_rules::level_access(store, f) { f.floor } else { top };
+                    for (id, mid, label) in &sockets {
+                        let d = bath_rules::plan_distance(&outline, [mid[0], mid[1]]);
+                        if d < r.tub_zone - 1e-6 && mid[2] <= rim + r.tub_zone_height + 1e-6 {
+                            out.push(base(format!("{label} is {} from the {what}, within {}'s {} zone", mm(d), r.id, mm(r.tub_zone)), Some(*id), Some(d), Some(r.tub_zone), None, Some(*mid)));
+                        }
+                    }
+                }
+                FixtureKind::Lavatory if dwelling => {
+                    let near = sockets.iter().map(|(_, mid, _)| bath_rules::plan_distance(&outline, [mid[0], mid[1]])).fold(f64::MAX, f64::min);
+                    if near > r.basin_reach + 1e-6 {
+                        out.push(base(format!("No receptacle within {} of the {what} ({}); the nearest is {}", mm(r.basin_reach), r.id, mm(near)), None, Some(near), None, Some(r.basin_reach), None));
+                    }
+                }
+                _ => {}
             }
         }
     }

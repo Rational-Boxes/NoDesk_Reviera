@@ -76,15 +76,15 @@ fn packs_are_chosen_from_the_code_or_by_name() {
     let in_use = |app: &mut App| -> Vec<String> {
         ok(app, "bath.rule_packs", json!({})).as_array().unwrap().iter().filter(|p| p["in_use"] == true).map(|p| p["id"].as_str().unwrap().to_owned()).collect()
     };
-    assert_eq!(in_use(&mut app), ["us_plumbing", "us_spa"], "the IBC by default");
+    assert_eq!(in_use(&mut app), ["us_plumbing", "us_spa", "us_nec"], "the IBC by default");
     ok(&mut app, "code.set", json!({ "code": "irc" }));
     ok(&mut app, "clearance.set_rule_set", json!({ "standard": "ada_2010" }));
-    assert_eq!(in_use(&mut app), ["us_plumbing", "ada_2010", "us_spa"]);
+    assert_eq!(in_use(&mut app), ["us_plumbing", "ada_2010", "us_spa", "us_nec"]);
     ok(&mut app, "bath.set_rule_packs", json!({ "packs": ["us_nkba"] }));
     assert_eq!(in_use(&mut app), ["us_nkba"]);
     assert_eq!(run(&mut app, "bath.set_rule_packs", json!({ "packs": ["nope"] })).unwrap_err().code, "bath.no_pack");
     ok(&mut app, "bath.set_rule_packs", json!({}));
-    assert_eq!(in_use(&mut app), ["us_plumbing", "ada_2010", "us_spa"], "automatic again");
+    assert_eq!(in_use(&mut app), ["us_plumbing", "ada_2010", "us_spa", "us_nec"], "automatic again");
 }
 
 #[test]
@@ -987,4 +987,38 @@ fn tiles_set_out_on_a_wall_and_a_floor() {
     // No overlaps reported for the finishes.
     let o = ok(&mut again, "overlap.find", json!({}));
     assert_eq!(o["overlaps"], json!([]), "{o:#}");
+}
+
+#[test]
+fn nec_bathroom_receptacles() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = new_app(dir.path());
+    // A 5 × 8 ft full bath under the IRC, the lavatory at the far end of the wet wall.
+    let (level, _) = room(&mut app, 1.525, 2.44);
+    ok(&mut app, "code.set", json!({ "code": "irc" }));
+    let out = ok(&mut app, "bath.layout", json!({ "template": "full_bath", "point": [0.76, 1.22], "level": level }));
+    let lav = out["placed"][2].as_u64().unwrap();
+    let nec = |app: &mut App| findings(app).into_iter().filter(|f| f["pack"] == "us_nec").collect::<Vec<_>>();
+    // No receptacles drawn yet: nothing asked.
+    assert_eq!(nec(&mut app), Vec::<Value>::new());
+    // A receptacle by the lavatory, 1.0 m up: fine.
+    let store = app.document(app.active().unwrap()).unwrap().doc.store().clone();
+    let f = reviera_core::bath_rules::fixture(&store, store.get(reviera_core::ElementId(lav)).unwrap()).unwrap();
+    let o = reviera_core::bath_rules::outline(&f);
+    let c = [(o[0][0] + o[2][0]) / 2.0, (o[0][1] + o[2][1]) / 2.0];
+    let s = ok(&mut app, "mep_type.load_starters", json!({ "names": ["Receptacle"] }));
+    let by_lav = ok(&mut app, "device.place", json!({ "type_id": s["Receptacle"], "point": [c[0], c[1]], "level": level, "offset": 1.0, "work_plane": true })).as_u64().unwrap();
+    assert_eq!(nec(&mut app), Vec::<Value>::new());
+    // One 0.3 m in front of the tub's middle, 0.4 m up: inside 406.9(C)'s zone.
+    let tub = reviera_core::bath_rules::fixture(&store, store.get(reviera_core::ElementId(out["placed"][0].as_u64().unwrap())).unwrap()).unwrap();
+    let front = tub.frame.apply([0.0, tub.front - 0.3, 0.0]);
+    let by_tub = ok(&mut app, "device.place", json!({ "type_id": s["Receptacle"], "point": [front[0], front[1]], "level": level, "offset": 0.4, "work_plane": true })).as_u64().unwrap();
+    let f = nec(&mut app);
+    assert!(f.len() == 1 && f[0]["other"] == by_tub, "{f:#?}");
+    // Without the lavatory's receptacle: 210.52(D) asks for one within 3 ft of the basin.
+    ok(&mut app, "element.delete", json!({ "element_ids": [by_lav, by_tub] }));
+    // Across the room from the basin.
+    ok(&mut app, "device.place", json!({ "type_id": s["Receptacle"], "point": [1.525 - c[0], 2.44 - c[1]], "level": level, "offset": 1.0, "work_plane": true }));
+    let f = nec(&mut app);
+    assert!(f.iter().any(|x| x["element"] == lav && x["message"].as_str().unwrap().contains("No receptacle")), "{f:#?}");
 }

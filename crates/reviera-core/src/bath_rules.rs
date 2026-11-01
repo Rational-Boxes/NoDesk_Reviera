@@ -50,6 +50,7 @@ const SHIPPED: &[&str] = &[
     include_str!("../../../schemas/bath/packs/uk_workplace.json"),
     include_str!("../../../schemas/bath/packs/uk_bs7671.json"),
     include_str!("../../../schemas/bath/packs/us_spa.json"),
+    include_str!("../../../schemas/bath/packs/us_nec.json"),
 ];
 
 /// How far either side of a fixture a side wall is looked for.
@@ -339,6 +340,8 @@ pub struct Pack {
     pub spa_access: Option<SpaAccess>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub whirlpool: Option<Whirlpool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub receptacles: Option<Receptacles>,
 }
 
 fn validator() -> &'static jsonschema::Validator {
@@ -417,6 +420,7 @@ pub fn automatic(store: &Store) -> Vec<String> {
         Code::Ibc | Code::Irc => {
             out.push("us_plumbing".to_owned());
             out.push("us_spa".to_owned());
+            out.push("us_nec".to_owned());
         }
         Code::UkAdk => {
             out.push("england_adm".to_owned());
@@ -1995,6 +1999,7 @@ pub fn product_pack() -> Pack {
         steam: None,
         spa_access: None,
         whirlpool: None,
+        receptacles: None,
     }
 }
 
@@ -2155,6 +2160,23 @@ pub fn piece(store: &Store, e: &crate::element::Element, floor: f64) -> Option<P
     Some(Piece { element: e.id(), outline, length: hi[0] - lo[0], depth: hi[1] - lo[1], top: g.placement.origin[2] + hi[2] - floor, end_top: g.placement.origin[2] + end_top - floor })
 }
 
+// ---- US bathroom receptacles (ARC-BATH-021) ----
+
+/// A pack's US-style receptacle rules: none near a tub or shower, one near each basin.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct Receptacles {
+    pub id: String,
+    pub description: String,
+    /// No receptacle within this of a tub's or shower's outside edge in plan, up to
+    /// `tub_zone_height` above its rim or threshold.
+    pub tub_zone: f64,
+    pub tub_zone_height: f64,
+    /// In a dwelling, a receptacle within this of each basin's outside edge.
+    pub basin_reach: f64,
+    pub source: String,
+    pub confidence: Confidence,
+}
+
 // ---- Whirlpool baths (ARC-BATH-017) ----
 
 /// A pack's rule for a whirlpool bath's pump access.
@@ -2217,7 +2239,7 @@ mod tests {
     #[test]
     fn the_shipped_packs_are_valid_and_cite_sources() {
         let register = include_str!("../../../design_documents/SOURCE_REGISTER.md");
-        assert_eq!(shipped().len(), 7);
+        assert_eq!(shipped().len(), 8);
         for p in shipped() {
             let sources = p.zones.iter().map(|z| &z.source).chain(p.distances.iter().map(|d| &d.source)).chain(p.bars.iter().map(|b| &b.source)).chain(p.counts.iter().map(|c| &c.source)).chain(p.electrical.iter().map(|e| &e.source));
             for s in sources {

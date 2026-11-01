@@ -689,6 +689,9 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
 - **Tile set-out** (ARC-BATH-020): tiles on a wall face or a floor from the middle or a corner,
   stack or half bond, drawn with their joints so cuts show in plans and elevations, and counted
   (full, cut, to order with waste) (`tile.create`, `tile.summary`).
+- **US bathroom receptacles** (ARC-BATH-021): a `us_nec` pack with NEC 2023 406.9(C) (no
+  receptacle within 3 ft of a tub or shower, up to 8 ft) and 210.52(D) (one within 3 ft of each
+  basin in a dwelling), checked by Check Bathrooms.
   **Not yet** (planned): living
   layouts that re-fit when the room changes, Jack-and-Jill and back-to-back wet walls,
   other packs' bars (Approved Document M's drop-down rails, shower and bath bars), room layouts, toilet cores and partitions, fixture counts,

@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Reviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Reviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 862 numbered requirements (320 P0 · 328 P1 · 207 P2 · 7 P3), 2,291 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 863 numbered requirements (320 P0 · 329 P1 · 207 P2 · 7 P3), 2,291 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,291 commands; 862 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,291 commands; 863 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -14528,7 +14528,7 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 - [x] A socket 1.5 m from the bath's zone 1 is reported, and one 3 m away is not.
 - [x] A luminaire in zone 1 rated IPX4 passes, one rated IP20 is reported, and one with no rating gets a note.
 
-*Built (2026-10-31):* the `electrical` section of the pack schema, the `uk_bs7671` pack (chosen with England's code), zones as virtual volumes in `clearances::all` (yellow, passed by `clearance.check`), and the device checks in `bath.check`. Not yet: NEC rules for the US (410.10(D) luminaires near tubs, 406.9(C) receptacles; their wording was not read), shaver units and SELV equipment told apart, zones clipped by walls and screens (DIN VDE 0100-701's "string" round a partial wall), and IP ratings in the component catalogue.
+*Built (2026-10-31):* the `electrical` section of the pack schema, the `uk_bs7671` pack (chosen with England's code), zones as virtual volumes in `clearances::all` (yellow, passed by `clearance.check`), and the device checks in `bath.check`. Not yet: NEC luminaire rules for the US (410.10(D), not verified; receptacles are ARC-BATH-021), shaver units and SELV equipment told apart, zones clipped by walls and screens (DIN VDE 0100-701's "string" round a partial wall), and IP ratings in the component catalogue.
 
 ### 3.9a.11 Shower falls
 **ID:** ARC-BATH-011 · **Priority:** P1 · **Ref:** `BATHROOMS_PLAN.md` §6.5; research/13 A4, A9
@@ -14860,6 +14860,39 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 - a tile schedule as a schedule element;
 - diagonal (45°) and herringbone patterns;
 - a datum picked by clicking in an elevation.
+
+### 3.9a.21 US bathroom receptacles
+**ID:** ARC-BATH-021 · **Priority:** P1 · **Ref:** `BATHROOMS_PLAN.md` §6.5; research/13 A6.1
+
+**Purpose.** Check bathroom receptacles under the NEC as ARC-BATH-010 checks BS 7671's zones.
+
+**Behaviour & rules.**
+- **Rules.** A pack's `receptacles` section gives:
+  - a zone round tubs and showers kept free of receptacles: in plan from the outside edge, and up from the rim, or the threshold;
+  - in a dwelling, the reach within which each basin has a receptacle.
+- **Pack.** `us_nec` (layer code; chosen with the IBC and IRC) carries NEC 2023 from trade summaries (secondary):
+  - 406.9(C): no receptacle within 3 ft (900 mm) of a tub's or shower's outside edge, up to 8 ft (2.5 m) above its rim or threshold;
+  - 210.52(D): one receptacle within 3 ft of each basin.
+- **Checks** in `bath.check`, of kind `electrical`:
+  - a receptacle in the zone;
+  - in a dwelling, a basin with no receptacle within reach. This is asked only once any receptacle is modelled, so a model without its electrical layout yet is not flagged at every basin.
+  
+  The rim is the fixture's top. For a level-access shower it is the floor.
+
+**Data (IFC mapping).** Receptacles are `IfcOutlet` POWEROUTLET (MEP-ELEC); nothing new is stored.
+
+**Commands.** `bath.check` (extended).
+
+**Acceptance criteria.**
+- [x] Under the IRC, a 5 × 8 ft bath with no receptacles has no NEC findings; with one by the basin, none; with one 300 mm in front of the tub, 400 mm up, that one is reported.
+- [x] With the only receptacle across the room from the basin, the basin is reported.
+
+*Built (2026-11-01):* the pack, the schema section and the checks. Not yet:
+- the zone cut by walls, doors and fixed barriers;
+- 406.9(C)'s exceptions;
+- GFCI protection (210.8) and the 20 A bathroom circuit (210.11(C)(3)) checked on circuits (MEP-ELEC);
+- the luminaire and switch rules (410.10(D), 404.4(C)), whose wording was not verified;
+- NKBA's 39 in recommendation as a guidance layer.
 
 ### 3.10.1 Model In-Place
 **ID:** ARC-INPL-001 · **Priority:** P1 · **Ref:** research/02 §11.1
@@ -29269,14 +29302,14 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 39 | 8 | 0 | 123 |
 | DM | 91 | 65 | 34 | 3 | 193 |
-| ARC | 77 | 88 | 20 | 1 | 186 |
+| ARC | 77 | 89 | 20 | 1 | 187 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 28 | 0 | 29 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
 | COL | 8 | 50 | 11 | 1 | 70 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **328** | **207** | **7** | **862** |
+| **Total** | **320** | **329** | **207** | **7** | **863** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 

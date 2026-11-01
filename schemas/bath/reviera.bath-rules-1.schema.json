@@ -36,7 +36,8 @@
     "sauna": {"$ref": "#/$defs/sauna"},
     "steam": {"$ref": "#/$defs/steam"},
     "spa_access": {"$ref": "#/$defs/spa_access"},
-    "whirlpool": {"$ref": "#/$defs/whirlpool"}
+    "whirlpool": {"$ref": "#/$defs/whirlpool"},
+    "receptacles": {"$ref": "#/$defs/receptacles"}
   },
   "$defs": {
     "fixture": {"enum": ["water_closet", "urinal", "lavatory", "bidet", "bath", "shower", "locker", "bench", "spa", "sauna_heater", "steam_head"]},
@@ -446,6 +447,21 @@
         "description": {"type": "string", "minLength": 1},
         "opening": {"type": "number", "exclusiveMinimum": 0, "description": "The opening's least width and height (metres)."},
         "clear_depth": {"type": "number", "exclusiveMinimum": 0, "description": "Kept clear in front of it (metres)."},
+        "source": {"type": "string", "pattern": "^S[0-9]{4}( S[0-9]{4})*$"},
+        "confidence": {"enum": ["verified", "secondary", "advisory"]}
+      }
+    },
+    "receptacles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description", "tub_zone", "tub_zone_height", "basin_reach", "source", "confidence"],
+      "description": "US-style receptacle rules: none near a tub or shower, and one near each basin.",
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "description": {"type": "string", "minLength": 1},
+        "tub_zone": {"type": "number", "minimum": 0, "description": "No receptacle within this of a tub's or shower's outside edge (metres, in plan)."},
+        "tub_zone_height": {"type": "number", "minimum": 0, "description": "... up to this above its rim or threshold."},
+        "basin_reach": {"type": "number", "minimum": 0, "description": "In a dwelling, a receptacle within this of each basin's outside edge."},
         "source": {"type": "string", "pattern": "^S[0-9]{4}( S[0-9]{4})*$"},
         "confidence": {"enum": ["verified", "secondary", "advisory"]}
       }

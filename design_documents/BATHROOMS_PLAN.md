@@ -10,7 +10,7 @@ zones (ARC-BATH-010), shower falls (ARC-BATH-011) and waterproofing extents (ARC
 all of §7: hot tubs (ARC-BATH-013), saunas (ARC-BATH-014), steam rooms (ARC-BATH-015), their
 accessibility (ARC-BATH-016) and whirlpool baths (ARC-BATH-017), with samples; and from §9 wall
 elevations and schedules (ARC-BATH-018), the compliance report (ARC-BATH-019) and tile set-out
-(ARC-BATH-020): every step of §10 has a first build. What is left is listed under each
+(ARC-BATH-020): every step of §10 has a first build; US receptacles followed (ARC-BATH-021). What is left is listed under each
 requirement's *Not yet*.
 **Owner's requests (2026-10-31):**
 - "deeper research into bathroom features, standards, and common components";
