@@ -1,0 +1,21 @@
+{
+  "format": "reviera.bath-rules-1",
+  "id": "uk_bs7671",
+  "title": "BS 7671 Section 701: locations containing a bath or shower",
+  "jurisdiction": "UK",
+  "edition": "BS 7671:2018+A2:2022 Section 701 (IEC 60364-7-701), from the SELECT pocket guide (secondary)",
+  "layer": "minimum",
+  "notes": "The standard is paywalled; values are from a public summary. The 17th edition asked for sockets 3 m from zone 1; the 18th asks 2.5 m. Shaver supply units (BS EN 61558-2-5) and SELV equipment are allowed in zone 2 and are not yet told apart.",
+  "electrical": {
+    "id": "BS 7671 701",
+    "description": "Zone 0 inside the bath or tray (0.10 m high for a shower without a tray), zone 1 above it to 2.25 m (or within 1.2 m of a trayless shower's head), zone 2 a further 0.6 m out; sockets at least 2.5 m from zone 1; IPX7 in zone 0 and IPX4 in zones 1 and 2",
+    "zone0_trayless_height": 0.1,
+    "zone1_height": 2.25,
+    "trayless_radius": 1.2,
+    "zone2_width": 0.6,
+    "socket_distance": 2.5,
+    "ip": {"zone0": "IPX7", "zone1": "IPX4", "zone2": "IPX4"},
+    "source": "S0918 S0919",
+    "confidence": "secondary"
+  }
+}

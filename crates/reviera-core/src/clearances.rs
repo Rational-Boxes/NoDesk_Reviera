@@ -67,6 +67,8 @@ pub enum ClearanceKind {
     SlideSpace,
     /// A bathroom fixture's clearance zone (ARC-BATH-002).
     FixtureSpace,
+    /// A bath's or shower's electrical zone (ARC-BATH-010): shown, not kept clear.
+    ElectricalZone,
 }
 
 impl ClearanceKind {
@@ -78,6 +80,7 @@ impl ClearanceKind {
             Self::PushSide => "Clearance:push_side/3d",
             Self::SlideSpace => "Clearance:slide_space/3d",
             Self::FixtureSpace => "Clearance:fixture_space/3d",
+            Self::ElectricalZone => "Clearance:electrical_zone/3d",
         }
     }
 
@@ -88,6 +91,7 @@ impl ClearanceKind {
             Self::PushSide => "push-side clearance",
             Self::SlideSpace => "slide space",
             Self::FixtureSpace => "fixture clear space",
+            Self::ElectricalZone => "electrical zone",
         }
     }
 }
@@ -258,6 +262,13 @@ pub fn all(store: &Store) -> Vec<Clearance> {
         .flat_map(|p| of_door(p, rules))
         .collect();
     out.extend(crate::bath_rules::spaces(store).into_iter().map(|s| s.clearance));
+    out.extend(crate::bath_rules::electrical_zones(store).into_iter().map(|z| Clearance {
+        element: z.element,
+        kind: ClearanceKind::ElectricalZone,
+        rule: format!("{} zone {}", z.pack, z.zone),
+        mesh: z.mesh(),
+        door_swing_forbidden: false,
+    }));
     out
 }
 

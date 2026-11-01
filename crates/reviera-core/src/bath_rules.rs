@@ -48,6 +48,7 @@ const SHIPPED: &[&str] = &[
     include_str!("../../../schemas/bath/packs/ada_2010.json"),
     include_str!("../../../schemas/bath/packs/england_adm.json"),
     include_str!("../../../schemas/bath/packs/uk_workplace.json"),
+    include_str!("../../../schemas/bath/packs/uk_bs7671.json"),
 ];
 
 /// How far either side of a fixture a side wall is looked for.
@@ -309,6 +310,8 @@ pub struct Pack {
     pub bars: Vec<Bar>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub counts: Vec<Count>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub electrical: Option<Electrical>,
 }
 
 fn validator() -> &'static jsonschema::Validator {
@@ -385,7 +388,10 @@ pub fn automatic(store: &Store) -> Vec<String> {
     let mut out = Vec::new();
     match crate::codes::settings(store).code {
         Code::Ibc | Code::Irc => out.push("us_plumbing".to_owned()),
-        Code::UkAdk => out.push("england_adm".to_owned()),
+        Code::UkAdk => {
+            out.push("england_adm".to_owned());
+            out.push("uk_bs7671".to_owned());
+        }
         _ => {}
     }
     if crate::clearances::rule_set(store) == crate::clearances::RuleSet::Ada2010 {
@@ -965,6 +971,161 @@ pub(crate) fn fixture_count(store: &Store, p: CountParams) -> Result<Counted> {
     Ok(Counted { pack: pack.id.clone(), row: row.id.clone(), description: row.description.clone(), source: row.source.clone(), needs, urinals_may_replace })
 }
 
+
+// ---- Electrical zones (ARC-BATH-010) ----
+
+/// IP ratings each zone needs.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ZoneIp {
+    pub zone0: String,
+    pub zone1: String,
+    pub zone2: String,
+}
+
+/// A pack's bathroom electrical zones (BS 7671 Section 701 / IEC 60364-7-701).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct Electrical {
+    pub id: String,
+    pub description: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub zone0_trayless_height: Option<f64>,
+    pub zone1_height: f64,
+    pub trayless_radius: f64,
+    pub zone2_width: f64,
+    pub socket_distance: f64,
+    pub ip: ZoneIp,
+    pub source: String,
+    pub confidence: Confidence,
+}
+
+/// One zone round one fixture: its plan outline and height.
+#[derive(Debug, Clone)]
+pub struct ElectricalZone {
+    pub element: ElementId,
+    /// 0, 1 or 2.
+    pub zone: u8,
+    pub outline: Vec<[f64; 2]>,
+    pub z0: f64,
+    pub z1: f64,
+    pub pack: String,
+}
+
+impl ElectricalZone {
+    pub fn contains(&self, p: [f64; 3]) -> bool {
+        p[2] >= self.z0 - 1e-6 && p[2] <= self.z1 + 1e-6 && inside(&self.outline, [p[0], p[1]])
+    }
+
+    pub fn mesh(&self) -> Mesh {
+        extrude(&self.outline, &[], self.z0, self.z1)
+    }
+}
+
+/// Point in polygon (even-odd).
+fn inside(poly: &[[f64; 2]], p: [f64; 2]) -> bool {
+    let mut c = false;
+    let n = poly.len();
+    for i in 0..n {
+        let (a, b) = (poly[i], poly[(i + 1) % n]);
+        if (a[1] > p[1]) != (b[1] > p[1]) && p[0] < (b[0] - a[0]) * (p[1] - a[1]) / (b[1] - a[1]) + a[0] {
+            c = !c;
+        }
+    }
+    c
+}
+
+/// The distance in plan from a point to a polygon's boundary (0 inside).
+pub fn plan_distance(poly: &[[f64; 2]], p: [f64; 2]) -> f64 {
+    if inside(poly, p) {
+        return 0.0;
+    }
+    let n = poly.len();
+    (0..n)
+        .map(|i| {
+            let (a, b) = (poly[i], poly[(i + 1) % n]);
+            let d = [b[0] - a[0], b[1] - a[1]];
+            let l2 = (d[0] * d[0] + d[1] * d[1]).max(1e-18);
+            let t = (((p[0] - a[0]) * d[0] + (p[1] - a[1]) * d[1]) / l2).clamp(0.0, 1.0);
+            (p[0] - a[0] - d[0] * t).hypot(p[1] - a[1] - d[1] * t)
+        })
+        .fold(f64::MAX, f64::min)
+}
+
+/// A rectangle in a fixture's frame, `grow` larger each way, in plan.
+fn rect(f: &Fixture, x: [f64; 2], y: [f64; 2], grow: f64) -> Vec<[f64; 2]> {
+    [[x[0] - grow, y[0] - grow], [x[1] + grow, y[0] - grow], [x[1] + grow, y[1] + grow], [x[0] - grow, y[1] + grow]]
+        .iter()
+        .map(|q| {
+            let w = f.frame.apply([q[0], q[1], 0.0]);
+            [w[0], w[1]]
+        })
+        .collect()
+}
+
+fn circle(c: [f64; 2], r: f64) -> Vec<[f64; 2]> {
+    (0..32).map(|k| {
+        let a = std::f64::consts::TAU * f64::from(k) / 32.0;
+        [c[0] + r * a.cos(), c[1] + r * a.sin()]
+    }).collect()
+}
+
+/// The zones round one bath or shower under a pack's rules.
+pub fn electrical_zones_of(store: &Store, f: &Fixture, pack: &Pack) -> Vec<ElectricalZone> {
+    let Some(e) = &pack.electrical else { return Vec::new() };
+    if !matches!(f.kind, FixtureKind::Bath | FixtureKind::Shower) {
+        return Vec::new();
+    }
+    let Some(el) = store.get(f.element) else { return Vec::new() };
+    let Ok(g) = crate::mesh_objects::regenerate(store, el) else { return Vec::new() };
+    let s = g.placement.scale;
+    let (zmin, zmax) = g.mesh.positions.iter().fold((f64::MAX, f64::MIN), |(a, b), q| (a.min(f64::from(q[2]) * s), b.max(f64::from(q[2]) * s)));
+    let base = g.placement.origin[2];
+    let (lo, hi) = (base + zmin, base + zmax);
+    let top = f.floor + e.zone1_height.max(hi - f.floor);
+    let zone = |zone: u8, outline: Vec<[f64; 2]>, z0: f64, z1: f64| ElectricalZone { element: f.element, zone, outline, z0, z1, pack: pack.id.clone() };
+    // A shower with no tray: a wall-mounted head or a level former under 20 mm.
+    let trayless = f.kind == FixtureKind::Shower && (lo > f.floor + 0.3 || hi - f.floor < 0.02);
+    if trayless {
+        let head = f.frame.apply([0.0, f.back, 0.0]);
+        let r = e.trayless_radius;
+        vec![
+            zone(0, circle([head[0], head[1]], r), f.floor, f.floor + e.zone0_trayless_height.unwrap_or(0.1)),
+            zone(1, circle([head[0], head[1]], r), f.floor, top),
+        ]
+    } else {
+        let (x, y) = (f.x, [f.front, f.back]);
+        vec![
+            zone(0, rect(f, x, y, 0.0), f.floor, hi),
+            zone(1, rect(f, x, y, 0.0), f.floor, top),
+            zone(2, rect(f, x, y, e.zone2_width), f.floor, f.floor + e.zone1_height),
+        ]
+    }
+}
+
+/// Every electrical zone under the packs in use.
+pub fn electrical_zones(store: &Store) -> Vec<ElectricalZone> {
+    let packs: Vec<Pack> = active(store).into_iter().filter(|p| p.electrical.is_some()).collect();
+    if packs.is_empty() {
+        return Vec::new();
+    }
+    fixtures(store).iter().flat_map(|f| packs.iter().flat_map(|p| electrical_zones_of(store, f, p))).collect()
+}
+
+/// An IP code's water figure (IPX4 → 4), if it has one.
+pub fn ip_water(code: &str) -> Option<u8> {
+    let c = code.trim().to_ascii_uppercase();
+    let rest = c.strip_prefix("IP")?;
+    rest.chars().nth(1)?.to_digit(10).map(|d| d as u8)
+}
+
+/// A device's IP code: `Pset_ElectricalDeviceCommon.IP_Code` on it or its type.
+pub fn device_ip(store: &Store, e: &crate::element::Element) -> Option<String> {
+    let read = |x: &crate::element::Element| {
+        let v = x.param("Pset_ElectricalDeviceCommon.IP_Code")?;
+        v.as_str().map(str::to_owned).or_else(|| v.get("value")?.as_str().map(str::to_owned))
+    };
+    read(e).or_else(|| crate::mesh_objects::type_of(store, e).and_then(|(t, _)| read(store.get(t)?)))
+}
+
 // ---- Commands ----
 
 fn project_id(txn: &Transaction<'_>) -> Result<ElementId> {
@@ -1203,9 +1364,9 @@ mod tests {
     #[test]
     fn the_shipped_packs_are_valid_and_cite_sources() {
         let register = include_str!("../../../design_documents/SOURCE_REGISTER.md");
-        assert_eq!(shipped().len(), 5);
+        assert_eq!(shipped().len(), 6);
         for p in shipped() {
-            let sources = p.zones.iter().map(|z| &z.source).chain(p.distances.iter().map(|d| &d.source)).chain(p.bars.iter().map(|b| &b.source)).chain(p.counts.iter().map(|c| &c.source));
+            let sources = p.zones.iter().map(|z| &z.source).chain(p.distances.iter().map(|d| &d.source)).chain(p.bars.iter().map(|b| &b.source)).chain(p.counts.iter().map(|c| &c.source)).chain(p.electrical.iter().map(|e| &e.source));
             for s in sources {
                 for id in s.split(' ') {
                     assert!(register.contains(&format!("| {id} |")), "{}: {id} is not in the source register", p.id);

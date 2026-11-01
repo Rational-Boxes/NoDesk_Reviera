@@ -4279,9 +4279,31 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 
 *Built (2026-10-31):* the five components, `locker` and `bench` fixture kinds (from the furniture's ObjectType), the ADA 811.3 and 903.2 zones and Approved Document M §5.18 zone in the packs, `bath.locker_room` (in `reviera_core::bath_layouts`), and Architecture › Build › Locker Room (its numbers, then a click in a plan). Defaults are E-68 in `EXPERT_REVIEW.md`. Not yet: individual shower cubicles and the accessible shower room, the drying area's towel rails, grooming counters, lobbies and screens against sightlines, pool changing villages, team rooms, and lockers in island runs.
 
----
+### 3.9a.10 Bathroom electrical zones
+**ID:** ARC-BATH-010 · **Priority:** P1 · **Ref:** `BATHROOMS_PLAN.md` §6.5; research/13 A6.2
 
-## 3.10 In-place models, model text and model lines
+**Purpose.** Show the zones round baths and showers where electrical equipment is restricted, and say which sockets, switches, lights, fans and heaters are in the wrong place or not rated for where they are.
+
+**Behaviour & rules.**
+- **Zone rules** are part of a rule pack (`electrical`): the zone 1 height, the radius of zone 1 round a shower without a tray, zone 2's width, the least horizontal distance from zone 1 to a socket outlet, and the IP rating each zone needs. A new pack `uk_bs7671` holds BS 7671 Section 701 (IEC 60364-7-701), from a public summary of the 18th edition (secondary): zone 0 inside the bath or tray (0.10 m high for a shower without a tray, IPX7); zone 1 above the bath or tray to 2.25 m or the highest fixed head, or within 1.2 m of the head of a shower without a tray (IPX4); zone 2 a further 0.6 m out, to 2.25 m (IPX4); sockets at least 2.5 m from zone 1 (the 17th edition said 3 m; the value is the pack's). It is chosen automatically with England's building code.
+- **Zones** are virtual volumes (ARC-MOD-031, kind *electrical zone*, shown in yellow) of each bath and shower: their footprints from the fixture's own (a shower head with no tray: the circle round the head). They are not clear spaces: walls and fixtures may stand in them, so `clearance.check` passes them by.
+- **Devices** are the components of the electrical categories (receptacles and outlets, switches, luminaires, fans, space heaters, electric appliances). A device's zone is the innermost zone its middle lies in. Its rating is `Pset_ElectricalDeviceCommon.IP_Code` on the device or its type (IP44, IPX4, …).
+- **`bath.check`** reports:
+  - a socket outlet (POWEROUTLET) in zone 0, 1 or 2, or nearer zone 1 in plan than the pack's distance: an error;
+  - any other device in a zone whose IP rating's second figure is below the zone's: an error; with no rating given: a note asking for one.
+  
+  Shaver supply units and SELV equipment, which the standard allows in zone 2, are not told apart yet; they are reported, to be accepted as intended.
+
+**Data (IFC mapping).** Zones are not exported (ARC-MOD-031). IP ratings are `Pset_ElectricalDeviceCommon.IP_Code`.
+
+**Commands.** `bath.check` and `clearance.list` (extended).
+
+**Acceptance criteria.**
+- [x] Under `uk_bs7671`, a bath has zones 0, 1 (to 2.25 m) and 2 (0.6 m beyond), and a level shower's head a 1.2 m zone 1.
+- [x] A socket 1.5 m from the bath's zone 1 is reported, and one 3 m away is not.
+- [x] A luminaire in zone 1 rated IPX4 passes, one rated IP20 is reported, and one with no rating gets a note.
+
+*Built (2026-10-31):* the `electrical` section of the pack schema, the `uk_bs7671` pack (chosen with England's code), zones as virtual volumes in `clearances::all` (yellow, passed by `clearance.check`), and the device checks in `bath.check`. Not yet: NEC rules for the US (410.10(D) luminaires near tubs, 406.9(C) receptacles; their wording was not read), shaver units and SELV equipment told apart, zones clipped by walls and screens (DIN VDE 0100-701's "string" round a partial wall), and IP ratings in the component catalogue.
 
 ### 3.10.1 Model In-Place
 **ID:** ARC-INPL-001 · **Priority:** P1 · **Ref:** research/02 §11.1

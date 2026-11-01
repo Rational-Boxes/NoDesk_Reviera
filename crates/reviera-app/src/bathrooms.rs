@@ -46,6 +46,8 @@ pub enum FindingKind {
     MissingBar,
     /// A grab bar out of its rule's range: its stretch, length, height, diameter or gap.
     Bar,
+    /// Electrical equipment where a bathroom's electrical zones do not allow it (ARC-BATH-010).
+    Electrical,
 }
 
 /// One thing the check found.
@@ -282,6 +284,7 @@ pub(crate) fn check(app: &mut App, p: CheckParams) -> Result<Vec<Finding>> {
                 }
             }
         }
+        out.extend(electrical_findings(store, only.as_deref()));
         out.sort_by(|a, b| a.severity.cmp(&b.severity).then(a.element.0.cmp(&b.element.0)));
         Ok(out)
     }
@@ -390,3 +393,100 @@ impl HostCommand for BathSwapProduct {
             .collect())
     }
 }
+
+/// Electrical devices in bathrooms' electrical zones, or sockets too near them (ARC-BATH-010).
+fn electrical_findings(store: &reviera_core::Store, only: Option<&[ElementId]>) -> Vec<Finding> {
+    use reviera_core::mesh_objects::{self as mo, Category};
+    let zones = bath_rules::electrical_zones(store);
+    if zones.is_empty() {
+        return Vec::new();
+    }
+    let packs = bath_rules::active(store);
+    let fixtures = bath_rules::fixtures(store);
+    let mut out = Vec::new();
+    for e in store.iter().filter(|e| mo::mesh_object_recipe(e).is_some()) {
+        let Some((_, ty)) = mo::type_of(store, e) else { continue };
+        let electrical = ty.category.is_electrical_device() || matches!(ty.category, Category::LightingFixture | Category::Fan | Category::SpaceHeater | Category::ElectricAppliance);
+        if !electrical {
+            continue;
+        }
+        let Ok(g) = mo::regenerate(store, e) else { continue };
+        let (mut lo, mut hi) = ([f64::MAX; 3], [f64::MIN; 3]);
+        for (_, (pts, _)) in g.slot_meshes() {
+            for q in pts {
+                for k in 0..3 {
+                    lo[k] = lo[k].min(q[k]);
+                    hi[k] = hi[k].max(q[k]);
+                }
+            }
+        }
+        if lo[0] > hi[0] {
+            continue;
+        }
+        let mid = [(lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0, (lo[2] + hi[2]) / 2.0];
+        let socket = ty.category == Category::ElectricalFixture && ty.predefined_type() == "POWEROUTLET";
+        let name = e.name.clone().or_else(|| mo::type_of(store, e).and_then(|(t, _)| store.get(t)?.name.clone())).unwrap_or_else(|| e.class.clone());
+        let label = format!("{name} {}", e.id().0);
+        for pack in packs.iter().filter(|p| p.electrical.is_some()) {
+            let rules = pack.electrical.as_ref().expect("filtered");
+            // Per fixture: the innermost zone the device's middle is in.
+            for f in &fixtures {
+                if only.is_some_and(|ids| !ids.contains(&f.element)) {
+                    continue;
+                }
+                let mine: Vec<&bath_rules::ElectricalZone> = zones.iter().filter(|z| z.element == f.element && z.pack == pack.id).collect();
+                let Some(zone1) = mine.iter().find(|z| z.zone == 1) else { continue };
+                let inner = mine.iter().filter(|z| z.contains(mid)).map(|z| z.zone).min();
+                let fixture_label = store.get(f.element).and_then(|x| mo::type_of(store, x)).and_then(|(t, _)| store.get(t)?.name.clone()).unwrap_or_default();
+                let base = |message: String, severity: Severity| Finding {
+                    severity,
+                    kind: FindingKind::Electrical,
+                    element: f.element,
+                    fixture: f.kind,
+                    pack: pack.id.clone(),
+                    edition: pack.edition.clone(),
+                    layer: pack.layer,
+                    rule: rules.id.clone(),
+                    description: rules.description.clone(),
+                    confidence: rules.confidence,
+                    source: rules.source.clone(),
+                    message,
+                    other: Some(e.id()),
+                    depth: None,
+                    centroid: Some(mid),
+                    measured: None,
+                    min: None,
+                    max: None,
+                };
+                let sev = if pack.layer == Layer::Recommended || rules.confidence == Confidence::Advisory { Severity::Note } else { Severity::Error };
+                if socket {
+                    if let Some(z) = inner {
+                        out.push(base(format!("{label} is a socket outlet in zone {z} of {fixture_label} {}", f.element.0), sev));
+                    } else {
+                        let d = bath_rules::plan_distance(&zone1.outline, [mid[0], mid[1]]);
+                        if d < rules.socket_distance - 1e-6 {
+                            out.push(Finding { measured: Some(d), min: Some(rules.socket_distance), ..base(format!("{label} is a socket outlet {} from zone 1 of {fixture_label} {}; {} asks for at least {}", mm(d), f.element.0, rules.id, mm(rules.socket_distance)), sev) });
+                        }
+                    }
+                    continue;
+                }
+                let Some(z) = inner else { continue };
+                let need = match z {
+                    0 => &rules.ip.zone0,
+                    1 => &rules.ip.zone1,
+                    _ => &rules.ip.zone2,
+                };
+                match bath_rules::device_ip(store, e) {
+                    None => out.push(base(format!("{label} is in zone {z} of {fixture_label} {} and has no IP rating; the zone needs {need} (Pset_ElectricalDeviceCommon.IP_Code)", f.element.0), Severity::Note)),
+                    Some(ip) => {
+                        if bath_rules::ip_water(&ip).unwrap_or(0) < bath_rules::ip_water(need).unwrap_or(0) {
+                            out.push(base(format!("{label} ({ip}) is in zone {z} of {fixture_label} {}, which needs {need}", f.element.0), sev));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+

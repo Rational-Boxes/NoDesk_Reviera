@@ -647,6 +647,10 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
   down the middle with the aisles the packs ask for, gang showers along one end and an
   accessible bench, keeping 5 % of the lockers accessible; lockers and benches have their ADA
   and Approved Document M clear spaces (`bath.locker_room`).
+- **Bathroom electrical zones** (ARC-BATH-010): BS 7671 Section 701 zones 0, 1 and 2 round baths
+  and showers (a new `uk_bs7671` pack), shown as virtual volumes; Check Bathrooms reports sockets
+  in the zones or within 2.5 m of zone 1, and devices whose IP rating
+  (`Pset_ElectricalDeviceCommon.IP_Code`) is below their zone's.
   **Not yet** (planned): living
   layouts that re-fit when the room changes, Jack-and-Jill and back-to-back wet walls,
   other packs' bars (Approved Document M's drop-down rails, shower and bath bars), room layouts, toilet cores and partitions, fixture counts,

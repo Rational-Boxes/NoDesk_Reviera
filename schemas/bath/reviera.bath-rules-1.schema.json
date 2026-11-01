@@ -28,7 +28,8 @@
     "zones": {"type": "array", "items": {"$ref": "#/$defs/zone"}},
     "distances": {"type": "array", "items": {"$ref": "#/$defs/distance"}},
     "bars": {"type": "array", "items": {"$ref": "#/$defs/bar"}},
-    "counts": {"type": "array", "items": {"$ref": "#/$defs/count"}}
+    "counts": {"type": "array", "items": {"$ref": "#/$defs/count"}},
+    "electrical": {"$ref": "#/$defs/electrical"}
   },
   "$defs": {
     "fixture": {"enum": ["water_closet", "urinal", "lavatory", "bidet", "bath", "shower", "locker", "bench"]},
@@ -234,6 +235,63 @@
           "description": "With a table: one more fixture per so many people (or part) beyond its last row; without it, the last row's count holds beyond it."
         },
         "minimum": {"type": "integer", "minimum": 0}
+      }
+    },
+    "electrical": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "description",
+        "zone1_height",
+        "trayless_radius",
+        "zone2_width",
+        "socket_distance",
+        "ip",
+        "source",
+        "confidence"
+      ],
+      "description": "Zones round baths and showers where electrical equipment is restricted (BS 7671 Section 701 / IEC 60364-7-701).",
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "description": {"type": "string", "minLength": 1},
+        "zone0_trayless_height": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Zone 0's height for a shower without a tray (default 0.10 m)."
+        },
+        "zone1_height": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Zone 1's height above the floor, or the highest fixed shower head if higher."
+        },
+        "trayless_radius": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Zone 1's radius round the head of a shower without a tray."
+        },
+        "zone2_width": {
+          "type": "number",
+          "minimum": 0,
+          "description": "How far zone 2 reaches beyond zone 1, horizontally."
+        },
+        "socket_distance": {
+          "type": "number",
+          "minimum": 0,
+          "description": "The least horizontal distance from zone 1 to a socket outlet."
+        },
+        "ip": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["zone0", "zone1", "zone2"],
+          "properties": {
+            "zone0": {"type": "string", "pattern": "^IP[0-9X][0-9X]$"},
+            "zone1": {"type": "string", "pattern": "^IP[0-9X][0-9X]$"},
+            "zone2": {"type": "string", "pattern": "^IP[0-9X][0-9X]$"}
+          }
+        },
+        "source": {"type": "string", "pattern": "^S[0-9]{4}( S[0-9]{4})*$"},
+        "confidence": {"enum": ["verified", "secondary", "advisory"]}
       }
     }
   }

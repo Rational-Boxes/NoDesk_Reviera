@@ -565,3 +565,45 @@ fn a_locker_room_too_narrow_for_approved_document_m() {
     assert_eq!(e.code, "bath.no_fit");
     assert!((e.details["depth_needed"].as_f64().unwrap() - 4.219).abs() < 0.001, "{}", e.details);
 }
+
+#[test]
+fn bathroom_electrical_zones() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = new_app(dir.path());
+    // A 4 × 3 m bathroom with a bath along its south wall, under England's code (BS 7671 701).
+    let (level, _) = room(&mut app, 4.0, 3.0);
+    ok(&mut app, "code.set", json!({ "code": "uk_adk", "occupancy": "dwelling" }));
+    let t = ok(&mut app, "bath.load_components", json!({ "names": ["Bath, 1700 × 700", "Shower head, gang"] }));
+    let bath = ok(&mut app, "bath.place_component", json!({ "type_id": t["Bath, 1700 × 700"], "point": [1.0, 0.1], "level": level })).as_u64().unwrap();
+    let list = ok(&mut app, "clearance.list", json!({ "element_ids": [bath] }));
+    let zone = |rule: &str| -> Value { list.as_array().unwrap().iter().find(|c| c["kind"] == "electrical_zone" && c["rule"] == rule).cloned().unwrap_or_else(|| panic!("{list:#}")) };
+    assert!((zone("uk_bs7671 zone 1")["max"][2].as_f64().unwrap() - 2.25).abs() < 0.01);
+    let (z1, z2) = (zone("uk_bs7671 zone 1"), zone("uk_bs7671 zone 2"));
+    assert!((z1["min"][0].as_f64().unwrap() - z2["min"][0].as_f64().unwrap() - 0.6).abs() < 0.01, "zone 2 reaches 0.6 m beyond zone 1");
+    // A gang shower head on the north wall: a 1.2 m zone 1 round it.
+    let head = ok(&mut app, "bath.place_component", json!({ "type_id": t["Shower head, gang"], "point": [3.0, 2.9], "level": level })).as_u64().unwrap();
+    let hz = ok(&mut app, "clearance.list", json!({ "element_ids": [head] }));
+    let r = hz.as_array().unwrap().iter().find(|c| c["rule"] == "uk_bs7671 zone 1").unwrap();
+    assert!((r["max"][0].as_f64().unwrap() - r["min"][0].as_f64().unwrap() - 2.4).abs() < 0.02, "{r}");
+    // Electrical zones are not clear spaces.
+    let c = ok(&mut app, "clearance.check", json!({ "element_ids": [bath] }));
+    assert!(c.as_array().unwrap().iter().all(|i| i["kind"] != "electrical_zone"));
+    ok(&mut app, "element.delete", json!({ "element_ids": [head] }));
+
+    let starters = ok(&mut app, "mep_type.load_starters", json!({ "names": ["Receptacle", "Wall Luminaire"] }));
+    // A socket on the east wall 1.5 m from the bath's zone 1 (its end at x ≈ 1.85): reported.
+    let near = ok(&mut app, "device.place", json!({ "type_id": starters["Receptacle"], "point": [3.35, 1.0], "level": level, "offset": 0.4, "work_plane": true })).as_u64().unwrap();
+    let f = findings(&mut app);
+    assert!(f.iter().any(|x| x["kind"] == "electrical" && x["other"] == near && x["message"].as_str().unwrap().contains("socket outlet")), "{f:#?}");
+    ok(&mut app, "element.move", json!({ "element_ids": [near], "vector": [0.6, 1.4, 0.0] }));
+    let f = findings(&mut app);
+    assert!(!f.iter().any(|x| x["other"] == near), "3 m away: {f:#?}");
+    // A luminaire over the bath in zone 1: no rating → a note; IP20 → an error; IPX4 → fine.
+    let lum = ok(&mut app, "lighting_fixture.place", json!({ "type_id": starters["Wall Luminaire"], "point": [1.0, 0.4], "level": level, "offset": 2.0, "work_plane": true })).as_u64().unwrap();
+    let state = |app: &mut App| findings(app).into_iter().find(|x| x["other"] == lum).map(|x| x["severity"].as_str().unwrap().to_owned());
+    assert_eq!(state(&mut app).as_deref(), Some("note"));
+    ok(&mut app, "pset.set", json!({ "element_id": lum, "pset_name": "Pset_ElectricalDeviceCommon", "property_name": "IP_Code", "value": "IP20" }));
+    assert_eq!(state(&mut app).as_deref(), Some("error"));
+    ok(&mut app, "pset.set", json!({ "element_id": lum, "pset_name": "Pset_ElectricalDeviceCommon", "property_name": "IP_Code", "value": "IPX4" }));
+    assert_eq!(state(&mut app), None);
+}
