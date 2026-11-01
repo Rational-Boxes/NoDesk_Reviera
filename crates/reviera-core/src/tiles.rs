@@ -104,6 +104,9 @@ pub struct Layout {
     u: [f64; 3],
     v: [f64; 3],
     n: [f64; 3],
+    /// Each piece's corners lifted off the surface's plane (a floor's falls), in the order
+    /// (min, min), (max, min), (max, max), (min, max); empty when the surface is flat.
+    rise: Vec<[f64; 4]>,
     pub thickness: f64,
     pub area: f64,
 }
@@ -135,11 +138,12 @@ impl Layout {
         let (mut p, mut t): (Vec<[f64; 3]>, Vec<u32>) = (Vec::new(), Vec::new());
         let (u, v, n) = (self.u, self.v, self.n);
         let flip = (u[1] * v[2] - u[2] * v[1]) * n[0] + (u[2] * v[0] - u[0] * v[2]) * n[1] + (u[0] * v[1] - u[1] * v[0]) * n[2] < 0.0;
-        for q in &self.pieces {
+        for (k, q) in self.pieces.iter().enumerate() {
             let base = p.len() as u32;
+            let rise = self.rise.get(k).copied().unwrap_or([0.0; 4]);
             for c in [0.0, self.thickness] {
-                for (a, b) in [(q.min[0], q.min[1]), (q.max[0], q.min[1]), (q.max[0], q.max[1]), (q.min[0], q.max[1])] {
-                    p.push(self.at(a, b, c));
+                for (j, (a, b)) in [(q.min[0], q.min[1]), (q.max[0], q.min[1]), (q.max[0], q.max[1]), (q.min[0], q.max[1])].into_iter().enumerate() {
+                    p.push(self.at(a, b, c + rise[j]));
                 }
             }
             // Bottom, top and four sides, outward when u × v points along n; reversed otherwise.
@@ -257,7 +261,7 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<Layout> {
                 .collect();
             let pieces = cut_round(set_out(region, w, h, r.joint, r.datum, r.pattern, &|_| true), &holes);
             let area = (region.1[0] - region.0[0]) * (region.1[1] - region.0[1]) - holes.iter().map(|(lo, hi)| (hi[0] - lo[0]) * (hi[1] - lo[1])).sum::<f64>();
-            let layout = Layout { pieces, origin, u, v, n, thickness: r.thickness, area };
+            let layout = Layout { pieces, origin, u, v, n, rise: Vec::new(), thickness: r.thickness, area };
             Ok(layout)
         }
         Host::Floor { floor } => {
@@ -280,7 +284,16 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<Layout> {
             let inside_floor = |p: [f64; 2]| inside(&poly, p) && !holes.iter().any(|hh| inside(hh, p));
             let pieces = set_out((lo, hi), w, h, r.joint, r.datum, r.pattern, &inside_floor);
             let origin = [outer[0][0], outer[0][1], g.top];
-            Ok(Layout { pieces, origin, u: [u2[0], u2[1], 0.0], v: [v2[0], v2[1], 0.0], n: [0.0, 0.0, 1.0], thickness: r.thickness, area: g.area() })
+            // On a warped floor (its falls), each corner sits on the top there.
+            let world = |a: f64, b: f64| [outer[0][0] + u2[0] * a + v2[0] * b, outer[0][1] + u2[1] * a + v2[1] * b];
+            let rise = match crate::shape_edit::shape_of(floor).and_then(|shape| crate::shape_edit::top_triangles(profile, &shape).ok()) {
+                Some(tris) => pieces
+                    .iter()
+                    .map(|q| [(q.min[0], q.min[1]), (q.max[0], q.min[1]), (q.max[0], q.max[1]), (q.min[0], q.max[1])].map(|(a, b)| crate::shape_edit::offset_in(&tris, world(a, b))))
+                    .collect(),
+                None => Vec::new(),
+            };
+            Ok(Layout { pieces, origin, u: [u2[0], u2[1], 0.0], v: [v2[0], v2[1], 0.0], n: [0.0, 0.0, 1.0], rise, thickness: r.thickness, area: g.area() })
         }
     }
 }

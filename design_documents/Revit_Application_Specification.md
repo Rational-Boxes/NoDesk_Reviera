@@ -14829,7 +14829,7 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 **Behaviour & rules.**
 - **A tile layout** is an `IfcCovering` that Reviera rebuilds from its recipe, so it follows its host:
   - CLADDING on a wall's face: along the wall from `from` to `to`, from `bottom` to `top` above its level;
-  - FLOORING on a floor's top: the whole of it, square to its outline's first edge.
+  - FLOORING on a floor's top: the whole of it, square to its outline's first edge. On a warped top (a shower's or wet room's falls, ARC-SHAPE-001) each piece's corners sit on the top there.
 - **Tiles**: `tile` wide and high, with `joint` between them, `thickness` off the surface.
 - **Datum**: `centred` puts a tile on the middle each way, so the cuts at both ends are equal. `corner` starts with a full tile at the start and bottom (on a floor, its first corner); `end_corner` at the end.
 - **Pattern**: `stack` or `half_bond` (each row moved half a tile).
@@ -14852,11 +14852,11 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 - [x] 600 × 600 mm on a 2.4 × 2.0 m floor from its corner: 9 full, 7 cut.
 - [x] A face found by a point runs between the walls meeting it; a floor is found under a point.
 - [x] On a wall with a door, no tile stands in the doorway and the area is less the door's.
+- [x] Floor tiles laid over a shower's falls dip toward its drain.
 - [x] Saved and reopened, the counts are the same; layouts sit under their level in the model tree and report no overlaps.
 
 *Built (2026-11-01):* the module, both commands, the IFC writer, the ribbon tool, and tiles in the wet room sample. Not yet:
 - tiles cut round fixtures and wall-hung items (doors and windows are done);
-- floor tiles following a warped (fallen) floor;
 - tile and grout as types with their materials' documents (COL-FE-006);
 - a tile schedule as a schedule element;
 - diagonal (45°) and herringbone patterns;

@@ -273,10 +273,12 @@ pub fn slab_mesh(profile: &Profile, shape: &Shape, top: f64, thickness: f64) -> 
 }
 
 /// The warped top's height offset at a plan point, or 0 outside it.
-fn surface_offset(profile: &Profile, shape: &Shape, p: [f64; 2]) -> f64 {
-    let Ok(tris) = top_triangles(profile, shape) else {
-        return 0.0;
-    };
+pub fn surface_offset(profile: &Profile, shape: &Shape, p: [f64; 2]) -> f64 {
+    top_triangles(profile, shape).map_or(0.0, |tris| offset_in(&tris, p))
+}
+
+/// The height offset at a plan point on a warped top's triangles, or 0 outside them.
+pub fn offset_in(tris: &[[[f64; 3]; 3]], p: [f64; 2]) -> f64 {
     for t in tris {
         let (a, b, c) = (t[0], t[1], t[2]);
         let d = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);

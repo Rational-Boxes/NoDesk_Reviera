@@ -28459,7 +28459,7 @@ CREATE TABLE base_rxd (
 <p><strong>Behaviour &amp; rules.</strong>
 - <strong>A tile layout</strong> is an <code>IfcCovering</code> that Reviera rebuilds from its recipe, so it follows its host:
   - CLADDING on a wall's face: along the wall from <code>from</code> to <code>to</code>, from <code>bottom</code> to <code>top</code> above its level;
-  - FLOORING on a floor's top: the whole of it, square to its outline's first edge.
+  - FLOORING on a floor's top: the whole of it, square to its outline's first edge. On a warped top (a shower's or wet room's falls, ARC-SHAPE-001) each piece's corners sit on the top there.
 - <strong>Tiles</strong>: <code>tile</code> wide and high, with <code>joint</code> between them, <code>thickness</code> off the surface.
 - <strong>Datum</strong>: <code>centred</code> puts a tile on the middle each way, so the cuts at both ends are equal. <code>corner</code> starts with a full tile at the start and bottom (on a floor, its first corner); <code>end_corner</code> at the end.
 - <strong>Pattern</strong>: <code>stack</code> or <code>half_bond</code> (each row moved half a tile).
@@ -28479,10 +28479,10 @@ CREATE TABLE base_rxd (
 - [x] 600 × 600 mm on a 2.4 × 2.0 m floor from its corner: 9 full, 7 cut.
 - [x] A face found by a point runs between the walls meeting it; a floor is found under a point.
 - [x] On a wall with a door, no tile stands in the doorway and the area is less the door's.
+- [x] Floor tiles laid over a shower's falls dip toward its drain.
 - [x] Saved and reopened, the counts are the same; layouts sit under their level in the model tree and report no overlaps.</p>
 <p><em>Built (2026-11-01):</em> the module, both commands, the IFC writer, the ribbon tool, and tiles in the wet room sample. Not yet:
 - tiles cut round fixtures and wall-hung items (doors and windows are done);
-- floor tiles following a warped (fallen) floor;
 - tile and grout as types with their materials' documents (COL-FE-006);
 - a tile schedule as a schedule element;
 - diagonal (45°) and herringbone patterns;

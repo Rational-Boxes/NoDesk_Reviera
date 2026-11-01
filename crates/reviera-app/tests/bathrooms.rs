@@ -651,6 +651,12 @@ fn shower_falls_to_a_drain() {
     let shape = ok(&mut app, "shape.get", json!({ "element_id": floor }));
     assert_eq!((shape["points"].as_array().unwrap().len(), shape["lines"].as_array().unwrap().len()), (1, 1), "{shape} {again}");
     assert!((shape["points"][0]["z"].as_f64().unwrap() - drop).abs() < 1e-6);
+    // Floor tiles follow the falls: the lowest dips toward the drain.
+    let tiles = ok(&mut app, "tile.create", json!({ "floor_id": floor, "tile": [0.2, 0.2] }));
+    let store = app.document(app.active().unwrap()).unwrap().doc.store().clone();
+    let l = reviera_core::tiles::regenerate(&store, store.get(reviera_core::ElementId(tiles.as_u64().unwrap())).unwrap()).unwrap();
+    let low = l.mesh().0.iter().map(|q| q[2]).fold(f64::MAX, f64::min);
+    assert!(low < -0.01 && low > drop - 0.001, "{low} {drop}");
     // A tray is not level access.
     let tray = ok(&mut app, "bath.place_component", json!({ "type_id": t["Shower tray, 900 × 900"], "point": [2.4, 0.1], "level": level })).as_u64().unwrap();
     let e = run(&mut app, "bath.shower_falls", json!({ "element_ids": [tray] })).unwrap_err();
