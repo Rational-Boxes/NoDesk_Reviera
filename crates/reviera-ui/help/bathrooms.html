@@ -9,6 +9,7 @@ it, and whether a WC is the right distance from its side wall.</p>
 <nav class="toc">
   <a href="#components">Bathroom components</a>
   <a href="#layouts">Bathroom layouts</a>
+  <a href="#products">Products in place of placeholders</a>
   <a href="#packs">Rule packs</a>
   <a href="#zones">Clear spaces</a>
   <a href="#check">Check Bathrooms</a>
@@ -50,6 +51,19 @@ the first WC is kept within any side-wall distance rule. Under the ADA, a WC's 6
 from its side wall, so the next fixture comes after it. If the room is too small nothing is placed,
 and the message says how many millimetres the wall is short or the room too shallow. Laying out
 again replaces the earlier layout in that room.</p>
+
+<h2 id="products">Products in place of placeholders</h2>
+<p>When a product is chosen, bring in the manufacturer's model and put it where the placeholder
+was. <b>Make Product…</b> (Architecture › Component, or the Architecture menu) asks for the model
+file (OBJ, STL, PLY, glTF), the placeholder it replaces, a turn so that its back faces the wall,
+its units, and the manufacturer's name, model, model reference and article number. The product
+takes the placeholder's IFC class and pipe connections, and is raised to its mounting height.
+Its manufacturer data are saved in <code>Pset_ManufacturerTypeInformation</code>.</p>
+<p>Select placeholders and choose <b>Swap for Product…</b>. Each keeps its identity, place and
+data; only its type changes. A report lists each one's size before and after, any connection that
+moved and by how much (a WC's outlet, for example), connections the product lacks, and the
+Check Bathrooms findings that appeared or were resolved. Undo puts the placeholders back. A
+product of another kind (a mirror for a WC) is refused.</p>
 
 <h2 id="packs">Rule packs</h2>
 <p>Four packs ship with Reviera. Each rule names its clause, its source and how sure the reading
@@ -143,7 +157,8 @@ brings the shipped one back. Project packs are saved with the model.</p>
 <p>Everything above is a command: <code>bath.rule_packs</code>, <code>bath.set_rule_packs</code>,
 <code>bath.add_rule_pack</code>, <code>bath.remove_rule_pack</code>, <code>bath.set_hand</code>,
 <code>bath.check</code>, <code>bath.load_components</code>, <code>bath.place_component</code>,
-<code>bath.layouts</code>, <code>bath.layout</code>,
+<code>bath.layouts</code>, <code>bath.layout</code>, <code>bath.make_product</code>,
+<code>bath.swap_product</code>,
 <code>bath.place_grab_bars</code>, <code>grab_bar.create</code> and
 <code>grab_bar.set</code>; <code>clearance.list</code> and <code>clearance.check</code> include
 fixture spaces. Lua scripts and AI agents (MCP, the <i>modeling</i> toolset) can use them.</p>

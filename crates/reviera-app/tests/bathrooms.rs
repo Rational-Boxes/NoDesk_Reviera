@@ -369,3 +369,54 @@ fn an_accessible_toilet_with_its_grab_bars() {
     assert!(!f.iter().any(|x| x["rule"] == "ADA 2010 604.2" || x["kind"] == "missing_bar" || x["kind"] == "bar"), "{f:#?}");
     assert!(!f.iter().any(|x| x["kind"] == "intrusion" && x["severity"] == "error"), "{f:#?}");
 }
+
+#[test]
+fn a_product_in_place_of_a_placeholder() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = new_app(dir.path());
+    let level = model(&mut app);
+    let types = ok(&mut app, "bath.load_components", json!({ "names": ["WC, close-coupled", "Mirror, 600 × 800"] }));
+    let wc = ok(&mut app, "bath.place_component", json!({ "type_id": types["WC, close-coupled"], "point": [2.0, -0.3], "level": level })).as_u64().unwrap();
+    let guid = ok(&mut app, "element.get_ids", json!({ "element_ids": [wc] }))[0]["guid"].clone();
+
+    // A manufacturer's WC, drawn with its front toward −x: 620 deep along x, 360 wide, 800 high.
+    let obj = dir.path().join("acme_wc.obj");
+    let (x, y, z) = (0.31, 0.18, 0.8);
+    let mut text = String::new();
+    for (a, b, c) in [(-x, -y, 0.0), (x, -y, 0.0), (x, y, 0.0), (-x, y, 0.0), (-x, -y, z), (x, -y, z), (x, y, z), (-x, y, z)] {
+        text.push_str(&format!("v {a} {b} {c}\n"));
+    }
+    for f in ["1 3 2", "1 4 3", "5 6 7", "5 7 8", "1 2 6", "1 6 5", "2 3 7", "2 7 6", "3 4 8", "3 8 7", "4 1 5", "4 5 8"] {
+        text.push_str(&format!("f {f}\n"));
+    }
+    std::fs::write(&obj, text).unwrap();
+    let product = ok(&mut app, "bath.make_product", json!({ "generic": types["WC, close-coupled"], "path": obj, "name": "Acme Model 1", "turn": 90.0, "units": "m", "manufacturer": "Acme", "model_label": "Model 1", "article_number": "A-100" })).as_u64().unwrap();
+    let listed = ok(&mut app, "mesh_object.types", json!({}));
+    let t = listed.as_array().unwrap().iter().find(|t| t["id"] == product).unwrap();
+    assert_eq!(t["category"], "plumbing_fixture");
+    let size: Vec<f64> = t["size"].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect();
+    assert!((size[0] - 0.36).abs() < 1e-6 && (size[1] - 0.62).abs() < 1e-6, "turned: {size:?}");
+    let ports = ok(&mut app, "connector.list", json!({ "element_id": product }));
+    assert_eq!(ports.as_array().unwrap().len(), 2, "the generic's connectors: {ports:#}");
+
+    // Swapped: the same element, a new size, its waste 40 mm nearer the wall's face side.
+    let report = ok(&mut app, "bath.swap_product", json!({ "element_ids": [wc], "type_id": product }));
+    let r = &report[0];
+    assert_eq!(r["element"], wc);
+    assert!((r["size_after"][1].as_f64().unwrap() - 0.62).abs() < 1e-6 && (r["size_before"][1].as_f64().unwrap() - 0.7).abs() < 1e-6, "{r:#}");
+    let moved: Vec<&str> = r["connectors_moved"].as_array().unwrap().iter().map(|m| m["name"].as_str().unwrap()).collect();
+    assert_eq!(moved, ["Waste"], "the cold supply on the back stays put: {r:#}");
+    assert!((r["connectors_moved"][0]["distance"].as_f64().unwrap() - 0.04).abs() < 0.002, "{r:#}");
+    assert_eq!(ok(&mut app, "element.get_ids", json!({ "element_ids": [wc] }))[0]["guid"], guid);
+    let path = dir.path().join("product.ifc");
+    ok(&mut app, "file.save_as", json!({ "path": path }));
+    let ifc = std::fs::read_to_string(&path).unwrap();
+    assert!(ifc.contains("'Pset_ManufacturerTypeInformation'") && ifc.contains("'Acme'") && ifc.contains("'A-100'"), "manufacturer data saved");
+
+    // Undone: the placeholder again.
+    ok(&mut app, "edit.undo", json!({}));
+    let back = ok(&mut app, "mesh_object.types", json!({}));
+    assert_eq!(back.as_array().unwrap().iter().find(|t| t["id"] == types["WC, close-coupled"]).unwrap()["copies"], 1);
+    // A mirror is not a WC.
+    assert_eq!(run(&mut app, "bath.swap_product", json!({ "element_ids": [wc], "type_id": types["Mirror, 600 × 800"] })).unwrap_err().code, "type.wrong_family");
+}

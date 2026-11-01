@@ -626,7 +626,14 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
 - **Bathroom layouts** (ARC-BATH-005): Architecture › Build › Bathroom Layout lays out a full
   bath, three-quarter bath, powder room, UK family bathroom, en-suite, cloakroom or accessible
   toilet in a room closed by walls, spaced by the rule packs in use, or reports how many
-  millimetres short the room is (`bath.layouts`, `bath.layout`). **Not yet** (planned): living
+  millimetres short the room is (`bath.layouts`, `bath.layout`).
+- **Products in place of placeholders** (ARC-BATH-006): Make Product… turns a manufacturer's
+  model file into a product of a placeholder's kind (its IFC class, pipe connections and mounting
+  height, with Pset_ManufacturerTypeInformation), and Swap for Product… gives selected
+  placeholders the product's type, keeping their identity, with a report of size changes,
+  connections moved and findings gained or resolved (`bath.make_product`, `bath.swap_product`;
+  `element.set_type` now swaps component types too). **Not yet** (planned): product documents
+  on component types, living
   layouts that re-fit when the room changes, Jack-and-Jill and back-to-back wet walls,
   other packs' bars (Approved Document M's drop-down rails, shower and bath bars), room layouts, toilet cores and partitions, fixture counts,
   locker rooms, wet areas, spas, the generic bathroom component library and product swaps.

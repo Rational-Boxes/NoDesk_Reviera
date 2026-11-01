@@ -495,7 +495,7 @@ fn cache() -> &'static Mutex<HashMap<String, Arc<Decoded>>> {
 }
 
 impl StoredMesh {
-    fn encode(positions: &[[f64; 3]], triangles: &[[u32; 3]], tri_slot: &[u32]) -> Self {
+    pub(crate) fn encode(positions: &[[f64; 3]], triangles: &[[u32; 3]], tri_slot: &[u32]) -> Self {
         let p: Vec<u8> = positions
             .iter()
             .flatten()

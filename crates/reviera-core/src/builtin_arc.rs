@@ -543,6 +543,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(BathPlaceComponent),
         registry.add(BathLayouts),
         registry.add(BathLayout),
+        registry.add(BathMakeProduct),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -6892,4 +6893,20 @@ edit_command!(
     crate::bath_layouts::LayoutParams,
     crate::bath_layouts::Layout,
     crate::bath_layouts::layout
+);
+
+edit_command!(
+    BathMakeProduct,
+    "bath.make_product",
+    "Make a product from a manufacturer's model",
+    "Imports a manufacturer's mesh (OBJ, STL, PLY, glTF, GLB) as a product type of a generic bathroom \
+     component's kind (ARC-BATH-006): its category, IFC predefined and element type, and the generic's \
+     connectors kept on its back, unless it brings its own. `turn` puts its back toward +y (the wall); its \
+     geometry is centred in plan and raised to the generic's lowest point, its mounting height. Manufacturer, \
+     model reference and label, article number and GTIN go in Pset_ManufacturerTypeInformation. Swap \
+     placeholders for it with `bath.swap_product`.",
+    "Make Product",
+    crate::bath_components::MakeProductParams,
+    crate::id::ElementId,
+    crate::bath_components::make_product
 );

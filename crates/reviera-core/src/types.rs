@@ -309,6 +309,33 @@ pub(crate) fn set_type(txn: &mut crate::txn::Transaction<'_>, p: SetTypeParams) 
             })?;
             let placed = inserts::resolve(txn.store(), txn.store().get(id).expect("exists"))?;
             inserts::check_fit(txn.store(), &placed)?;
+        } else if crate::mesh_objects::mesh_object_recipe(e).is_some() {
+            // A placed component (DM-IMP-015, ARC-BATH-006): another type of its category, so its
+            // IFC class stays; it keeps its place, hosting and own data.
+            let (Some((_, now)), Some(new)) = (crate::mesh_objects::type_of(&store, e), crate::mesh_objects::mesh_object_type(ty)) else {
+                return Err(Error::new("type.wrong_family", format!("element {id} needs a component type")));
+            };
+            if now.category != new.category {
+                return Err(Error::new(
+                    "type.wrong_family",
+                    format!("element {id} is a {}; the type is a {}", now.category.label(), new.category.label()),
+                ));
+            }
+            let guid = ty.guid().to_string();
+            let predefined = new.predefined_type().to_owned();
+            let object_type = ty.param("@ElementType").filter(|_| predefined == "USERDEFINED").cloned();
+            txn.modify(id, |w| {
+                w.params.insert("@type".into(), Value::String(guid));
+                w.params.insert("@PredefinedType".into(), Value::String(predefined));
+                match object_type {
+                    Some(o) => {
+                        w.params.insert("@ObjectType".into(), o);
+                    }
+                    None => {
+                        w.params.remove("@ObjectType");
+                    }
+                }
+            })?;
         } else if crate::roofs::roof_recipe(e).is_some() {
             if !crate::roofs::is_roof_type(ty) {
                 return Err(Error::new(

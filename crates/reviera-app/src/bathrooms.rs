@@ -49,7 +49,7 @@ pub enum FindingKind {
 }
 
 /// One thing the check found.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct Finding {
     pub severity: Severity,
     pub kind: FindingKind,
@@ -110,7 +110,13 @@ impl HostCommand for BathCheck {
     };
 
     fn run(&self, app: &mut App, _: &Caller, p: Option<CheckParams>) -> Result<Vec<Finding>> {
-        let p = p.unwrap_or_default();
+        check(app, p.unwrap_or_default())
+    }
+}
+
+/// The bathroom check (`bath.check`).
+pub(crate) fn check(app: &mut App, p: CheckParams) -> Result<Vec<Finding>> {
+    {
         let bodies = app.bodies()?;
         let doc = app.active().expect("bodies checked");
         let store = app.get(doc)?.doc.store();
@@ -278,5 +284,109 @@ impl HostCommand for BathCheck {
         }
         out.sort_by(|a, b| a.severity.cmp(&b.severity).then(a.element.0.cmp(&b.element.0)));
         Ok(out)
+    }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SwapParams {
+    /// The fixtures to change.
+    pub element_ids: Vec<ElementRef>,
+    /// The product (or other component) type to give them.
+    pub type_id: ElementRef,
+}
+
+/// A connector that moved in a swap.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct Moved {
+    pub name: String,
+    /// How far (metres), and from and to (project coordinates).
+    pub distance: f64,
+    pub from: [f64; 3],
+    pub to: [f64; 3],
+}
+
+/// What a swap did to one fixture.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct Swapped {
+    pub element: ElementId,
+    pub size_before: [f64; 3],
+    pub size_after: [f64; 3],
+    pub connectors_moved: Vec<Moved>,
+    /// Connectors the old type had that the new one has not (by name).
+    pub connectors_lost: Vec<String>,
+    pub findings_new: Vec<Finding>,
+    pub findings_gone: Vec<Finding>,
+}
+
+pub(crate) struct BathSwapProduct;
+
+impl HostCommand for BathSwapProduct {
+    type Host = App;
+    type Params = SwapParams;
+    type Output = Vec<Swapped>;
+    const META: CommandMeta = CommandMeta {
+        name: "bath.swap_product",
+        version: 1,
+        summary: "Put a product in place of placeholder fixtures",
+        description: "Gives fixtures another component type of the same category, typically a manufacturer's \
+                      product made with `bath.make_product` in place of a generic placeholder (ARC-BATH-006), \
+                      through `element.set_type`, so each keeps its GlobalId, place and own data. Reports for each \
+                      its size before and after, the connectors that moved and how far, those the new type lacks, \
+                      and the `bath.check` findings that appeared or went away. Undo restores the old type.",
+        effects: &[Effect::Edit],
+        transaction_name: "Swap Product",
+    };
+
+    fn run(&self, app: &mut App, caller: &Caller, p: SwapParams) -> Result<Vec<Swapped>> {
+        let doc = app.active().ok_or_else(|| Error::new("document.none", "no document is open"))?;
+        let ids: Vec<ElementId> = {
+            let store = app.get(doc)?.doc.store();
+            p.element_ids.iter().map(|r| store.resolve(r).ok_or_else(|| Error::new("element.not_found", format!("no element {r:?}")))).collect::<Result<_>>()?
+        };
+        let state = |app: &mut App| -> Result<Vec<([f64; 3], Vec<(String, [f64; 3])>)>> {
+            let store = app.get(doc)?.doc.store();
+            Ok(ids
+                .iter()
+                .map(|id| {
+                    let e = store.get(*id);
+                    let size = e.and_then(|e| reviera_core::mesh_objects::type_of(store, e)).map_or([0.0; 3], |(_, t)| t.size.map(|v| v * t.scale));
+                    let ports = e.map(|e| reviera_core::mep::ports(store, e).into_iter().map(|q| (q.connector.name, q.position)).collect()).unwrap_or_default();
+                    (size, ports)
+                })
+                .collect())
+        };
+        let only = Some(ids.iter().map(|id| ElementRef::Id(*id)).collect::<Vec<_>>());
+        let before = state(app)?;
+        let found_before = check(app, CheckParams { element_ids: only.clone(), tolerance: None })?;
+        app.execute("element.set_type", serde_json::json!({ "element_ids": ids.iter().map(|i| i.0).collect::<Vec<_>>(), "type_id": p.type_id }), caller)?;
+        let after = state(app)?;
+        let found_after = check(app, CheckParams { element_ids: only, tolerance: None })?;
+        let key = |f: &Finding| (f.element, f.rule.clone(), format!("{:?}", f.kind), f.other);
+        Ok(ids
+            .iter()
+            .enumerate()
+            .map(|(k, id)| {
+                let (sb, pb) = &before[k];
+                let (sa, pa) = &after[k];
+                let mut moved = Vec::new();
+                let mut lost = Vec::new();
+                for (name, from) in pb {
+                    match pa.iter().find(|(n, _)| n == name) {
+                        Some((_, to)) => {
+                            let d = ((to[0] - from[0]).powi(2) + (to[1] - from[1]).powi(2) + (to[2] - from[2]).powi(2)).sqrt();
+                            if d > 0.0005 {
+                                moved.push(Moved { name: name.clone(), distance: d, from: *from, to: *to });
+                            }
+                        }
+                        None => lost.push(name.clone()),
+                    }
+                }
+                let mine = |v: &Vec<Finding>, other: &Vec<Finding>| -> Vec<Finding> {
+                    v.iter().filter(|f| f.element == *id && !other.iter().any(|o| key(o) == key(f))).cloned().collect()
+                };
+                Swapped { element: *id, size_before: *sb, size_after: *sa, connectors_moved: moved, connectors_lost: lost, findings_new: mine(&found_after, &found_before), findings_gone: mine(&found_before, &found_after) }
+            })
+            .collect())
     }
 }

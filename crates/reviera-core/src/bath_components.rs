@@ -14,7 +14,7 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 
 use crate::error::{Error, Result};
-use crate::id::ElementId;
+use crate::id::{ElementId, ElementRef};
 use crate::mep::{Classification as K, Connector, FlowDirection as D};
 use crate::mesh_objects::Category as C;
 use crate::txn::Transaction;
@@ -453,4 +453,100 @@ pub(crate) fn place(txn: &mut Transaction<'_>, p: crate::mep_controls::PlacePara
         return Err(Error::new("bath.not_a_component", format!("{} is not a bathroom component (bath.load_components)", ty.name.clone().unwrap_or_default())));
     }
     crate::mep_controls::place_hosted(txn, p, |_| true, "bath.not_a_component", "a bathroom component", 0.0)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct MakeProductParams {
+    /// The generic component it stands for (a type from `bath.load_components`).
+    pub generic: ElementRef,
+    /// The manufacturer's mesh (OBJ, STL, PLY, glTF, GLB).
+    pub path: String,
+    /// The product type's name; the file's name when omitted.
+    pub name: Option<String>,
+    /// A turn about the vertical, degrees anticlockwise, to put its back to +y (toward the wall).
+    #[serde(default)]
+    pub turn: f64,
+    #[serde(default)]
+    pub units: crate::mesh_objects::Units,
+    #[serde(default)]
+    pub up_axis: crate::mesh_objects::UpAxis,
+    pub manufacturer: Option<String>,
+    pub model_reference: Option<String>,
+    pub model_label: Option<String>,
+    pub article_number: Option<String>,
+    pub gtin: Option<String>,
+}
+
+/// Makes a product type from a manufacturer's mesh, of a generic component's kind
+/// (`bath.make_product`): its category, IFC predefined type and element type, its connectors at
+/// the same places relative to its back and centre, and its geometry raised to the generic's
+/// lowest point (its mounting height). Manufacturer data go in `Pset_ManufacturerTypeInformation`.
+pub(crate) fn make_product(txn: &mut Transaction<'_>, p: MakeProductParams) -> Result<ElementId> {
+    use crate::mesh_objects::{self as mo, ImportOptions, Insertion};
+    let store = txn.store().clone();
+    let g = store.resolve(&p.generic).and_then(|t| store.get(t)).filter(|e| is_component(e)).ok_or_else(|| Error::new("bath.not_a_component", "the generic is not a bathroom component (bath.load_components)"))?;
+    let gt = mo::mesh_object_type(g).expect("a component type");
+    let gm = gt.mesh.decode()?;
+    let g_min_z = gm.positions.iter().map(|q| f64::from(q[2])).fold(f64::MAX, f64::min) * gt.scale;
+    let options = ImportOptions { units: p.units, up_axis: p.up_axis, insertion: Insertion::BottomCentre, clean: true };
+    let id = mo::import(txn, mo::ImportParams { path: p.path.clone(), name: p.name.clone(), category: gt.category, options, allow_large: false })?;
+    let mut t = mo::mesh_object_type(txn.store().get(id).expect("imported")).expect("a type");
+    let m = t.mesh.decode()?;
+    // Turned, then centred again in plan and raised to the generic's lowest point.
+    let (s, c) = p.turn.to_radians().sin_cos();
+    let turned: Vec<[f64; 3]> = m.positions.iter().map(|q| {
+        let (x, y) = (f64::from(q[0]), f64::from(q[1]));
+        [x * c - y * s, x * s + y * c, f64::from(q[2])]
+    }).collect();
+    let (mut lo, mut hi) = ([f64::MAX; 3], [f64::MIN; 3]);
+    for q in &turned {
+        for k in 0..3 {
+            lo[k] = lo[k].min(q[k]);
+            hi[k] = hi[k].max(q[k]);
+        }
+    }
+    let (cx, cy) = ((lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0);
+    let dz = g_min_z / t.scale - lo[2];
+    let positions: Vec<[f64; 3]> = turned.iter().map(|q| [q[0] - cx, q[1] - cy, q[2] + dz]).collect();
+    let slots: Vec<u32> = m.tri_slot.iter().map(|s| u32::from(*s)).collect();
+    t.mesh = mo::StoredMesh::encode(&positions, &m.triangles, &slots);
+    t.size = [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]];
+    // The generic's connectors, kept on the product's back plane.
+    if t.connectors.is_empty() {
+        let back_g = gt.size[1] * gt.scale / 2.0;
+        let back_p = t.size[1] * t.scale / 2.0;
+        t.connectors = gt.connectors.iter().cloned().map(|mut k| {
+            if (k.origin[1] - back_g).abs() < 1e-6 {
+                k.origin[1] = back_p;
+            }
+            k
+        }).collect();
+    }
+    t.predefined = gt.predefined.clone();
+    let element_type = g.param("@ElementType").cloned();
+    let predefined = gt.predefined_type().to_owned();
+    let recipe = serde_json::to_value(&t).expect("serialises");
+    // With their IFC types (IFC4 Pset_ManufacturerTypeInformation).
+    let data: Vec<(&str, &str, Option<String>)> = vec![
+        ("Manufacturer", "IfcLabel", p.manufacturer),
+        ("ModelReference", "IfcLabel", p.model_reference),
+        ("ModelLabel", "IfcLabel", p.model_label),
+        ("ArticleNumber", "IfcIdentifier", p.article_number),
+        ("GlobalTradeItemNumber", "IfcIdentifier", p.gtin),
+    ];
+    txn.modify(id, |e| {
+        e.params.insert(crate::walls::RECIPE_KEY.into(), recipe);
+        e.params.insert("@PredefinedType".into(), predefined.into());
+        e.params.insert(MARK.into(), true.into());
+        if let Some(v) = element_type {
+            e.params.insert("@ElementType".into(), v);
+        }
+        for (k, ty, v) in data {
+            if let Some(v) = v.filter(|v| !v.trim().is_empty()) {
+                e.params.insert(format!("Pset_ManufacturerTypeInformation.{k}"), serde_json::json!({ "type": ty, "value": v }));
+            }
+        }
+    })?;
+    Ok(id)
 }

@@ -206,4 +206,126 @@ impl Gui {
             Err(e) => error(&frame, &format!("The layout was not made:\n{}", e.message)),
         }
     }
+
+    /// Architecture › Make Product (ARC-BATH-006): a manufacturer's model file made into a product
+    /// type of a generic component's kind, with its manufacturer data.
+    pub(crate) fn make_product(&mut self) {
+        let frame = self.frame;
+        let Some(store) = self.store_now() else {
+            return frame.set_status_text("Open or create a project first (File > New)", 0);
+        };
+        if !store.iter().any(|e| reviera_core::bath_components::is_component(e)) {
+            if let Err(e) = self.run("bath.load_components", json!({})) {
+                return error(&frame, &e);
+            }
+        }
+        let Some(store) = self.store_now() else { return };
+        let order = reviera_core::bath_components::names();
+        let mut generics: Vec<(reviera_core::ElementId, String)> = store
+            .iter()
+            .filter(|e| reviera_core::bath_components::is_component(e))
+            .filter_map(|e| e.name.clone().filter(|n| order.contains(&n.as_str())).map(|n| (e.id(), n)))
+            .collect();
+        generics.sort_by_key(|g| order.iter().position(|n| *n == g.1).unwrap_or(usize::MAX));
+        let fd = FileDialog::builder(&frame)
+            .with_message("The manufacturer's model")
+            .with_wildcard("3D models (*.obj;*.stl;*.ply;*.gltf;*.glb)|*.obj;*.stl;*.ply;*.gltf;*.glb")
+            .with_style(FileDialogStyle::Open | FileDialogStyle::FileMustExist)
+            .build();
+        if fd.show_modal() != ID_OK {
+            return;
+        }
+        let Some(path) = fd.get_path() else { return };
+        let stem = std::path::Path::new(&path).file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+        let f = super::reinforcement_ui::Form::new(&frame, "Make Product");
+        let names: Vec<String> = generics.iter().map(|g| g.1.clone()).collect();
+        let generic = f.choice("In place of", &names, 0);
+        let name = f.text("Name", &stem, "The product type's name");
+        let turns = ["0°", "90°", "180°", "270°"].map(str::to_owned);
+        let turn = f.choice("Turn", &turns, 0);
+        let units_list = ["As the file says", "Millimetres", "Centimetres", "Metres", "Inches", "Feet"].map(str::to_owned);
+        let units = f.choice("Units", &units_list, 0);
+        let manufacturer = f.text("Manufacturer", "", "");
+        let model = f.text("Model", "", "Its name in the manufacturer's range");
+        let reference = f.text("Model reference", "", "");
+        let article = f.text("Article number", "", "");
+        let ok = f.show("Its back goes to the wall: turn it until its back faces +y. It is raised to the placeholder's mounting height and takes the placeholder's pipe connections.", "Make");
+        let k = generic.get_selection().map_or(0, |k| k as usize);
+        let unit = ["auto", "mm", "cm", "m", "in", "ft"][units.get_selection().unwrap_or(0) as usize];
+        let args = json!({
+            "generic": generics.get(k).map(|g| g.0 .0),
+            "path": path,
+            "name": name.get_value(),
+            "turn": 90.0 * f64::from(turn.get_selection().unwrap_or(0)),
+            "units": unit,
+            "manufacturer": manufacturer.get_value(),
+            "model_label": model.get_value(),
+            "model_reference": reference.get_value(),
+            "article_number": article.get_value(),
+        });
+        f.dialog.destroy();
+        if !ok {
+            return;
+        }
+        match self.run("bath.make_product", args) {
+            Ok(_) => frame.set_status_text("Product made: select placeholders and use Swap for Product, or place it with Bathroom", 0),
+            Err(e) => error(&frame, &format!("The product was not made:\n{e}")),
+        }
+    }
+
+    /// Architecture › Swap for Product (ARC-BATH-006): the selected fixtures get a product type
+    /// of their kind; the report says what changed.
+    pub(crate) fn swap_for_product(&mut self) {
+        let frame = self.frame;
+        let selected = self.selection();
+        let Some(store) = self.store_now() else { return };
+        let category = selected
+            .iter()
+            .filter_map(|id| store.get(*id))
+            .find_map(|e| reviera_core::mesh_objects::type_of(&store, e).map(|(_, t)| t.category));
+        let Some(category) = category else {
+            return error(&frame, "Select the placeholder fixtures to replace first.");
+        };
+        let products: Vec<(reviera_core::ElementId, String)> = store
+            .iter()
+            .filter(|e| reviera_core::bath_components::is_component(e) && reviera_core::mesh_objects::mesh_object_type(e).is_some_and(|t| t.category == category))
+            .map(|e| (e.id(), e.name.clone().unwrap_or_default()))
+            .collect();
+        if products.is_empty() {
+            return error(&frame, "No other component of this kind: make one with Make Product first.");
+        }
+        let names: Vec<String> = products.iter().map(|p| p.1.clone()).collect();
+        let labels: Vec<&str> = names.iter().map(String::as_str).collect();
+        let d = SingleChoiceDialog::builder(&frame, &format!("Give the {} selected the type:", selected.len()), "Swap for Product", &labels).build();
+        if d.show_modal() != ID_OK {
+            return;
+        }
+        let k = usize::try_from(d.get_selection()).unwrap_or(0);
+        d.destroy();
+        let ids: Vec<u64> = selected.iter().map(|id| id.0).collect();
+        let report = match self.run("bath.swap_product", json!({ "element_ids": ids, "type_id": products[k].0 .0 })) {
+            Ok(v) => v,
+            Err(e) => return error(&frame, &format!("Not swapped:\n{e}")),
+        };
+        self.refresh_scene(&frame);
+        let mut lines = Vec::new();
+        for r in report.as_array().cloned().unwrap_or_default() {
+            let size = |k: &str| r[k].as_array().map(|v| v.iter().map(|x| format!("{:.0}", x.as_f64().unwrap_or(0.0) * 1000.0)).collect::<Vec<_>>().join(" × ")).unwrap_or_default();
+            lines.push(format!("{}: {} mm, was {} mm", self.element_label(&r["element"]), size("size_after"), size("size_before")));
+            for m in r["connectors_moved"].as_array().cloned().unwrap_or_default() {
+                lines.push(format!("  {} connection moved {:.0} mm", m["name"].as_str().unwrap_or_default(), m["distance"].as_f64().unwrap_or(0.0) * 1000.0));
+            }
+            for c in r["connectors_lost"].as_array().cloned().unwrap_or_default() {
+                lines.push(format!("  {} connection: the product has none", c.as_str().unwrap_or_default()));
+            }
+            for f in r["findings_new"].as_array().cloned().unwrap_or_default() {
+                lines.push(format!("  New: {}", f["message"].as_str().unwrap_or_default()));
+            }
+            for f in r["findings_gone"].as_array().cloned().unwrap_or_default() {
+                lines.push(format!("  Resolved: {}", f["message"].as_str().unwrap_or_default()));
+            }
+        }
+        let d = MessageDialog::builder(&frame, &lines.join("\n"), "Swap for Product").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build();
+        d.show_modal();
+    }
 }

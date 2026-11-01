@@ -4771,6 +4771,8 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "bath.check" => with(gui, Gui::check_bathrooms),
         "bath.place_grab_bars" => with(gui, Gui::place_grab_bars),
         "ui.place_bathroom_component" => with(gui, Gui::place_bathroom_component),
+        "ui.make_product" => with(gui, Gui::make_product),
+        "ui.swap_for_product" => with(gui, Gui::swap_for_product),
         "ui.bathroom_layout" => with(gui, |g| {
             g.bathroom_layout();
             focus(g);

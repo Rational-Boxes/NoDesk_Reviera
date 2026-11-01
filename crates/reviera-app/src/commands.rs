@@ -60,6 +60,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add_host(crate::overlaps::OverlapFind),
         registry.add_host(crate::overlaps::ClearanceCheck),
         registry.add_host(crate::bathrooms::BathCheck),
+        registry.add_host(crate::bathrooms::BathSwapProduct),
         registry.add_host(crate::overlaps::OverlapResolve),
         registry.add_host(crate::compute::ComputeKinds),
         registry.add_host(crate::compute::ComputeDistill),

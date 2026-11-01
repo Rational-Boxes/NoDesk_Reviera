@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Reviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Reviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 846 numbered requirements (320 P0 · 318 P1 · 201 P2 · 7 P3), 2,264 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 847 numbered requirements (320 P0 · 319 P1 · 201 P2 · 7 P3), 2,266 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,264 commands; 846 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,266 commands; 847 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -14389,6 +14389,28 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 
 *Built (2026-10-31):* `reviera_core::bath_layouts`, `bath.layouts`, `bath.layout`, and Architecture › Build › Bathroom Layout (a template, the start end and replace, then a click in a plan, through the Room tool's click). A fixture's clear spaces measured from its side wall (an ADA WC's 60 in) are kept clear by the next fixture. The IRC bath rule (21 in in front of a tub) is marked advisory in `us_plumbing`: its source gives no width, and the whole length is strict where a WC stands beside the tub. Not yet: layouts that re-fit when the room changes, Jack-and-Jill and back-to-back wet walls, doors and their swings in the fit, turning spaces, and shower rooms with the shower across the end.
 
+### 3.9a.6 Products in place of placeholders
+**ID:** ARC-BATH-006 · **Priority:** P1 · **Ref:** owner requirement (2026-10-31: "support for specific realized components with provided models and documents"); `BATHROOMS_PLAN.md` §8; research/13 F1–F5
+
+**Purpose.** When a product is chosen, put the manufacturer's model in place of the placeholder without losing anything the project has hung on it, and see at once what the change does to the bathroom.
+
+**Behaviour & rules.**
+- **Making a product.** `bath.make_product` imports a manufacturer's mesh (OBJ, STL, PLY, glTF; DM-IMP-015) as a product of a generic component's kind: the same category, IFC class and predefined type (and ElementType), its connectors taken from the generic at the same places relative to the back and centre, unless the product brings its own. It is placed on the wall as the generic is: the mesh's back (+y) to the wall and its geometry at its mounting height, so a product drawn from floor level needs no offset. Its manufacturer data go in `Pset_ManufacturerTypeInformation` (Manufacturer, ModelReference, ModelLabel, ArticleNumber, GlobalTradeItemNumber), set from the command's fields.
+- **Swapping.** `element.set_type` gives copies of a component another component type of the same category; each copy keeps its GlobalId, tag, place, hosting, layout tag and its own parameters. A type of another category is refused (`type.wrong_family`), since the IFC class would change.
+- **`bath.swap_product`** does the swap for the fixtures given and reports, for each: the size before and after, each connector that moved and by how much, and the `bath.check` findings that appeared or went away. Undo restores the placeholder.
+- **Documents.** A product's documents (data sheet, installation guide, O&M, warranty, EPD, HPD, certificates) are linked to its type as a material's are (COL-FE-006): a folder on this computer or on FileEngine. (Built with the product-documents step.)
+
+**Data (IFC mapping).** The product is a custom-object type (DM-IMP-015) with its psets; copies map its representation. A swap changes only the copies' `IfcRelDefinesByType`.
+
+**Commands.** See the catalog: `bath.make_product`, `bath.swap_product`; `element.set_type` (extended).
+
+**Acceptance criteria.**
+- [x] A product made from an OBJ of a WC, in place of the generic close-coupled WC, has the WC's IFC class, predefined type and connectors, and its manufacturer data in `Pset_ManufacturerTypeInformation`.
+- [x] Swapping a placed generic WC for the product keeps its GlobalId and place, reports its new size and how far its waste connector moved, and lists findings that appear; undo restores the generic.
+- [x] Swapping a WC for a mirror type is refused.
+
+*Built (2026-10-31):* `bath.make_product` (in `reviera_core::bath_components`), `element.set_type` for component copies (same category; the copy's PredefinedType and ObjectType follow the new type), `bath.swap_product` in `reviera-app`, and Make Product… and Swap for Product… (Architecture › Component and the Architecture menu). Not yet: product documents on component types (the documents bullet above), products from Component Libraries and IFC files, and matching candidates by classification.
+
 ---
 
 ## 3.10 In-place models, model text and model lines
@@ -15575,6 +15597,8 @@ All commands below are registered once in the command registry and exposed autom
 | `bath.place_component` | type_id, point, level, offset?, rotation?, host_wall?, side?, work_plane? | element_id | Yes | ARC-BATH-004 |
 | `bath.layouts` | — | [{id, title, end?, run}] | No (query) | ARC-BATH-005 |
 | `bath.layout` | template, point, level, wet_wall_id?, start?, replace?, fit_only? | {placed, fit} | Yes | ARC-BATH-005 |
+| `bath.make_product` | generic, path, name, manufacturer?, model_reference?, model_label?, article_number?, gtin?, units?, up_axis? | type_id | Yes | ARC-BATH-006 |
+| `bath.swap_product` | element_ids, type_id | [{element, size_before, size_after, connectors_moved, findings_new, findings_gone}] | Yes | ARC-BATH-006 |
 | `grab_bar.create` | level, points, wall_id?, side?, diameter?, gap? | element_id | Yes | ARC-BATH-003 |
 | `grab_bar.set` | element_ids, diameter?, gap?, top? | — | Yes | ARC-BATH-003 |
 | `enclosure.create` | form, footprint \| host_wall_ids, level_id, params | element_id | Yes | ARC-GLZ-001 |
@@ -28705,14 +28729,14 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 39 | 8 | 0 | 123 |
 | DM | 91 | 65 | 34 | 3 | 193 |
-| ARC | 77 | 78 | 14 | 1 | 170 |
+| ARC | 77 | 79 | 14 | 1 | 171 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 28 | 0 | 29 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
 | COL | 8 | 50 | 11 | 1 | 70 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **318** | **201** | **7** | **846** |
+| **Total** | **320** | **319** | **201** | **7** | **847** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -28907,7 +28931,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2264 unique commands** in 426 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2266 unique commands** in 426 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -28943,7 +28967,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `array` | 6 |
 | `assembly` | 16 |
 | `assemblytemplate` | 1 |
-| `bath` | 11 |
+| `bath` | 13 |
 | `bcf` | 33 |
 | `beam` | 6 |
 | `beam_system` | 5 |
@@ -29455,12 +29479,14 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `bath.layout` | 3 | template, point, level, wet_wall_id?, start?, replace?, fit_only? | {placed, fit} | Yes | ARC-BATH-005 |
 | `bath.layouts` | 3 | — | [{id, title, end?, run}] | No (query) | ARC-BATH-005 |
 | `bath.load_components` | 3 | names? | {name: type_id} | Yes | ARC-BATH-004 |
+| `bath.make_product` | 3 | generic, path, name, manufacturer?, model_reference?, model_label?, article_number?, gtin?, units?, up_axis? | type_id | Yes | ARC-BATH-006 |
 | `bath.place_component` | 3 | type_id, point, level, offset?, rotation?, host_wall?, side?, work_plane? | element_id | Yes | ARC-BATH-004 |
 | `bath.place_grab_bars` | 3 | element_ids? | {placed, skipped} | Yes | ARC-BATH-003 |
 | `bath.remove_rule_pack` | 3 | id | — | Yes | ARC-BATH-001 |
 | `bath.rule_packs` | 3 | — | [{id, title, layer, jurisdiction, edition, in_use, shipped, zones, distances}] | No (query) | ARC-BATH-001 |
 | `bath.set_hand` | 3 | element_ids, hand: auto\ | left\ | right | — |
 | `bath.set_rule_packs` | 3 | packs? (none for automatic) | — | Yes | ARC-BATH-001 |
+| `bath.swap_product` | 3 | element_ids, type_id | [{element, size_before, size_after, connectors_moved, findings_new, findings_gone}] | Yes | ARC-BATH-006 |
 | `bcf.add_comment` | 6 | topic_id, text, viewpoint?: current\ | none | comment_id | Yes |
 | `bcf.add_viewpoint` | 6 | topic_id, view_id? | viewpoint_id | Yes | COL-BCF-001 |
 | `bcf.api_bind_project` | 6 | connection_id, project_id | () | No | COL-BCF-002 |

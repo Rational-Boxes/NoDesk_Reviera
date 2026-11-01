@@ -4165,6 +4165,28 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 
 *Built (2026-10-31):* `reviera_core::bath_layouts`, `bath.layouts`, `bath.layout`, and Architecture › Build › Bathroom Layout (a template, the start end and replace, then a click in a plan, through the Room tool's click). A fixture's clear spaces measured from its side wall (an ADA WC's 60 in) are kept clear by the next fixture. The IRC bath rule (21 in in front of a tub) is marked advisory in `us_plumbing`: its source gives no width, and the whole length is strict where a WC stands beside the tub. Not yet: layouts that re-fit when the room changes, Jack-and-Jill and back-to-back wet walls, doors and their swings in the fit, turning spaces, and shower rooms with the shower across the end.
 
+### 3.9a.6 Products in place of placeholders
+**ID:** ARC-BATH-006 · **Priority:** P1 · **Ref:** owner requirement (2026-10-31: "support for specific realized components with provided models and documents"); `BATHROOMS_PLAN.md` §8; research/13 F1–F5
+
+**Purpose.** When a product is chosen, put the manufacturer's model in place of the placeholder without losing anything the project has hung on it, and see at once what the change does to the bathroom.
+
+**Behaviour & rules.**
+- **Making a product.** `bath.make_product` imports a manufacturer's mesh (OBJ, STL, PLY, glTF; DM-IMP-015) as a product of a generic component's kind: the same category, IFC class and predefined type (and ElementType), its connectors taken from the generic at the same places relative to the back and centre, unless the product brings its own. It is placed on the wall as the generic is: the mesh's back (+y) to the wall and its geometry at its mounting height, so a product drawn from floor level needs no offset. Its manufacturer data go in `Pset_ManufacturerTypeInformation` (Manufacturer, ModelReference, ModelLabel, ArticleNumber, GlobalTradeItemNumber), set from the command's fields.
+- **Swapping.** `element.set_type` gives copies of a component another component type of the same category; each copy keeps its GlobalId, tag, place, hosting, layout tag and its own parameters. A type of another category is refused (`type.wrong_family`), since the IFC class would change.
+- **`bath.swap_product`** does the swap for the fixtures given and reports, for each: the size before and after, each connector that moved and by how much, and the `bath.check` findings that appeared or went away. Undo restores the placeholder.
+- **Documents.** A product's documents (data sheet, installation guide, O&M, warranty, EPD, HPD, certificates) are linked to its type as a material's are (COL-FE-006): a folder on this computer or on FileEngine. (Built with the product-documents step.)
+
+**Data (IFC mapping).** The product is a custom-object type (DM-IMP-015) with its psets; copies map its representation. A swap changes only the copies' `IfcRelDefinesByType`.
+
+**Commands.** See the catalog: `bath.make_product`, `bath.swap_product`; `element.set_type` (extended).
+
+**Acceptance criteria.**
+- [x] A product made from an OBJ of a WC, in place of the generic close-coupled WC, has the WC's IFC class, predefined type and connectors, and its manufacturer data in `Pset_ManufacturerTypeInformation`.
+- [x] Swapping a placed generic WC for the product keeps its GlobalId and place, reports its new size and how far its waste connector moved, and lists findings that appear; undo restores the generic.
+- [x] Swapping a WC for a mirror type is refused.
+
+*Built (2026-10-31):* `bath.make_product` (in `reviera_core::bath_components`), `element.set_type` for component copies (same category; the copy's PredefinedType and ObjectType follow the new type), `bath.swap_product` in `reviera-app`, and Make Product… and Swap for Product… (Architecture › Component and the Architecture menu). Not yet: product documents on component types (the documents bullet above), products from Component Libraries and IFC files, and matching candidates by classification.
+
 ---
 
 ## 3.10 In-place models, model text and model lines
@@ -5351,6 +5373,8 @@ All commands below are registered once in the command registry and exposed autom
 | `bath.place_component` | type_id, point, level, offset?, rotation?, host_wall?, side?, work_plane? | element_id | Yes | ARC-BATH-004 |
 | `bath.layouts` | — | [{id, title, end?, run}] | No (query) | ARC-BATH-005 |
 | `bath.layout` | template, point, level, wet_wall_id?, start?, replace?, fit_only? | {placed, fit} | Yes | ARC-BATH-005 |
+| `bath.make_product` | generic, path, name, manufacturer?, model_reference?, model_label?, article_number?, gtin?, units?, up_axis? | type_id | Yes | ARC-BATH-006 |
+| `bath.swap_product` | element_ids, type_id | [{element, size_before, size_after, connectors_moved, findings_new, findings_gone}] | Yes | ARC-BATH-006 |
 | `grab_bar.create` | level, points, wall_id?, side?, diameter?, gap? | element_id | Yes | ARC-BATH-003 |
 | `grab_bar.set` | element_ids, diameter?, gap?, top? | — | Yes | ARC-BATH-003 |
 | `enclosure.create` | form, footprint \| host_wall_ids, level_id, params | element_id | Yes | ARC-GLZ-001 |
