@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Reviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Reviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 860 numbered requirements (320 P0 · 327 P1 · 206 P2 · 7 P3), 2,287 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 861 numbered requirements (320 P0 · 328 P1 · 206 P2 · 7 P3), 2,289 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,287 commands; 860 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,289 commands; 861 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -14791,6 +14791,36 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 
 *Built (2026-11-01):* both commands, the fixture-unit fields, the interior marker, View › Create › Bathroom Elevations and Bathroom Schedules, and both in the bathrooms sample. Not yet: tiles, rails and mounting heights dimensioned on the elevations, rooms other than rectangles, the compliance report as HTML and BCF topics (§9), tile set-out (§6.6), and the fixture-unit values themselves (the generic components carry placeholder units, not the IPC tables').
 
+### 3.9a.19 Bathroom compliance report
+**ID:** ARC-BATH-019 · **Priority:** P1 · **Ref:** `BATHROOMS_PLAN.md` §9
+
+**Purpose.** Hand Check Bathrooms' findings on as a report people can read and as issues that can be tracked.
+
+**Behaviour & rules.**
+- **`bath.report`** runs Check Bathrooms and writes an HTML report:
+  - first, the rule packs in use with their editions and layers;
+  - then each room's findings, errors first. Each row gives the fixture, the rule with its pack, edition and layer, what was found, the value measured against the rule's range, the rule's confidence and its sources.
+  
+  Rooms are named by number and name. Fixtures in no room come last. Values are shown in their units: falls and slopes in percent, loads in kPa, a sauna's volumes in m³, lengths in millimetres.
+- **`bcf.from_bath_check`** makes a BCF topic (COL-BCF-005) for each error, or each finding with `severity: all`:
+  - type Issue, status Open, titled by the rule and the fixture;
+  - described by the finding with its pack, edition, confidence and source;
+  - labelled `Bathroom` and with the pack's id;
+  - a viewpoint boxed round the fixture (`margin`, default 1 m), with the fixture and the element in its way selected, and its snapshot.
+  
+  A topic's GUID comes from the pack, rule, fixture and other element, so running it again adds only new findings. It takes one undoable step.
+- **UI.** View › Coordination › Bathroom Report (saved, then opened in the browser) and Issues from Bathrooms.
+
+**Data (IFC mapping).** The report is a file; the topics are the project's BCF issues (COL-BCF-001).
+
+**Commands.** See the catalog: `bath.report`, `bcf.from_bath_check`.
+
+**Acceptance criteria.**
+- [x] A WC 600 mm from a lavatory in a named room gives a report with that room and its error, and as many BCF topics as errors; run again, none new.
+- [x] A hot tub's load shows in kPa.
+
+*Built (2026-11-01):* both commands and their ribbon buttons. Not yet: a PDF report, per-room filtering, and closing topics whose findings are gone.
+
 ### 3.10.1 Model In-Place
 **ID:** ARC-INPL-001 · **Priority:** P1 · **Ref:** research/02 §11.1
 
@@ -16054,6 +16084,8 @@ All commands below are registered once in the command registry and exposed autom
 | `bath.steam_room` | point, level, bench_wall_id?, start?, height?, material?, exterior_wall?, floor_falls?, accessible?, replace? | {placed, ceiling, steam_head, drain?, length, depth, ceiling_high, ceiling_low, ceiling_slope, volume, design_volume, benches} | Yes | ARC-BATH-015 |
 | `bath.elevations` | point, level, name?, scale?, sheet? | {views, walls, sheet?} | Yes | ARC-BATH-018 |
 | `bath.schedules` | sheet_id? | {fixtures, accessories} | Yes | ARC-BATH-018 |
+| `bath.report` | path, title? | {path, errors, notes, rooms} | No | ARC-BATH-019 |
+| `bcf.from_bath_check` | severity?: error\|all, margin?, fields?, author? | {topic_ids, already} | Yes | ARC-BATH-019 |
 | `unit.create_type` | room_ids \| element_ids, name, bay? | {type_id, members, left_out} | Yes | ARC-GRP-004 |
 | `unit.set_connection_points` | type_id, points | — | Yes | ARC-GRP-004 |
 | `unit.array_path` | type_id, path, count \| pitch, handing?, numbering? | array_id | Yes | ARC-GRP-004 |
@@ -29195,14 +29227,14 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 39 | 8 | 0 | 123 |
 | DM | 91 | 65 | 34 | 3 | 193 |
-| ARC | 77 | 87 | 19 | 1 | 184 |
+| ARC | 77 | 88 | 19 | 1 | 185 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 28 | 0 | 29 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
 | COL | 8 | 50 | 11 | 1 | 70 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **327** | **206** | **7** | **860** |
+| **Total** | **320** | **328** | **206** | **7** | **861** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -29257,7 +29289,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.2a Reviera-originated features
 
-135 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
+136 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
 
 | Requirement | Ch | Feature |
 |-------------|----|---------|
@@ -29361,6 +29393,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | ARC-RAIL-003 | 3 | 3.7.8b Railing openings and gates |
 | ARC-DECK-001 | 3 | 3.7.8a Decks |
 | ARC-BATH-018 | 3 | 3.9a.18 Bathroom elevations and schedules |
+| ARC-BATH-019 | 3 | 3.9a.19 Bathroom compliance report |
 | ARC-MOD-030 | 3 | 3.12.2a Volume overlaps, virtual volumes and their resolution |
 | ARC-MOD-031 | 3 | 3.12.2a Volume overlaps, virtual volumes and their resolution |
 | ARC-MOD-032 | 3 | 3.12.2a Volume overlaps, virtual volumes and their resolution |
@@ -29399,7 +29432,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2287 unique commands** in 427 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2289 unique commands** in 427 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -29435,8 +29468,8 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `array` | 6 |
 | `assembly` | 16 |
 | `assemblytemplate` | 1 |
-| `bath` | 23 |
-| `bcf` | 33 |
+| `bath` | 24 |
+| `bcf` | 34 |
 | `beam` | 6 |
 | `beam_system` | 5 |
 | `bending_detail` | 1 |
@@ -29955,6 +29988,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `bath.place_component` | 3 | type_id, point, level, offset?, rotation?, host_wall?, side?, work_plane? | element_id | Yes | ARC-BATH-004 |
 | `bath.place_grab_bars` | 3 | element_ids? | {placed, skipped} | Yes | ARC-BATH-003 |
 | `bath.remove_rule_pack` | 3 | id | — | Yes | ARC-BATH-001 |
+| `bath.report` | 3 | path, title? | {path, errors, notes, rooms} | No | ARC-BATH-019 |
 | `bath.rule_packs` | 3 | — | [{id, title, layer, jurisdiction, edition, in_use, shipped, zones, distances}] | No (query) | ARC-BATH-001 |
 | `bath.sauna` | 3 | point, level, bench_wall_id?, start?, tiers?, height?, uninsulated_area?, log_walls?, heater_kw?, accessible?, replace? | {placed, heater, heater_kw, sizing, length, depth, height, benches, bench_tops} | Yes | ARC-BATH-014 |
 | `bath.schedules` | 3 | sheet_id? | {fixtures, accessories} | Yes | ARC-BATH-018 |
@@ -29982,6 +30016,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `bcf.delete_topic` | 6 | topic_ids[] | () | Yes | COL-BCF-001 |
 | `bcf.export` | 6 | path, topic_ids[]?, version: 2.1\ | 3.0 | () | No |
 | `bcf.export_viewpoint` | 6 | view_id?, path | export_report | No | COL-BCF-003 |
+| `bcf.from_bath_check` | 3 | severity?: error\ | all, margin?, fields?, author? | {topic_ids, already} | Yes |
 | `bcf.from_clash` | 6 | clash_result_ids[], group_by? | topic_ids[] | Yes | COL-BCF-005 |
 | `bcf.get` | 6 | topic_id | topic | No (query) | COL-BCF-001 |
 | `bcf.import` | 6 | path | import_report | Yes | COL-BCF-001 |

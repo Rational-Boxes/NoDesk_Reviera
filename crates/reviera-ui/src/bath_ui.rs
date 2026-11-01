@@ -628,4 +628,42 @@ impl Gui {
             Err(e) => error(&frame, &e),
         }
     }
+
+    /// View › Coordination › Bathroom Report (ARC-BATH-019): the compliance report as HTML,
+    /// opened in the browser.
+    pub(crate) fn bath_report(&mut self) {
+        let frame = self.frame;
+        let fd = FileDialog::builder(&frame)
+            .with_message("Bathroom Compliance Report")
+            .with_wildcard("HTML (*.html)|*.html")
+            .with_style(FileDialogStyle::Save | FileDialogStyle::OverwritePrompt)
+            .build();
+        if fd.show_modal() != ID_OK {
+            return;
+        }
+        let Some(mut path) = fd.get_path() else { return };
+        if !path.to_lowercase().ends_with(".html") {
+            path.push_str(".html");
+        }
+        match self.run("bath.report", json!({ "path": path })) {
+            Ok(r) => {
+                frame.set_status_text(&format!("Bathroom report: {} error(s), {} note(s), written to {path}", r["errors"], r["notes"]), 0);
+                launch_default_browser(&format!("file://{path}"), BrowserLaunchFlags::Default);
+            }
+            Err(e) => error(&frame, &e),
+        }
+    }
+
+    /// View › Coordination › Issues from Bathrooms (ARC-BATH-019).
+    pub(crate) fn bath_issues(&mut self) {
+        let frame = self.frame;
+        match self.run("bcf.from_bath_check", json!({})) {
+            Ok(r) => {
+                let (made, already) = (r["topic_ids"].as_array().map_or(0, Vec::len), r["already"].as_u64().unwrap_or(0));
+                self.refresh_scene(&frame);
+                frame.set_status_text(&format!("{made} BCF issue(s) made from Check Bathrooms' errors{}; see the Issues pane", if already > 0 { format!(", {already} already had one") } else { String::new() }), 0);
+            }
+            Err(e) => error(&frame, &e),
+        }
+    }
 }

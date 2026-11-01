@@ -912,3 +912,33 @@ fn bathroom_schedules_with_fixture_units() {
     let wsfu: f64 = col(&t, "Water Supply Fixture Units").iter().map(|v| v.parse::<f64>().unwrap()).sum();
     assert!(dfu > 0.0 && wsfu > 0.0, "{t:#}");
 }
+
+#[test]
+fn a_compliance_report_and_bcf_issues() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = new_app(dir.path());
+    // A WC 600 mm from a lavatory in a named room: the IPC's 30 in between centrelines is
+    // short, an error.
+    let (level, _) = room(&mut app, 3.0, 2.4);
+    let r = ok(&mut app, "room.place", json!({ "level_id": level, "point": [1.5, 1.2] }));
+    ok(&mut app, "room.set", json!({ "room_ids": [r], "name": "Washroom" }));
+    let t = ok(&mut app, "mep_type.load_starters", json!({ "names": ["Water Closet", "Lavatory"] }));
+    for (name, x) in [("Water Closet", 1.0), ("Lavatory", 1.6)] {
+        ok(&mut app, "plumbing_fixture.place", json!({ "type_id": t[name], "point": [x, 0.1], "level": level }));
+    }
+    let errors = errors(&mut app).len();
+    assert!(errors > 0);
+    let path = dir.path().join("report.html");
+    let rep = ok(&mut app, "bath.report", json!({ "path": path }));
+    assert_eq!(rep["errors"].as_u64().unwrap() as usize, errors, "{rep:#}");
+    let html = std::fs::read_to_string(&path).unwrap();
+    assert!(html.contains("<h1>Bathroom compliance</h1>") && html.contains("IPC") && html.contains("class=\"error\""), "{html}");
+    assert_eq!(rep["rooms"].as_array().unwrap().len(), 1, "{rep:#}");
+    // A BCF topic per error; again, none new.
+    let b = ok(&mut app, "bcf.from_bath_check", json!({}));
+    assert_eq!(b["topic_ids"].as_array().unwrap().len(), errors, "{b:#}");
+    let again = ok(&mut app, "bcf.from_bath_check", json!({}));
+    assert_eq!((again["topic_ids"].as_array().unwrap().len(), again["already"].as_u64().unwrap() as usize), (0, errors));
+    let topics = ok(&mut app, "bcf.list", json!({}));
+    assert!(topics.to_string().contains("Bathroom"), "{topics:#}");
+}

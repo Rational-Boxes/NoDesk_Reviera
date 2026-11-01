@@ -683,6 +683,9 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
   interior elevations at 1:25 on an A3 sheet, shown in plan as one interior marker; Bathroom
   Schedules makes a plumbing fixture schedule with drainage and water supply fixture units by
   room, and an accessories schedule (`bath.elevations`, `bath.schedules`).
+- **Bathroom compliance report** (ARC-BATH-019): Check Bathrooms' findings written as an HTML
+  report room by room, with each rule's pack, edition, measured value, confidence and sources,
+  or made into BCF issues with viewpoints and snapshots (`bath.report`, `bcf.from_bath_check`).
   **Not yet** (planned): living
   layouts that re-fit when the room changes, Jack-and-Jill and back-to-back wet walls,
   other packs' bars (Approved Document M's drop-down rails, shower and bath bars), room layouts, toilet cores and partitions, fixture counts,

@@ -4567,6 +4567,36 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 
 *Built (2026-11-01):* both commands, the fixture-unit fields, the interior marker, View › Create › Bathroom Elevations and Bathroom Schedules, and both in the bathrooms sample. Not yet: tiles, rails and mounting heights dimensioned on the elevations, rooms other than rectangles, the compliance report as HTML and BCF topics (§9), tile set-out (§6.6), and the fixture-unit values themselves (the generic components carry placeholder units, not the IPC tables').
 
+### 3.9a.19 Bathroom compliance report
+**ID:** ARC-BATH-019 · **Priority:** P1 · **Ref:** `BATHROOMS_PLAN.md` §9
+
+**Purpose.** Hand Check Bathrooms' findings on as a report people can read and as issues that can be tracked.
+
+**Behaviour & rules.**
+- **`bath.report`** runs Check Bathrooms and writes an HTML report:
+  - first, the rule packs in use with their editions and layers;
+  - then each room's findings, errors first. Each row gives the fixture, the rule with its pack, edition and layer, what was found, the value measured against the rule's range, the rule's confidence and its sources.
+  
+  Rooms are named by number and name. Fixtures in no room come last. Values are shown in their units: falls and slopes in percent, loads in kPa, a sauna's volumes in m³, lengths in millimetres.
+- **`bcf.from_bath_check`** makes a BCF topic (COL-BCF-005) for each error, or each finding with `severity: all`:
+  - type Issue, status Open, titled by the rule and the fixture;
+  - described by the finding with its pack, edition, confidence and source;
+  - labelled `Bathroom` and with the pack's id;
+  - a viewpoint boxed round the fixture (`margin`, default 1 m), with the fixture and the element in its way selected, and its snapshot.
+  
+  A topic's GUID comes from the pack, rule, fixture and other element, so running it again adds only new findings. It takes one undoable step.
+- **UI.** View › Coordination › Bathroom Report (saved, then opened in the browser) and Issues from Bathrooms.
+
+**Data (IFC mapping).** The report is a file; the topics are the project's BCF issues (COL-BCF-001).
+
+**Commands.** See the catalog: `bath.report`, `bcf.from_bath_check`.
+
+**Acceptance criteria.**
+- [x] A WC 600 mm from a lavatory in a named room gives a report with that room and its error, and as many BCF topics as errors; run again, none new.
+- [x] A hot tub's load shows in kPa.
+
+*Built (2026-11-01):* both commands and their ribbon buttons. Not yet: a PDF report, per-room filtering, and closing topics whose findings are gone.
+
 ### 3.10.1 Model In-Place
 **ID:** ARC-INPL-001 · **Priority:** P1 · **Ref:** research/02 §11.1
 
@@ -5830,6 +5860,8 @@ All commands below are registered once in the command registry and exposed autom
 | `bath.steam_room` | point, level, bench_wall_id?, start?, height?, material?, exterior_wall?, floor_falls?, accessible?, replace? | {placed, ceiling, steam_head, drain?, length, depth, ceiling_high, ceiling_low, ceiling_slope, volume, design_volume, benches} | Yes | ARC-BATH-015 |
 | `bath.elevations` | point, level, name?, scale?, sheet? | {views, walls, sheet?} | Yes | ARC-BATH-018 |
 | `bath.schedules` | sheet_id? | {fixtures, accessories} | Yes | ARC-BATH-018 |
+| `bath.report` | path, title? | {path, errors, notes, rooms} | No | ARC-BATH-019 |
+| `bcf.from_bath_check` | severity?: error\|all, margin?, fields?, author? | {topic_ids, already} | Yes | ARC-BATH-019 |
 | `unit.create_type` | room_ids \| element_ids, name, bay? | {type_id, members, left_out} | Yes | ARC-GRP-004 |
 | `unit.set_connection_points` | type_id, points | — | Yes | ARC-GRP-004 |
 | `unit.array_path` | type_id, path, count \| pitch, handing?, numbering? | array_id | Yes | ARC-GRP-004 |

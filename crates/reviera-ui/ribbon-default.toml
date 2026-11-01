@@ -774,6 +774,18 @@ icon = "export_csv"
 help = "Make a plumbing fixture schedule (each room's fixtures by type, with drainage and water supply fixture units, and totals) and a bathroom accessories schedule (ARC-BATH-018)"
 
 [[action]]
+id = "ui.bath_report"
+label = "Bathroom Report"
+icon = "export_csv"
+help = "Write Check Bathrooms' findings as an HTML compliance report, room by room: each rule with its pack, edition and layer, what was found, the value against the rule's range, its confidence and sources (ARC-BATH-019)"
+
+[[action]]
+id = "bcf.from_bath_check"
+label = "Issues from Bathrooms"
+icon = "bath_check"
+help = "Make a BCF issue for each Check Bathrooms error, with a viewpoint boxed round the fixture and a snapshot; running it again adds only new ones (ARC-BATH-019)"
+
+[[action]]
 id = "ui.toilet_core"
 label = "Toilet Core"
 icon = "bathroom_layout"
@@ -4140,6 +4152,8 @@ tools = [
   { action = "ui.pane.clash", size = "large" },
   { action = "overlap.find", size = "large" },
   { action = "bath.check", size = "large" },
+  { action = "ui.bath_report", size = "small" },
+  { action = "bcf.from_bath_check", size = "small" },
   { action = "bath.place_grab_bars", size = "large" },
   { action = "ui.fixture_count", size = "small" },
   { action = "geometry.remove_boolean", size = "small" },

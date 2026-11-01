@@ -452,7 +452,7 @@ pub struct FromClashReport {
 }
 
 /// A topic GUID that is the same for the same clashes: a hash of their ids as a UUID.
-fn clash_guid(ids: &[&str]) -> String {
+pub(crate) fn clash_guid(ids: &[&str]) -> String {
     let fnv = |seed: u64| ids.iter().flat_map(|s| s.bytes().chain([0u8])).fold(seed, |h, b| (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3));
     let n = (u128::from(fnv(0xcbf2_9ce4_8422_2325)) << 64) | u128::from(fnv(0x8422_2325_cbf2_9ce4));
     // Version 8 (custom), RFC 9562 variant.

@@ -26,6 +26,7 @@ pub mod csg;
 pub mod inspect;
 pub mod notes;
 pub mod output;
+pub mod bath_report;
 pub mod bathrooms;
 pub mod overlaps;
 pub mod schedules;
