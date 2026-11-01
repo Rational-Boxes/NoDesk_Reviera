@@ -49,6 +49,7 @@ const SHIPPED: &[&str] = &[
     include_str!("../../../schemas/bath/packs/england_adm.json"),
     include_str!("../../../schemas/bath/packs/uk_workplace.json"),
     include_str!("../../../schemas/bath/packs/uk_bs7671.json"),
+    include_str!("../../../schemas/bath/packs/us_spa.json"),
 ];
 
 /// How far either side of a fixture a side wall is looked for.
@@ -86,6 +87,8 @@ pub enum FixtureKind {
     /// Locker-room furniture (ARC-BATH-009), by its ElementType.
     Locker,
     Bench,
+    /// A hot tub or portable spa (ARC-BATH-013), by its ObjectType.
+    Spa,
 }
 
 impl FixtureKind {
@@ -94,6 +97,7 @@ impl FixtureKind {
         Some(match o {
             "Locker" => Self::Locker,
             "Bench" => Self::Bench,
+            "Hot Tub" => Self::Spa,
             _ => return None,
         })
     }
@@ -121,6 +125,7 @@ impl FixtureKind {
             Self::Shower => "shower",
             Self::Locker => "locker",
             Self::Bench => "bench",
+            Self::Spa => "hot tub",
         }
     }
 }
@@ -316,6 +321,8 @@ pub struct Pack {
     pub falls: Option<Falls>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub waterproofing: Vec<Waterproofing>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spa: Option<SpaRules>,
 }
 
 fn validator() -> &'static jsonschema::Validator {
@@ -391,7 +398,10 @@ pub fn automatic(store: &Store) -> Vec<String> {
     use crate::codes::Code;
     let mut out = Vec::new();
     match crate::codes::settings(store).code {
-        Code::Ibc | Code::Irc => out.push("us_plumbing".to_owned()),
+        Code::Ibc | Code::Irc => {
+            out.push("us_plumbing".to_owned());
+            out.push("us_spa".to_owned());
+        }
         Code::UkAdk => {
             out.push("england_adm".to_owned());
             out.push("uk_bs7671".to_owned());
@@ -465,12 +475,13 @@ impl Fixture {
     }
 
     fn out(&self, (from, d): (OutFrom, f64)) -> f64 {
-        // Out is −y; nothing behind the wall face.
+        // Out is −y; nothing behind a wall face, but a free-standing fixture's zone may go round
+        // it.
         let y = match from {
             OutFrom::Wall => self.back - d,
             OutFrom::Front => self.front - d,
         };
-        y.min(self.back)
+        if self.rear_wall.is_some() { y.min(self.back) } else { y }
     }
 
     /// A zone's volume, in project coordinates.
@@ -529,7 +540,7 @@ fn ray_segment(p: [f64; 2], d: [f64; 2], a: [f64; 2], b: [f64; 2]) -> Option<f64
 /// A sanitary fixture's frame, extents and side wall, if it is a bathroom fixture.
 pub fn fixture(store: &Store, e: &crate::element::Element) -> Option<Fixture> {
     let kind = match e.class.as_str() {
-        "IfcSanitaryTerminal" => None,
+        "IfcSanitaryTerminal" => e.param("@ObjectType").and_then(|v| v.as_str()).and_then(FixtureKind::from_object_type),
         "IfcFurniture" => Some(FixtureKind::from_object_type(e.param("@ObjectType")?.as_str()?)?),
         _ => return None,
     };
@@ -1763,6 +1774,62 @@ pub(crate) fn waterproofing_schedule(store: &Store, p: WaterproofingParams) -> R
     Ok(WaterproofingSchedule { wall_area: sum(Surface::Wall), floor_area: sum(Surface::Floor), extents })
 }
 
+// ---- Hot tubs and spas (ARC-BATH-013) ----
+
+/// A pack's rules for hot tubs and spas: electrical distances and the floor load.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct SpaRules {
+    pub id: String,
+    pub description: String,
+    /// In plan from the tub's outline: receptacles and wall switches at least this far.
+    pub receptacle_distance: f64,
+    pub switch_distance: f64,
+    /// Luminaires and fans over the tub (within `receptacle_distance` of it) at least this far
+    /// above the water.
+    pub luminaire_height: f64,
+    /// The water this far below the rim.
+    #[serde(default = "default_water_below_rim")]
+    pub water_below_rim: f64,
+    /// For the floor load: each seat's occupant (kg), and the live load (kPa) to compare with
+    /// on a suspended floor.
+    pub occupant_mass: f64,
+    pub floor_live_load: f64,
+    /// The pad asked for on the lowest level (m of reinforced concrete).
+    pub pad_thickness: f64,
+    pub source: String,
+    pub confidence: Confidence,
+}
+
+fn default_water_below_rim() -> f64 {
+    0.1
+}
+
+/// The type properties holding a hot tub's filled weight (kg) and seats.
+pub const SPA_WEIGHT: &str = "SpaProperties.FilledWeight";
+pub const SPA_SEATS: &str = "SpaProperties.Seats";
+
+/// A spa's filled weight and seats: on the copy, else its type.
+pub fn spa_weight(store: &Store, e: &crate::element::Element) -> Option<(f64, f64)> {
+    let num = |x: &crate::element::Element, k: &str| {
+        let v = x.param(k)?;
+        v.as_f64().or_else(|| v.get("value")?.as_f64()).or_else(|| v.as_str()?.trim().parse().ok())
+    };
+    let ty = mesh_objects::type_of(store, e).and_then(|(t, _)| store.get(t));
+    let get = |k: &str| num(e, k).or_else(|| ty.and_then(|t| num(t, k)));
+    Some((get(SPA_WEIGHT)?, get(SPA_SEATS).unwrap_or(0.0)))
+}
+
+/// A fixture's plan outline (its extents in its frame).
+pub fn outline(f: &Fixture) -> Vec<[f64; 2]> {
+    [[f.x[0], f.front], [f.x[1], f.front], [f.x[1], f.back], [f.x[0], f.back]]
+        .iter()
+        .map(|q| {
+            let w = f.frame.apply([q[0], q[1], 0.0]);
+            [w[0], w[1]]
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1770,7 +1837,7 @@ mod tests {
     #[test]
     fn the_shipped_packs_are_valid_and_cite_sources() {
         let register = include_str!("../../../design_documents/SOURCE_REGISTER.md");
-        assert_eq!(shipped().len(), 6);
+        assert_eq!(shipped().len(), 7);
         for p in shipped() {
             let sources = p.zones.iter().map(|z| &z.source).chain(p.distances.iter().map(|d| &d.source)).chain(p.bars.iter().map(|b| &b.source)).chain(p.counts.iter().map(|c| &c.source)).chain(p.electrical.iter().map(|e| &e.source));
             for s in sources {

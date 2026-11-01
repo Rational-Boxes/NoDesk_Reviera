@@ -31,10 +31,11 @@
     "counts": {"type": "array", "items": {"$ref": "#/$defs/count"}},
     "electrical": {"$ref": "#/$defs/electrical"},
     "falls": {"$ref": "#/$defs/falls"},
-    "waterproofing": {"type": "array", "items": {"$ref": "#/$defs/waterproofing"}}
+    "waterproofing": {"type": "array", "items": {"$ref": "#/$defs/waterproofing"}},
+    "spa": {"$ref": "#/$defs/spa"}
   },
   "$defs": {
-    "fixture": {"enum": ["water_closet", "urinal", "lavatory", "bidet", "bath", "shower", "locker", "bench"]},
+    "fixture": {"enum": ["water_closet", "urinal", "lavatory", "bidet", "bath", "shower", "locker", "bench", "spa"]},
     "rule": {
       "type": "object",
       "required": ["id", "description", "fixtures", "source", "confidence"],
@@ -340,6 +341,25 @@
         "floor_sides": {"type": "number", "minimum": 0},
         "whole_room": {"type": "boolean", "description": "The whole floor of the room the fixture stands in (a wet room)."},
         "class": {"type": "string", "pattern": "^W[0-3]-I$", "description": "A DIN 18534 water-exposure class, as data."},
+        "source": {"type": "string", "pattern": "^S[0-9]{4}( S[0-9]{4})*$"},
+        "confidence": {"enum": ["verified", "secondary", "advisory"]}
+      }
+    },
+    "spa": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description", "receptacle_distance", "switch_distance", "luminaire_height", "occupant_mass", "floor_live_load", "pad_thickness", "source", "confidence"],
+      "description": "Hot tubs and spas: electrical distances and the floor load.",
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "description": {"type": "string", "minLength": 1},
+        "receptacle_distance": {"type": "number", "minimum": 0, "description": "Receptacles at least this far in plan from the tub's outline (metres)."},
+        "switch_distance": {"type": "number", "minimum": 0, "description": "Wall switches at least this far in plan from the tub's outline."},
+        "luminaire_height": {"type": "number", "minimum": 0, "description": "Luminaires and fans over the tub at least this far above the water."},
+        "water_below_rim": {"type": "number", "minimum": 0, "description": "The water level below the rim (default 0.1 m)."},
+        "occupant_mass": {"type": "number", "minimum": 0, "description": "Each seat's bather, for the floor load (kg)."},
+        "floor_live_load": {"type": "number", "exclusiveMinimum": 0, "description": "The floor live load to compare with on a suspended floor (kPa)."},
+        "pad_thickness": {"type": "number", "minimum": 0, "description": "The concrete pad asked for on the lowest level (metres)."},
         "source": {"type": "string", "pattern": "^S[0-9]{4}( S[0-9]{4})*$"},
         "confidence": {"enum": ["verified", "secondary", "advisory"]}
       }

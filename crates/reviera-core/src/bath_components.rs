@@ -259,6 +259,25 @@ pub fn catalogue() -> Vec<Component> {
             shape: || Shape::default().cuboid([-0.7625, 0.7625], [-0.38, 0.38], [0.0, 0.013]),
             connectors: || shower_connectors(0.76),
         },
+        // Hot tubs (ARC-BATH-013): portable, plugged in, filled weights from spa_props.
+        Component {
+            name: "Hot tub, 2.0 × 2.0 m",
+            category: C::PlumbingFixture,
+            predefined: "USERDEFINED",
+            element_type: Some("Hot Tub"),
+            color: WOOD,
+            shape: || Shape::default().prism(&rounded([0.0, 0.0], 2.0, 2.0, 0.2), 0.0, 0.9),
+            connectors: none,
+        },
+        Component {
+            name: "Hot tub, 2.3 × 2.3 m",
+            category: C::PlumbingFixture,
+            predefined: "USERDEFINED",
+            element_type: Some("Hot Tub"),
+            color: WOOD,
+            shape: || Shape::default().prism(&rounded([0.0, 0.0], 2.3, 2.3, 0.25), 0.0, 0.95),
+            connectors: none,
+        },
         // Accessories (IfcFurniture USERDEFINED, as research/13 E3 maps them).
         Component {
             name: "Mirror, 600 × 800",
@@ -446,6 +465,16 @@ fn shower_connectors(w: f64) -> Vec<Connector> {
     ]
 }
 
+/// A hot tub's filled weight (kg) and seats: about 450 kg/m² of footprint, the middle of one
+/// maker's 400–490 (research/13 D1.6).
+fn spa_props(name: &str) -> Option<(f64, u32)> {
+    match name {
+        "Hot tub, 2.0 × 2.0 m" => Some((1800.0, 5)),
+        "Hot tub, 2.3 × 2.3 m" => Some((2400.0, 7)),
+        _ => None,
+    }
+}
+
 /// The components' names.
 pub fn names() -> Vec<&'static str> {
     catalogue().iter().map(|c| c.name).collect()
@@ -483,6 +512,10 @@ pub(crate) fn load(txn: &mut Transaction<'_>, p: LoadParams) -> Result<BTreeMap<
                     e.params.insert(MARK.into(), true.into());
                     if let Some(t) = element_type {
                         e.params.insert("@ElementType".into(), t.into());
+                    }
+                    if let Some((kg, seats)) = spa_props(c.name) {
+                        e.params.insert(crate::bath_rules::SPA_WEIGHT.into(), serde_json::json!({ "type": "IfcMassMeasure", "value": kg }));
+                        e.params.insert(crate::bath_rules::SPA_SEATS.into(), serde_json::json!({ "type": "IfcCountMeasure", "value": seats }));
                     }
                 })?;
                 id

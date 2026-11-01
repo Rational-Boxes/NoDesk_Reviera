@@ -659,10 +659,14 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
   that the rule packs want waterproof (IPC 417.4 and 419.3, IRC R307.2; a wet room's whole floor
   under Approved Document M), shown with the virtual volumes and scheduled with areas
   (Waterproofing, `bath.waterproofing`, CSV to the clipboard).
+- **Hot tubs** (ARC-BATH-013): two hot tub components with filled weights and seats; a new
+  `us_spa` pack keeps 0.9 m clear round them for service and checks NEC 680.43's indoor distances
+  (receptacles 6 ft, switches 5 ft, lights 7 ft 6 in above the water; advisory), and Check
+  Bathrooms reports the filled load on an upper floor against 40 psf, or asks for a pad.
   **Not yet** (planned): living
   layouts that re-fit when the room changes, Jack-and-Jill and back-to-back wet walls,
   other packs' bars (Approved Document M's drop-down rails, shower and bath bars), room layouts, toilet cores and partitions, fixture counts,
-  locker rooms, wet areas, spas, the generic bathroom component library and product swaps.
+  locker rooms, wet areas, saunas, steam rooms, whirlpool baths, the generic bathroom component library and product swaps.
 
 ### Structure (in development)
 

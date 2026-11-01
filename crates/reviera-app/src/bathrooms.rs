@@ -50,6 +50,8 @@ pub enum FindingKind {
     Electrical,
     /// A level-access shower's floor falling too little, too much or not at all (ARC-BATH-011).
     Falls,
+    /// A hot tub's load on the floor, or the pad it needs (ARC-BATH-013).
+    Load,
 }
 
 /// One thing the check found.
@@ -288,6 +290,7 @@ pub(crate) fn check(app: &mut App, p: CheckParams) -> Result<Vec<Finding>> {
         }
         out.extend(electrical_findings(store, only.as_deref()));
         out.extend(falls_findings(store, only.as_deref()));
+        out.extend(spa_findings(store, only.as_deref()));
         out.sort_by(|a, b| a.severity.cmp(&b.severity).then(a.element.0.cmp(&b.element.0)));
         Ok(out)
     }
@@ -543,6 +546,110 @@ fn falls_findings(store: &reviera_core::Store, only: Option<&[ElementId]>) -> Ve
                     if let Some(max) = rules.max.filter(|m| steepest > m + 1e-4) {
                         out.push(base(format!("{what}'s floor falls {}, steeper than the {} {} allows", pct(steepest), pct(max), rules.id), Some(steepest)));
                     }
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Hot tubs: devices too near them, and their load on the floor (ARC-BATH-013).
+fn spa_findings(store: &reviera_core::Store, only: Option<&[ElementId]>) -> Vec<Finding> {
+    use reviera_core::mesh_objects::{self as mo, Category};
+    let packs: Vec<bath_rules::Pack> = bath_rules::active(store).into_iter().filter(|p| p.spa.is_some()).collect();
+    let spas: Vec<bath_rules::Fixture> = bath_rules::fixtures(store).into_iter().filter(|f| f.kind == FixtureKind::Spa && !only.is_some_and(|ids| !ids.contains(&f.element))).collect();
+    if packs.is_empty() || spas.is_empty() {
+        return Vec::new();
+    }
+    // Devices: their middle and lowest point, and what they are.
+    #[derive(PartialEq)]
+    enum Dev {
+        Receptacle,
+        Switch,
+        Light,
+    }
+    let mut devices = Vec::new();
+    for e in store.iter().filter(|e| mo::mesh_object_recipe(e).is_some()) {
+        let Some((_, ty)) = mo::type_of(store, e) else { continue };
+        let dev = match ty.category {
+            Category::ElectricalFixture if ty.predefined_type() == "POWEROUTLET" => Dev::Receptacle,
+            Category::SwitchingDevice => Dev::Switch,
+            Category::LightingFixture | Category::Fan => Dev::Light,
+            _ => continue,
+        };
+        let Ok(g) = mo::regenerate(store, e) else { continue };
+        let (mut lo, mut hi) = ([f64::MAX; 3], [f64::MIN; 3]);
+        for (_, (pts, _)) in g.slot_meshes() {
+            for q in pts {
+                for k in 0..3 {
+                    lo[k] = lo[k].min(q[k]);
+                    hi[k] = hi[k].max(q[k]);
+                }
+            }
+        }
+        if lo[0] > hi[0] {
+            continue;
+        }
+        let name = e.name.clone().or_else(|| store.get(mo::type_of(store, e)?.0)?.name.clone()).unwrap_or_else(|| e.class.clone());
+        devices.push((e.id(), dev, [(lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0], lo[2], format!("{name} {}", e.id().0)));
+    }
+    let lowest = reviera_core::levels::list(store).iter().map(|l| l.elevation).fold(f64::MAX, f64::min);
+    let mut out = Vec::new();
+    for f in &spas {
+        let Some(el) = store.get(f.element) else { continue };
+        let outline = bath_rules::outline(f);
+        let rim = mo::regenerate(store, el).ok().map_or(f.floor + 0.9, |g| g.placement.origin[2] + g.mesh.positions.iter().map(|q| f64::from(q[2]) * g.placement.scale).fold(f64::MIN, f64::max));
+        let what = format!("Hot tub {}", f.element.0);
+        for pack in &packs {
+            let rules = pack.spa.as_ref().expect("filtered");
+            let sev = if pack.layer == Layer::Recommended || rules.confidence == Confidence::Advisory { Severity::Note } else { Severity::Error };
+            let base = |kind: FindingKind, message: String, other: Option<ElementId>, measured: Option<f64>, min: Option<f64>, max: Option<f64>| Finding {
+                severity: sev,
+                kind,
+                element: f.element,
+                fixture: f.kind,
+                pack: pack.id.clone(),
+                edition: pack.edition.clone(),
+                layer: pack.layer,
+                rule: rules.id.clone(),
+                description: rules.description.clone(),
+                confidence: rules.confidence,
+                source: rules.source.clone(),
+                message,
+                other,
+                depth: None,
+                centroid: None,
+                measured,
+                min,
+                max,
+            };
+            let water = rim - rules.water_below_rim;
+            for (id, dev, mid, low, label) in &devices {
+                let d = bath_rules::plan_distance(&outline, *mid);
+                let (need, what_dev) = match dev {
+                    Dev::Receptacle => (rules.receptacle_distance, "a receptacle"),
+                    Dev::Switch => (rules.switch_distance, "a wall switch"),
+                    Dev::Light => {
+                        if d < rules.receptacle_distance - 1e-6 && *low < water + rules.luminaire_height - 1e-6 {
+                            out.push(base(FindingKind::Electrical, format!("{label} is {} above {what}'s water; {} asks for at least {}", mm(*low - water), rules.id, mm(rules.luminaire_height)), Some(*id), Some(*low - water), Some(rules.luminaire_height), None));
+                        }
+                        continue;
+                    }
+                };
+                if d < need - 1e-6 {
+                    out.push(base(FindingKind::Electrical, format!("{label} is {what_dev} {} from {what}; {} asks for at least {}", mm(d), rules.id, mm(need)), Some(*id), Some(d), Some(need), None));
+                }
+            }
+            // The load on the floor: the filled weight and a bather a seat over the footprint.
+            if let Some((kg, seats)) = bath_rules::spa_weight(store, el) {
+                let area = (f.x[1] - f.x[0]) * (f.back - f.front);
+                let kpa = (kg + seats * rules.occupant_mass) * 9.81 / area.max(1e-6) / 1000.0;
+                if f.floor > lowest + 0.01 {
+                    if kpa > rules.floor_live_load {
+                        out.push(base(FindingKind::Load, format!("{what} loads its floor with {kpa:.1} kPa (filled, {seats} bathers), above the {:.2} kPa the floor is commonly designed for; check the structure", rules.floor_live_load), None, Some(kpa), None, Some(rules.floor_live_load)));
+                    }
+                } else {
+                    out.push(base(FindingKind::Load, format!("{what} ({kpa:.1} kPa filled) needs a pad of at least {} of reinforced concrete", mm(rules.pad_thickness)), None, Some(kpa), None, None));
                 }
             }
         }

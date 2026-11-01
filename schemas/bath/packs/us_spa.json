@@ -1,0 +1,53 @@
+{
+  "format": "reviera.bath-rules-1",
+  "id": "us_spa",
+  "title": "Hot tubs and spas: NEC Article 680 Part IV and manufacturer guidance",
+  "jurisdiction": "US",
+  "edition": "NEC 2017–2023 Article 680 Part IV (secondary summaries); manufacturer installation guides",
+  "layer": "minimum",
+  "notes": "NFPA 70 is behind a login; the distances are from secondary summaries that differ by edition, so findings are advisory. Outdoor spas follow the pool rules (680.22), whose receptacle distances the sources give as 6, 10 or 20 ft; only the indoor rules (680.43) are encoded. The floor load is a check prompt, not a structural design.",
+  "zones": [
+    {
+      "id": "Spa service access",
+      "description": "About 3 ft (0.9 m) clear round a portable spa so its skirt panels and equipment bay can come off",
+      "fixtures": [
+        "spa"
+      ],
+      "across": [
+        [
+          "near_edge",
+          -0.9
+        ],
+        [
+          "far_edge",
+          0.9
+        ]
+      ],
+      "out": [
+        [
+          "wall",
+          -0.9
+        ],
+        [
+          "front",
+          0.9
+        ]
+      ],
+      "source": "S1140",
+      "confidence": "advisory"
+    }
+  ],
+  "spa": {
+    "id": "NEC 680.43 indoor spa",
+    "description": "Receptacles at least 6 ft (1.83 m) from the inside wall of an indoor spa, wall switches at least 5 ft (1.52 m), luminaires and fans over it at least 7 ft 6 in (2.29 m) above the water; the filled spa and its bathers checked against the floor's 40 psf (1.92 kPa) residential live load, and a pad of at least 4 in (100 mm) of reinforced concrete on grade",
+    "receptacle_distance": 1.83,
+    "switch_distance": 1.52,
+    "luminaire_height": 2.29,
+    "water_below_rim": 0.1,
+    "occupant_mass": 80.0,
+    "floor_live_load": 1.92,
+    "pad_thickness": 0.1,
+    "source": "S1137 S1138 S1139 S1140 S1504",
+    "confidence": "advisory"
+  }
+}

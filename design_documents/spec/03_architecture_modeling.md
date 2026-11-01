@@ -4367,6 +4367,37 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 
 *Built (2026-10-31):* the `waterproofing` section of the pack schema with `us_plumbing` and `england_adm` rules, extents as virtual volumes (`clearance.list`, blue), `bath.waterproofing`, and Architecture › Build › Waterproofing with CSV to the clipboard. Not yet: strips clipped to the wall's ends and openings, overlaps between neighbouring fixtures' extents counted once, rooms other than rectangles for a wet room's floor, DIN 18534 classes in a pack, screened showers in England told from open ones, and extents drawn in elevations and plans (they show with the virtual volumes in 3D only).
 
+### 3.9a.13 Hot tubs and spas
+**ID:** ARC-BATH-013 · **Priority:** P2 · **Ref:** `BATHROOMS_PLAN.md` §7; research/13 D1
+
+**Purpose.** Place hot tubs and portable spas with their filled weight, keep their service space clear, and check the electrical distances and the load on the floor.
+
+**Behaviour & rules.**
+- **Components.** The bathroom component catalogue (ARC-BATH-004) gains hot tubs:
+  - `Hot tub, 2.0 × 2.0 m` (5 seats, 0.9 m high);
+  - `Hot tub, 2.3 × 2.3 m` (7 seats, 0.95 m high).
+  
+  They are `IfcSanitaryTerminal` USERDEFINED with ElementType `Hot Tub` (each copy's ObjectType). Each type carries its filled weight and seats (`SpaProperties.FilledWeight` in kg, `SpaProperties.Seats`), which a product (ARC-BATH-006) or `pset.set` replaces.
+- **Rules.** A new pack, `us_spa` (layer code; chosen with the IBC and IRC), holds:
+  - a service clearance of 3 ft (0.9 m) all round, a fixture zone (ARC-BATH-002) kept clear to 1.0 m (manufacturer guidance, advisory);
+  - NEC 680.43 for indoor spas (advisory: secondary sources, and they differ by edition): receptacles at least 6 ft (1.83 m) from the inside wall, wall switches at least 5 ft (1.52 m), and luminaires and fans at least 7 ft 6 in (2.29 m) above the water.
+  
+  The distances are measured in plan from the tub's outline. The water level is taken as 100 mm below the rim.
+- **Checks** in `bath.check`:
+  - a receptacle, switch, luminaire or fan nearer the tub than its rule allows (findings of kind `electrical`, as ARC-BATH-010);
+  - the floor load: the filled weight plus 80 kg a seat over the tub's footprint, in kPa. On a level above the lowest it is reported as a note to check against the floor's structure, giving the 1.92 kPa (40 psf) residential live load for comparison. On the lowest level, the note asks for a pad of at least 100 mm of reinforced concrete.
+
+**Data (IFC mapping).** `IfcSanitaryTerminal` USERDEFINED / ElementType `Hot Tub`; the filled weight and seats in the type's `SpaProperties` property set.
+
+**Commands.** Existing: `bath.load_components`, `bath.place_component`, `bath.check`, `pset.set`.
+
+**Acceptance criteria.**
+- [x] A 2.0 × 2.0 m hot tub placed indoors under the IRC has a 0.9 m clear space all round, and a vanity placed in it is reported.
+- [x] A receptacle 1.2 m from the tub is reported, and one 2.0 m away is not.
+- [x] On an upper level, the tub's load (about 5.4 kPa) is reported against 1.92 kPa; with its filled weight set to 300 kg it is not.
+
+*Built (2026-10-31):* the hot tub components with their `SpaProperties`, the `us_spa` pack (zones and the `spa` section of the pack schema), the electrical and load checks in `bath.check` (kind `load` for the floor load), and fixture zones that go round a free-standing fixture with no wall behind it. Not yet: outdoor spas (barriers, ISPSC 305, ASTM F1346 covers, NEC 680.42), steps and handrails, a deck, the floor load checked against a slab's own design load, UK and European rules (HSG282, EN 17125), swim spas, and the rest of §7 (whirlpool baths, saunas, steam rooms, accessibility).
+
 ### 3.10.1 Model In-Place
 **ID:** ARC-INPL-001 · **Priority:** P1 · **Ref:** research/02 §11.1
 

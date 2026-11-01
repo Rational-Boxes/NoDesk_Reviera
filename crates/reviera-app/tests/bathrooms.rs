@@ -72,15 +72,15 @@ fn packs_are_chosen_from_the_code_or_by_name() {
     let in_use = |app: &mut App| -> Vec<String> {
         ok(app, "bath.rule_packs", json!({})).as_array().unwrap().iter().filter(|p| p["in_use"] == true).map(|p| p["id"].as_str().unwrap().to_owned()).collect()
     };
-    assert_eq!(in_use(&mut app), ["us_plumbing"], "the IBC by default");
+    assert_eq!(in_use(&mut app), ["us_plumbing", "us_spa"], "the IBC by default");
     ok(&mut app, "code.set", json!({ "code": "irc" }));
     ok(&mut app, "clearance.set_rule_set", json!({ "standard": "ada_2010" }));
-    assert_eq!(in_use(&mut app), ["us_plumbing", "ada_2010"]);
+    assert_eq!(in_use(&mut app), ["us_plumbing", "ada_2010", "us_spa"]);
     ok(&mut app, "bath.set_rule_packs", json!({ "packs": ["us_nkba"] }));
     assert_eq!(in_use(&mut app), ["us_nkba"]);
     assert_eq!(run(&mut app, "bath.set_rule_packs", json!({ "packs": ["nope"] })).unwrap_err().code, "bath.no_pack");
     ok(&mut app, "bath.set_rule_packs", json!({}));
-    assert_eq!(in_use(&mut app), ["us_plumbing", "ada_2010"], "automatic again");
+    assert_eq!(in_use(&mut app), ["us_plumbing", "ada_2010", "us_spa"], "automatic again");
 }
 
 #[test]
@@ -695,4 +695,39 @@ fn waterproofing_extents() {
     let shower = ok(&mut app, "bath.place_component", json!({ "type_id": t["Roll-in shower, 60 × 30 in"], "point": [1.0, 0.1], "level": level })).as_u64().unwrap();
     let s = ok(&mut app, "bath.waterproofing", json!({ "element_ids": [shower] }));
     assert!((s["floor_area"].as_f64().unwrap() - 7.5).abs() < 0.05, "{s:#}");
+}
+
+#[test]
+fn a_hot_tub_its_service_space_electrics_and_load() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = new_app(dir.path());
+    // A 2 m hot tub free-standing in a 6 × 4 m room under the IRC: 0.9 m clear all round.
+    let (level, _) = room(&mut app, 6.0, 4.0);
+    ok(&mut app, "code.set", json!({ "code": "irc" }));
+    let t = ok(&mut app, "bath.load_components", json!({ "names": ["Hot tub, 2.0 × 2.0 m", "Vanity basin, 900"] }));
+    let tub = ok(&mut app, "bath.place_component", json!({ "type_id": t["Hot tub, 2.0 × 2.0 m"], "point": [2.5, 2.0], "level": level, "work_plane": true })).as_u64().unwrap();
+    let (lo, hi) = space(&mut app, tub, "Spa service access");
+    assert!((hi[0] - lo[0] - 3.8).abs() < 0.01 && (hi[1] - lo[1] - 3.8).abs() < 0.01, "{lo:?} {hi:?}");
+    // A vanity on the south wall in front of it stands in that space.
+    let vanity = ok(&mut app, "bath.place_component", json!({ "type_id": t["Vanity basin, 900"], "point": [2.5, 0.1], "level": level })).as_u64().unwrap();
+    let f = findings(&mut app);
+    assert!(f.iter().any(|x| x["element"] == tub && x["kind"] == "intrusion" && x["other"] == vanity), "{f:#?}");
+    ok(&mut app, "element.delete", json!({ "element_ids": [vanity] }));
+    // A receptacle 1.2 m from it: under 6 ft; moved to 2.0 m: fine.
+    let s = ok(&mut app, "mep_type.load_starters", json!({ "names": ["Receptacle"] }));
+    let r = ok(&mut app, "device.place", json!({ "type_id": s["Receptacle"], "point": [4.7, 2.0], "level": level, "offset": 0.4, "work_plane": true })).as_u64().unwrap();
+    let near = |app: &mut App| findings(app).into_iter().any(|x| x["element"] == tub && x["kind"] == "electrical" && x["other"] == r);
+    assert!(near(&mut app));
+    ok(&mut app, "element.move", json!({ "element_ids": [r], "vector": [0.8, 0.0, 0.0] }));
+    assert!(!near(&mut app));
+    // On the ground floor it asks for a pad.
+    let load = |app: &mut App, id: u64| findings(app).into_iter().find(|x| x["element"] == id && x["kind"] == "load");
+    assert!(load(&mut app, tub).unwrap()["message"].as_str().unwrap().contains("pad"));
+    // Upstairs: about 5.4 kPa filled against 1.92; at a filled weight of 300 kg, under it.
+    let up = ok(&mut app, "level.create", json!({ "elevation": 3.0 }));
+    let upper = ok(&mut app, "bath.place_component", json!({ "type_id": t["Hot tub, 2.0 × 2.0 m"], "point": [2.5, 2.0], "level": up, "work_plane": true })).as_u64().unwrap();
+    let l = load(&mut app, upper).unwrap();
+    assert!((l["measured"].as_f64().unwrap() - 5.4).abs() < 0.05, "{l:#}");
+    ok(&mut app, "pset.set", json!({ "element_id": upper, "pset_name": "SpaProperties", "property_name": "FilledWeight", "value": 300.0 }));
+    assert!(load(&mut app, upper).is_none());
 }

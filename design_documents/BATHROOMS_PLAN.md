@@ -6,8 +6,9 @@ Built so far (2026-10-31): rule packs and fixture clearance zones (ARC-BATH-001/
 rule (ARC-BATH-003), the generic component catalogue (ARC-BATH-004) and layout templates
 (ARC-BATH-005), products and their documents (ARC-BATH-006), fixture counts (ARC-BATH-007),
 toilet cores (ARC-BATH-008), locker rooms (ARC-BATH-009), and step 9's wet areas: electrical
-zones (ARC-BATH-010), shower falls (ARC-BATH-011) and waterproofing extents (ARC-BATH-012). Next:
-spas (§7), then schedules and elevations (§9).
+zones (ARC-BATH-010), shower falls (ARC-BATH-011) and waterproofing extents (ARC-BATH-012), and
+the first of §7: hot tubs (ARC-BATH-013). Next: the rest of §7 (whirlpool baths, saunas, steam
+rooms), then schedules and elevations (§9).
 **Owner's requests (2026-10-31):**
 - "deeper research into bathroom features, standards, and common components";
 - "review clearance rules, accessibility rules, rails, etc.";
