@@ -974,6 +974,16 @@ fn tiles_set_out_on_a_wall_and_a_floor() {
     let floor2 = ok(&mut app, "tile.create", json!({ "point": [1.0, 1.0], "level": level }));
     let s = ok(&mut app, "tile.summary", json!({ "element_ids": [floor2] }));
     assert!((s[0]["area"].as_f64().unwrap() - 2.4 * 2.0).abs() < 1e-6, "{s:#}");
+    // A door in the north wall: its tiles stop at the opening, the area less the door's.
+    let door = ok(&mut app, "door.place", json!({ "host_wall_id": walls[2], "point_along": 1.3 })).as_u64().unwrap();
+    let north = ok(&mut app, "tile.create", json!({ "wall_id": walls[2], "point": [1.2, 1.5], "top": 1.2 }));
+    let store = app.document(app.active().unwrap()).unwrap().doc.store().clone();
+    let l = reviera_core::tiles::regenerate(&store, store.get(reviera_core::ElementId(north.as_u64().unwrap())).unwrap()).unwrap();
+    let d = reviera_core::inserts::placed(&store).into_iter().find(|i| i.id.0 == door).unwrap();
+    let (dw, along) = (d.recipe.width.unwrap_or(d.ty.width), d.recipe.along);
+    assert!(l.pieces.iter().all(|p| p.max[0] <= along - dw / 2.0 + 1e-6 || p.min[0] >= along + dw / 2.0 - 1e-6), "a tile in the doorway");
+    let s = ok(&mut app, "tile.summary", json!({ "element_ids": [north] }));
+    assert!((s[0]["area"].as_f64().unwrap() - (2.4 - dw) * 1.2).abs() < 1e-6, "{s:#}");
     // Saved and reopened, the same.
     let before = ok(&mut app, "tile.summary", json!({}));
     let path = dir.path().join("tiles.ifc");

@@ -185,6 +185,35 @@ fn set_out(region: ([f64; 2], [f64; 2]), w: f64, h: f64, joint: f64, datum: Datu
     out
 }
 
+/// Pieces with openings taken out of them: each piece an opening overlaps becomes the parts of
+/// it left, below, above and right of the opening, all cut.
+fn cut_round(pieces: Vec<Piece>, holes: &[([f64; 2], [f64; 2])]) -> Vec<Piece> {
+    let mut out = pieces;
+    for (lo, hi) in holes {
+        let mut next = Vec::new();
+        for p in out {
+            let overlaps = p.min[0] < hi[0] && p.max[0] > lo[0] && p.min[1] < hi[1] && p.max[1] > lo[1];
+            if !overlaps {
+                next.push(p);
+                continue;
+            }
+            let parts = [
+                ([p.min[0], p.min[1]], [lo[0].min(p.max[0]), p.max[1]]),
+                ([hi[0].max(p.min[0]), p.min[1]], [p.max[0], p.max[1]]),
+                ([lo[0].max(p.min[0]), p.min[1]], [hi[0].min(p.max[0]), lo[1].max(p.min[1])]),
+                ([lo[0].max(p.min[0]), hi[1].min(p.max[1])], [hi[0].min(p.max[0]), p.max[1]]),
+            ];
+            for (a, b) in parts {
+                if b[0] - a[0] >= SLIVER && b[1] - a[1] >= SLIVER {
+                    next.push(Piece { min: a, max: b, full: false });
+                }
+            }
+        }
+        out = next;
+    }
+    out
+}
+
 fn inside(poly: &[[f64; 2]], p: [f64; 2]) -> bool {
     let mut c = false;
     let n = poly.len();
@@ -212,8 +241,22 @@ pub fn regenerate(store: &Store, e: &Element) -> Result<Layout> {
             let origin = [g.start[0] + nrm[0] * s * face, g.start[1] + nrm[1] * s * face, z0];
             let (u, v, n) = ([d[0], d[1], 0.0], [0.0, 0.0, 1.0], [nrm[0] * s, nrm[1] * s, 0.0]);
             let region = ([from.min(*to), *bottom], [from.max(*to), *top]);
-            let pieces = set_out(region, w, h, r.joint, r.datum, r.pattern, &|_| true);
-            let area = (region.1[0] - region.0[0]) * (region.1[1] - region.0[1]);
+            // The wall's doors and windows, in the face's axes: tiles stop at them.
+            let holes: Vec<([f64; 2], [f64; 2])> = crate::inserts::placed(store)
+                .iter()
+                .filter(|i| i.host == wall.id())
+                .map(|i| {
+                    let (iw, ih) = (i.recipe.width.unwrap_or(i.ty.width), i.recipe.height.unwrap_or(i.ty.height));
+                    let b = i.z0 - z0;
+                    ([i.recipe.along - iw / 2.0, b], [i.recipe.along + iw / 2.0, b + ih])
+                })
+                .filter_map(|(lo, hi)| {
+                    let (lo, hi) = ([lo[0].max(region.0[0]), lo[1].max(region.0[1])], [hi[0].min(region.1[0]), hi[1].min(region.1[1])]);
+                    (hi[0] > lo[0] && hi[1] > lo[1]).then_some((lo, hi))
+                })
+                .collect();
+            let pieces = cut_round(set_out(region, w, h, r.joint, r.datum, r.pattern, &|_| true), &holes);
+            let area = (region.1[0] - region.0[0]) * (region.1[1] - region.0[1]) - holes.iter().map(|(lo, hi)| (hi[0] - lo[0]) * (hi[1] - lo[1])).sum::<f64>();
             let layout = Layout { pieces, origin, u, v, n, thickness: r.thickness, area };
             Ok(layout)
         }
