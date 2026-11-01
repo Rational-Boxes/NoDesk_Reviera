@@ -14528,7 +14528,7 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 - [x] A socket 1.5 m from the bath's zone 1 is reported, and one 3 m away is not.
 - [x] A luminaire in zone 1 rated IPX4 passes, one rated IP20 is reported, and one with no rating gets a note.
 
-*Built (2026-10-31):* the `electrical` section of the pack schema, the `uk_bs7671` pack (chosen with England's code), zones as virtual volumes in `clearances::all` (yellow, passed by `clearance.check`), and the device checks in `bath.check`. Not yet: NEC luminaire rules for the US (410.10(D), not verified; receptacles are ARC-BATH-021), shaver units and SELV equipment told apart, the zones' drawn volumes clipped by walls (the checks already pass a device with a wall between it and the fixture), screens and partial walls (DIN VDE 0100-701's "string" round a partial wall), and IP ratings in the component catalogue.
+*Built (2026-10-31):* the `electrical` section of the pack schema, the `uk_bs7671` pack (chosen with England's code), zones as virtual volumes in `clearances::all` (yellow, passed by `clearance.check`), and the device checks in `bath.check`. Not yet: NEC luminaire rules for the US (410.10(D), not verified; receptacles are ARC-BATH-021), shaver units and SELV equipment told apart, the zones' drawn volumes clipped by walls (the checks already pass a device with a wall between it and the fixture), screens and partial walls (DIN VDE 0100-701's "string" round a partial wall), and IP ratings for the catalogue's other electrical components (the heated towel rail is IPX4; the hand dryer has none, as no source gave one).
 
 ### 3.9a.11 Shower falls
 **ID:** ARC-BATH-011 · **Priority:** P1 · **Ref:** `BATHROOMS_PLAN.md` §6.5; research/13 A4, A9

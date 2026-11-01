@@ -660,6 +660,11 @@ pub(crate) fn load(txn: &mut Transaction<'_>, p: LoadParams) -> Result<BTreeMap<
                     if let Some(t) = element_type {
                         e.params.insert("@ElementType".into(), t.into());
                     }
+                    if c.name == "Heated towel rail, 500 × 800" {
+                        // Rated for BS 7671's zone 1 when fixed (research/13 E3); a product's own
+                        // rating replaces it.
+                        e.params.insert("Pset_ElectricalDeviceCommon.IP_Code".into(), serde_json::json!({ "type": "IfcLabel", "value": "IPX4" }));
+                    }
                     if c.name == "Whirlpool bath, 1700 × 750" {
                         // IFC's bath type for a whirlpool (PEnum_BathType SPA), and its pump.
                         e.params.insert("Pset_SanitaryTerminalTypeBath.BathType".into(), serde_json::json!({ "type": "IfcLabel", "value": "SPA" }));

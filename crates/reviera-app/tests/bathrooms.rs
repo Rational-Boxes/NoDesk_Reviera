@@ -620,6 +620,11 @@ fn bathroom_electrical_zones() {
     assert_eq!(state(&mut app).as_deref(), Some("error"));
     ok(&mut app, "pset.set", json!({ "element_id": lum, "pset_name": "Pset_ElectricalDeviceCommon", "property_name": "IP_Code", "value": "IPX4" }));
     assert_eq!(state(&mut app), None);
+    // The generic heated towel rail carries IPX4: in zone 1 by the bath, nothing to report.
+    let rail_t = ok(&mut app, "bath.load_components", json!({ "names": ["Heated towel rail, 500 × 800"] }));
+    let rail = ok(&mut app, "bath.place_component", json!({ "type_id": rail_t["Heated towel rail, 500 × 800"], "point": [1.0, 0.75], "level": level, "work_plane": true })).as_u64().unwrap();
+    let f = findings(&mut app);
+    assert!(!f.iter().any(|x| x["other"] == rail), "{f:#?}");
 }
 
 /// A floor over a `room`'s inside.
