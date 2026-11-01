@@ -133,6 +133,21 @@ fn put(txn: &mut Transaction<'_>, mut d: ProductDocs) -> Result<()> {
     })
 }
 
+/// The key of a component type's documentation (ARC-BATH-006): `type:` and its GlobalId, beside
+/// the materials' names.
+pub const TYPE_PREFIX: &str = "type:";
+
+/// The documentation key of a component type.
+pub fn type_key(e: &Element) -> String {
+    format!("{TYPE_PREFIX}{}", e.guid())
+}
+
+/// The component type a documentation key names, if it names one.
+pub fn type_of_key(store: &Store, key: &str) -> Option<crate::id::ElementId> {
+    let guid = key.strip_prefix(TYPE_PREFIX)?;
+    store.find_by_guid(&crate::id::GlobalId::parse(guid)?)
+}
+
 fn material_name(m: &str) -> Result<String> {
     let m = m.trim();
     if m.is_empty() {
@@ -284,6 +299,9 @@ fn factor_id(epd: &str) -> String {
 /// `docs.set_values`.
 pub(crate) fn set_values(txn: &mut Transaction<'_>, p: SetValuesParams) -> Result<SetValuesOut> {
     let m = material_name(&p.material)?;
+    if p.carbon.is_some() && m.starts_with(TYPE_PREFIX) {
+        return Err(bad("docs.invalid_input", "carbon factors are made for materials; a product's EPD values are kept with its type"));
+    }
     let set = p.set.trim().to_lowercase();
     if set.is_empty() || !set.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
         return Err(bad("docs.invalid_input", "a field set is named in letters, digits and _ (epd, hpd)"));
@@ -355,7 +373,13 @@ pub(crate) fn set_values(txn: &mut Transaction<'_>, p: SetValuesParams) -> Resul
 
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct MaterialOut {
+    /// The material's name, or `type:` and a component type's GlobalId.
     pub material: String,
+    /// What to show: the material's name, or "Product: " and the type's name.
+    pub label: String,
+    /// The component type, for a product's documentation.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub type_id: Option<crate::id::ElementId>,
     /// Whether a wall, floor, ceiling or roof uses it.
     pub in_use: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -372,13 +396,32 @@ pub(crate) fn materials(store: &Store, _: embodied_carbon::Empty) -> Result<Vec<
     for k in d.materials.keys() {
         names.entry(k.clone()).or_insert(false);
     }
-    Ok(names
+    // Products (component types with manufacturer data, ARC-BATH-006), documented or not.
+    let mut copies: BTreeMap<String, usize> = BTreeMap::new();
+    for e in store.iter().filter(|e| crate::mesh_objects::mesh_object_recipe(e).is_some()) {
+        if let Some(t) = e.param("@type").and_then(serde_json::Value::as_str) {
+            *copies.entry(t.to_owned()).or_default() += 1;
+        }
+    }
+    for t in store.iter().filter(|e| crate::mesh_objects::mesh_object_type(e).is_some() && e.params.keys().any(|k| k.starts_with("Pset_ManufacturerTypeInformation."))) {
+        names.entry(type_key(t)).or_insert(copies.get(&t.guid().to_string()).is_some_and(|n| *n > 0));
+    }
+    let mut out: Vec<MaterialOut> = names
         .into_iter()
         .map(|(material, in_use)| {
             let md = d.materials.get(&material).cloned().unwrap_or_default();
-            MaterialOut { material, in_use, link: md.link, values: md.values }
+            let type_id = type_of_key(store, &material);
+            let label = match type_id.and_then(|t| store.get(t)) {
+                Some(t) => format!("Product: {}", t.name.clone().unwrap_or_default()),
+                None if material.starts_with(TYPE_PREFIX) => "Product: (type gone)".to_owned(),
+                None => material.clone(),
+            };
+            MaterialOut { material, label, type_id, in_use, link: md.link, values: md.values }
         })
-        .collect())
+        .collect();
+    // Materials first, then products.
+    out.sort_by_key(|m| m.type_id.is_some());
+    Ok(out)
 }
 
 #[cfg(test)]

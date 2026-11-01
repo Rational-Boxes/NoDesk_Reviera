@@ -738,6 +738,12 @@ icon = "bathroom"
 help = "Make a manufacturer's model (OBJ, STL, PLY, glTF) into a product of a bathroom placeholder's kind: its IFC class and pipe connections, at its mounting height, with the manufacturer's data (ARC-BATH-006)"
 
 [[action]]
+id = "ui.product_documents"
+label = "Product Documents..."
+icon = "bathroom"
+help = "The selected component's product documents (data sheet, installation guide, O&M, warranty, EPD, HPD, certificates): a folder on this computer or on FileEngine, and the values taken from them, kept with its type (ARC-BATH-006)"
+
+[[action]]
 id = "ui.swap_for_product"
 label = "Swap for Product..."
 icon = "bathroom"
@@ -3415,6 +3421,7 @@ tools = [
   { action = "mesh_object.import", size = "small" },
   { action = "ui.make_product", size = "small" },
   { action = "ui.swap_for_product", size = "small" },
+  { action = "ui.product_documents", size = "small" },
   { action = "ui.pane.components", size = "small" },
   { action = "library.import_files", size = "small" },
 ]
@@ -4631,7 +4638,7 @@ items = [
   "ceiling.create", "ceiling.edit_boundary", "roof.create_footprint", "roof.edit_footprint", "-",
   "room.place", "room.place_automatically", "-",
   "roof.create_extrusion", "slabedge.create", "enclosure.create", "roof.create_geodesic", "growing.layout", "growing.lights", "-",
-  "ui.place_bathroom_component", "ui.bathroom_layout", "ui.make_product", "ui.swap_for_product", "bath.place_grab_bars", "bath.check", "-",
+  "ui.place_bathroom_component", "ui.bathroom_layout", "ui.make_product", "ui.swap_for_product", "ui.product_documents", "bath.place_grab_bars", "bath.check", "-",
   "opening.create_wall", "opening.create_vertical", "opening.create_by_face", "opening.create_shaft", "-",
   "grid.create", "level.create", "refplane.create", "modelline.create", "-",
   "workplane.set", "workplane.show",

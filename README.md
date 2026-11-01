@@ -632,8 +632,10 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
   height, with Pset_ManufacturerTypeInformation), and Swap for Product… gives selected
   placeholders the product's type, keeping their identity, with a report of size changes,
   connections moved and findings gained or resolved (`bath.make_product`, `bath.swap_product`;
-  `element.set_type` now swaps component types too). **Not yet** (planned): product documents
-  on component types, living
+  `element.set_type` now swaps component types too). Product Documents… links a product's
+  documents folder (local or FileEngine) and values to its type, saved as an
+  `IfcRelAssociatesDocument` and property sets on the type (`docs.*` with `type:<GlobalId>`).
+  **Not yet** (planned): living
   layouts that re-fit when the room changes, Jack-and-Jill and back-to-back wet walls,
   other packs' bars (Approved Document M's drop-down rails, shower and bath bars), room layouts, toilet cores and partitions, fixture counts,
   locker rooms, wet areas, spas, the generic bathroom component library and product swaps.

@@ -379,17 +379,7 @@ fn a_product_in_place_of_a_placeholder() {
     let wc = ok(&mut app, "bath.place_component", json!({ "type_id": types["WC, close-coupled"], "point": [2.0, -0.3], "level": level })).as_u64().unwrap();
     let guid = ok(&mut app, "element.get_ids", json!({ "element_ids": [wc] }))[0]["guid"].clone();
 
-    // A manufacturer's WC, drawn with its front toward −x: 620 deep along x, 360 wide, 800 high.
-    let obj = dir.path().join("acme_wc.obj");
-    let (x, y, z) = (0.31, 0.18, 0.8);
-    let mut text = String::new();
-    for (a, b, c) in [(-x, -y, 0.0), (x, -y, 0.0), (x, y, 0.0), (-x, y, 0.0), (-x, -y, z), (x, -y, z), (x, y, z), (-x, y, z)] {
-        text.push_str(&format!("v {a} {b} {c}\n"));
-    }
-    for f in ["1 3 2", "1 4 3", "5 6 7", "5 7 8", "1 2 6", "1 6 5", "2 3 7", "2 7 6", "3 4 8", "3 8 7", "4 1 5", "4 5 8"] {
-        text.push_str(&format!("f {f}\n"));
-    }
-    std::fs::write(&obj, text).unwrap();
+    let obj = box_obj(dir.path());
     let product = ok(&mut app, "bath.make_product", json!({ "generic": types["WC, close-coupled"], "path": obj, "name": "Acme Model 1", "turn": 90.0, "units": "m", "manufacturer": "Acme", "model_label": "Model 1", "article_number": "A-100" })).as_u64().unwrap();
     let listed = ok(&mut app, "mesh_object.types", json!({}));
     let t = listed.as_array().unwrap().iter().find(|t| t["id"] == product).unwrap();
@@ -419,4 +409,53 @@ fn a_product_in_place_of_a_placeholder() {
     assert_eq!(back.as_array().unwrap().iter().find(|t| t["id"] == types["WC, close-coupled"]).unwrap()["copies"], 1);
     // A mirror is not a WC.
     assert_eq!(run(&mut app, "bath.swap_product", json!({ "element_ids": [wc], "type_id": types["Mirror, 600 × 800"] })).unwrap_err().code, "type.wrong_family");
+}
+
+/// A manufacturer's WC as an OBJ, drawn with its front toward −x: 620 deep along x, 360 wide,
+/// 800 high.
+fn box_obj(dir: &std::path::Path) -> std::path::PathBuf {
+    let obj = dir.join("acme_wc.obj");
+    let (x, y, z) = (0.31, 0.18, 0.8);
+    let mut text = String::new();
+    for (a, b, c) in [(-x, -y, 0.0), (x, -y, 0.0), (x, y, 0.0), (-x, y, 0.0), (-x, -y, z), (x, -y, z), (x, y, z), (-x, y, z)] {
+        text.push_str(&format!("v {a} {b} {c}\n"));
+    }
+    for f in ["1 3 2", "1 4 3", "5 6 7", "5 7 8", "1 2 6", "1 6 5", "2 3 7", "2 7 6", "3 4 8", "3 8 7", "4 1 5", "4 5 8"] {
+        text.push_str(&format!("f {f}\n"));
+    }
+    std::fs::write(&obj, text).unwrap();
+    obj
+}
+
+#[test]
+fn a_products_documents_go_with_its_type() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = new_app(dir.path());
+    let level = model(&mut app);
+    let types = ok(&mut app, "bath.load_components", json!({ "names": ["WC, close-coupled"] }));
+    let product = ok(&mut app, "bath.make_product", json!({ "generic": types["WC, close-coupled"], "path": box_obj(dir.path()), "name": "Acme Model 1", "turn": 90.0, "units": "m", "manufacturer": "Acme" })).as_u64().unwrap();
+    ok(&mut app, "bath.place_component", json!({ "type_id": product, "point": [2.0, -0.3], "level": level }));
+    // Generic placeholders are not listed; the product is.
+    let listed = ok(&mut app, "docs.materials", json!({}));
+    let p = listed.as_array().unwrap().iter().find(|m| m["type_id"] == product).unwrap_or_else(|| panic!("{listed:#}")).clone();
+    assert_eq!(p["label"], "Product: Acme Model 1");
+    assert!(!listed.as_array().unwrap().iter().any(|m| m["label"] == "Product: WC, close-coupled"));
+    let key = p["material"].as_str().unwrap().to_owned();
+
+    let docs = dir.path().join("Acme Model 1 documents");
+    std::fs::create_dir(&docs).unwrap();
+    std::fs::write(docs.join("data sheet.pdf"), b"%PDF- a data sheet").unwrap();
+    std::fs::write(docs.join("epd.pdf"), b"%PDF- an EPD").unwrap();
+    ok(&mut app, "docs.link", json!({ "material": key, "path": docs }));
+    ok(&mut app, "docs.set_doc_type", json!({ "material": key, "file_uid": "epd.pdf", "doc_type": "EPD" }));
+    ok(&mut app, "docs.enter_values", json!({ "material": key, "set": "epd", "values": { "epd_number": "EPD-ACME-1", "gwp_a1a3": "45" }, "units": { "gwp_a1a3": "kg CO2 eq" } }));
+    assert_eq!(run(&mut app, "docs.enter_values", json!({ "material": key, "set": "epd", "carbon": true, "values": { "gwp_a1a3": "45", "declared_unit": "1 piece" } })).unwrap_err().code, "docs.invalid_input", "carbon factors are for materials");
+
+    let path = dir.path().join("documented.ifc");
+    ok(&mut app, "file.save_as", json!({ "path": path }));
+    ok(&mut app, "file.save", json!({}));
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert_eq!(text.matches("IFCRELASSOCIATESDOCUMENT(").count(), 1, "once, after two saves");
+    assert_eq!(text.lines().filter(|l| l.contains("IFCPROPERTYSET(") && l.contains("'Reviera_EPD'")).count(), 1);
+    assert!(text.contains("'EPD-ACME-1'") && text.contains("Acme Model 1 documents"));
 }

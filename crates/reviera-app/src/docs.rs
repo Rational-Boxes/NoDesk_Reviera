@@ -781,13 +781,13 @@ pub(crate) fn report_html(app: &mut App, caller: &Caller, carbon_run_id: Option<
         if md.is_some_and(|d| d.link.is_some() || !d.values.is_empty()) {
             documented += 1;
         } else if m.in_use {
-            warnings.push(format!("{}: in use, with no product documentation", m.material));
+            warnings.push(format!("{}: in use, with no product documentation", m.label));
         }
         let mut cell = |set: &str, number: Option<String>, until: Option<String>| -> String {
             let Some(n) = number else { return "<span class=\"muted\">none</span>".into() };
             let state = validity(until.as_deref(), &today);
             if !state.is_empty() {
-                warnings.push(format!("{}: the {set} {n} {state} ({})", m.material, until.clone().unwrap_or_default()));
+                warnings.push(format!("{}: the {set} {n} {state} ({})", m.label, until.clone().unwrap_or_default()));
             }
             format!("{}<br><span class=\"muted\">valid until {}</span>{}", esc(&n), esc(until.as_deref().unwrap_or("?")), if state.is_empty() { String::new() } else { format!(" <span class=\"warn\">{state}</span>") })
         };
@@ -798,7 +798,7 @@ pub(crate) fn report_html(app: &mut App, caller: &Caller, carbon_run_id: Option<
             _ => String::new(),
         };
         let folder = md.and_then(|d| d.link.as_ref()).map_or_else(String::new, |l| esc(&l.folder_name));
-        h.push_str(&format!("<tr><td>{}</td><td>{}</td><td>{folder}</td><td>{epd_cell}</td><td>{gwp}</td><td>{hpd_cell}</td></tr>", esc(&m.material), if m.in_use { "yes" } else { "no" }));
+        h.push_str(&format!("<tr><td>{}</td><td>{}</td><td>{folder}</td><td>{epd_cell}</td><td>{gwp}</td><td>{hpd_cell}</td></tr>", esc(&m.label), if m.in_use { "yes" } else { "no" }));
     }
     h.push_str("</table>");
 
@@ -870,7 +870,7 @@ pub(crate) fn report_html(app: &mut App, caller: &Caller, carbon_run_id: Option<
 
 fn run_materials(app: &mut App, caller: &Caller) -> Result<Vec<reviera_core::product_docs::MaterialOut>> {
     let v = app.execute("docs.materials", json!({}), caller)?.result;
-    Ok(v.as_array().into_iter().flatten().map(|m| reviera_core::product_docs::MaterialOut { material: m["material"].as_str().unwrap_or("").to_owned(), in_use: m["in_use"] == true, link: None, values: BTreeMap::new() }).collect())
+    Ok(v.as_array().into_iter().flatten().map(|m| reviera_core::product_docs::MaterialOut { material: m["material"].as_str().unwrap_or("").to_owned(), label: m["label"].as_str().or(m["material"].as_str()).unwrap_or("").to_owned(), type_id: serde_json::from_value(m["type_id"].clone()).ok(), in_use: m["in_use"] == true, link: None, values: BTreeMap::new() }).collect())
 }
 
 host!(DocsReport, "docs.report", "Write the material documentation report",

@@ -82,7 +82,7 @@ fn main_dialog(frame: &Frame, materials: &[Value], at: usize, docs: &[Value], no
                 (false, false) if m["in_use"] == true => "in use, not documented",
                 _ => "not in use",
             };
-            format!("{} ({state})", m["material"].as_str().unwrap_or(""))
+            format!("{} ({state})", m["label"].as_str().or(m["material"].as_str()).unwrap_or(""))
         })
         .collect();
     let choice = Choice::builder(&dialog).with_choices(if names.is_empty() { vec!["No materials: walls, floors, ceilings and roofs name them".into()] } else { names.clone() }).build();
@@ -261,17 +261,42 @@ fn review(frame: &Frame, run: &Value) -> Option<Accepted> {
 impl Gui {
     /// File › Material Documents…
     pub(crate) fn material_documents(&mut self) {
+        self.material_documents_at(None);
+    }
+
+    /// Architecture › Product Documents (ARC-BATH-006): the Material Documents dialog on the
+    /// selected component's type.
+    pub(crate) fn product_documents(&mut self) {
+        let frame = self.frame;
+        let Some(store) = self.store_now() else { return };
+        let key = self.selection().iter().filter_map(|id| store.get(*id)).find_map(|e| {
+            let ty = if reviera_core::mesh_objects::mesh_object_type(e).is_some() { Some(e) } else { reviera_core::mesh_objects::type_of(&store, e).and_then(|(t, _)| store.get(t)) }?;
+            Some(reviera_core::product_docs::type_key(ty))
+        });
+        match key {
+            Some(k) => self.material_documents_at(Some(k)),
+            None => error(&frame, "Select a placed component (a fixture, a product) first."),
+        }
+    }
+
+    fn material_documents_at(&mut self, start: Option<String>) {
         let frame = self.frame;
         if self.app.active().is_none() {
             return error(&frame, "Open a project first.");
         }
         let mut at = 0usize;
+        let mut start = start;
         let mut note = String::new();
         loop {
             let materials = match self.run("docs.materials", json!({})) {
                 Ok(v) => v.as_array().cloned().unwrap_or_default(),
                 Err(e) => return error(&frame, &format!("The materials could not be read:\n{e}")),
             };
+            if let Some(k) = start.take()
+                && let Some(i) = materials.iter().position(|m| m["material"] == k.as_str())
+            {
+                at = i;
+            }
             at = at.min(materials.len().saturating_sub(1));
             let m = materials.get(at).cloned();
             let name = m.as_ref().and_then(|m| m["material"].as_str()).unwrap_or("").to_owned();

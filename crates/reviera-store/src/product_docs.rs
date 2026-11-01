@@ -12,13 +12,73 @@
 
 use std::collections::{BTreeSet, HashMap};
 
-use reviera_core::Document;
+use reviera_core::{Document, GlobalId};
 use reviera_ifc::{AttrValue, IfcModel, StepId};
 use serde_json::Value;
 
 use crate::Result;
 
 const TAG: &str = "rxd:product_docs";
+
+/// The document reference for a link: its location and identification.
+fn reference(ifc: &mut IfcModel, l: &reviera_core::product_docs::Link) -> Result<StepId> {
+    let s = |v: &str| AttrValue::String(v.into());
+    let r = ifc.create("IfcDocumentReference")?;
+    let (location, identification) = match &l.path {
+        Some(p) if l.is_local() => (format!("file://{}", p.replace('\\', "/").trim_start_matches('/').split('/').fold(String::new(), |a, c| a + "/" + c)), p.clone()),
+        _ if l.url.is_empty() => (format!("fileengine://{}/{}", l.connection_id, l.folder_uid), l.folder_uid.clone()),
+        _ => (format!("{}#folder={}", l.url.trim_end_matches('/'), l.folder_uid), l.folder_uid.clone()),
+    };
+    ifc.set_attribute(r, "Location", &s(&location))?;
+    ifc.set_attribute(r, "Identification", &s(&identification))?;
+    if !l.folder_name.is_empty() {
+        ifc.set_attribute(r, "Name", &s(&l.folder_name))?;
+    }
+    ifc.set_attribute(r, "Description", &s(TAG))?;
+    Ok(r)
+}
+
+/// A component type's documentation: its folder associated with the type, and its values as
+/// property sets the type holds.
+fn write_type_docs(ifc: &mut IfcModel, ty: StepId, md: &reviera_core::product_docs::MaterialDocs) -> Result<()> {
+    let s = |v: &str| AttrValue::String(v.into());
+    if let Some(l) = &md.link {
+        let r = reference(ifc, l)?;
+        let rel = ifc.create_rooted("IfcRelAssociatesDocument", &GlobalId::new())?;
+        ifc.set_attribute(rel, "Name", &s("Product documentation"))?;
+        ifc.set_attribute(rel, "Description", &s(TAG))?;
+        ifc.set_attribute(rel, "RelatedObjects", &AttrValue::List(vec![AttrValue::Ref(ty.0)]))?;
+        ifc.set_attribute(rel, "RelatingDocument", &AttrValue::Ref(r.0))?;
+    }
+    let mut sets = match ifc.attribute(ty, "HasPropertySets")? {
+        AttrValue::List(v) => v,
+        _ => Vec::new(),
+    };
+    for (set, values) in &md.values {
+        let mut props = Vec::new();
+        for (field, t) in values {
+            let Some(v) = nominal(&t.value) else { continue };
+            let p = ifc.create("IfcPropertySingleValue")?;
+            ifc.set_attribute(p, "Name", &s(if t.property.is_empty() { field } else { &t.property }))?;
+            ifc.set_attribute(p, "Description", &s(TAG))?;
+            ifc.set_attribute(p, "NominalValue", &v)?;
+            props.push(AttrValue::Ref(p.0));
+        }
+        if props.is_empty() {
+            continue;
+        }
+        let pset = md.psets.get(set).cloned().unwrap_or_else(|| format!("Reviera_{}", set.to_uppercase()));
+        let ps = ifc.create_rooted("IfcPropertySet", &GlobalId::new())?;
+        ifc.set_attribute(ps, "Name", &s(&pset))?;
+        ifc.set_attribute(ps, "Description", &s(TAG))?;
+        ifc.set_attribute(ps, "HasProperties", &AttrValue::List(props))?;
+        sets.push(AttrValue::Ref(ps.0));
+    }
+    if !sets.is_empty() {
+        ifc.set_attribute(ty, "HasPropertySets", &AttrValue::List(sets))?;
+    }
+    Ok(())
+}
 
 fn ours(ifc: &IfcModel, id: StepId) -> bool {
     matches!(ifc.attribute(id, "Description"), Ok(AttrValue::String(d)) if d == TAG || d.starts_with("rxd:product_docs "))
@@ -42,7 +102,7 @@ pub(crate) fn write_product_docs(ifc: &mut IfcModel, doc: &Document) -> Result<(
     if ifc.schema() == "IFC2X3" {
         return Ok(());
     }
-    for class in ["IfcExternalReferenceRelationship", "IfcDocumentReference", "IfcMaterialProperties", "IfcPropertySingleValue", "IfcMaterial"] {
+    for class in ["IfcExternalReferenceRelationship", "IfcRelAssociatesDocument", "IfcDocumentReference", "IfcMaterialProperties", "IfcPropertySet", "IfcPropertySingleValue", "IfcMaterial"] {
         for e in ifc.entities_of_type(class)? {
             if ours(ifc, e.id) {
                 ifc.remove(e.id)?;
@@ -61,6 +121,12 @@ pub(crate) fn write_product_docs(ifc: &mut IfcModel, doc: &Document) -> Result<(
     }
     let s = |v: &str| AttrValue::String(v.into());
     for (name, md) in &data.materials {
+        // A product's documentation goes on its type (ARC-BATH-006).
+        if let Some(guid) = name.strip_prefix(reviera_core::product_docs::TYPE_PREFIX) {
+            let Some(ty) = GlobalId::parse(guid).and_then(|g| ifc.find_by_guid(&g)) else { continue };
+            write_type_docs(ifc, ty, md)?;
+            continue;
+        }
         let material = match materials.get(name) {
             Some(m) => *m,
             None => {
@@ -71,19 +137,8 @@ pub(crate) fn write_product_docs(ifc: &mut IfcModel, doc: &Document) -> Result<(
             }
         };
         if let Some(l) = &md.link {
-            let r = ifc.create("IfcDocumentReference")?;
-            let (location, identification) = match &l.path {
-                // A local folder: a file URI, identified by its path.
-                Some(p) if l.is_local() => (format!("file://{}", p.replace('\\', "/").trim_start_matches('/').split('/').fold(String::new(), |a, c| a + "/" + c)), p.clone()),
-                _ if l.url.is_empty() => (format!("fileengine://{}/{}", l.connection_id, l.folder_uid), l.folder_uid.clone()),
-                _ => (format!("{}#folder={}", l.url.trim_end_matches('/'), l.folder_uid), l.folder_uid.clone()),
-            };
-            ifc.set_attribute(r, "Location", &s(&location))?;
-            ifc.set_attribute(r, "Identification", &s(&identification))?;
-            if !l.folder_name.is_empty() {
-                ifc.set_attribute(r, "Name", &s(&l.folder_name))?;
-            }
-            ifc.set_attribute(r, "Description", &s(TAG))?;
+            // A local folder: a file URI, identified by its path.
+            let r = reference(ifc, l)?;
             let rel = ifc.create("IfcExternalReferenceRelationship")?;
             ifc.set_attribute(rel, "Name", &s("Product documentation"))?;
             ifc.set_attribute(rel, "Description", &s(TAG))?;
