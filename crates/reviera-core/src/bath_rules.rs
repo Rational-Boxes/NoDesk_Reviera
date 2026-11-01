@@ -337,6 +337,8 @@ pub struct Pack {
     pub steam: Option<SteamRules>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub spa_access: Option<SpaAccess>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub whirlpool: Option<Whirlpool>,
 }
 
 fn validator() -> &'static jsonschema::Validator {
@@ -669,6 +671,7 @@ pub fn spaces_of(store: &Store, f: &Fixture, packs: &[Pack]) -> Vec<Space> {
         }
     }
     out.extend(heater_space(store, f));
+    out.extend(pump_access_space(store, f, packs));
     out
 }
 
@@ -1991,6 +1994,7 @@ pub fn product_pack() -> Pack {
         sauna: None,
         steam: None,
         spa_access: None,
+        whirlpool: None,
     }
 }
 
@@ -2149,6 +2153,61 @@ pub fn piece(store: &Store, e: &crate::element::Element, floor: f64) -> Option<P
         })
         .collect();
     Some(Piece { element: e.id(), outline, length: hi[0] - lo[0], depth: hi[1] - lo[1], top: g.placement.origin[2] + hi[2] - floor, end_top: g.placement.origin[2] + end_top - floor })
+}
+
+// ---- Whirlpool baths (ARC-BATH-017) ----
+
+/// A pack's rule for a whirlpool bath's pump access.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct Whirlpool {
+    pub id: String,
+    pub description: String,
+    /// The access opening's least width and height, in the bath's apron at the pump.
+    pub opening: f64,
+    /// Kept clear in front of the opening, to take the panel off and reach the pump.
+    pub clear_depth: f64,
+    pub source: String,
+    pub confidence: Confidence,
+}
+
+/// A whirlpool bath's pump: along its length from its middle (metres), a property of its type
+/// or product; a bath without it has no pump.
+pub const PUMP_POSITION: &str = "WhirlpoolBath.PumpPosition";
+
+/// The space kept clear in front of a whirlpool bath's pump access, under the packs' rules.
+fn pump_access_space(store: &Store, f: &Fixture, packs: &[Pack]) -> Option<Space> {
+    if f.kind != FixtureKind::Bath {
+        return None;
+    }
+    let e = store.get(f.element)?;
+    let pump = product_number(store, e, PUMP_POSITION)?;
+    let (pack, r) = packs.iter().find_map(|p| p.whirlpool.as_ref().map(|w| (p, w)))?;
+    let half = r.opening / 2.0;
+    let (x0, x1) = ((pump - half).max(f.x[0]), (pump + half).min(f.x[1]));
+    let outline: Vec<[f64; 2]> = [[x0, f.front - r.clear_depth], [x1, f.front - r.clear_depth], [x1, f.front], [x0, f.front]]
+        .iter()
+        .map(|q| {
+            let w = f.frame.apply([q[0], q[1], 0.0]);
+            [w[0], w[1]]
+        })
+        .collect();
+    let zone = Zone {
+        id: r.id.clone(),
+        description: r.description.clone(),
+        fixtures: vec![FixtureKind::Bath],
+        occupancy: RuleOccupancy::default(),
+        source: r.source.clone(),
+        confidence: r.confidence,
+        across: [(AcrossFrom::Centre, x0), (AcrossFrom::Centre, x1)],
+        out: [(OutFrom::Front, 0.0), (OutFrom::Front, r.clear_depth)],
+        height: Some(r.opening),
+        door_swing: None,
+    };
+    Some(Space {
+        clearance: Clearance { element: f.element, kind: ClearanceKind::FixtureSpace, rule: zone.id.clone(), mesh: extrude(&outline, &[], f.floor + 0.005, f.floor + r.opening), door_swing_forbidden: false },
+        pack: pack.id.clone(),
+        zone,
+    })
 }
 
 #[cfg(test)]

@@ -10,38 +10,124 @@
     {
       "id": "IPC 405.3.1 side",
       "description": "15 in (381 mm) from the centreline of a WC, urinal, lavatory or bidet to any side wall, partition, vanity or other fixture; 30 in between centrelines",
-      "fixtures": ["water_closet", "urinal", "lavatory", "bidet"],
-      "across": [["centre", -0.381], ["centre", 0.381]],
-      "out": [["wall", 0.0], ["front", 0.0]],
+      "fixtures": [
+        "water_closet",
+        "urinal",
+        "lavatory",
+        "bidet"
+      ],
+      "across": [
+        [
+          "centre",
+          -0.381
+        ],
+        [
+          "centre",
+          0.381
+        ]
+      ],
+      "out": [
+        [
+          "wall",
+          0.0
+        ],
+        [
+          "front",
+          0.0
+        ]
+      ],
       "source": "S0873 S0878",
       "confidence": "verified"
     },
     {
       "id": "IPC 405.3.1 front",
       "description": "21 in (533 mm) clear in front of a WC, urinal, lavatory or bidet to any wall, fixture or door",
-      "fixtures": ["water_closet", "urinal", "lavatory", "bidet"],
-      "across": [["centre", -0.381], ["centre", 0.381]],
-      "out": [["front", 0.0], ["front", 0.533]],
+      "fixtures": [
+        "water_closet",
+        "urinal",
+        "lavatory",
+        "bidet"
+      ],
+      "across": [
+        [
+          "centre",
+          -0.381
+        ],
+        [
+          "centre",
+          0.381
+        ]
+      ],
+      "out": [
+        [
+          "front",
+          0.0
+        ],
+        [
+          "front",
+          0.533
+        ]
+      ],
       "source": "S0873 S0878",
       "confidence": "verified"
     },
     {
       "id": "IRC R307.1 shower",
       "description": "24 in (610 mm) clear in front of a shower opening",
-      "fixtures": ["shower"],
+      "fixtures": [
+        "shower"
+      ],
       "occupancy": "dwelling",
-      "across": [["near_edge", 0.0], ["far_edge", 0.0]],
-      "out": [["front", 0.0], ["front", 0.61]],
+      "across": [
+        [
+          "near_edge",
+          0.0
+        ],
+        [
+          "far_edge",
+          0.0
+        ]
+      ],
+      "out": [
+        [
+          "front",
+          0.0
+        ],
+        [
+          "front",
+          0.61
+        ]
+      ],
       "source": "S0883 S0884",
       "confidence": "secondary"
     },
     {
       "id": "IRC R307.1 bath",
       "description": "21 in (533 mm) clear in front of a bathtub; the source gives no width, so the whole length is taken, which is strict where a WC stands beside the tub",
-      "fixtures": ["bath"],
+      "fixtures": [
+        "bath"
+      ],
       "occupancy": "dwelling",
-      "across": [["near_edge", 0.0], ["far_edge", 0.0]],
-      "out": [["front", 0.0], ["front", 0.533]],
+      "across": [
+        [
+          "near_edge",
+          0.0
+        ],
+        [
+          "far_edge",
+          0.0
+        ]
+      ],
+      "out": [
+        [
+          "front",
+          0.0
+        ],
+        [
+          "front",
+          0.533
+        ]
+      ],
       "source": "S0886",
       "confidence": "advisory"
     }
@@ -52,11 +138,47 @@
       "occupancy": "A-1",
       "description": "Theatres and other assembly with fixed seats for performances",
       "fixtures": {
-        "water_closet_male": {"basis": "male", "ratio": [{"per": 125}]},
-        "water_closet_female": {"basis": "female", "ratio": [{"per": 65}]},
-        "lavatory": {"basis": "each_sex", "ratio": [{"per": 200}]},
-        "drinking_fountain": {"basis": "total", "ratio": [{"per": 500}]},
-        "service_sink": {"basis": "total", "table": [[1, 1]]}
+        "water_closet_male": {
+          "basis": "male",
+          "ratio": [
+            {
+              "per": 125
+            }
+          ]
+        },
+        "water_closet_female": {
+          "basis": "female",
+          "ratio": [
+            {
+              "per": 65
+            }
+          ]
+        },
+        "lavatory": {
+          "basis": "each_sex",
+          "ratio": [
+            {
+              "per": 200
+            }
+          ]
+        },
+        "drinking_fountain": {
+          "basis": "total",
+          "ratio": [
+            {
+              "per": 500
+            }
+          ]
+        },
+        "service_sink": {
+          "basis": "total",
+          "table": [
+            [
+              1,
+              1
+            ]
+          ]
+        }
       },
       "source": "S0873",
       "confidence": "verified",
@@ -67,10 +189,39 @@
       "occupancy": "A-2 nightclubs",
       "description": "Nightclubs, bars, taverns, dance halls",
       "fixtures": {
-        "water_closet": {"basis": "each_sex", "ratio": [{"per": 40}]},
-        "lavatory": {"basis": "each_sex", "ratio": [{"per": 75}]},
-        "drinking_fountain": {"basis": "total", "ratio": [{"per": 500}]},
-        "service_sink": {"basis": "total", "table": [[1, 1]]}
+        "water_closet": {
+          "basis": "each_sex",
+          "ratio": [
+            {
+              "per": 40
+            }
+          ]
+        },
+        "lavatory": {
+          "basis": "each_sex",
+          "ratio": [
+            {
+              "per": 75
+            }
+          ]
+        },
+        "drinking_fountain": {
+          "basis": "total",
+          "ratio": [
+            {
+              "per": 500
+            }
+          ]
+        },
+        "service_sink": {
+          "basis": "total",
+          "table": [
+            [
+              1,
+              1
+            ]
+          ]
+        }
       },
       "source": "S0873",
       "confidence": "verified",
@@ -81,10 +232,39 @@
       "occupancy": "A-2 restaurants",
       "description": "Restaurants, banquet halls, food courts",
       "fixtures": {
-        "water_closet": {"basis": "each_sex", "ratio": [{"per": 75}]},
-        "lavatory": {"basis": "each_sex", "ratio": [{"per": 200}]},
-        "drinking_fountain": {"basis": "total", "ratio": [{"per": 500}]},
-        "service_sink": {"basis": "total", "table": [[1, 1]]}
+        "water_closet": {
+          "basis": "each_sex",
+          "ratio": [
+            {
+              "per": 75
+            }
+          ]
+        },
+        "lavatory": {
+          "basis": "each_sex",
+          "ratio": [
+            {
+              "per": 200
+            }
+          ]
+        },
+        "drinking_fountain": {
+          "basis": "total",
+          "ratio": [
+            {
+              "per": 500
+            }
+          ]
+        },
+        "service_sink": {
+          "basis": "total",
+          "table": [
+            [
+              1,
+              1
+            ]
+          ]
+        }
       },
       "source": "S0873",
       "confidence": "verified",
@@ -95,11 +275,47 @@
       "occupancy": "A-3",
       "description": "Auditoriums without fixed seats, galleries, libraries, gymnasiums",
       "fixtures": {
-        "water_closet_male": {"basis": "male", "ratio": [{"per": 125}]},
-        "water_closet_female": {"basis": "female", "ratio": [{"per": 65}]},
-        "lavatory": {"basis": "each_sex", "ratio": [{"per": 200}]},
-        "drinking_fountain": {"basis": "total", "ratio": [{"per": 500}]},
-        "service_sink": {"basis": "total", "table": [[1, 1]]}
+        "water_closet_male": {
+          "basis": "male",
+          "ratio": [
+            {
+              "per": 125
+            }
+          ]
+        },
+        "water_closet_female": {
+          "basis": "female",
+          "ratio": [
+            {
+              "per": 65
+            }
+          ]
+        },
+        "lavatory": {
+          "basis": "each_sex",
+          "ratio": [
+            {
+              "per": 200
+            }
+          ]
+        },
+        "drinking_fountain": {
+          "basis": "total",
+          "ratio": [
+            {
+              "per": 500
+            }
+          ]
+        },
+        "service_sink": {
+          "basis": "total",
+          "table": [
+            [
+              1,
+              1
+            ]
+          ]
+        }
       },
       "source": "S0873 S1095",
       "confidence": "verified",
@@ -110,11 +326,47 @@
       "occupancy": "A-3 worship",
       "description": "Places of worship",
       "fixtures": {
-        "water_closet_male": {"basis": "male", "ratio": [{"per": 150}]},
-        "water_closet_female": {"basis": "female", "ratio": [{"per": 75}]},
-        "lavatory": {"basis": "each_sex", "ratio": [{"per": 200}]},
-        "drinking_fountain": {"basis": "total", "ratio": [{"per": 1000}]},
-        "service_sink": {"basis": "total", "table": [[1, 1]]}
+        "water_closet_male": {
+          "basis": "male",
+          "ratio": [
+            {
+              "per": 150
+            }
+          ]
+        },
+        "water_closet_female": {
+          "basis": "female",
+          "ratio": [
+            {
+              "per": 75
+            }
+          ]
+        },
+        "lavatory": {
+          "basis": "each_sex",
+          "ratio": [
+            {
+              "per": 200
+            }
+          ]
+        },
+        "drinking_fountain": {
+          "basis": "total",
+          "ratio": [
+            {
+              "per": 1000
+            }
+          ]
+        },
+        "service_sink": {
+          "basis": "total",
+          "table": [
+            [
+              1,
+              1
+            ]
+          ]
+        }
       },
       "source": "S0873",
       "confidence": "verified",
@@ -125,12 +377,63 @@
       "occupancy": "A-4/A-5",
       "description": "Arenas, rinks, swimming pools, stadiums",
       "fixtures": {
-        "water_closet_male": {"basis": "male", "ratio": [{"to": 1500, "per": 75}, {"per": 120}]},
-        "water_closet_female": {"basis": "female", "ratio": [{"to": 1520, "per": 40}, {"per": 60}]},
-        "lavatory_male": {"basis": "male", "ratio": [{"per": 200}]},
-        "lavatory_female": {"basis": "female", "ratio": [{"per": 150}]},
-        "drinking_fountain": {"basis": "total", "ratio": [{"per": 1000}]},
-        "service_sink": {"basis": "total", "table": [[1, 1]]}
+        "water_closet_male": {
+          "basis": "male",
+          "ratio": [
+            {
+              "to": 1500,
+              "per": 75
+            },
+            {
+              "per": 120
+            }
+          ]
+        },
+        "water_closet_female": {
+          "basis": "female",
+          "ratio": [
+            {
+              "to": 1520,
+              "per": 40
+            },
+            {
+              "per": 60
+            }
+          ]
+        },
+        "lavatory_male": {
+          "basis": "male",
+          "ratio": [
+            {
+              "per": 200
+            }
+          ]
+        },
+        "lavatory_female": {
+          "basis": "female",
+          "ratio": [
+            {
+              "per": 150
+            }
+          ]
+        },
+        "drinking_fountain": {
+          "basis": "total",
+          "ratio": [
+            {
+              "per": 1000
+            }
+          ]
+        },
+        "service_sink": {
+          "basis": "total",
+          "table": [
+            [
+              1,
+              1
+            ]
+          ]
+        }
       },
       "source": "S0873 S1095",
       "confidence": "verified",
@@ -141,10 +444,47 @@
       "occupancy": "B",
       "description": "Business (offices, banks, outpatient clinics)",
       "fixtures": {
-        "water_closet": {"basis": "each_sex", "ratio": [{"to": 50, "per": 25}, {"per": 50}]},
-        "lavatory": {"basis": "each_sex", "ratio": [{"to": 80, "per": 40}, {"per": 80}]},
-        "drinking_fountain": {"basis": "total", "ratio": [{"per": 100}]},
-        "service_sink": {"basis": "total", "table": [[1, 1]]}
+        "water_closet": {
+          "basis": "each_sex",
+          "ratio": [
+            {
+              "to": 50,
+              "per": 25
+            },
+            {
+              "per": 50
+            }
+          ]
+        },
+        "lavatory": {
+          "basis": "each_sex",
+          "ratio": [
+            {
+              "to": 80,
+              "per": 40
+            },
+            {
+              "per": 80
+            }
+          ]
+        },
+        "drinking_fountain": {
+          "basis": "total",
+          "ratio": [
+            {
+              "per": 100
+            }
+          ]
+        },
+        "service_sink": {
+          "basis": "total",
+          "table": [
+            [
+              1,
+              1
+            ]
+          ]
+        }
       },
       "source": "S0874",
       "confidence": "verified",
@@ -155,10 +495,39 @@
       "occupancy": "E",
       "description": "Educational",
       "fixtures": {
-        "water_closet": {"basis": "each_sex", "ratio": [{"per": 50}]},
-        "lavatory": {"basis": "each_sex", "ratio": [{"per": 50}]},
-        "drinking_fountain": {"basis": "total", "ratio": [{"per": 100}]},
-        "service_sink": {"basis": "total", "table": [[1, 1]]}
+        "water_closet": {
+          "basis": "each_sex",
+          "ratio": [
+            {
+              "per": 50
+            }
+          ]
+        },
+        "lavatory": {
+          "basis": "each_sex",
+          "ratio": [
+            {
+              "per": 50
+            }
+          ]
+        },
+        "drinking_fountain": {
+          "basis": "total",
+          "ratio": [
+            {
+              "per": 100
+            }
+          ]
+        },
+        "service_sink": {
+          "basis": "total",
+          "table": [
+            [
+              1,
+              1
+            ]
+          ]
+        }
       },
       "source": "S0873 S1095",
       "confidence": "verified",
@@ -169,10 +538,39 @@
       "occupancy": "F-1/F-2",
       "description": "Factories",
       "fixtures": {
-        "water_closet": {"basis": "each_sex", "ratio": [{"per": 100}]},
-        "lavatory": {"basis": "each_sex", "ratio": [{"per": 100}]},
-        "drinking_fountain": {"basis": "total", "ratio": [{"per": 400}]},
-        "service_sink": {"basis": "total", "table": [[1, 1]]}
+        "water_closet": {
+          "basis": "each_sex",
+          "ratio": [
+            {
+              "per": 100
+            }
+          ]
+        },
+        "lavatory": {
+          "basis": "each_sex",
+          "ratio": [
+            {
+              "per": 100
+            }
+          ]
+        },
+        "drinking_fountain": {
+          "basis": "total",
+          "ratio": [
+            {
+              "per": 400
+            }
+          ]
+        },
+        "service_sink": {
+          "basis": "total",
+          "table": [
+            [
+              1,
+              1
+            ]
+          ]
+        }
       },
       "source": "S0873",
       "confidence": "verified",
@@ -183,10 +581,39 @@
       "occupancy": "M",
       "description": "Mercantile (no customer facilities for 50 or fewer)",
       "fixtures": {
-        "water_closet": {"basis": "each_sex", "ratio": [{"per": 500}]},
-        "lavatory": {"basis": "each_sex", "ratio": [{"per": 750}]},
-        "drinking_fountain": {"basis": "total", "ratio": [{"per": 1000}]},
-        "service_sink": {"basis": "total", "table": [[1, 1]]}
+        "water_closet": {
+          "basis": "each_sex",
+          "ratio": [
+            {
+              "per": 500
+            }
+          ]
+        },
+        "lavatory": {
+          "basis": "each_sex",
+          "ratio": [
+            {
+              "per": 750
+            }
+          ]
+        },
+        "drinking_fountain": {
+          "basis": "total",
+          "ratio": [
+            {
+              "per": 1000
+            }
+          ]
+        },
+        "service_sink": {
+          "basis": "total",
+          "table": [
+            [
+              1,
+              1
+            ]
+          ]
+        }
       },
       "source": "S0873",
       "confidence": "verified",
@@ -197,9 +624,30 @@
       "occupancy": "R-1",
       "description": "Hotels and motels: per sleeping unit",
       "fixtures": {
-        "water_closet": {"basis": "unit", "ratio": [{"per": 1}]},
-        "lavatory": {"basis": "unit", "ratio": [{"per": 1}]},
-        "shower": {"basis": "unit", "ratio": [{"per": 1}]}
+        "water_closet": {
+          "basis": "unit",
+          "ratio": [
+            {
+              "per": 1
+            }
+          ]
+        },
+        "lavatory": {
+          "basis": "unit",
+          "ratio": [
+            {
+              "per": 1
+            }
+          ]
+        },
+        "shower": {
+          "basis": "unit",
+          "ratio": [
+            {
+              "per": 1
+            }
+          ]
+        }
       },
       "source": "S0873",
       "confidence": "verified"
@@ -209,9 +657,30 @@
       "occupancy": "R-2/R-3",
       "description": "Apartments and dwellings: per dwelling unit",
       "fixtures": {
-        "water_closet": {"basis": "unit", "ratio": [{"per": 1}]},
-        "lavatory": {"basis": "unit", "ratio": [{"per": 1}]},
-        "shower": {"basis": "unit", "ratio": [{"per": 1}]}
+        "water_closet": {
+          "basis": "unit",
+          "ratio": [
+            {
+              "per": 1
+            }
+          ]
+        },
+        "lavatory": {
+          "basis": "unit",
+          "ratio": [
+            {
+              "per": 1
+            }
+          ]
+        },
+        "shower": {
+          "basis": "unit",
+          "ratio": [
+            {
+              "per": 1
+            }
+          ]
+        }
       },
       "source": "S0873",
       "confidence": "verified"
@@ -221,10 +690,38 @@
       "occupancy": "R-2 dormitories",
       "description": "Dormitories, R-4 and I-1",
       "fixtures": {
-        "water_closet": {"basis": "each_sex", "ratio": [{"per": 10}]},
-        "lavatory": {"basis": "each_sex", "ratio": [{"per": 10}]},
-        "shower": {"basis": "total", "ratio": [{"per": 8}]},
-        "drinking_fountain": {"basis": "total", "ratio": [{"per": 100}]}
+        "water_closet": {
+          "basis": "each_sex",
+          "ratio": [
+            {
+              "per": 10
+            }
+          ]
+        },
+        "lavatory": {
+          "basis": "each_sex",
+          "ratio": [
+            {
+              "per": 10
+            }
+          ]
+        },
+        "shower": {
+          "basis": "total",
+          "ratio": [
+            {
+              "per": 8
+            }
+          ]
+        },
+        "drinking_fountain": {
+          "basis": "total",
+          "ratio": [
+            {
+              "per": 100
+            }
+          ]
+        }
       },
       "source": "S0873",
       "confidence": "verified",
@@ -235,10 +732,39 @@
       "occupancy": "S",
       "description": "Storage",
       "fixtures": {
-        "water_closet": {"basis": "each_sex", "ratio": [{"per": 100}]},
-        "lavatory": {"basis": "each_sex", "ratio": [{"per": 100}]},
-        "drinking_fountain": {"basis": "total", "ratio": [{"per": 1000}]},
-        "service_sink": {"basis": "total", "table": [[1, 1]]}
+        "water_closet": {
+          "basis": "each_sex",
+          "ratio": [
+            {
+              "per": 100
+            }
+          ]
+        },
+        "lavatory": {
+          "basis": "each_sex",
+          "ratio": [
+            {
+              "per": 100
+            }
+          ]
+        },
+        "drinking_fountain": {
+          "basis": "total",
+          "ratio": [
+            {
+              "per": 1000
+            }
+          ]
+        },
+        "service_sink": {
+          "basis": "total",
+          "table": [
+            [
+              1,
+              1
+            ]
+          ]
+        }
       },
       "source": "S0873",
       "confidence": "verified",
@@ -289,5 +815,13 @@
       "source": "S0873",
       "confidence": "verified"
     }
-  ]
+  ],
+  "whirlpool": {
+    "id": "IRC P2720 whirlpool pump access",
+    "description": "A whirlpool bathtub's pump reachable through an access opening at least 18 × 18 in (457 mm), a panel or door closing it, where the pump is more than 2 ft from the opening; the space in front of the opening kept clear to take the panel off",
+    "opening": 0.457,
+    "clear_depth": 0.6,
+    "source": "S1159 S1160",
+    "confidence": "secondary"
+  }
 }

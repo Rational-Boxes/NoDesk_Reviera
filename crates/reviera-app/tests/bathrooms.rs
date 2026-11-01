@@ -837,3 +837,24 @@ fn accessible_saunas_and_spas() {
     ok(&mut app, "bath.place_component", json!({ "type_id": t["Spa transfer wall"], "point": [3.0, 3.2], "level": level, "work_plane": true }));
     assert_eq!(access(&mut app), Vec::<String>::new());
 }
+
+#[test]
+fn a_whirlpool_baths_pump_access_is_kept_clear() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = new_app(dir.path());
+    // A whirlpool bath along the south wall under the IRC: 18 in clear at its pump, 600 mm out.
+    let (level, _) = room(&mut app, 3.0, 2.4);
+    ok(&mut app, "code.set", json!({ "code": "irc" }));
+    let t = ok(&mut app, "bath.load_components", json!({ "names": ["Whirlpool bath, 1700 × 750", "Bath, 1700 × 700", "Vanity basin, 900"] }));
+    let tub = ok(&mut app, "bath.place_component", json!({ "type_id": t["Whirlpool bath, 1700 × 750"], "point": [1.0, 0.1], "level": level })).as_u64().unwrap();
+    let (lo, hi) = space(&mut app, tub, "IRC P2720 whirlpool pump access");
+    assert!((hi[0] - lo[0] - 0.457).abs() < 0.01 && (hi[1] - lo[1] - 0.6).abs() < 0.01 && (hi[2] - 0.457).abs() < 0.01, "{lo:?} {hi:?}");
+    // A plain bath has no pump.
+    let plain = ok(&mut app, "bath.place_component", json!({ "type_id": t["Bath, 1700 × 700"], "point": [1.0, 2.3], "level": level })).as_u64().unwrap();
+    assert!(spaces(&mut app, plain).iter().all(|(r, _, _)| !r.contains("P2720")));
+    // A vanity standing in front of the pump.
+    let mid = [(lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0];
+    let v = ok(&mut app, "bath.place_component", json!({ "type_id": t["Vanity basin, 900"], "point": mid, "level": level, "work_plane": true })).as_u64().unwrap();
+    let f = findings(&mut app);
+    assert!(f.iter().any(|x| x["element"] == tub && x["other"] == v && x["rule"] == "IRC P2720 whirlpool pump access"), "{f:#?}");
+}

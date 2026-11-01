@@ -677,10 +677,12 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
   a sauna or steam room for a §903 bench and a 60 in turning space, and a spa outside a dwelling
   for a pool lift, transfer wall or transfer system; Sauna and Steam Room lay out an accessible
   bench, and the components include a transfer wall and a pool lift.
+- **Whirlpool baths** (ARC-BATH-017): a whirlpool bath component whose pump position is product
+  data; the IRC's 18 × 18 in pump access is kept clear in front of its apron.
   **Not yet** (planned): living
   layouts that re-fit when the room changes, Jack-and-Jill and back-to-back wet walls,
   other packs' bars (Approved Document M's drop-down rails, shower and bath bars), room layouts, toilet cores and partitions, fixture counts,
-  locker rooms, wet areas, whirlpool baths, the generic bathroom component library and product swaps.
+  locker rooms, wet areas, the generic bathroom component library and product swaps.
 
 ### Structure (in development)
 

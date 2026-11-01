@@ -35,7 +35,8 @@
     "spa": {"$ref": "#/$defs/spa"},
     "sauna": {"$ref": "#/$defs/sauna"},
     "steam": {"$ref": "#/$defs/steam"},
-    "spa_access": {"$ref": "#/$defs/spa_access"}
+    "spa_access": {"$ref": "#/$defs/spa_access"},
+    "whirlpool": {"$ref": "#/$defs/whirlpool"}
   },
   "$defs": {
     "fixture": {"enum": ["water_closet", "urinal", "lavatory", "bidet", "bath", "shower", "locker", "bench", "spa", "sauna_heater", "steam_head"]},
@@ -431,6 +432,20 @@
         "transfer_wall_height": {"$ref": "#/$defs/pair"},
         "transfer_wall_depth": {"$ref": "#/$defs/pair"},
         "transfer_wall_length": {"type": "number", "exclusiveMinimum": 0},
+        "source": {"type": "string", "pattern": "^S[0-9]{4}( S[0-9]{4})*$"},
+        "confidence": {"enum": ["verified", "secondary", "advisory"]}
+      }
+    },
+    "whirlpool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description", "opening", "clear_depth", "source", "confidence"],
+      "description": "A whirlpool bath's pump access: the opening in its apron at the pump, and the space kept clear in front of it. The pump's position is the bath type's WhirlpoolBath.PumpPosition.",
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "description": {"type": "string", "minLength": 1},
+        "opening": {"type": "number", "exclusiveMinimum": 0, "description": "The opening's least width and height (metres)."},
+        "clear_depth": {"type": "number", "exclusiveMinimum": 0, "description": "Kept clear in front of it (metres)."},
         "source": {"type": "string", "pattern": "^S[0-9]{4}( S[0-9]{4})*$"},
         "confidence": {"enum": ["verified", "secondary", "advisory"]}
       }

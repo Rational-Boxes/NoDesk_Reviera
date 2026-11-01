@@ -4521,6 +4521,27 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 
 *Built (2026-11-01):* the `spa_access` section and its `ada_2010` values, the components, `accessible` on the Sauna and Steam Room tools and dialogs, and the checks. Not yet: the transfer wall's 60 × 60 in clear deck and its grab bars' gaps checked, the pool lift's seat and deck, transfer systems' steps, the door kept out of the bench's clear floor space, clusters (5 % of spas), and UK guidance (none public for spas).
 
+### 3.9a.17 Whirlpool baths
+**ID:** ARC-BATH-017 · **Priority:** P2 · **Ref:** `BATHROOMS_PLAN.md` §7; research/13 D2
+
+**Purpose.** Keep a whirlpool bath's pump reachable: the access opening in its apron, and the space in front of it, stay clear.
+
+**Behaviour & rules.**
+- **The pump** is a property of the bath's type or product: `WhirlpoolBath.PumpPosition`, along the bath from its middle (metres). A bath without it has no pump.
+- **Component.** `Whirlpool bath, 1700 × 750` carries `Pset_SanitaryTerminalTypeBath.BathType` SPA (IFC's whirlpool) and its pump 600 mm toward the foot end.
+- **Rule.** A pack's `whirlpool` section gives the opening's least size and the depth kept clear in front of it. `us_plumbing`: the IRC's P2720 access opening of at least 18 × 18 in (457 mm), with 600 mm in front of it kept clear (secondary: an approved code change and a state notice). The opening is assumed at the pump. The IRC asks for one where the pump is more than 2 ft from an opening.
+- **The space** is a fixture zone (ARC-BATH-002): 457 mm wide at the pump, 600 mm out from the apron, 457 mm high. What stands in it is reported by `bath.check` and `clearance.check`. A wall or vanity built across the apron there is caught.
+
+**Data (IFC mapping).** The bath as `IfcSanitaryTerminal` BATH with `Pset_SanitaryTerminalTypeBath.BathType` SPA; its pump's position in `WhirlpoolBath`.
+
+**Commands.** Existing: `bath.load_components`, `bath.place_component`, `bath.check`, `clearance.list`.
+
+**Acceptance criteria.**
+- [x] A whirlpool bath under the IRC has a 457 × 600 mm space at its pump, 457 mm high; a plain bath has none.
+- [x] A vanity standing in it is reported.
+
+*Built (2026-11-01):* the `whirlpool` section and its `us_plumbing` values, the component and the zone. Not yet: the access panel drawn in the apron, NEC Part VII (the pump's GFCI circuit and its receptacle within 1 ft of the opening), and a bath enclosed on its apron side by tiling (the opening is then cut into it, which Reviera does not model).
+
 ### 3.10.1 Model In-Place
 **ID:** ARC-INPL-001 · **Priority:** P1 · **Ref:** research/02 §11.1
 

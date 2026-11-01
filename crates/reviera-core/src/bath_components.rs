@@ -222,6 +222,16 @@ pub fn catalogue() -> Vec<Component> {
             connectors: || bath_connectors(1.7, 0.7),
         },
         Component {
+            name: "Whirlpool bath, 1700 × 750",
+            category: C::PlumbingFixture,
+            predefined: "BATH",
+            element_type: None,
+            color: WHITE,
+            // As the 1700 bath, 750 wide; its pump under the foot end, 600 mm from the middle.
+            shape: || bath_shape(1.7, 0.75, 0.55),
+            connectors: || bath_connectors(1.7, 0.75),
+        },
+        Component {
             name: "Bath, 60 × 30 in",
             category: C::PlumbingFixture,
             predefined: "BATH",
@@ -620,6 +630,11 @@ pub(crate) fn load(txn: &mut Transaction<'_>, p: LoadParams) -> Result<BTreeMap<
                     e.params.insert(MARK.into(), true.into());
                     if let Some(t) = element_type {
                         e.params.insert("@ElementType".into(), t.into());
+                    }
+                    if c.name == "Whirlpool bath, 1700 × 750" {
+                        // IFC's bath type for a whirlpool (PEnum_BathType SPA), and its pump.
+                        e.params.insert("Pset_SanitaryTerminalTypeBath.BathType".into(), serde_json::json!({ "type": "IfcLabel", "value": "SPA" }));
+                        e.params.insert(crate::bath_rules::PUMP_POSITION.into(), serde_json::json!({ "type": "IfcLengthMeasure", "value": 0.6 }));
                     }
                     if c.name == "Sauna heater, wall" {
                         // A 6 kW wall heater's typical distances (research/13 D3.3); a product's
