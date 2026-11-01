@@ -42,6 +42,7 @@ pub const UI_ACTIONS: &[&str] = &[
     "ui.material_documents",
     "ui.publish_local_documents",
     "ui.place_bathroom_component",
+    "ui.bathroom_layout",
     "ui.profiler",
     "load_classification.manage",
     "demand_factor.manage",

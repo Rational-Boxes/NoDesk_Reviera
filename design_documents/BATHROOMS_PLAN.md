@@ -2,7 +2,10 @@
 
 **Status:** Draft 0.2 · 2026-10-31 · building started at the owner's request ("focus on implementing
 bathroom related features"), on the defaults proposed in §11 until the owner says otherwise.
-Built so far: rule packs and fixture clearance zones (ARC-BATH-001/002).
+Built so far (2026-10-31): rule packs and fixture clearance zones (ARC-BATH-001/002), grab bars by
+rule (ARC-BATH-003), the generic component catalogue (ARC-BATH-004) and layout templates
+(ARC-BATH-005): §10 steps 1–5. Next: product types with documents and the generic-to-specific
+swap (step 6).
 **Owner's requests (2026-10-31):**
 - "deeper research into bathroom features, standards, and common components";
 - "review clearance rules, accessibility rules, rails, etc.";

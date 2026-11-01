@@ -622,7 +622,12 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
   accessories (mirror, dispensers, hand dryer, baby changing unit, shower seat, towel rail, …) on
   a wall face at their usual sizes and heights, with pipe or power connectors, written to IFC as
   sanitary terminals, furniture with their ObjectType, an electric appliance and a space heater
-  (`bath.load_components`, `bath.place_component`). **Not yet** (planned):
+  (`bath.load_components`, `bath.place_component`).
+- **Bathroom layouts** (ARC-BATH-005): Architecture › Build › Bathroom Layout lays out a full
+  bath, three-quarter bath, powder room, UK family bathroom, en-suite, cloakroom or accessible
+  toilet in a room closed by walls, spaced by the rule packs in use, or reports how many
+  millimetres short the room is (`bath.layouts`, `bath.layout`). **Not yet** (planned): living
+  layouts that re-fit when the room changes, Jack-and-Jill and back-to-back wet walls,
   other packs' bars (Approved Document M's drop-down rails, shower and bath bars), room layouts, toilet cores and partitions, fixture counts,
   locker rooms, wet areas, spas, the generic bathroom component library and product swaps.
 

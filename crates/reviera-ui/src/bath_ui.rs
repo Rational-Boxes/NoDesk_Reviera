@@ -162,4 +162,48 @@ impl Gui {
         self.start_place_tool(super::components::Source::Type(id), name);
         self.set_place_offset(h);
     }
+
+    /// Architecture › Build › Bathroom Layout (ARC-BATH-005): a template and its options, then a
+    /// click inside a room closed by walls lays it out there.
+    pub(crate) fn bathroom_layout(&mut self) {
+        let frame = self.frame;
+        let templates = match self.run("bath.layouts", json!({})) {
+            Ok(v) => v.as_array().cloned().unwrap_or_default(),
+            Err(e) => return error(&frame, &e),
+        };
+        let f = super::reinforcement_ui::Form::new(&frame, "Bathroom Layout");
+        let titles: Vec<String> = templates.iter().map(|t| t["title"].as_str().unwrap_or_default().to_owned()).collect();
+        let t = f.choice("Template", &titles, 0);
+        let start = f.choice("Start from", &["The left end, facing the wet wall".to_owned(), "The right end".to_owned()], 0);
+        let replace = f.choice("An earlier layout here", &["Replace it".to_owned(), "Keep it".to_owned()], 0);
+        let ok = f.show("Then click inside a room closed by walls, in a plan: the fixtures run along its longer wall, spaced by the bathroom rule packs in use.", "Choose Room");
+        let k = t.get_selection().map_or(0, |k| k as usize);
+        let right = start.get_selection() == Some(1);
+        let keep = replace.get_selection() == Some(1);
+        f.dialog.destroy();
+        let Some(id) = templates.get(k).and_then(|t| t["id"].as_str()).filter(|_| ok).map(str::to_owned) else { return };
+        self.start_room_tool();
+        if let Some(tool) = self.room_tool.as_mut() {
+            tool.layout = Some(json!({ "template": id, "start": if right { "right" } else { "left" }, "replace": !keep }));
+            frame.set_status_text("Bathroom Layout: click inside the room; Esc ends", 0);
+        }
+    }
+
+    /// Lays out a bathroom where the Bathroom Layout tool was clicked, and reports the fit.
+    pub(crate) fn layout_bathroom_at(&mut self, args: serde_json::Value) {
+        let frame = self.frame;
+        match self.app.execute("bath.layout", args, &super::user()) {
+            Ok(out) => {
+                let placed = out.result["placed"].as_array().map_or(0, Vec::len);
+                self.refresh_scene(&frame);
+                let problems = self
+                    .run("bath.check", json!({ "element_ids": out.result["placed"] }))
+                    .ok()
+                    .and_then(|v| v.as_array().map(|a| a.iter().filter(|f| f["severity"] == "error").count()))
+                    .unwrap_or(0);
+                frame.set_status_text(&format!("{placed} component(s) laid out; Check Bathrooms finds {problems} error(s)"), 0);
+            }
+            Err(e) => error(&frame, &format!("The layout was not made:\n{}", e.message)),
+        }
+    }
 }

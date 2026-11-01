@@ -732,6 +732,12 @@ icon = "grab_bar"
 help = "Put the grab bars the bathroom rule packs ask for at the selected fixtures, or at all of them: for the ADA, a WC's side and rear bars (ARC-BATH-003)"
 
 [[action]]
+id = "ui.bathroom_layout"
+label = "Bathroom Layout"
+icon = "bathroom_layout"
+help = "Lay out a whole bathroom from a template (full bath, shower room, powder room, family bathroom, en-suite, cloakroom, accessible toilet) in a room closed by walls, spaced by the bathroom rule packs; too small a room is reported with the shortfall (ARC-BATH-005)"
+
+[[action]]
 id = "ui.place_bathroom_component"
 label = "Bathroom"
 icon = "bathroom"
@@ -3384,6 +3390,7 @@ tools = [
   { action = "roof.create_extrusion", size = "small" },
   { action = "enclosure.create", size = "large" },
   { action = "ui.place_bathroom_component", size = "large" },
+  { action = "ui.bathroom_layout", size = "large" },
   { action = "roof.create_geodesic", size = "small" },
   { action = "growing.layout", size = "small" },
   { action = "growing.lights", size = "small" },
@@ -4610,6 +4617,7 @@ items = [
   "ceiling.create", "ceiling.edit_boundary", "roof.create_footprint", "roof.edit_footprint", "-",
   "room.place", "room.place_automatically", "-",
   "roof.create_extrusion", "slabedge.create", "enclosure.create", "roof.create_geodesic", "growing.layout", "growing.lights", "-",
+  "ui.place_bathroom_component", "ui.bathroom_layout", "bath.place_grab_bars", "bath.check", "-",
   "opening.create_wall", "opening.create_vertical", "opening.create_by_face", "opening.create_shaft", "-",
   "grid.create", "level.create", "refplane.create", "modelline.create", "-",
   "workplane.set", "workplane.show",

@@ -295,3 +295,77 @@ fn generic_components_load_place_and_save() {
     assert!(text.contains("IFCSANITARYTERMINAL(") && text.contains(".TOILETPAN."));
     let _ = mirror;
 }
+
+/// A room closed by four walls whose inner faces are `w` × `l` (x by y), its corner at the origin;
+/// returns the level and the walls (south, east, north, west).
+fn room(app: &mut App, w: f64, l: f64) -> (Value, [u64; 4]) {
+    ok(app, "file.new", json!({}));
+    let level = ok(app, "level.list", json!({}))[0]["id"].clone();
+    // The wall thickness, from a probe room's fit.
+    let probe = [wall(app, &level, [20.0, 0.0], [23.0, 0.0]), wall(app, &level, [23.0, 0.0], [23.0, 4.0]), wall(app, &level, [23.0, 4.0], [20.0, 4.0]), wall(app, &level, [20.0, 4.0], [20.0, 0.0])];
+    let fit = ok(app, "bath.layout", json!({ "template": "cloakroom", "point": [21.5, 2.0], "level": level, "fit_only": true }))["fit"].clone();
+    let t = 4.0 - fit["length"].as_f64().unwrap();
+    ok(app, "element.delete", json!({ "element_ids": probe }));
+    let h = t / 2.0;
+    let (x0, y0, x1, y1) = (-h, -h, w + h, l + h);
+    let s = wall(app, &level, [x0, y0], [x1, y0]);
+    let e = wall(app, &level, [x1, y0], [x1, y1]);
+    let n = wall(app, &level, [x1, y1], [x0, y1]);
+    let wst = wall(app, &level, [x0, y1], [x0, y0]);
+    (level, [s, e, n, wst])
+}
+
+fn errors(app: &mut App) -> Vec<Value> {
+    findings(app).into_iter().filter(|f| f["severity"] == "error").collect()
+}
+
+#[test]
+fn a_full_bath_in_five_by_eight_feet() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = new_app(dir.path());
+    let (level, walls) = room(&mut app, 1.525, 2.44);
+    let out = ok(&mut app, "bath.layout", json!({ "template": "full_bath", "point": [0.76, 1.2], "level": level }));
+    assert_eq!(out["placed"].as_array().unwrap().len(), 3, "{out:#}");
+    let fit = &out["fit"];
+    assert!((fit["length"].as_f64().unwrap() - 2.44).abs() < 0.002 && (fit["depth"].as_f64().unwrap() - 1.525).abs() < 0.002, "{fit}");
+    assert_eq!(errors(&mut app), Vec::<Value>::new(), "spaced to the rules");
+    // The wet wall is a long side (west or east), and the WC is 15 in or more from the tub.
+    let wc = out["placed"][1].as_u64().unwrap();
+    let ports = ok(&mut app, "connector.list", json!({ "element_id": wc }));
+    let waste = ports.as_array().unwrap().iter().find(|p| p["connector"]["name"] == "Waste").unwrap()["position"].clone();
+    let along = waste[1].as_f64().unwrap();
+    let tub_edge = 0.76;
+    assert!(along - tub_edge >= 0.381 - 0.002 || (2.44 - along) - tub_edge >= 0.381 - 0.002, "{waste}");
+
+    // Laid out again with replace: the same three, not six.
+    let again = ok(&mut app, "bath.layout", json!({ "template": "full_bath", "point": [0.76, 1.2], "level": level, "replace": true }));
+    assert!(run(&mut app, "element.get_ids", json!({ "element_ids": [wc] })).is_err(), "the earlier WC removed");
+    assert_eq!(again["placed"].as_array().unwrap().len(), 3);
+    let _ = walls;
+}
+
+#[test]
+fn too_small_a_room_is_refused_with_the_shortfall() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = new_app(dir.path());
+    let (level, _) = room(&mut app, 1.525, 1.8);
+    let e = run(&mut app, "bath.layout", json!({ "template": "full_bath", "point": [0.76, 0.9], "level": level })).unwrap_err();
+    assert_eq!(e.code, "bath.no_fit");
+    assert!(e.message.contains("mm short"), "{}", e.message);
+    let short = e.details["length_short"].as_f64().unwrap();
+    assert!(short > 0.3 && short < 0.5, "{short}");
+    assert!(ok(&mut app, "mesh_object.types", json!({})).as_array().unwrap().iter().all(|t| t["copies"] == 0), "nothing placed");
+}
+
+#[test]
+fn an_accessible_toilet_with_its_grab_bars() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = new_app(dir.path());
+    let (level, walls) = room(&mut app, 1.8, 2.6);
+    ok(&mut app, "bath.set_rule_packs", json!({ "packs": ["us_plumbing", "ada_2010"] }));
+    let out = ok(&mut app, "bath.layout", json!({ "template": "accessible_single_user", "point": [0.9, 1.3], "level": level, "wet_wall_id": walls[3] }));
+    assert_eq!(out["grab_bars"]["placed"].as_array().unwrap().len(), 2, "{out:#}");
+    let f = findings(&mut app);
+    assert!(!f.iter().any(|x| x["rule"] == "ADA 2010 604.2" || x["kind"] == "missing_bar" || x["kind"] == "bar"), "{f:#?}");
+    assert!(!f.iter().any(|x| x["kind"] == "intrusion" && x["severity"] == "error"), "{f:#?}");
+}

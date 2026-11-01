@@ -30,6 +30,8 @@ pub struct RoomTool {
     hover: Vec<Line>,
     /// The Space tool (MEP-SPACE-001): clicks place MEP spaces, not rooms.
     space: bool,
+    /// The Bathroom Layout tool (ARC-BATH-005): clicks lay out a bathroom with these arguments.
+    pub(crate) layout: Option<serde_json::Value>,
 }
 
 impl Gui {
@@ -57,7 +59,7 @@ impl Gui {
         self.cancel_sketch();
         self.end_ceiling_tool();
         self.leave_walk();
-        self.room_tool = Some(RoomTool { hover: Vec::new(), space });
+        self.room_tool = Some(RoomTool { hover: Vec::new(), space, layout: None });
         let _ = self.run("selection.clear", json!({}));
         self.selection_changed();
         frame.set_status_text(
@@ -139,6 +141,11 @@ impl Gui {
             return;
         };
         let space = self.room_tool.as_ref().is_some_and(|t| t.space);
+        if let Some(mut args) = self.room_tool.as_ref().and_then(|t| t.layout.clone()) {
+            args["point"] = json!(p);
+            args["level"] = json!(plan.level);
+            return self.layout_bathroom_at(args);
+        }
         let (command, what) = if space { ("space.place", "Space") } else { ("room.place", "Room") };
         match self.app.execute(
             command,

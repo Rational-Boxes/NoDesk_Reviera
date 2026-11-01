@@ -1402,6 +1402,10 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "bath_check" => format!(
             r#"<path d="M4 3h24" {s}/><rect x="11" y="4" width="10" height="4" fill="{f}" {s}/><ellipse cx="16" cy="13" rx="4.5" ry="5" fill="{f}" {s}/><rect x="6" y="19" width="20" height="9" fill="none" {sa} stroke-dasharray="3 2"/>"#
         ),
+        // A room in plan: a bath across one end and two fixtures along the wall.
+        "bathroom_layout" => format!(
+            r#"<rect x="3" y="3" width="26" height="26" fill="none" {s}/><rect x="5" y="5" width="22" height="7" rx="2" fill="{f}" {s}/><circle cx="10" cy="20" r="3.5" fill="{f}" {s}/><rect x="17" y="17" width="9" height="6" rx="1" fill="{a}" {s}/>"#
+        ),
         // A WC from the side: cistern, bowl and pedestal.
         "bathroom" => format!(
             r#"<rect x="19" y="4" width="8" height="12" fill="{f}" {s}/><path d="M5 16h22v2c0 4-4 6-8 6h-2l-1 4H11l1-5c-4-1-7-3-7-7z" fill="{f}" {s}/><path d="M5 16h14" {sa}/>"#

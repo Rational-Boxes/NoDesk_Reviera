@@ -37,13 +37,13 @@
     },
     {
       "id": "IRC R307.1 bath",
-      "description": "21 in (533 mm) clear in front of a bathtub",
+      "description": "21 in (533 mm) clear in front of a bathtub; the source gives no width, so the whole length is taken, which is strict where a WC stands beside the tub",
       "fixtures": ["bath"],
       "occupancy": "dwelling",
       "across": [["near_edge", 0.0], ["far_edge", 0.0]],
       "out": [["front", 0.0], ["front", 0.533]],
       "source": "S0886",
-      "confidence": "secondary"
+      "confidence": "advisory"
     }
   ]
 }

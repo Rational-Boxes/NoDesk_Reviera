@@ -115,7 +115,7 @@ pub enum RuleOccupancy {
 }
 
 impl RuleOccupancy {
-    fn applies(self, o: crate::codes::Occupancy) -> bool {
+    pub fn applies(self, o: crate::codes::Occupancy) -> bool {
         use crate::codes::Occupancy as O;
         matches!((self, o), (Self::Any, _) | (Self::Dwelling, O::Dwelling) | (Self::Other, O::Other))
     }
@@ -459,7 +459,7 @@ impl Fixture {
 }
 
 /// Where a ray from `p` along `d` first meets a wall's plan outline within `reach`, and the wall.
-fn ray_to_walls(store: &Store, p: [f64; 2], d: [f64; 2], z: f64, reach: f64) -> Option<(f64, ElementId)> {
+pub(crate) fn ray_to_walls(store: &Store, p: [f64; 2], d: [f64; 2], z: f64, reach: f64) -> Option<(f64, ElementId)> {
     let mut best: Option<(f64, ElementId)> = None;
     for w in store.iter().filter(|e| crate::walls::wall_recipe(e).is_some()) {
         let Ok(g) = crate::walls::regenerate(store, w) else { continue };

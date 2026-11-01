@@ -8,6 +8,7 @@ it is placed. <b>Check Bathrooms</b> then lists what stands in that space, which
 it, and whether a WC is the right distance from its side wall.</p>
 <nav class="toc">
   <a href="#components">Bathroom components</a>
+  <a href="#layouts">Bathroom layouts</a>
   <a href="#packs">Rule packs</a>
   <a href="#zones">Clear spaces</a>
   <a href="#check">Check Bathrooms</a>
@@ -29,6 +30,26 @@ to the wall, at its own mounting height (a mirror's bottom 1000 mm up, a lavator
 Fixtures have their pipe connections, so they join plumbing systems, and their clear spaces and
 grab bars follow from the rule packs. In IFC they are sanitary terminals, furniture (named Mirror,
 Shower Seat, …), an electric appliance (the hand dryer) and a space heater (the towel rail).</p>
+
+<h2 id="layouts">Bathroom layouts</h2>
+<p><b>Bathroom Layout</b> (Architecture › Build) lays out a whole bathroom in a room closed by four
+walls. Choose a template, then click inside the room in a plan:</p>
+<ul>
+  <li><b>Full bath</b> (US, 5 × 8 ft): a 60 × 30 in bath across one end, then a WC and a pedestal
+  lavatory along the wet wall.</li>
+  <li><b>Three-quarter bath</b>: a 900 mm shower tray, WC and lavatory.</li>
+  <li><b>Powder room</b>, <b>cloakroom WC</b>: a WC and a lavatory or hand-rinse basin.</li>
+  <li><b>Family bathroom</b> (UK): a 1700 × 700 bath across the end, a WC and a basin.</li>
+  <li><b>En-suite</b>: a shower tray, WC and hand-rinse basin.</li>
+  <li><b>Accessible single-user toilet</b>: an accessible-height WC in the corner, a lavatory, and
+  the grab bars the packs ask for.</li>
+</ul>
+<p>The fixtures run along the room's longer wall from its left end as you face it (or the right).
+Each is spaced so that its side clear space under the rule packs in use misses its neighbours, and
+the first WC is kept within any side-wall distance rule. Under the ADA, a WC's 60 in clearance runs
+from its side wall, so the next fixture comes after it. If the room is too small nothing is placed,
+and the message says how many millimetres the wall is short or the room too shallow. Laying out
+again replaces the earlier layout in that room.</p>
 
 <h2 id="packs">Rule packs</h2>
 <p>Four packs ship with Reviera. Each rule names its clause, its source and how sure the reading
@@ -122,6 +143,7 @@ brings the shipped one back. Project packs are saved with the model.</p>
 <p>Everything above is a command: <code>bath.rule_packs</code>, <code>bath.set_rule_packs</code>,
 <code>bath.add_rule_pack</code>, <code>bath.remove_rule_pack</code>, <code>bath.set_hand</code>,
 <code>bath.check</code>, <code>bath.load_components</code>, <code>bath.place_component</code>,
+<code>bath.layouts</code>, <code>bath.layout</code>,
 <code>bath.place_grab_bars</code>, <code>grab_bar.create</code> and
 <code>grab_bar.set</code>; <code>clearance.list</code> and <code>clearance.check</code> include
 fixture spaces. Lua scripts and AI agents (MCP, the <i>modeling</i> toolset) can use them.</p>

@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Reviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Reviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 845 numbered requirements (320 P0 · 317 P1 · 201 P2 · 7 P3), 2,262 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 846 numbered requirements (320 P0 · 318 P1 · 201 P2 · 7 P3), 2,264 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,262 commands; 845 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,264 commands; 846 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -14353,6 +14353,42 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 
 *Built (2026-10-31):* `reviera_core::bath_components` (the catalogue above, shaped from prisms), a new component category *Electric Appliance* (`IfcElectricAppliance`), `ElementType` written for types and `ObjectType` copied to copies of USERDEFINED types, `bath.load_components`, `bath.place_component`, and Architecture › Build › Bathroom, which loads them the first time and places the chosen one at each click (on the nearest wall face). Sizes marked as judgement in research/13 E3 are E-67 in `EXPERT_REVIEW.md`. Not yet: a WC seat as its own accessory, shower screens, cubicle partitions, lockers and benches (with toilet cores and locker rooms), and replacing a placeholder with a product.
 
+### 3.9a.5 Bathroom layouts
+**ID:** ARC-BATH-005 · **Priority:** P1 · **Ref:** owner requirement (2026-10-31); `BATHROOMS_PLAN.md` §6.1; research/13 A3
+
+**Purpose.** Lay out a whole bathroom in one step from a common template, spaced by the rules in use, and say plainly when the room is too small and by how much.
+
+**Behaviour & rules.**
+- **The room** is found from a point inside it: the nearest wall in each of four directions along the wet wall and across it. It must be closed on all four sides by Reviera walls; otherwise the layout is refused and the open side named.
+- **The wet wall** is the wall given, or else the longer side. The fixtures run along it from one end (`left` or `right` as you face it; default left).
+- **Templates** (research/13 A3), with the generic components of ARC-BATH-004:
+
+| Template | End (across the start end) | Along the wet wall |
+|---|---|---|
+| `full_bath` (US 5 × 8 ft) | Bath, 60 × 30 in | WC, close-coupled; Lavatory, pedestal |
+| `three_quarter_bath` | — | Shower tray, 900 × 900; WC, close-coupled; Lavatory, pedestal |
+| `powder_room` | — | WC, close-coupled; Lavatory, wall-hung |
+| `uk_family_bathroom` | Bath, 1700 × 700 | WC, close-coupled; Lavatory, pedestal |
+| `en_suite` | — | Shower tray, 900 × 900; WC, close-coupled; Hand-rinse basin |
+| `cloakroom` | — | WC, close-coupled; Hand-rinse basin |
+| `accessible_single_user` | — | WC, accessible height (in the corner); Lavatory, wall-hung; with its grab bars |
+
+- **Spacing.** A bath at the end stands against the end wall, across the room if it fits. Each fixture along the wall is placed so that its own side clear space (from the packs in use) misses its neighbours' bodies and theirs misses it: the centre-to-centre distance is the larger of the two half-widths plus the other fixture's half-width. The first fixture's centreline is kept from the end (the end wall, or the end item) by its side space, and within a distance rule's range when there is one (an ADA WC 16–18 in from its side wall). With no packs in use, fixtures are 50 mm apart.
+- **Fit.** If the run is longer than the wet wall, or a fixture's front clear space reaches past the opposite wall, nothing is placed and the shortfall is reported in each direction (`bath.no_fit`, with the millimetres missing). `fit_only` reports the fit without placing.
+- The fixtures are placed in one undo step and tagged with the layout, so `replace` removes the components an earlier layout placed in the same room first. The result lists what was placed and the fit (the length and depth needed and available); `bath.check` then reports on the fixtures as on any others.
+
+**Data (IFC mapping).** The placed components as ARC-BATH-004; the layout tag is RXD element data (`rxd:bath_layout`).
+
+**Commands.** See the catalog: `bath.layout`, `bath.layouts`.
+
+**Acceptance criteria.**
+- [x] `full_bath` in a 1525 × 2440 mm (5 × 8 ft) room under `us_plumbing` places the tub across the end, the WC with its centreline at least 15 in from the tub, and the lavatory at least 30 in from the WC's centreline, with no `bath.check` errors.
+- [x] `full_bath` in a 1525 × 1800 mm room places nothing and reports how many millimetres the wet wall is short.
+- [x] `accessible_single_user` under `ada_2010` puts the WC's centreline 16–18 in from the side wall and places its grab bars.
+- [x] `replace` removes the earlier layout's components in the same room and places the new ones.
+
+*Built (2026-10-31):* `reviera_core::bath_layouts`, `bath.layouts`, `bath.layout`, and Architecture › Build › Bathroom Layout (a template, the start end and replace, then a click in a plan, through the Room tool's click). A fixture's clear spaces measured from its side wall (an ADA WC's 60 in) are kept clear by the next fixture. The IRC bath rule (21 in in front of a tub) is marked advisory in `us_plumbing`: its source gives no width, and the whole length is strict where a WC stands beside the tub. Not yet: layouts that re-fit when the room changes, Jack-and-Jill and back-to-back wet walls, doors and their swings in the fit, turning spaces, and shower rooms with the shower across the end.
+
 ---
 
 ## 3.10 In-place models, model text and model lines
@@ -15537,6 +15573,8 @@ All commands below are registered once in the command registry and exposed autom
 | `bath.place_grab_bars` | element_ids? | {placed, skipped} | Yes | ARC-BATH-003 |
 | `bath.load_components` | names? | {name: type_id} | Yes | ARC-BATH-004 |
 | `bath.place_component` | type_id, point, level, offset?, rotation?, host_wall?, side?, work_plane? | element_id | Yes | ARC-BATH-004 |
+| `bath.layouts` | — | [{id, title, end?, run}] | No (query) | ARC-BATH-005 |
+| `bath.layout` | template, point, level, wet_wall_id?, start?, replace?, fit_only? | {placed, fit} | Yes | ARC-BATH-005 |
 | `grab_bar.create` | level, points, wall_id?, side?, diameter?, gap? | element_id | Yes | ARC-BATH-003 |
 | `grab_bar.set` | element_ids, diameter?, gap?, top? | — | Yes | ARC-BATH-003 |
 | `enclosure.create` | form, footprint \| host_wall_ids, level_id, params | element_id | Yes | ARC-GLZ-001 |
@@ -28667,14 +28705,14 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 39 | 8 | 0 | 123 |
 | DM | 91 | 65 | 34 | 3 | 193 |
-| ARC | 77 | 77 | 14 | 1 | 169 |
+| ARC | 77 | 78 | 14 | 1 | 170 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 28 | 0 | 29 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
 | COL | 8 | 50 | 11 | 1 | 70 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **317** | **201** | **7** | **845** |
+| **Total** | **320** | **318** | **201** | **7** | **846** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -28869,7 +28907,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2262 unique commands** in 426 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2264 unique commands** in 426 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -28905,7 +28943,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `array` | 6 |
 | `assembly` | 16 |
 | `assemblytemplate` | 1 |
-| `bath` | 9 |
+| `bath` | 11 |
 | `bcf` | 33 |
 | `beam` | 6 |
 | `beam_system` | 5 |
@@ -29414,6 +29452,8 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `assemblytemplate.save` | 5 | sheet_id, name | template_id | Yes | DOC-ASM-005 |
 | `bath.add_rule_pack` | 3 | pack | — | Yes | ARC-BATH-001 |
 | `bath.check` | 3 | element_ids? | finding[] | No (query) | ARC-BATH-002 |
+| `bath.layout` | 3 | template, point, level, wet_wall_id?, start?, replace?, fit_only? | {placed, fit} | Yes | ARC-BATH-005 |
+| `bath.layouts` | 3 | — | [{id, title, end?, run}] | No (query) | ARC-BATH-005 |
 | `bath.load_components` | 3 | names? | {name: type_id} | Yes | ARC-BATH-004 |
 | `bath.place_component` | 3 | type_id, point, level, offset?, rotation?, host_wall?, side?, work_plane? | element_id | Yes | ARC-BATH-004 |
 | `bath.place_grab_bars` | 3 | element_ids? | {placed, skipped} | Yes | ARC-BATH-003 |

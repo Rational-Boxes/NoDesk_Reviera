@@ -4771,6 +4771,10 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "bath.check" => with(gui, Gui::check_bathrooms),
         "bath.place_grab_bars" => with(gui, Gui::place_grab_bars),
         "ui.place_bathroom_component" => with(gui, Gui::place_bathroom_component),
+        "ui.bathroom_layout" => with(gui, |g| {
+            g.bathroom_layout();
+            focus(g);
+        }),
         "ui.pane.clash" => Gui::toggle_clash_pane(gui),
         "ui.pane.issues" => with(gui, Gui::toggle_issues_pane),
         "ui.pane.system_browser" => Gui::toggle_system_browser(gui),

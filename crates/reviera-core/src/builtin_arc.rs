@@ -541,6 +541,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(GrabBarSet),
         registry.add(BathLoadComponents),
         registry.add(BathPlaceComponent),
+        registry.add(BathLayouts),
+        registry.add(BathLayout),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -6862,4 +6864,32 @@ edit_command!(
     crate::mep_controls::PlaceParams,
     crate::id::ElementId,
     crate::bath_components::place
+);
+
+read_command!(
+    BathLayouts,
+    "bath.layouts",
+    "List the bathroom layout templates",
+    "Lists the bathroom layout templates (ARC-BATH-005): each one's id, title, the bath across its start end if \
+     any, and the components along its wet wall.",
+    Option<crate::bath_rules::NoParams>,
+    Vec<crate::bath_layouts::Template>,
+    crate::bath_layouts::list
+);
+
+edit_command!(
+    BathLayout,
+    "bath.layout",
+    "Lay out a bathroom from a template",
+    "Lays out a bathroom from a template in the rectangular room around `point`, closed by walls (ARC-BATH-005): \
+     a bath across the start end where the template has one, then the fixtures along the wet wall (the one \
+     given, else the longer side) from its left end as you face it (or `right`), each spaced so its side clear \
+     space under the rule packs in use misses its neighbours, the first kept within a side-wall distance rule. \
+     If the room is too small nothing is placed and the shortfall in millimetres is reported (`bath.no_fit`); \
+     `fit_only` reports the fit alone. `replace` first removes an earlier layout's components in the same \
+     room. The accessible template also places its grab bars.",
+    "Bathroom Layout",
+    crate::bath_layouts::LayoutParams,
+    crate::bath_layouts::Layout,
+    crate::bath_layouts::layout
 );
