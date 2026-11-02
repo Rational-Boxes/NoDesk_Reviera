@@ -68,11 +68,18 @@ pub struct Error {
     /// The HTTP status, when the server answered.
     pub status: Option<u16>,
     pub message: String,
+    /// The server's answer, when it was JSON (the conversion service names its refusals in `kind`).
+    pub detail: Option<Value>,
 }
 
 impl Error {
     fn new(kind: ErrorKind, message: impl Into<String>) -> Self {
-        Self { kind, status: None, message: message.into() }
+        Self { kind, status: None, message: message.into(), detail: None }
+    }
+
+    /// The refusal's name, as the conversion service gives it (`managed_in_builder`, `locked`, …).
+    pub fn code(&self) -> Option<&str> {
+        self.detail.as_ref()?.get("kind")?.as_str()
     }
 }
 
@@ -225,7 +232,8 @@ fn http_client(timeout: Duration) -> Result<reqwest::blocking::Client> {
 
 /// The error an HTTP answer stands for: the server's `{"error": …}` text, by status.
 fn failure(status: u16, body: &str, what: &str) -> Error {
-    let said = serde_json::from_str::<Value>(body).ok().and_then(|v| v["error"].as_str().map(str::to_owned)).filter(|s| !s.is_empty());
+    let detail = serde_json::from_str::<Value>(body).ok().filter(Value::is_object);
+    let said = detail.as_ref().and_then(|v| v["error"].as_str().map(str::to_owned)).filter(|s| !s.is_empty());
     let kind = match status {
         401 => ErrorKind::Auth,
         403 => ErrorKind::Forbidden,
@@ -240,7 +248,7 @@ fn failure(status: u16, body: &str, what: &str) -> Error {
         (_, Some(s)) => format!("{what}: {s}"),
         (_, None) => format!("{what}: the server answered {status}"),
     };
-    Error { kind, status: Some(status), message }
+    Error { kind, status: Some(status), message, detail }
 }
 
 fn percent(segment: &str) -> String {
@@ -530,6 +538,7 @@ impl Client {
                 kind: ErrorKind::Conflict,
                 status: None,
                 message: format!("the file was saved by {} since it was opened (version {}; opened at {})", by.as_deref().unwrap_or("someone else"), now.version, if expected.is_empty() { "none" } else { expected }),
+                detail: None,
             });
         }
         self.write(uid, bytes)?;
@@ -578,6 +587,35 @@ impl Client {
     pub fn extract(&self, body: &Value, timeout: Duration) -> Result<Value> {
         let r = self.send("extracting from the documents", || self.http.post(self.csai("v1/extract")).header("Accept", "application/json").timeout(timeout).json(body))?;
         r.json().map_err(|_| Error::new(ErrorKind::Protocol, "extracting from the documents: the answer is not JSON"))
+    }
+
+    /// Publishes an extraction prompt set an application relies on
+    /// (`PUT /csai/v1/prompt-sets/slug/{slug}`, JSON in the `fileengine.prompt_set.v1` shape):
+    /// any member's key may, with no setup on the server. Publishing an unchanged definition again
+    /// changes nothing. The answer has `id`, `slug`, `revision`, `changed`, `model` and `warnings`,
+    /// plus `created` when the set is new. A set an editor took over or locked answers
+    /// [`ErrorKind::Conflict`] with [`Error::code`] `managed_in_builder` or `locked`; a retired one
+    /// HTTP 410 (`prompt_set_retired`, with `replaced_by`). A server without prompt sets answers
+    /// [`ErrorKind::NotFound`] with no code.
+    pub fn publish_prompt_set(&self, slug: &str, definition: &Value) -> Result<Value> {
+        let r = self.send("publishing the prompt set", || self.http.put(self.csai(&format!("v1/prompt-sets/slug/{}", percent(slug)))).json(definition))?;
+        let created = r.status().as_u16() == 201;
+        let mut v: Value = r.json().map_err(|_| Error::new(ErrorKind::Protocol, "publishing the prompt set: the answer is not JSON"))?;
+        if let Some(m) = v.as_object_mut() {
+            m.insert("created".into(), Value::Bool(created));
+        }
+        Ok(v)
+    }
+
+    /// The published prompt sets the key may use (`GET /csai/v1/prompt-sets`), matching `q` (name
+    /// or description; empty for all): each with `id`, `slug`, `name`, `revision`, `managed` and
+    /// `fields`.
+    pub fn prompt_sets(&self, q: &str) -> Result<Vec<Value>> {
+        let mut url = self.csai("v1/prompt-sets");
+        url.query_pairs_mut().append_pair("q", q).append_pair("limit", "100");
+        let r = self.send("the prompt sets", || self.http.get(url.clone()))?;
+        let v: Value = r.json().map_err(|_| Error::new(ErrorKind::Protocol, "the prompt sets: the answer is not JSON"))?;
+        Ok(v["prompt_sets"].as_array().cloned().unwrap_or_default())
     }
 
     /// The key's usage of the conversion service (`GET /csai/v1/usage`): `state` (ok, warning,

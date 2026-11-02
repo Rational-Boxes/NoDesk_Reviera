@@ -104,6 +104,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add_host(crate::docs::DocsExtract),
         registry.add_host(crate::docs::DocsApplyExtracted),
         registry.add_host(crate::docs::DocsUsage),
+        registry.add_host(crate::docs::DocsPublishFieldSets),
         registry.add_host(crate::docs::DocsEnterValues),
         registry.add_host(crate::docs::DocsOpenPath),
         registry.add_host(crate::docs::DocsLocalCollections),

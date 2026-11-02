@@ -208,6 +208,90 @@ fn a_material_documented_from_its_epd_and_hpd() {
     assert_eq!(run(&mut app, "docs.usage", json!({ "connection_id": conn })).unwrap()["state"], "ok");
 }
 
+/// A session signed in to the fake, in its own directory.
+fn session(fake: &Fake, dir: &std::path::Path) -> (App, String) {
+    let mut app = new_app(dir);
+    let conn = run(&mut app, "fileengine.connect", json!({ "url": fake.url, "name": "Acme files" })).unwrap()["id"].as_str().unwrap().to_owned();
+    run(&mut app, "fileengine.sign_in", json!({ "connection_id": conn, "key": "fesk_test", "secret": "fesks_secret" })).unwrap();
+    (app, conn)
+}
+
+#[test]
+fn field_sets_published_as_prompt_sets() {
+    let fake = Fake::start("fesk_test", "fesks_secret", "ann@acme.test");
+    let (d1, d2, d3) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    let (mut app, conn) = session(&fake, d1.path());
+    let (_folder, [epd, _hpd, _sheet]) = product_folder(&fake);
+    let field = |r: &Value, f: &str| r["documents"][0]["fields"].as_array().unwrap().iter().find(|v| v["field"] == f).unwrap().clone();
+
+    // The first extraction publishes the field set, with nothing set up on the server, and names it.
+    assert!(fake.prompt_set("reviera.epd").is_none());
+    let r = run(&mut app, "docs.extract", json!({ "connection_id": conn, "files": [epd], "set": "epd" })).unwrap();
+    let ps = fake.prompt_set("reviera.epd").expect("published");
+    assert_eq!((ps["revision"].as_u64(), ps["managed"].as_str()), (Some(1), Some("application")));
+    assert_eq!(ps["name"], "EPD (BIM Reviera)");
+    let types: Vec<(&str, &str)> = ps["fields"].as_array().unwrap().iter().map(|f| (f["name"].as_str().unwrap(), f["type"].as_str().unwrap())).collect();
+    assert!(types.contains(&("gwp_a1a3", "number")) && types.contains(&("valid_until", "date")) && types.contains(&("manufacturer", "string")), "{types:?}");
+    let gwp = ps["fields"].as_array().unwrap().iter().find(|f| f["name"] == "gwp_a1a3").unwrap();
+    assert_eq!((gwp["label"].as_str(), gwp["unit"].as_str()), (Some("GWP A1-A3"), Some("kg CO2e per declared unit")));
+    assert_eq!(r["prompt_set"]["id"], ps["id"]);
+    assert_eq!(r["prompt_set"]["revision"], 1);
+    assert!(r["note"].is_null(), "{}", r["note"]);
+    assert_eq!(field(&r, "gwp_a1a3")["value"], 126.0);
+    assert_eq!(r["documents"][0]["markup"]["status"], "no_pdf");
+    // Published once a session: the next extraction goes straight to the set.
+    fake.take_log();
+    run(&mut app, "docs.extract", json!({ "connection_id": conn, "files": [epd], "set": "epd" })).unwrap();
+    assert!(!fake.take_log().iter().any(|l| l.contains("prompt-sets")));
+
+    // Publishing again, or from a second user's Reviera, changes nothing.
+    let p = run(&mut app, "docs.publish_field_sets", json!({ "connection_id": conn })).unwrap();
+    assert_eq!(p.as_array().unwrap().iter().map(|x| (x["set"].as_str().unwrap(), x["created"] == true, x["changed"] == true)).collect::<Vec<_>>(), [("epd", false, false), ("hpd", true, true)]);
+    let (mut other, conn2) = session(&fake, d2.path());
+    let p = run(&mut other, "docs.publish_field_sets", json!({ "connection_id": conn2, "sets": ["epd"] })).unwrap();
+    assert_eq!((p[0]["changed"].as_bool(), p[0]["prompt_set"]["revision"].as_u64()), (Some(false), Some(1)));
+    assert_eq!(fake.prompt_set("reviera.epd").unwrap()["revision"], 1);
+
+    // A PDF read with the set comes back with its marked-up copy.
+    let c = Client::new(&fake.url, true).unwrap();
+    c.sign_in("fesk_test", "fesks_secret").unwrap();
+    let pdf = c.create_file(&fake.uid_of("Engineering/Acme Type X Board").unwrap(), "epd.pdf").unwrap();
+    c.write(&pdf, EPD.as_bytes()).unwrap();
+    let r = run(&mut other, "docs.extract", json!({ "connection_id": conn2, "files": [pdf], "set": "epd" })).unwrap();
+    assert_eq!(r["documents"][0]["markup"]["status"], "written");
+    assert!(r["documents"][0]["markup"]["name"].as_str().unwrap().contains("-extractpdf_"));
+
+    // An editor takes the set over and drops fields: Reviera uses it as they left it, and says so.
+    fake.take_over_prompt_set("reviera.epd", Some(json!([{ "name": "epd_number", "type": "string" }, { "name": "gwp_a1a3", "type": "number" }])));
+    let p = run(&mut other, "docs.publish_field_sets", json!({ "connection_id": conn2, "sets": ["epd"] })).unwrap();
+    assert_eq!(p[0]["prompt_set"]["managed"], "builder");
+    assert!(p[0]["prompt_set"]["revision"].is_null());
+    assert!(p[0]["note"].as_str().unwrap().contains("an editor manages reviera.epd"), "{}", p[0]["note"]);
+    let r = run(&mut other, "docs.extract", json!({ "connection_id": conn2, "files": [epd], "set": "epd" })).unwrap();
+    assert_eq!(r["prompt_set"]["revision"], 2);
+    assert!(r["note"].as_str().unwrap().contains("an editor"));
+    assert_eq!(field(&r, "gwp_a1a3")["value"], 126.0);
+    assert_eq!(field(&r, "manufacturer")["found"], false, "a field the editor dropped is not asked for");
+    assert_eq!(fake.prompt_set("reviera.epd").unwrap()["revision"], 2, "Reviera does not publish over an editor");
+
+    // Retired with nothing in its place: extraction still works, with the field set's schema.
+    fake.retire_prompt_set("reviera.epd", None);
+    let r = run(&mut other, "docs.extract", json!({ "connection_id": conn2, "files": [epd], "set": "epd" })).unwrap();
+    assert!(r["prompt_set"].is_null());
+    assert!(r["note"].as_str().unwrap().contains("retired"), "{}", r["note"]);
+    assert_eq!(field(&r, "manufacturer")["value"], "Acme Gypsum");
+
+    // A server from before prompt sets is sent the schema, and the run says why.
+    let old = Fake::start("fesk_test", "fesks_secret", "ann@acme.test");
+    old.without_prompt_sets();
+    let (mut app3, conn3) = session(&old, d3.path());
+    let (_f, [epd3, _, _]) = product_folder(&old);
+    let r = run(&mut app3, "docs.extract", json!({ "connection_id": conn3, "files": [epd3], "set": "epd" })).unwrap();
+    assert!(r["prompt_set"].is_null());
+    assert!(r["note"].as_str().unwrap().contains("no extraction prompt sets"), "{}", r["note"]);
+    assert_eq!(field(&r, "gwp_a1a3")["value"], 126.0);
+}
+
 /// Against a real FileEngine with the conversion service: a product folder holding an EPD and an
 /// HPD of a real product (doc.type set), e.g. `Engineering/Reviera test/Product Library/<product>`.
 /// Read-only on the server: it extracts and applies into a model that is never uploaded.

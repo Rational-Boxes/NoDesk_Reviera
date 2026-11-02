@@ -5,7 +5,9 @@
 //! routes [`crate::Client`] uses the way the live door does: bearer tokens from a service
 //! credential that run out, folders and files by uid, every write and restore a new version,
 //! soft delete, metadata, renditions (none) and permission checks (a folder can be made
-//! read-only).
+//! read-only). The conversion service's prompt sets are faked too: an application publishes its
+//! own, and a test can play the editor who takes one over, locks or retires it, or a server that
+//! has none.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::io::{BufRead, BufReader, Read, Write};
@@ -46,6 +48,92 @@ struct State {
     extractions: BTreeSet<String>,
     /// Discussion threads on files.
     threads: Vec<Value>,
+    /// Extraction prompt sets.
+    prompt_sets: Vec<PromptSet>,
+    /// The conversion service predates prompt sets.
+    no_prompt_sets: bool,
+}
+
+#[derive(Debug, Clone)]
+struct PromptSet {
+    id: String,
+    slug: String,
+    /// `application` (published through the slug route) or `builder` (an editor took it over).
+    managed: &'static str,
+    locked: bool,
+    retired: bool,
+    replaced_by: Option<String>,
+    /// The published definitions, revision 1 first.
+    revisions: Vec<Value>,
+}
+
+impl PromptSet {
+    fn view(&self) -> Value {
+        let body = self.revisions.last().cloned().unwrap_or(Value::Null);
+        json!({ "id": self.id, "slug": self.slug, "name": body["name"], "description": body["description"], "revision": self.revisions.len(), "managed": self.managed, "fields": body["fields"] })
+    }
+}
+
+/// A prompt set's definition as the service keeps it, or why it is refused.
+fn prompt_set_body(raw: &Value, slug: &str) -> Result<Value, String> {
+    let mut body = raw.as_object().cloned().ok_or("the definition must be an object")?;
+    for k in ["format", "type", "exported", "status"] {
+        body.remove(k);
+    }
+    body.insert("slug".into(), json!(slug));
+    if body.get("name").and_then(Value::as_str).is_none_or(|n| n.trim().is_empty()) {
+        return Err("a prompt set needs a name".into());
+    }
+    let fields = body.get("fields").and_then(Value::as_array).filter(|f| !f.is_empty()).ok_or("a prompt set needs at least one field")?;
+    for f in fields {
+        let name = f["name"].as_str().unwrap_or_default();
+        if name.is_empty() || !name.chars().all(|c| c.is_ascii_alphanumeric() || "_.-".contains(c)) {
+            return Err(format!("field name {name:?} is not allowed"));
+        }
+        let t = f["type"].as_str().unwrap_or("string");
+        if !["string", "text", "number", "integer", "boolean", "date", "enum", "list"].contains(&t) {
+            return Err(format!("field {name}: type {t:?} is not allowed"));
+        }
+        if f.get("unit").is_some_and(|u| !u.is_null()) && !matches!(t, "number" | "integer") {
+            return Err(format!("field {name}: a unit is only meaningful on a number or integer field"));
+        }
+        if f["unit"].as_str().is_some_and(|u| u.chars().count() > 32) {
+            return Err(format!("field {name}: unit is longer than 32 characters"));
+        }
+        if t == "enum" && f["enum"].as_array().is_none_or(Vec::is_empty) {
+            return Err(format!("field {name}: an enum field needs a list of values"));
+        }
+    }
+    Ok(Value::Object(body))
+}
+
+/// The JSON Schema a prompt set's fields compile to, as `/v1/extract` takes it.
+fn compile_prompt_set(body: &Value) -> Value {
+    let props: serde_json::Map<String, Value> = body["fields"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|f| {
+            let s = match f["type"].as_str().unwrap_or("string") {
+                "number" | "integer" => json!({ "type": f["type"] }),
+                "boolean" => json!({ "type": "boolean" }),
+                "date" => json!({ "type": "string", "format": "date" }),
+                "enum" => json!({ "type": "string", "enum": f["enum"] }),
+                "list" => json!({ "type": "array", "items": { "type": "string" } }),
+                _ => json!({ "type": "string" }),
+            };
+            (f["name"].as_str().unwrap_or_default().to_owned(), s)
+        })
+        .collect();
+    json!({ "type": "object", "properties": props })
+}
+
+fn refuse(status: u16, kind: &str, message: &str, extra: Value) -> Answer {
+    let mut v = json!({ "kind": kind, "error": message });
+    if let (Some(m), Some(x)) = (v.as_object_mut(), extra.as_object()) {
+        m.extend(x.clone());
+    }
+    (status, "application/json", serde_json::to_vec(&v).unwrap())
 }
 
 impl State {
@@ -238,14 +326,58 @@ fn done() -> Answer {
 fn answer_csai(st: &mut State, method: &str, seg: &[&str], body: &Value) -> Answer {
     match (method, seg) {
         ("GET", ["usage"]) => ok(json!({ "state": "ok", "subject": "key", "limits": { "requests": { "used": st.extractions.len(), "limit": 60, "state": "ok" } }, "message": "" })),
+        _ if st.no_prompt_sets && seg.first() == Some(&"prompt-sets") => err(404, "Not Found"),
+        ("GET", ["prompt-sets"]) => ok(json!({ "prompt_sets": st.prompt_sets.iter().filter(|p| !p.retired).map(PromptSet::view).collect::<Vec<_>>() })),
+        ("PUT", ["prompt-sets", "slug", slug]) => {
+            let body = match prompt_set_body(body, slug) {
+                Ok(b) => b,
+                Err(e) => return refuse(400, "invalid_definition", &e, Value::Null),
+            };
+            let Some(p) = st.prompt_sets.iter_mut().find(|p| p.slug == *slug) else {
+                st.next += 1;
+                let id = format!("ps_{:04}", st.next);
+                st.prompt_sets.push(PromptSet { id: id.clone(), slug: (*slug).to_owned(), managed: "application", locked: false, retired: false, replaced_by: None, revisions: vec![body] });
+                return (201, "application/json", serde_json::to_vec(&json!({ "id": id, "slug": slug, "revision": 1, "changed": true, "model": null, "warnings": [] })).unwrap());
+            };
+            if p.retired {
+                return refuse(410, "prompt_set_retired", "this prompt set was retired", json!({ "replaced_by": p.replaced_by }));
+            }
+            if p.revisions.last() == Some(&body) {
+                return ok(json!({ "id": p.id, "slug": slug, "revision": p.revisions.len(), "changed": false, "model": null, "warnings": [] }));
+            }
+            if p.managed == "builder" {
+                return refuse(409, "managed_in_builder", "this prompt set is managed in the web application", json!({ "current_revision": p.revisions.len() }));
+            }
+            if p.locked {
+                return refuse(409, "locked", "this prompt set is locked by an editor", json!({ "current_revision": p.revisions.len() }));
+            }
+            p.revisions.push(body);
+            ok(json!({ "id": p.id, "slug": slug, "revision": p.revisions.len(), "changed": true, "model": null, "warnings": [] }))
+        }
         ("POST", ["extract"]) => {
+            let mut prompt_set = Value::Null;
+            let schema = match body["prompt_set"].as_str() {
+                Some(_) if st.no_prompt_sets => return err(400, "schema is required"),
+                Some(_) if !body["schema"].is_null() => return err(400, "give prompt_set or schema + instructions, not both"),
+                Some(id) => {
+                    let Some(p) = st.prompt_sets.iter().find(|p| p.id == id) else { return refuse(404, "not_found", "no such prompt set", Value::Null) };
+                    if p.retired {
+                        return refuse(410, "prompt_set_retired", "this prompt set was retired", json!({ "replaced_by": p.replaced_by }));
+                    }
+                    let n = body["revision"].as_u64().map_or(p.revisions.len(), |n| n as usize);
+                    let Some(rev) = n.checked_sub(1).and_then(|i| p.revisions.get(i)) else { return refuse(404, "not_found", "no such published revision", Value::Null) };
+                    prompt_set = json!({ "id": p.id, "name": rev["name"], "slug": p.slug, "revision": n, "current_revision": p.revisions.len() });
+                    compile_prompt_set(rev)
+                }
+                None => body["schema"].clone(),
+            };
             let files: Vec<String> = match (body["files"].as_array(), body["folder_uid"].as_str()) {
                 (Some(f), None) => f.iter().filter_map(Value::as_str).map(str::to_owned).collect(),
                 (None, Some(folder)) => st.nodes.iter().filter(|(_, e)| e.parent == folder && !e.dir && !e.deleted).map(|(u, _)| u.clone()).collect(),
                 _ => return err(400, "give exactly one of files or folder_uid"),
             };
-            let Some(props) = body["schema"]["properties"].as_object() else { return err(400, "schema must be a JSON Schema of type object with properties") };
-            let schema_key = body["schema"].to_string();
+            let Some(props) = schema["properties"].as_object() else { return err(400, "schema must be a JSON Schema of type object with properties") };
+            let schema_key = schema.to_string();
             st.next += 1;
             let run_id = format!("run{:04}", st.next);
             let (mut plan, mut skipped, mut items) = (Vec::new(), Vec::new(), Vec::new());
@@ -294,10 +426,20 @@ fn answer_csai(st: &mut State, method: &str, seg: &[&str], body: &Value) -> Answ
                 cached_total += usize::from(cached);
                 found_total += found;
                 not_found_total += not_found;
-                items.push(json!({ "file_uid": uid, "name": name, "version": version, "data": data, "counts": { "found": found, "not_found": not_found, "dropped_no_evidence": 0 }, "valid": true, "cached": cached }));
+                let mut item = json!({ "file_uid": uid, "name": name, "version": version, "data": data, "counts": { "found": found, "not_found": not_found, "dropped_no_evidence": 0 }, "valid": true, "cached": cached });
+                if !prompt_set.is_null() {
+                    // A prompt set marks up a PDF's evidence (the fake's documents are text, so only one named .pdf).
+                    item["markup"] = if name.to_lowercase().ends_with(".pdf") { json!({ "status": "written", "name": format!("{version}-extractpdf_{}.pdf", &prompt_set["id"].as_str().unwrap_or_default()[3..]) }) } else { json!({ "status": "no_pdf" }) };
+                }
+                items.push(item);
             }
             let summary = json!({ "files": plan.len() + skipped.len(), "extracted": items.len(), "cached": cached_total, "skipped": skipped.len(), "failed": 0, "found": found_total, "not_found": not_found_total, "dropped_no_evidence": 0, "cancelled": false, "truncated": false });
-            ok(json!({ "run_id": run_id, "plan": { "files": plan, "skipped": skipped, "truncated": false }, "items": items, "summary": summary }))
+            let mut out = json!({ "run_id": run_id, "plan": { "files": plan, "skipped": skipped, "truncated": false }, "items": items, "summary": summary });
+            if !prompt_set.is_null() {
+                out["plan"]["prompt_set"] = prompt_set.clone();
+                out["summary"]["prompt_set"] = prompt_set;
+            }
+            ok(out)
         }
         _ => err(404, "not found"),
     }
@@ -537,6 +679,8 @@ fn reason(status: u16) -> &'static str {
         403 => "Forbidden",
         404 => "Not Found",
         409 => "Conflict",
+        410 => "Gone",
+        429 => "Too Many Requests",
         _ => "Error",
     }
 }
@@ -621,6 +765,42 @@ impl Fake {
     /// The discussion threads, as the server holds them.
     pub fn threads(&self) -> Vec<Value> {
         self.state.lock().unwrap().threads.clone()
+    }
+
+    /// The conversion service answers as one from before prompt sets (their routes are not found).
+    pub fn without_prompt_sets(&self) {
+        self.state.lock().unwrap().no_prompt_sets = true;
+    }
+
+    /// The prompt set `slug`: `id`, `revision` (the newest), `managed`, `fields`, or none.
+    pub fn prompt_set(&self, slug: &str) -> Option<Value> {
+        self.state.lock().unwrap().prompt_sets.iter().find(|p| p.slug == slug).map(PromptSet::view)
+    }
+
+    /// An editor takes the prompt set over in the web application (it becomes builder-managed),
+    /// optionally publishing their own `fields` as its next revision.
+    pub fn take_over_prompt_set(&self, slug: &str, fields: Option<Value>) {
+        let mut st = self.state.lock().unwrap();
+        let p = st.prompt_sets.iter_mut().find(|p| p.slug == slug).expect("a published prompt set");
+        p.managed = "builder";
+        if let Some(f) = fields {
+            let mut body = p.revisions.last().cloned().unwrap_or_default();
+            body["fields"] = f;
+            p.revisions.push(body);
+        }
+    }
+
+    /// An editor locks the prompt set's slug.
+    pub fn lock_prompt_set(&self, slug: &str) {
+        self.state.lock().unwrap().prompt_sets.iter_mut().filter(|p| p.slug == slug).for_each(|p| p.locked = true);
+    }
+
+    /// An editor retires the prompt set, optionally naming the set that replaces it.
+    pub fn retire_prompt_set(&self, slug: &str, replaced_by: Option<&str>) {
+        self.state.lock().unwrap().prompt_sets.iter_mut().filter(|p| p.slug == slug).for_each(|p| {
+            p.retired = true;
+            p.replaced_by = replaced_by.map(str::to_owned);
+        });
     }
 
     /// The requests answered so far (`GET /v1/whoami` …), and forgets them.

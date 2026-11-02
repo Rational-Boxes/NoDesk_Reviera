@@ -65,6 +65,13 @@ of that type whole, and gives back these values:</p>
 version. A value the service could not back with a quote is listed as <i>not found</i>: nothing
 is guessed. Reading takes about half a minute a document. Reading the same version again is
 answered at once from the service's cache.</p>
+<p>The first time you read with a field set on a server, Reviera publishes it there as an
+extraction <i>prompt set</i> named <code>reviera.epd</code> or <code>reviera.hpd</code>. Your
+administrator doesn't need to set anything up. The server's own extraction tools and folder
+automation can then use the same definition. If someone who manages extraction on the server has
+taken the set over, Reviera reads with their version, and the review says so. A PDF read this way
+also gets a marked-up copy beside it on FileEngine, with each value's words highlighted. A server
+without prompt sets is asked the old way, with the same results.</p>
 
 <h2 id="accept">Accepting values</h2>
 <p>Nothing is written until you accept. Tick the values you want and choose <b>Apply</b>. They go
@@ -124,6 +131,6 @@ folder, and the documents are on FileEngine for others to read.</p>
 <p>Everything above is a command in the <code>docs</code> domain: <code>docs.link</code>,
 <code>docs.list</code>, <code>docs.set_doc_type</code>, <code>docs.document_path</code>,
 <code>docs.enter_values</code>, <code>docs.extract</code>, <code>docs.apply_extracted</code>,
-<code>docs.materials</code>, <code>docs.field_sets</code>, <code>docs.usage</code>,
+<code>docs.materials</code>, <code>docs.field_sets</code>, <code>docs.publish_field_sets</code>, <code>docs.usage</code>,
 <code>docs.local_collections</code> and <code>docs.publish_local</code>. Lua scripts and AI agents (MCP) can use them, acting as you. The field
 sets are JSON Schemas in <code>schemas/extract/</code>.</p>

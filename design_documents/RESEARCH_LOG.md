@@ -212,6 +212,17 @@ Any source that fails this test is rejected. Rejections are noted in the session
 
 ---
 
+### 2026-11-02 — FileEngine extraction prompt sets: API verification (no new research)
+
+- **Purpose:** publish Reviera's extraction field sets as the conversion service's prompt sets and read with them (COL-FE-011, `FILEENGINE_INTEGRATION.md` §7c, §11.9).
+- **Method:**
+  - Read, for the interface only, the owner's own design `EXTRACTION_PROMPT_SETS.md` and the prompt-set routes on branch `feat/extraction-prompt-sets` (to ca04a2b) in the owner's checkout of the conversion/search/AI service.
+  - Checked the live server: `/csai/v1/prompt-sets` and `/csai/v1/extract/models` answer 404, so prompt sets are not deployed there yet.
+- **Findings:** the routes, the `fileengine.prompt_set.v1` shape, field types and limits, and the refusals (`managed_in_builder`, `locked`, 410 retired with `replaced_by`). Reviera's review points are §11.9 items 42–48.
+- **Clean-room:** no FileEngine implementation code was copied; Reviera talks to the services over HTTP only, and the fake server in `clients/fileengine` is written from the documented interface. No new sources; the design is the owner's own project.
+
+---
+
 ## 5. Source Register
 
 The full register is in **`SOURCE_REGISTER.md` §A**. It had 577 sources at first (1,250 after Session 4 and its follow-ups), each with an ID, area, type, URL, HTTP status and public-availability verdict. It was generated from the research files' Sources sections on 2026-10-12, and every URL was re-checked with an unauthenticated request.

@@ -54,7 +54,7 @@ fn bad(code: &'static str, msg: impl Into<String>) -> Error {
     Error::new(code, msg)
 }
 
-fn failed(e: reviera_fileengine::Error) -> Error {
+pub(crate) fn failed(e: reviera_fileengine::Error) -> Error {
     let code = match e.kind {
         ErrorKind::Url => "fileengine.bad_url",
         ErrorKind::Transport => "fileengine.unreachable",
@@ -102,6 +102,8 @@ pub struct Connections {
     clients: HashMap<String, Client>,
     /// This session's product data extraction runs (`docs.extract`), by id.
     runs: HashMap<String, crate::docs::Run>,
+    /// The field sets published as prompt sets this session, by connection and set.
+    publications: HashMap<(String, String), crate::docs::Publication>,
 }
 
 impl std::fmt::Debug for Connections {
@@ -220,6 +222,19 @@ impl Connections {
 
     pub(crate) fn run(&self, id: &str) -> Option<crate::docs::Run> {
         self.runs.get(id).cloned()
+    }
+
+    pub(crate) fn keep_publication(&mut self, conn: &str, p: crate::docs::Publication) {
+        self.publications.insert((conn.to_owned(), p.set.clone()), p);
+    }
+
+    pub(crate) fn publication(&self, conn: &str, set: &str) -> Option<crate::docs::Publication> {
+        self.publications.get(&(conn.to_owned(), set.to_owned())).cloned()
+    }
+
+    /// Forgets what was published to `conn`, so the next extraction publishes again.
+    pub(crate) fn forget_publications(&mut self, conn: &str) {
+        self.publications.retain(|(c, _), _| c != conn);
     }
 
     /// The working-copy folder of file `uid` (at `version`, for a past one).
@@ -443,6 +458,7 @@ host!(FeRemove, "fileengine.remove", "Remove a FileEngine connection",
     if let Some(c) = s.clients.remove(&p.connection_id) {
         let _ = c.sign_out();
     }
+    s.forget_publications(&p.connection_id);
     Ok(())
 });
 
@@ -494,6 +510,7 @@ host!(FeSignIn, "fileengine.sign_in", "Sign in to FileEngine",
         not_for_agents(caller, "a credential")?;
     }
     let s = &mut app.fileengine;
+    s.forget_publications(&p.connection_id);
     let mut settings = s.load()?;
     let at = settings.connections.iter().position(|x| x.id == p.connection_id).ok_or_else(|| bad("fileengine.no_connection", format!("no FileEngine connection {:?}", p.connection_id)))?;
     let mut profile = settings.connections[at].clone();
@@ -533,6 +550,7 @@ host!(FeSignOut, "fileengine.sign_out", "Sign out of FileEngine",
     if let Some(c) = s.clients.remove(&p.connection_id) {
         let _ = c.sign_out();
     }
+    s.forget_publications(&p.connection_id);
     if p.forget {
         s.delete_secret(&p.connection_id);
     }
@@ -606,7 +624,7 @@ host!(FeBrowse, "fileengine.browse", "List a FileEngine folder",
             (None, None) => Node { uid: reviera_fileengine::ROOT.into(), kind: reviera_fileengine::Kind::Directory, ..Node::default() },
         };
         if !folder.is_dir() {
-            return Err(reviera_fileengine::Error { kind: ErrorKind::Conflict, status: None, message: format!("{} is a file, not a folder", folder.name) });
+            return Err(reviera_fileengine::Error { kind: ErrorKind::Conflict, status: None, message: format!("{} is a file, not a folder", folder.name), detail: None });
         }
         let entries = c.list(&folder.uid, false)?;
         let writable = c.can(&folder.uid, "w").unwrap_or(false);

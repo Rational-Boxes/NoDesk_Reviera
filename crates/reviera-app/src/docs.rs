@@ -11,6 +11,11 @@
 //!   for a **field set** (`schemas/extract/<set>.json`, MIT) from the folder's documents of that
 //!   set's `doc.type`, or from files named. Each value comes back with the quote it was read from,
 //!   or as not found. The run is kept for this session; nothing is written.
+//! - Each field set is published to the server as an extraction **prompt set** (`reviera.<set>`,
+//!   `docs.publish_field_sets`), the first time a session extracts with it, with nothing to set up
+//!   on the server. Extraction then names the set and the revision published, so the server's
+//!   cache, marked-up PDFs and folder automation all see the same definition. A set an editor has
+//!   taken over is used as the editor left it; a server without prompt sets is sent the schema.
 //! - `docs.apply_extracted` writes the fields the user accepts onto the material in one undo step
 //!   (`docs.set_values`), each with its source, optionally into the folder's metadata too, and an
 //!   EPD's GWP as the material's embodied-carbon factor.
@@ -62,6 +67,8 @@ pub struct Field {
     pub folder_key: Option<String>,
     /// string, number, boolean.
     pub kind: String,
+    /// The unit a number is asked for in, if the field set names one.
+    pub unit: Option<String>,
     pub description: String,
 }
 
@@ -75,10 +82,15 @@ pub struct FieldSet {
     /// The `doc.type` of the documents it reads.
     pub doc_type: String,
     pub fields: Vec<Field>,
+    /// The prompt set it is published as on a FileEngine server.
+    pub slug: String,
     #[serde(skip)]
     instructions: String,
     #[serde(skip)]
     schema: Value,
+    /// Its prompt-set definition (`fileengine.prompt_set.v1`).
+    #[serde(skip)]
+    definition: Value,
 }
 
 /// The schema without Reviera's own annotations, as the service is sent it.
@@ -103,10 +115,61 @@ fn parse_set(id: &str, text: &str) -> FieldSet {
             property: f["x-reviera"]["property"].as_str().unwrap_or(k).to_owned(),
             folder_key: f["x-reviera"]["folder_key"].as_str().map(str::to_owned),
             kind: f["type"].as_str().unwrap_or("string").to_owned(),
+            unit: f["x-reviera"]["unit"].as_str().map(str::to_owned),
             description: s(&f["description"]),
         })
         .collect();
-    FieldSet { id: id.to_owned(), title: s(&v["title"]), description: s(&v["description"]), pset: s(&x["pset"]), doc_type: s(&x["doc_type"]), fields, instructions: s(&x["instructions"]), schema: plain(&v) }
+    let slug = format!("reviera.{id}");
+    let definition = definition(&v, &slug);
+    FieldSet { id: id.to_owned(), title: s(&v["title"]), description: s(&v["description"]), pset: s(&x["pset"]), doc_type: s(&x["doc_type"]), fields, slug, instructions: s(&x["instructions"]), schema: plain(&v), definition }
+}
+
+/// A field set as a prompt set (`fileengine.prompt_set.v1`): its fields typed as the service
+/// types them, each with its label, description and unit. Reviera's own mapping (`x-reviera`:
+/// property, folder key) stays in Reviera.
+fn definition(v: &Value, slug: &str) -> Value {
+    let fields: Vec<Value> = v["properties"]
+        .as_object()
+        .into_iter()
+        .flatten()
+        .map(|(k, f)| {
+            let t = match (f["type"].as_str().unwrap_or("string"), f["format"].as_str()) {
+                (_, _) if f["enum"].is_array() => "enum",
+                ("string", Some("date")) => "date",
+                ("number", _) => "number",
+                ("integer", _) => "integer",
+                ("boolean", _) => "boolean",
+                ("array", _) => "list",
+                _ => "string",
+            };
+            let mut d = json!({ "name": k, "label": f["x-reviera"]["label"].as_str().unwrap_or(k), "type": t, "description": f["description"].as_str().unwrap_or_default() });
+            // The service takes a unit only on a number, and a short one; a longer one stays in the description.
+            match f["x-reviera"]["unit"].as_str() {
+                Some(u) if matches!(t, "number" | "integer") && u.chars().count() <= 32 => d["unit"] = json!(u),
+                Some(u) => d["description"] = json!(format!("{} (in {u})", d["description"].as_str().unwrap_or_default()).trim().to_owned()),
+                None => {}
+            }
+            if t == "enum" {
+                d["enum"] = f["enum"].clone();
+            }
+            for b in ["minimum", "maximum"] {
+                if f[b].is_number() && matches!(t, "number" | "integer") {
+                    d[b] = f[b].clone();
+                }
+            }
+            d
+        })
+        .collect();
+    let title = v["title"].as_str().unwrap_or(slug);
+    json!({
+        "format": "fileengine.prompt_set.v1",
+        "type": "extraction_prompt_set",
+        "name": format!("{title} (BIM Reviera)"),
+        "slug": slug,
+        "description": v["description"],
+        "instructions": v["x-reviera"]["instructions"],
+        "fields": fields,
+    })
 }
 
 pub fn field_sets() -> Vec<FieldSet> {
@@ -124,6 +187,115 @@ host!(DocsFieldSets, "docs.field_sets", "List the product data field sets",
      are written as and the doc.type of the documents it reads. Shipped as JSON Schemas in schemas/extract/.",
     [Read], reviera_core::embodied_carbon::Empty, Vec<FieldSet>, |app, caller, p| {
     Ok(field_sets())
+});
+
+// ---- Field sets as prompt sets on the server ----
+
+/// The server's prompt set a field set's extraction names.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct PromptSetRef {
+    pub id: String,
+    pub slug: String,
+    /// The revision extraction pins (the one Reviera published), or none for the set's current
+    /// one (an editor's).
+    pub revision: Option<u64>,
+    /// `application` (Reviera's definition) or `builder` (an editor took it over).
+    pub managed: String,
+}
+
+/// What publishing a field set to a connection's server came to.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct Publication {
+    pub set: String,
+    pub slug: String,
+    /// The prompt set extraction names, or none when the field set's schema is sent instead.
+    pub prompt_set: Option<PromptSetRef>,
+    /// Whether this publish made a set or a revision (false: the server had it already).
+    pub created: bool,
+    pub changed: bool,
+    /// Why extraction uses something other than Reviera's own published revision.
+    pub note: Option<String>,
+    /// The server's warnings (a model it does not offer, …).
+    pub warnings: Vec<String>,
+}
+
+/// Publishes field set `set` as prompt set `reviera.<set>` on connection `conn` (idempotent:
+/// unchanged, it changes nothing), and keeps the answer for the session.
+fn publish(app: &mut App, conn: &str, set: &FieldSet) -> Result<Publication> {
+    let answer = app.fileengine.with(conn, |c| Ok(c.publish_prompt_set(&set.slug, &set.definition)))?;
+    let mut out = Publication { set: set.id.clone(), slug: set.slug.clone(), prompt_set: None, created: false, changed: false, note: None, warnings: Vec::new() };
+    match answer {
+        Ok(v) => {
+            out.created = v["created"] == true;
+            out.changed = v["changed"] == true;
+            out.warnings = v["warnings"].as_array().into_iter().flatten().map(|w| w.as_str().map_or_else(|| w["message"].as_str().unwrap_or(&w.to_string()).to_owned(), str::to_owned)).collect();
+            if v["model"]["fallback"] == true {
+                out.note = Some(format!("the server runs it on its default model ({})", v["model"]["used"].as_str().unwrap_or("?")));
+            }
+            out.prompt_set = Some(PromptSetRef { id: v["id"].as_str().unwrap_or_default().to_owned(), slug: set.slug.clone(), revision: v["revision"].as_u64(), managed: "application".into() });
+        }
+        Err(e) => match (e.status, e.code()) {
+            // A server from before prompt sets.
+            (Some(404), None) => out.note = Some("this server has no extraction prompt sets yet, so the field set's schema is sent".into()),
+            (Some(409), Some(code @ ("managed_in_builder" | "locked"))) => {
+                // An editor has the set: extraction uses it as they left it.
+                let found = app.fileengine.with(conn, |c| c.prompt_sets(""))?.into_iter().find(|p| p["slug"] == set.slug.as_str());
+                match found {
+                    Some(p) => {
+                        out.note = Some(format!("an editor {} {} on the server, so its revision {} is used, not Reviera's definition", if code == "locked" { "locked" } else { "manages" }, set.slug, p["revision"]));
+                        out.prompt_set = Some(PromptSetRef { id: p["id"].as_str().unwrap_or_default().to_owned(), slug: set.slug.clone(), revision: None, managed: p["managed"].as_str().unwrap_or("builder").to_owned() });
+                    }
+                    None => out.note = Some(format!("an editor manages {} on the server but it has no published revision, so the field set's schema is sent", set.slug)),
+                }
+            }
+            (Some(410), _) => {
+                let by = e.detail.as_ref().and_then(|d| d["replaced_by"].as_str()).filter(|s| !s.is_empty()).map(str::to_owned);
+                match by {
+                    Some(id) => {
+                        out.note = Some(format!("{} was retired on the server; the set that replaces it ({id}) is used", set.slug));
+                        out.prompt_set = Some(PromptSetRef { id, slug: set.slug.clone(), revision: None, managed: "builder".into() });
+                    }
+                    None => out.note = Some(format!("{} was retired on the server, so the field set's schema is sent", set.slug)),
+                }
+            }
+            // Refused for this key or over the server's limits: extraction still works with the schema.
+            (Some(400 | 403 | 429), _) => out.note = Some(format!("the server did not take the prompt set ({}), so the field set's schema is sent", e.message)),
+            _ => return Err(crate::fileengine::failed(e)),
+        },
+    }
+    app.fileengine.keep_publication(conn, out.clone());
+    Ok(out)
+}
+
+/// The prompt set extraction with `set` names on `conn`: the one published this session, else
+/// published now.
+fn publication(app: &mut App, conn: &str, set: &FieldSet) -> Result<Publication> {
+    match app.fileengine.publication(conn, &set.id) {
+        Some(p) => Ok(p),
+        None => publish(app, conn, set),
+    }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PublishParams {
+    pub connection_id: String,
+    /// The field sets (default: all of them).
+    #[serde(default)]
+    pub sets: Vec<String>,
+}
+
+host!(DocsPublishFieldSets, "docs.publish_field_sets", "Publish the field sets to FileEngine",
+    "Publishes Reviera's field sets (docs.field_sets) to the connection's server as extraction prompt sets \
+     named reviera.<set> (COL-FE-011), so that the server's extraction, its marked-up PDFs and folder \
+     automation use the same definitions. Any signed-in member may: nothing is set up on the server first. \
+     Publishing an unchanged set changes nothing; a changed one becomes its next revision. docs.extract \
+     publishes a set the first time a session uses it, so this is only needed to publish ahead or again. A set \
+     an editor took over or locked is left as they have it and used as it is; a server without prompt sets \
+     is noted and its extractions are sent the schema.",
+    [Network], PublishParams, Vec<Publication>, |app, caller, p| {
+    let sets: Vec<FieldSet> = if p.sets.is_empty() { field_sets() } else { p.sets.iter().map(|s| field_set(s)).collect::<Result<_>>()? };
+    sets.iter().map(|s| publish(app, &p.connection_id, s)).collect()
 });
 
 // ---- Links and documents (COL-FE-006) ----
@@ -429,6 +601,9 @@ pub struct DocumentResult {
     /// Whether the answer matched the field set.
     pub valid: bool,
     pub fields: Vec<FieldValue>,
+    /// The marked-up PDF the service made with each value's evidence highlighted: `status`
+    /// (written, no_pdf, too_large, disabled) and the sidecar's `name` and `uid`.
+    pub markup: Option<Value>,
 }
 
 #[derive(Debug, Clone, Serialize, JsonSchema)]
@@ -450,6 +625,11 @@ pub struct Run {
     pub skipped: Vec<Skipped>,
     /// The service's counts: found, not found, dropped for want of a quote, cached, tokens.
     pub summary: Value,
+    /// The server's prompt set it ran (`id`, `name`, `revision`, `current_revision`), or none
+    /// when the field set's schema was sent.
+    pub prompt_set: Option<Value>,
+    /// Why it ran with something other than Reviera's own published definition.
+    pub note: Option<String>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -498,11 +678,13 @@ fn to_run(v: &Value, set: &FieldSet, conn: &str, material: Option<String>) -> Ru
                     }
                 })
                 .collect(),
+            markup: Some(it["markup"].clone()).filter(|m| m.is_object()),
         })
         .collect();
     let mut skipped: Vec<Skipped> = v["plan"]["skipped"].as_array().into_iter().flatten().map(|k| Skipped { file_uid: s(&k["file_uid"]), name: k["name"].as_str().map(str::to_owned), reason: s(&k["reason"]) }).collect();
     skipped.extend(v["items"].as_array().into_iter().flatten().filter(|it| !it["skipped"].is_null()).map(|it| Skipped { file_uid: s(&it["file_uid"]), name: it["name"].as_str().map(str::to_owned), reason: it["skipped"].as_str().map_or_else(|| it["skipped"].to_string(), str::to_owned) }));
-    Run { run_id: s(&v["run_id"]), set: set.id.clone(), connection_id: conn.to_owned(), material, documents, skipped, summary: v["summary"].clone() }
+    let prompt_set = [&v["summary"]["prompt_set"], &v["plan"]["prompt_set"]].into_iter().find(|p| p.is_object()).cloned();
+    Run { run_id: s(&v["run_id"]), set: set.id.clone(), connection_id: conn.to_owned(), material, documents, skipped, summary: v["summary"].clone(), prompt_set, note: None }
 }
 
 host!(DocsExtract, "docs.extract", "Read product data from documents",
@@ -511,7 +693,10 @@ host!(DocsExtract, "docs.extract", "Read product data from documents",
      `files` named on `connection_id`. Each value comes with the quote it was read from, or as not found: the \
      service never guesses. Nothing is written; docs.apply_extracted writes the values the user accepts. The \
      run is kept for this session. Reading takes about half a minute a document; asking again is answered \
-     from the service's cache unless `cache` is `refresh`.",
+     from the service's cache unless `cache` is `refresh`. The field set goes as the server's prompt set \
+     reviera.<set>, published the first time a session uses it (docs.publish_field_sets), at the revision \
+     published, or as an editor left it; a server without prompt sets is sent the schema. A PDF read with a \
+     prompt set gets a marked-up copy with the evidence highlighted (each document's `markup`).",
     [Network, Read], ExtractParams, Run, |app, caller, p| {
     let set = field_set(&p.set)?;
     let cache = p.cache.as_deref().unwrap_or("use");
@@ -534,9 +719,37 @@ host!(DocsExtract, "docs.extract", "Read product data from documents",
         (None, Some(c), false) => (c.clone(), p.files.clone(), None),
         _ => return Err(bad("docs.invalid_input", "give a linked material, or a connection_id and files")),
     };
-    let body = json!({ "files": files, "schema": set.schema, "instructions": set.instructions, "cache": cache });
-    let v = app.fileengine.with(&conn, |c| c.extract(&body, EXTRACT_TIMEOUT))?;
-    let run = to_run(&v, &set, &conn, material);
+    let raw = json!({ "files": files, "schema": set.schema, "instructions": set.instructions, "cache": cache });
+    let mut pubn = publication(app, &conn, &set)?;
+    let mut answer = None;
+    for _ in 0..2 {
+        let Some(ps) = &pubn.prompt_set else { break };
+        let body = json!({ "files": files, "prompt_set": ps.id, "revision": ps.revision, "cache": cache });
+        match app.fileengine.with(&conn, |c| Ok(c.extract(&body, EXTRACT_TIMEOUT)))? {
+            Ok(v) => {
+                answer = Some(v);
+                break;
+            }
+            // The set went (retired, or the server was reset) since it was published: publish again.
+            Err(e) if matches!(e.status, Some(404 | 410)) && e.code().is_some() => {
+                app.fileengine.forget_publications(&conn);
+                pubn = publish(app, &conn, &set)?;
+            }
+            Err(e) => return Err(crate::fileengine::failed(e)),
+        }
+    }
+    let v = match answer {
+        Some(v) => v,
+        None => app.fileengine.with(&conn, |c| c.extract(&raw, EXTRACT_TIMEOUT))?,
+    };
+    let mut run = to_run(&v, &set, &conn, material);
+    run.note = pubn.note.clone().or_else(|| (pubn.prompt_set.is_some() && run.prompt_set.is_none()).then(|| "the set was not used, so the field set's schema was sent".to_owned()));
+    if let Some(ps) = &run.prompt_set
+        && let (Some(r), Some(cur)) = (ps["revision"].as_u64(), ps["current_revision"].as_u64())
+        && cur > r
+    {
+        run.note = Some(format!("{}; the server has a newer revision ({cur}) than the one Reviera published ({r})", run.note.take().unwrap_or_else(|| format!("{} ran at revision {r}", pubn.slug))));
+    }
     app.fileengine.keep_run(run.clone());
     Ok(run)
 });

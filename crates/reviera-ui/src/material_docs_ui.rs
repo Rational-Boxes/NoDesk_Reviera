@@ -224,11 +224,22 @@ fn review(frame: &Frame, run: &Value) -> Option<Accepted> {
         }
     }
     let skipped: Vec<String> = run["skipped"].as_array().into_iter().flatten().map(|s| format!("{} ({})", s["name"].as_str().or(s["file_uid"].as_str()).unwrap_or(""), s["reason"].as_str().unwrap_or(""))).collect();
+    // The server's prompt set it ran, why not Reviera's own if so, and the marked-up PDFs.
+    let ps = &run["prompt_set"];
+    let mut server = if ps.is_object() { format!("\nRead with the server's prompt set “{}”, revision {}.", ps["name"].as_str().unwrap_or(""), ps["revision"]) } else { String::new() };
+    if let Some(n) = run["note"].as_str() {
+        server.push_str(&format!(" Note: {n}."));
+    }
+    let marked: Vec<String> = docs.iter().filter(|d| d["markup"]["status"] == "written").map(|d| format!("{} ({})", d["name"].as_str().unwrap_or(""), d["markup"]["name"].as_str().unwrap_or(""))).collect();
+    if !marked.is_empty() {
+        server.push_str(&format!("\nMarked-up PDF with the evidence highlighted, beside the document on FileEngine: {}", marked.join("; ")));
+    }
     let note = StaticText::builder(&dialog)
         .with_label(&format!(
-            "Select the values to keep (Ctrl+click to add or remove one). Nothing is written until you Apply, and Undo takes it all back.{}{}",
+            "Select the values to keep (Ctrl+click to add or remove one). Nothing is written until you Apply, and Undo takes it all back.{}{}{}",
             if several { " Where documents disagree, keep one of them." } else { "" },
-            if skipped.is_empty() { String::new() } else { format!("\nNot read: {}", skipped.join("; ")) }
+            if skipped.is_empty() { String::new() } else { format!("\nNot read: {}", skipped.join("; ")) },
+            server
         ))
         .build();
     note.wrap(1080);

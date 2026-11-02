@@ -560,6 +560,25 @@ parameter it fills and its data type, so units are parsed by Reviera's own unit 
 Each schema field is a plain value (string, number, date); the service wraps it with `unit`,
 `evidence` and `found` (§3.1), so Reviera's schemas stay small.
 
+**Field sets as server prompt sets** (COL-FE-011, built 2026-11-02 against csai's
+EXTRACTION_PROMPT_SETS.md §4.5). The conversion service now keeps extraction definitions as
+versioned **prompt sets**. An application may publish the ones it relies on with any member's
+key, so no administrator has to create sets or grant roles first. Reviera publishes each field
+set as `reviera.<set>` the first time a session extracts with it (`docs.publish_field_sets` does
+it ahead).
+- Publishing an unchanged definition changes nothing; a newer Reviera's changed one becomes the
+  next revision.
+- Extraction then names the set and the revision Reviera published, so the server's cache, its
+  marked-up PDF (the evidence highlighted, a sidecar of the document) and folder automation see
+  the same definition.
+- The fields are typed as the service types them (number, date, enum…), with label, description
+  and unit. The `x-reviera` mapping (IFC property, folder key) stays in Reviera. No model is
+  named, so runs use the deployment's default.
+- An editor who takes a set over or locks it keeps it: Reviera uses it as the editor left it and
+  notes that in the run.
+- A retired set with no replacement, a refused publish, or a server from before prompt sets falls
+  back to sending the schema, as before.
+
 **Provenance in the model.** An accepted value records where it came from, in RXD beside the
 parameter: `{file_uid, version, run_id, field, cached}`. The quote is not copied into the model
 by default: the run record in FileEngine holds it, erasure reaches it there, and a model copied
@@ -872,6 +891,56 @@ one key and scope shared with the REST door. Points from the desktop side:
     research panel is added later, it would show the consent request in a dialog as §3.9
     proposes.
 
+### 11.9 Extraction prompt sets (`EXTRACTION_PROMPT_SETS.md`), reviewed 2026-11-02
+
+Reviewed against csai's branch `feat/extraction-prompt-sets` (plan b2a0da4…058372a,
+implementation P1–P3 5046600…ca04a2b) and folder_actions P3–P4. The live server does not have it
+yet: `/csai/v1/prompt-sets` and `/csai/v1/extract/models` answer 404, which Reviera reads as
+"no prompt sets" and falls back.
+
+**What it gives Reviera:**
+- one definition per field set, shared by the desktop, the cache and automation;
+- publishing with no server-side setup, idempotent by hash;
+- revisions Reviera can pin;
+- the marked-up PDF;
+- `extraction.complete` on the bus, so a folder rule can act on values Reviera's users extract.
+
+Earlier items it settles:
+- 34 (dates): `date` fields compile to `format: date` with an ISO 8601 hint;
+- 36 (schema contract): the field types and limits are now defined;
+- 32 (where the page comes from): partly, since the markup locator reports a page.
+
+Points from the desktop side:
+
+42. **Revision churn between releases** (*needed*). The hash is compared with the current
+    revision only. Two Reviera releases in one tenant with different definitions would each
+    publish a new revision at every start, alternating. After 20 revisions a day, both get
+    `429 revision_limit`, and Reviera falls back to the schema. Please answer a definition that
+    matches *any* earlier published revision with that revision (`changed: false`, `revision: n`,
+    `current_revision`) instead of publishing it again. Reviera already pins the revision it gets
+    back, so each release keeps its own.
+43. **The set's id in the 409 answers** (*wanted*). `managed_in_builder` and `locked` give
+    `current_revision` but not the set's `id`. Reviera then lists every set to find its slug. A
+    `GET /v1/prompt-sets/slug/{slug}` would also do.
+44. **Listing by slug** (*wanted*). `?q=` matches name and description only; a slug filter
+    would let item 43's lookup be one request.
+45. **The unit in the prompt** (*check*). A field's `unit` is added to its description as
+    "(unit: …)". Please confirm the model still reports the unit as printed and does not convert
+    (item 33), or state that a value comes in the field's unit. Reviera converts with its own
+    parser and shows the printed unit.
+46. **Reading the marked-up PDF** (*check*). Each item's `markup` has the sidecar's `uid` and
+    name. Can a member read that hidden child through the REST door
+    (`GET /api/v1/files/{uid}/content`) with their own key? Reviera would then open it at the
+    page beside the review table.
+47. **Retired sets stay retired** (*note*). A retired application-managed slug answers 410 to
+    every later publish, so a newer Reviera cannot bring it back; only an editor can. That is the
+    intended editor control. Reviera falls back to the schema, so those extractions emit
+    `extraction.complete` with `prompt_set: null`, which folder rules skip.
+48. **Contract and licence** (*needed*, as items 29 and 37). The prompt-set routes,
+    `fileengine.prompt_set.v1` and the sidecar entry format (`fileengine.extract_cache.v1`)
+    should be in the permissively licensed OpenAPI description Reviera's MIT client is written
+    against.
+
 ### 11.8 Summary by Reviera phase
 
 | Reviera phase (§9) | Needs | Wants |
@@ -884,6 +953,7 @@ one key and scope shared with the REST door. Points from the desktop side:
 | 6. Discussion service | 17 | 23, 24, 25 |
 | Single sign-on | 15 | 16 |
 | 5b. Extraction (§7c) | 31, 32, 35, 37 | 33, 34, 36, 38–40 |
+| 5c. Prompt sets (§7c, COL-FE-011) | 42, 48 | 43–46 |
 
 ## Sources
 
@@ -894,6 +964,10 @@ FileEngine repositories read on 2026-10-27:
   `fileengine_external_share` and `fileengine_convert_search_ai`;
 - `file_engine_frontend/design_documents/XEOKIT_UPGRADE_MARKUP_BCF_PLAN.md` (§4 viewpoint
   anchor, §10 BCF mapping).
+
+Read on 2026-11-02: `convert_search_ai/design_documents/EXTRACTION_PROMPT_SETS.md` and the
+prompt-set routes on branch `feat/extraction-prompt-sets` (to ca04a2b), as a consumer's
+interface; nothing copied.
 
 Read on 2026-10-29: `fileengine_convert_search_ai/design_documents/HEADLESS_RESEARCH_API.md`
 (branch `research/headless-research-api`, 0db3dd3), the owner's own design, read as a

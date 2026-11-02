@@ -27178,7 +27178,7 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 
 **Behaviour & rules.**
 - **Field sets** ship as JSON Schemas in `schemas/extract/` (MIT): `epd` and `hpd` to start with. Each field's `x-reviera` names its label, the IFC property it fills and the FileEngine folder metadata key it may fill. `docs.field_sets` lists them.
-- `docs.extract` sends the linked folder's documents of the matching `doc.type`, or the files named, to the conversion service's headless extraction (`POST /csai/v1/extract`). It sends the field set's schema without the `x-reviera` annotations, with `tools` denied. The run is kept for the session and returned: for each document and field, the value, its unit, the evidence quote and offset, the version it was read from, and whether it came from the cache. Fields with no supporting quote are listed as not found; nothing is guessed. `cache: "refresh"` asks again.
+- `docs.extract` sends the linked folder's documents of the matching `doc.type`, or the files named, to the conversion service's headless extraction (`POST /csai/v1/extract`). It names the field set's prompt set on the server (COL-FE-011), or sends the field set's schema without the `x-reviera` annotations where it cannot. The run is kept for the session and returned: for each document and field, the value, its unit, the evidence quote and offset, the version it was read from, and whether it came from the cache. Fields with no supporting quote are listed as not found; nothing is guessed. `cache: "refresh"` asks again.
 - A **local folder** cannot be read by extraction (`docs.local_folder`); its values are typed in. `docs.enter_values` takes a field set's values as text, checks them against the field set (numbers, dates), and writes them as `docs.apply_extracted` does, with the document they were read from as their source. *Enter Values…* in the Material Documents dialog shows the set's fields.
 - Nothing is written until the user accepts. `docs.apply_extracted` writes the accepted fields onto the material in one undo step. Each value records its source: file uid and name, version, run id, field set and field. With `to_folder`, the values are also written to the folder's metadata under the field's key. The quote is not copied into the model.
 - An EPD's GWP A1–A3, applied with `carbon: true`, also becomes the material's embodied-carbon factor (ANA-CARB-001). It goes in a library named *Product EPDs* and is matched to the material, per m², m³, kg or piece. A declared unit in ft², ft³, lb or a multiple (`1,000 ft2`) is converted, and one Reviera cannot read is refused with the reason.
@@ -27227,6 +27227,29 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 **Acceptance criteria.**
 - [x] Against the fake server: a local folder publishes with its types; publishing again adds versions; with relink, the model points at the uploaded folder and files, no local folder is left, and one undo restores it.
 - [x] Live: a local folder publishes into the test folder and the material's documents are then listed from FileEngine.
+
+### Field sets published as extraction prompt sets
+**ID:** COL-FE-011 · **Priority:** P2 · **Ref:** FILEENGINE_INTEGRATION §7c, §11.9
+
+**Purpose.** Reviera's field sets become the server's own extraction definitions, with nothing for an administrator to set up, so the server's cache, its marked-up PDFs and its folder automation all use the definition Reviera reads with. People who manage extraction on the server can still adopt, lock or retire a definition.
+
+**Behaviour & rules.**
+- Each field set is published as the conversion service's **prompt set** `reviera.<set>` (`PUT /csai/v1/prompt-sets/slug/{slug}`, `fileengine.prompt_set.v1`). Any signed-in member's key may do this; nothing is configured on the server first. Its fields are typed as the service types them (string, number, integer, boolean, date, enum, list), each with its label, description and unit. Reviera's own mapping (IFC property, folder key) stays in Reviera. No model is named, so the deployment's default model is used.
+- `docs.extract` publishes a field set the first time a session uses it on a connection, then names the set and the revision it published (`prompt_set`, `revision`). Publishing an unchanged definition changes nothing on the server; a changed one (a newer Reviera) becomes the set's next revision. `docs.publish_field_sets` publishes ahead or again and reports, per set, the prompt set, whether anything changed, and any note or warning. Signing in again or out forgets what was published that session.
+- **When an editor has the set** (taken over or locked in the web application), Reviera does not publish over it. It uses the set's current revision as the editor left it and says so in the run's `note`. A field the editor removed is reported as not found.
+- **Fallbacks.** Extraction still works, sending the field set's schema as before (COL-FE-007), with the reason in the run's `note`, when:
+  - the server has no prompt sets (an older conversion service);
+  - the set was retired with nothing in its place (one that names a replacement is used instead);
+  - the server refuses the publish (limits, permissions).
+
+  A set that disappears between publishing and extracting is published again once.
+- The run records the prompt set and revision it ran (`prompt_set`), and the review dialog shows them. When the server has a newer revision than the one pinned, the run says so. A PDF read with a prompt set gets a marked-up copy with each value's evidence highlighted, a sidecar beside the document. Each document's `markup` gives its status and name, and the review dialog lists it.
+
+**Acceptance criteria.**
+- [x] Against the fake server, the first extraction publishes `reviera.epd` (revision 1, typed fields, units) and names it. Publishing again, or from a second user's session, changes nothing.
+- [x] An editor's take-over is used as they left it (their revision, fields they removed not found), and Reviera does not publish over it.
+- [x] A retired set, and a server without prompt sets, fall back to the schema with the reason given, and the values are still read.
+- [ ] Live: against a server with prompt sets deployed, `docs.publish_field_sets` publishes both sets, and an EPD in the test folder is read through `reviera.epd` with its marked-up PDF.
 
 ### Publishing files and the material documentation report
 **ID:** COL-FE-008 · **Priority:** P2 · **Ref:** FILEENGINE_INTEGRATION §7a
@@ -28668,6 +28691,7 @@ Every command below is registered once and is available from the UI, Lua and MCP
 | `docs.apply_extracted` | run_id, material, fields?, file_uid?, to_folder?, carbon? | applied | Yes | COL-FE-007 |
 | `docs.enter_values` | material, set, values, units?, document?, carbon? | applied | Yes | COL-FE-007 |
 | `docs.usage` | connection_id | usage | No (query) | COL-FE-007 |
+| `docs.publish_field_sets` | connection_id, sets? | publication[] | No | COL-FE-011 |
 | `docs.local_collections` | — | {path, folder_name, materials, documents}[] | No (query) | COL-FE-010 |
 | `docs.publish_local` | connection_id, parent_uid, paths?, relink? | {path, folder_uid, folder_name, uploaded, updated, relinked}[] | With relink: Yes | COL-FE-010 |
 | `docs.replace_all` | data | () | Yes | COL-FE-010 |
@@ -29322,9 +29346,9 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 28 | 0 | 29 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
-| COL | 8 | 50 | 11 | 1 | 70 |
+| COL | 8 | 50 | 12 | 1 | 71 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **329** | **207** | **7** | **863** |
+| **Total** | **320** | **329** | **208** | **7** | **864** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -29379,7 +29403,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.2a Reviera-originated features
 
-136 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
+137 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
 
 | Requirement | Ch | Feature |
 |-------------|----|---------|
@@ -29511,6 +29535,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | COL-FE-007 | 6 | Product data from documents |
 | COL-FE-009 | 6 | Issues on a FileEngine model |
 | COL-FE-010 | 6 | Publishing local documentation folders to FileEngine |
+| COL-FE-011 | 6 | Field sets published as extraction prompt sets |
 | COL-FE-008 | 6 | Publishing files and the material documentation report |
 | COL-MRG-001 | 6 | Three-way merge by GlobalId and RXD id |
 | COL-OWN-002 | 6 | Live ownership document and sync lock |
@@ -29522,7 +29547,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2291 unique commands** in 428 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2292 unique commands** in 428 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -29627,7 +29652,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `discipline` | 1 |
 | `displacement` | 5 |
 | `distribution_system` | 1 |
-| `docs` | 17 |
+| `docs` | 18 |
 | `door` | 1 |
 | `dormer` | 3 |
 | `duct` | 4 |
@@ -30457,6 +30482,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `docs.list` | 6 | material \ | connection_id + folder_uid | document[] | No (query) |
 | `docs.local_collections` | 6 | — | {path, folder_name, materials, documents}[] | No (query) | COL-FE-010 |
 | `docs.materials` | 6 | — | {material, link?, values}[] | No (query) | COL-FE-006 |
+| `docs.publish_field_sets` | 6 | connection_id, sets? | publication[] | No | COL-FE-011 |
 | `docs.publish_local` | 6 | connection_id, parent_uid, paths?, relink? | {path, folder_uid, folder_name, uploaded, updated, relinked}[] | With relink: Yes | COL-FE-010 |
 | `docs.replace_all` | 6 | data | () | Yes | COL-FE-010 |
 | `docs.report` | 6 | path, carbon_run_id? | {path, materials, documented, warnings} | No | COL-FE-008 |
