@@ -190,6 +190,18 @@ dylibbundler --overwrite-dir --bundle-deps --create-dir \
     --dest-dir "$APP/Contents/Frameworks/" \
     --install-path @executable_path/../Frameworks/ \
     --search-path "$BREW/lib" --search-path "$OCC/lib" --search-path "$IFCOS_LIB"
+# Homebrew's TBB carries a Linux-style `$ORIGIN` rpath that dylibbundler fails to rewrite (its
+# "no LC_RPATH load command with path:" error is not fatal); it then adds its own rpath beside the
+# one already there, and dyld refuses a library with a duplicate LC_RPATH. Keep one of each.
+for f in "$APP/Contents/MacOS/reviera" "$APP"/Contents/Frameworks/*.dylib; do
+    otool -l "$f" | awk '/cmd LC_RPATH/ { getline; getline; print $2 }' | sort | uniq -d |
+    while read -r rp; do
+        while [ "$(otool -l "$f" | awk '/cmd LC_RPATH/ { getline; getline; print $2 }' |
+                   grep -cxF "$rp")" -gt 1 ]; do
+            install_name_tool -delete_rpath "$rp" "$f"
+        done
+    done
+done
 # Nothing may still point into Homebrew.
 if otool -L "$APP/Contents/MacOS/reviera" "$APP"/Contents/Frameworks/*.dylib | grep -E "$BREW|/usr/local/(opt|Cellar)" ; then
     echo "error: Homebrew paths remain in the bundle (see above)" >&2
@@ -227,6 +239,10 @@ else
     codesign --force --deep -s - "$APP"
 fi
 codesign --verify --deep --strict --verbose=2 "$APP"
+# The bundle must load from its own Frameworks: a dyld failure here would otherwise only show up
+# when a user opens the app.
+# `reviera` without arguments reads commands from stdin and exits at its end.
+"$APP/Contents/MacOS/reviera" </dev/null >/dev/null
 
 # ------------------------------------------------------------------ 7. The disk image
 step "Creating $DMG"

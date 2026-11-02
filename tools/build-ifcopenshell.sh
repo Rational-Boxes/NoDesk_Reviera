@@ -24,6 +24,22 @@ if [ ! -d "$SRC/.git" ]; then
     git clone --depth 1 --branch "$IFCOS_TAG" https://github.com/IfcOpenShell/IfcOpenShell.git "$SRC"
 fi
 
+# Local fixes to the pinned source (tools/patches/*.patch), applied idempotently so re-runs and a
+# reused checkout stay clean. Currently: a plain-double profile_point constructor, since Boost
+# >= 1.89 made boost::optional's converting constructor explicit (the Ifc*ShapeProfileDef tables).
+PATCHES="$(cd "$(dirname "$0")" && pwd)/patches"
+if [ -d "$PATCHES" ]; then
+    for p in "$PATCHES"/*.patch; do
+        [ -e "$p" ] || continue
+        if git -C "$SRC" apply --reverse --check "$p" >/dev/null 2>&1; then
+            echo "patch already applied: $(basename "$p")"
+        else
+            echo "applying patch: $(basename "$p")"
+            git -C "$SRC" apply "$p"
+        fi
+    done
+fi
+
 # Schemas: IFC4 is the default project schema, IFC4X3_ADD2 is offered in Local mode, and IFC2X3
 # is read for older files (TECH_STACK §3.1, §3.7.3).
 cmake -S "$SRC/cmake" -B "$BUILD" -G Ninja \
