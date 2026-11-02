@@ -973,6 +973,8 @@ fn the_bathrooms_sample_keeps_its_rooms() {
     // Its door's vent, and no notice in a house.
     let count = |t: &str| s.iter().filter(|e| e.param("@ObjectType").and_then(Value::as_str) == Some(t)).count();
     assert_eq!((count("Sauna Door Vent"), count("Sauna Notice")), (1, 0));
+    // The steam room's generator outside it.
+    assert_eq!(s.iter().filter(|e| reviera_core::bath_rules::is_steam_generator(e)).count(), 1);
     // The steam room's ceiling slopes 2 in per ft.
     let head = reviera_core::bath_rules::fixtures(&s).into_iter().find(|f| f.kind == reviera_core::bath_rules::FixtureKind::SteamHead).unwrap();
     let room = reviera_core::bath_rules::room_around(&s, &head).unwrap();

@@ -390,6 +390,23 @@ pub fn catalogue() -> Vec<Component> {
             connectors: none,
         },
         Component {
+            name: "Steam generator",
+            category: C::Humidifier,
+            predefined: "STEAMINJECTION",
+            element_type: None,
+            color: GREY,
+            // A 450 × 250 × 400 mm generator on the floor outside the room, its back to the wall; the
+            // steam line and the water supply leave its top, the drain its base.
+            shape: || Shape::default().cuboid([-0.225, 0.225], [-0.25, 0.0], [0.0, 0.4]),
+            connectors: || {
+                vec![
+                    pipe("Steam", [0.15, -0.125, 0.4], [0.0, 0.0, 1.0], K::DomesticHotWater, 0.015, 0.0),
+                    pipe("Cold water", [-0.15, -0.125, 0.4], [0.0, 0.0, 1.0], K::DomesticColdWater, 0.015, 0.0),
+                    pipe("Drain", [0.0, -0.125, 0.0], [0.0, 0.0, -1.0], K::Sanitary, 0.02, 0.0),
+                ]
+            },
+        },
+        Component {
             name: "Steam room bench 600",
             category: C::Furniture,
             predefined: "USERDEFINED",

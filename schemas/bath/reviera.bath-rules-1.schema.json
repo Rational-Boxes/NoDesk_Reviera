@@ -426,6 +426,8 @@
         "height_unit": {"type": "number", "exclusiveMinimum": 0},
         "height_step": {"type": "number", "minimum": 0},
         "exterior_wall": {"type": "number", "minimum": 0},
+        "generator_run": {"type": "number", "exclusiveMinimum": 0, "description": "The longest steam line from the generator to the head (metres)."},
+        "control_height": {"$ref": "#/$defs/pair", "description": "The control pad's height above the floor, least and most (metres)."},
         "source": {"type": "string", "pattern": "^S[0-9]{4}( S[0-9]{4})*$"},
         "confidence": {"enum": ["verified", "secondary", "advisory"]}
       }

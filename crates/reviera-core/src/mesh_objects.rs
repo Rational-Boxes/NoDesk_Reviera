@@ -79,10 +79,12 @@ pub enum Category {
     Alarm,
     /// Hand dryers and other appliances (ARC-BATH-004).
     ElectricAppliance,
+    /// Steam generators and other humidifiers (ARC-BATH-015).
+    Humidifier,
 }
 
 impl Category {
-    pub const ALL: [Category; 25] = [
+    pub const ALL: [Category; 26] = [
         Category::GenericModel,
         Category::Furniture,
         Category::Column,
@@ -108,6 +110,7 @@ impl Category {
         Category::SwitchingDevice,
         Category::Alarm,
         Category::ElectricAppliance,
+        Category::Humidifier,
     ];
 
     pub fn label(self) -> &'static str {
@@ -137,6 +140,7 @@ impl Category {
             Category::SwitchingDevice => "Switching Device",
             Category::Alarm => "Alarm",
             Category::ElectricAppliance => "Electric Appliance",
+            Category::Humidifier => "Humidifier",
         }
     }
 
@@ -168,6 +172,7 @@ impl Category {
             Category::SwitchingDevice => "IfcSwitchingDevice",
             Category::Alarm => "IfcAlarm",
             Category::ElectricAppliance => "IfcElectricAppliance",
+            Category::Humidifier => "IfcHumidifier",
         }
     }
 
@@ -199,6 +204,7 @@ impl Category {
             Category::SwitchingDevice => "IfcSwitchingDeviceType",
             Category::Alarm => "IfcAlarmType",
             Category::ElectricAppliance => "IfcElectricApplianceType",
+            Category::Humidifier => "IfcHumidifierType",
         }
     }
 
@@ -212,7 +218,7 @@ impl Category {
     pub fn is_mechanical_equipment(self) -> bool {
         matches!(
             self,
-            Category::MechanicalEquipment | Category::AirTerminalBox | Category::Fan | Category::Boiler | Category::Chiller | Category::Pump | Category::SpaceHeater
+            Category::MechanicalEquipment | Category::AirTerminalBox | Category::Fan | Category::Boiler | Category::Chiller | Category::Pump | Category::SpaceHeater | Category::Humidifier
         )
     }
 

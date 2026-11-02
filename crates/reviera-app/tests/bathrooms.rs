@@ -1121,3 +1121,38 @@ fn a_sauna_doors_vent_and_notice() {
     let store = app.document(app.active().unwrap()).unwrap().doc.store().clone();
     assert!(!store.iter().any(|e| e.param("@ObjectType").and_then(Value::as_str) == Some("Sauna Notice")));
 }
+
+#[test]
+fn a_steam_rooms_generator_and_control() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = new_app(dir.path());
+    let (level, _) = room_h(&mut app, 2.4, 1.8, 2.4);
+    room_floor(&mut app, &level, 2.4, 1.8);
+    // The generator goes outside the room behind the head's wall; the control 1.5 m up.
+    let s = ok(&mut app, "bath.steam_room", json!({ "point": [1.2, 0.9], "level": level, "wall_assembly": true }));
+    let generator = s["generator"].as_u64().expect("a generator");
+    let steam = |app: &mut App| findings(app).into_iter().filter(|f| f["kind"] == "steam").map(|f| f["message"].as_str().unwrap().to_owned()).collect::<Vec<_>>();
+    assert_eq!(steam(&mut app), Vec::<String>::new());
+    let store = app.document(app.active().unwrap()).unwrap().doc.store().clone();
+    let g = store.iter().find(|e| e.id().0 == generator).unwrap();
+    assert_eq!(g.class, "IfcHumidifier");
+    // Moved into the room's middle, or 20 m away: reported.
+    let o = reviera_core::mesh_objects::regenerate(&store, g).unwrap().placement.origin;
+    ok(&mut app, "element.move", json!({ "element_ids": [generator], "vector": [1.2 - o[0], 0.9 - o[1], 0.0] }));
+    let f = steam(&mut app);
+    assert!(f.len() == 1 && f[0].contains("inside the steam room"), "{f:#?}");
+    ok(&mut app, "element.move", json!({ "element_ids": [generator], "vector": [-20.0, 0.0, 0.0] }));
+    let f = steam(&mut app);
+    assert!(f.len() == 1 && f[0].contains("steam line of at most 15240"), "{f:#?}");
+    // None at all.
+    ok(&mut app, "element.delete", json!({ "element_ids": [generator] }));
+    let f = steam(&mut app);
+    assert!(f.len() == 1 && f[0].contains("No steam generator"), "{f:#?}");
+    // The control pad lowered to 900 mm.
+    ok(&mut app, "bath.steam_room", json!({ "point": [1.2, 0.9], "level": level, "replace": true }));
+    let store = app.document(app.active().unwrap()).unwrap().doc.store().clone();
+    let control = store.iter().find(|e| e.param("@ObjectType").and_then(Value::as_str) == Some("Steam Control")).unwrap().id();
+    ok(&mut app, "element.move", json!({ "element_ids": [control.0], "vector": [0.0, 0.0, -0.6] }));
+    let f = steam(&mut app);
+    assert!(f.len() == 1 && f[0].contains("is 900 mm up"), "{f:#?}");
+}

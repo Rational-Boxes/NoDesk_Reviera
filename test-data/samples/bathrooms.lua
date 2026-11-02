@@ -82,7 +82,7 @@ end
 --    centre drain. Its walls take the vapour-proof TCNA SR614 assembly (steel studs, cement
 --    board, a bonded membrane and a vapour retarder; `wall_assembly`), which is thinner than the
 --    200 mm walls, so the room grows a little. A tiled room of about 9 m³ needs a generator for
---    that volume (makers' factors).
+--    that volume (makers' factors); a steam generator stands outside the head's wall.
 local steam_walls = room(21, 0, 2.4, 1.8, 2.4)
 floor(21, 0, 2.4, 1.8)
 reviera.bath.steam_room{ point = {22.2, 0.9}, level = l1, bench_wall_id = steam_walls[1], material = "tile", wall_assembly = true }

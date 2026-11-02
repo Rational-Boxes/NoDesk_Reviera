@@ -61,7 +61,9 @@ the sizes given are inside the walls, from the inside corner named.
    3. Four tiled bench modules go along the south wall. The steam head goes low on the east wall
       and the control 1.5 m up on the north wall.
    4. The floor falls ¼ in per foot to a centre drain.
-   5. The status bar asks for a generator for about 9 m³.
+   5. The status bar asks for a generator for about 9 m³. One is placed on the floor outside
+      the east wall, behind the steam head (*Generator* left at *Outside*); in a real house it
+      would move to a dry, ventilated closet within 50 ft (15 m) of the head.
    
    The script names the south wall as the bench wall (`bench_wall_id`).
 

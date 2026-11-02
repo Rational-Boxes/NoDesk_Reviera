@@ -904,6 +904,48 @@ fn steam_findings(store: &reviera_core::Store, only: Option<&[ElementId]>) -> Ve
         if !bare.is_empty() {
             out.push(base(format!("The steam room round {what} has walls without a vapour-proof membrane ({}); give them a layered type with one, such as Steam Room Wall (TCNA SR614)", bare.join(", ")), None, None, None, None));
         }
+        // The control pad's height (4–6 ft), for each control in the room.
+        let mid_of = |e: &reviera_core::element::Element| -> Option<[f64; 3]> {
+            let g = reviera_core::mesh_objects::regenerate(store, e).ok()?;
+            let (mut lo, mut hi) = ([f64::MAX; 3], [f64::MIN; 3]);
+            for (_, (pts, _)) in g.slot_meshes() {
+                for q in pts {
+                    for k in 0..3 {
+                        lo[k] = lo[k].min(q[k]);
+                        hi[k] = hi[k].max(q[k]);
+                    }
+                }
+            }
+            (lo[0] <= hi[0]).then(|| [(lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0, (lo[2] + hi[2]) / 2.0])
+        };
+        if let Some([lo, hi]) = rules.control_height {
+            for e in store.iter().filter(|e| e.param("@ObjectType").and_then(serde_json::Value::as_str) == Some("Steam Control")) {
+                let Some(m) = mid_of(e) else { continue };
+                let up = m[2] - f.floor;
+                if bath_rules::plan_distance(&room.outline, [m[0], m[1]]) <= 0.15 && (up < lo - 1e-6 || up > hi + 1e-6) {
+                    out.push(base(format!("The steam control {} is {} up; {} puts it {}–{} above the floor", e.id().0, mm(up), rules.id, mm(lo), mm(hi)), Some(e.id()), Some(up), Some(lo), Some(hi)));
+                }
+            }
+        }
+        // The generator: outside the room and within its run of the head.
+        if let Some(run) = rules.generator_run {
+            let at = mid_of(store.get(f.element).expect("a fixture")).unwrap_or([middle[0], middle[1], f.floor]);
+            let nearest = store
+                .iter()
+                .filter(|e| bath_rules::is_steam_generator(e))
+                .filter_map(|e| mid_of(e).map(|m| (e.id(), m, (m[0] - at[0]).hypot(m[1] - at[1]).hypot(m[2] - at[2]))))
+                .min_by(|a, b| a.2.total_cmp(&b.2));
+            match nearest {
+                None => out.push(base(format!("No steam generator is modelled for {what}; makers put it outside the room within {} of the head", mm(run)), None, None, None, Some(run))),
+                Some((g, m, _)) if bath_rules::plan_distance(&room.outline, [m[0], m[1]]) == 0.0 => {
+                    out.push(base(format!("Steam generator {} stands inside the steam room; makers put it outside, in a dry, ventilated space", g.0), Some(g), None, None, None));
+                }
+                Some((g, _, d)) if d > run + 1e-6 => {
+                    out.push(base(format!("Steam generator {} is at least {} from {what}; {} allows a steam line of at most {}", g.0, mm(d), rules.id, mm(run)), Some(g), Some(d), None, Some(run)));
+                }
+                _ => {}
+            }
+        }
         let head = bath_rules::outline(f);
         for (b, outline) in &benches {
             let d = outline.iter().map(|q| bath_rules::plan_distance(&head, *q)).fold(f64::MAX, f64::min).min(head.iter().map(|q| bath_rules::plan_distance(outline, *q)).fold(f64::MAX, f64::min));

@@ -2128,8 +2128,19 @@ pub struct SteamRules {
     pub height_unit: f64,
     pub height_step: f64,
     pub exterior_wall: f64,
+    /// The longest steam line from the generator to the head that makers allow (metres).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub generator_run: Option<f64>,
+    /// The control pad's height above the floor, least and most (metres).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub control_height: Option<[f64; 2]>,
     pub source: String,
     pub confidence: Confidence,
+}
+
+/// A steam generator: an `IfcHumidifier`, STEAMINJECTION.
+pub fn is_steam_generator(e: &crate::element::Element) -> bool {
+    e.class == "IfcHumidifier" && e.param("@PredefinedType").and_then(serde_json::Value::as_str) == Some("STEAMINJECTION")
 }
 
 /// The steam rules in use, else the shipped ones.

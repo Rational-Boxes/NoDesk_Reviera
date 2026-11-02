@@ -4475,6 +4475,7 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
   - a ceiling over the room, 10 mm in from its walls. Its high side is over the bench wall at `height` (default the ideal, at most the walls' height), and it falls at the least slope to the far wall. A room too deep for that slope above 1.8 m is reported. Ceilings take their slope from shape offsets on their corners (ARC-SHAPE-001), which the shape commands do not yet edit on ceilings.
   - the bench along the bench wall;
   - the steam head on the start end wall, across the room from the bench, and the control on the far wall;
+  - with `generator` (default on), a `Steam generator` (an `IfcHumidifier`, STEAMINJECTION, a new *Humidifier* component category) on the floor outside the room, its back to the start end wall behind the head. Its connectors are the steam line and cold water at its top and a drain at its base;
   - where a Reviera floor is under the room, its falls to a centre drain (as ARC-BATH-011).
   
   It returns the room's volume (under the sloped ceiling) and the generator's design volume for `material` and `exterior_wall`. With `replace` set, it removes an earlier layout in the room first. With `wall_assembly` it first gives the room's four walls the *Steam Room Wall (TCNA SR614)* type. That is a layered type (ARC-CMPD-001), steam side last: gypsum board 12.7 mm; steel studs, 20 ga at 406 mm, 92 mm; a vapour retarder lapped over the pan; cement backer board 12.7 mm; a bonded waterproof membrane; tile and setting bed 12 mm. The walls keep their location lines, so the room's faces move.
@@ -4482,9 +4483,11 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
   - no ceiling modelled over the room, or one flatter than the least slope;
   - a room higher than the greatest height;
   - a bench nearer the head than its distance;
-  - walls whose type has no membrane layer (a note naming them).
+  - walls whose type has no membrane layer (a note naming them);
+  - where the rules give `generator_run`: no steam generator in the model, the nearest one standing inside the room, or the nearest one further from the head in a straight line than the run (the pipe's run is longer still, so this is a lower bound). `us_spa` carries 50 ft (15.24 m) from one maker's manual (S1156);
+  - where the rules give `control_height`: a steam control in the room whose middle is outside it. `us_spa` carries 4–6 ft (1.22–1.83 m) from the same manual.
 
-**Data (IFC mapping).** The ceiling as `IfcCovering` CEILING, sloped through its shape (`rxd:shape`); the head and control as above.
+**Data (IFC mapping).** The ceiling as `IfcCovering` CEILING, sloped through its shape (`rxd:shape`); the head and control as above; the generator as `IfcHumidifier` STEAMINJECTION.
 
 **Commands.** See the catalog: `bath.steam_room`.
 
@@ -4494,8 +4497,9 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 - [x] With its ceiling removed, the room is reported as having none.
 - [x] A 2.4 m deep room is refused, its 1:6 ceiling coming down below 1.8 m under 2.13 m.
 - [x] Plain walls are reported as having no membrane; with `wall_assembly` they take the SR614 type, with its two membranes, and nothing is reported.
+- [x] The generator is placed outside the room and nothing is reported; moved into the room, 20 m away or deleted, it is reported; a control lowered to 900 mm is reported.
 
-*Built (2026-11-01):* the `steam` section of the pack schema and its `us_spa` values, the three components, `bath.steam_room` (Architecture › Build › Steam Room, then a click in the room) and the checks. Not yet: the generator placed outside the room with its steam line pitched back, generator sizing in kW (makers' tables were not read), a vapour-tight door, the control's height checked (4–6 ft), steam showers in bathrooms, and the shape commands on ceilings.
+*Built (2026-11-01):* the `steam` section of the pack schema and its `us_spa` values, the three components, `bath.steam_room` (Architecture › Build › Steam Room, then a click in the room) and the checks. *Built (2026-11-01, later):* the generator (its component, the Humidifier category, `generator` and the dialog's *Generator* choice), `generator_run` and `control_height` and their checks. Not yet: the steam line drawn and pitched back to the generator, generator sizing in kW (makers' tables were not read), a vapour-tight door, steam showers in bathrooms, and the shape commands on ceilings.
 
 ### 3.9a.16 Accessible saunas, steam rooms and spas
 **ID:** ARC-BATH-016 · **Priority:** P2 · **Ref:** `BATHROOMS_PLAN.md` §7; research/13 D6

@@ -674,7 +674,9 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
   condensate runs to the walls, a tiled bench, the steam head and its control, and the floor's
   falls to a drain, and gives the generator's design volume from the walls' finish; Check
   Bathrooms reports a flat or missing ceiling, a room over 8 ft and a head near a bench
-  (`bath.steam_room`).
+  (`bath.steam_room`). A steam generator goes outside the room behind the head's wall; Check
+  Bathrooms reports one missing, inside the room or beyond 50 ft of the head, and a control pad
+  outside 4–6 ft.
 - **Accessible saunas, steam rooms and spas** (ARC-BATH-016): under the ADA, Check Bathrooms asks
   a sauna or steam room for a §903 bench and a 60 in turning space, and a spa outside a dwelling
   for a pool lift, transfer wall or transfer system; Sauna and Steam Room lay out an accessible

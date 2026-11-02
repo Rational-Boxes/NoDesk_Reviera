@@ -799,6 +799,9 @@ pub struct SteamRoomParams {
     /// their location lines).
     #[serde(default)]
     pub wall_assembly: bool,
+    /// Place a steam generator outside the room, on the floor behind the head's wall (default
+    /// true); move it to a dry, ventilated closet within the rules' run of the head.
+    pub generator: Option<bool>,
     #[serde(default)]
     pub replace: bool,
 }
@@ -847,6 +850,8 @@ pub struct SteamRoom {
     pub volume: f64,
     pub design_volume: f64,
     pub benches: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub generator: Option<ElementId>,
 }
 
 /// Lays out a steam room (`bath.steam_room`): a ceiling sloped to shed condensate, a tiled bench,
@@ -914,7 +919,7 @@ pub(crate) fn steam_room(txn: &mut Transaction<'_>, p: SteamRoomParams) -> Resul
     })?;
     placed.push(ceiling);
 
-    let names = [if p.accessible { "Steam room bench, accessible 600" } else { "Steam room bench 600" }, "Steam head", "Steam control"];
+    let names = [if p.accessible { "Steam room bench, accessible 600" } else { "Steam room bench 600" }, "Steam head", "Steam control", "Steam generator"];
     let types = crate::bath_components::load(txn, crate::bath_components::LoadParams { names: names.iter().map(|n| (*n).to_owned()).collect() })?;
     let facing = (-w[0]).atan2(w[1]);
     let mut put = |txn: &mut Transaction<'_>, name: &str, host: Option<ElementId>, q: [f64; 2], rotation: f64| -> Result<ElementId> {
@@ -948,6 +953,12 @@ pub(crate) fn steam_room(txn: &mut Transaction<'_>, p: SteamRoomParams) -> Resul
     let head_b = (bench_depth + rules.head_clearance + 0.1).max(room.depth - 0.35).min(room.depth - 0.1);
     let steam_head = put(txn, names[1], Some(room.start_wall), at(0.1, head_b), 0.0)?;
     put(txn, names[2], Some(room.opposite), at(0.4, room.depth - 0.1), 0.0)?;
+    // The generator behind the head's wall, outside the room, its back to the wall.
+    let mut generator = None;
+    if p.generator.unwrap_or(true) {
+        let thick = crate::walls::regenerate(txn.store(), txn.store().get(room.start_wall).expect("found"))?.width;
+        generator = Some(put(txn, names[3], None, at(-thick - 0.01, head_b), (-run[0]).atan2(run[1]))?);
+    }
     // The floor's falls to a centre drain.
     let mut drain = None;
     if p.floor_falls.unwrap_or(true)
@@ -958,7 +969,7 @@ pub(crate) fn steam_room(txn: &mut Transaction<'_>, p: SteamRoomParams) -> Resul
         let d = bath_rules::lay_falls(txn, floor, &corners, bath_rules::DrainAt::Centre, rules.floor_fall, None, ElementRef::Guid(level.guid().clone()), drain_type, serves)?;
         drain = Some(d);
     }
-    Ok(SteamRoom { placed, ceiling, steam_head, drain, length: room.length, depth: room.depth, ceiling_high: high, ceiling_low: low, ceiling_slope: slope, volume, design_volume, benches: modules })
+    Ok(SteamRoom { placed, ceiling, steam_head, drain, length: room.length, depth: room.depth, ceiling_high: high, ceiling_low: low, ceiling_slope: slope, volume, design_volume, benches: modules, generator })
 }
 
 // ---- Bathroom elevations (ARC-BATH-018) ----

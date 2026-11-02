@@ -125,7 +125,7 @@
   },
   "steam": {
     "id": "Steam room practice (TCNA SR614, makers)",
-    "description": "The ceiling sloped at least 2 in per ft (1:6) so condensate runs to the walls, at most 8 ft (2.44 m) high and ideally 7 ft (2.13 m); the floor a pre-pitched bed falling ¼ in per ft to its drain (TCNA SR614); the steam head away from seats and benches (12–14 in); the generator's design volume from one maker's factors: fibreglass or acrylic ×0.65, ceramic tile ×1.0, glass tile or block ×1.35, natural stone ×1.65, +10 % a foot above 7 ft, +10 % with an outside wall (makers' factors differ, so a product's own replace them)",
+    "description": "The ceiling sloped at least 2 in per ft (1:6) so condensate runs to the walls, at most 8 ft (2.44 m) high and ideally 7 ft (2.13 m); the floor a pre-pitched bed falling ¼ in per ft to its drain (TCNA SR614); the steam head away from seats and benches (12–14 in); the generator outside the room within 50 ft (15.24 m) of the head, its steam line pitched back to it with no traps, and the control pad 4–6 ft (1.22–1.83 m) up (one maker's manual); the generator's design volume from one maker's factors: fibreglass or acrylic ×0.65, ceramic tile ×1.0, glass tile or block ×1.35, natural stone ×1.65, +10 % a foot above 7 ft, +10 % with an outside wall (makers' factors differ, so a product's own replace them)",
     "ceiling_slope": 0.1667,
     "ceiling_ideal": 2.13,
     "ceiling_max": 2.44,
@@ -141,6 +141,8 @@
     "height_unit": 0.3048,
     "height_step": 0.1,
     "exterior_wall": 0.1,
+    "generator_run": 15.24,
+    "control_height": [1.22, 1.83],
     "source": "S1150 S1154 S1155 S1156 S1180",
     "confidence": "advisory"
   }
