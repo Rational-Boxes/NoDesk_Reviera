@@ -74,6 +74,11 @@
   </supports>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.0~pre.8" date="2026-11-02" type="development">
+      <description>
+        <p>Eighth pre-release (tag 0.1.0-pre.8), for testing. Product data field sets are published to FileEngine as extraction prompt sets, and the review opens the marked-up PDF with each value's evidence highlighted. IFC files get default colours that web viewers such as FileEngine's xeokit preview show: translucent windows and distinct walls and floors, also for models saved before default colours existed. Steam rooms place their steam generator and check its distance and the control's height. macOS builds are fixed.</p>
+      </description>
+    </release>
     <release version="0.1.0~pre.7" date="2026-11-01" type="development">
       <description>
         <p>Seventh pre-release (tag 0.1.0-pre.7), for testing: bathrooms. Rule packs for US, ADA and English codes with fixture clear spaces, grab bars and fixture counts; generic fixtures and accessories, and products to swap in; layouts from templates, toilet cores and locker rooms; electrical zones, shower falls and waterproofing; hot tubs, saunas (heater sized from the room, vents, sensor, door vent and notice), steam rooms and whirlpool baths, with ADA spa access; interior elevations and schedules, an HTML compliance report and BCF issues; and tile set-out on walls and floors. Also issues on FileEngine models, local material documents, and greenhouse heating pipes and pad-and-fan cooling.</p>
