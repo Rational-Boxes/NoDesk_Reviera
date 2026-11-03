@@ -81,7 +81,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: third_party/install
-          key: ifcopenshell-macos-${{ hashFiles('tools/build-ifcopenshell.sh') }}
+          key: ifcopenshell-macos-${{ hashFiles('tools/build-ifcopenshell.sh', 'tools/patches/**') }}
 
       - uses: Swatinem/rust-cache@v2
         with:
