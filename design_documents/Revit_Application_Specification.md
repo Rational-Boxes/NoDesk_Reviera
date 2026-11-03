@@ -27247,13 +27247,13 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
   - the server refuses the publish (limits, permissions).
 
   A set that disappears between publishing and extracting is published again once.
-- The run records the prompt set and revision it ran (`prompt_set`), and the review dialog shows them. When the server has a newer revision than the one pinned, the run says so. A PDF read with a prompt set gets a marked-up copy with each value's evidence highlighted, a sidecar beside the document. Each document's `markup` gives its status and name, and the review dialog lists it.
+- The run records the prompt set and revision it ran (`prompt_set`), and the review dialog shows them. When the server has a newer revision than the one pinned, the run says so. A PDF read with a prompt set gets a marked-up copy with each value's evidence highlighted, a sidecar beside the document. Each document's `markup` gives its status, name and uid, and the page each value was located on. The review dialog lists it, and *Open Marked-up PDF* downloads the selected value's document's copy and opens it in the system's PDF viewer (`docs.document_path`), then returns to the review with the selection kept.
 
 **Acceptance criteria.**
 - [x] Against the fake server, the first extraction publishes `reviera.epd` (revision 1, typed fields, units) and names it. Publishing again, or from a second user's session, changes nothing.
 - [x] An editor's take-over is used as they left it (their revision, fields they removed not found), and Reviera does not publish over it.
 - [x] A retired set, and a server without prompt sets, fall back to the schema with the reason given, and the values are still read.
-- [ ] Live: against a server with prompt sets deployed, `docs.publish_field_sets` publishes both sets, and an EPD in the test folder is read through `reviera.epd` with its marked-up PDF.
+- [x] Live: against a server with prompt sets deployed, `docs.publish_field_sets` publishes both sets, and an EPD in the test folder is read through `reviera.epd` with its marked-up PDF (Proxima File Vault, 2026-11-02: both sets created at revision 1, unchanged when published again; the CertainTeed EPD's eight values located in its marked-up copy).
 
 ### Publishing files and the material documentation report
 **ID:** COL-FE-008 · **Priority:** P2 · **Ref:** FILEENGINE_INTEGRATION §7a

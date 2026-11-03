@@ -327,6 +327,51 @@ fn a_real_product_folder() {
     eprintln!("{}", text.lines().filter(|l| l.contains("rxd:product_docs") || l.contains("IFCMATERIALPROPERTIES")).collect::<Vec<_>>().join("\n"));
 }
 
+/// Against a real FileEngine with prompt sets deployed (COL-FE-011): both field sets published as
+/// `reviera.epd` and `reviera.hpd` (created the first time against a server, unchanged after), then
+/// the EPD in `REVIERA_FILEENGINE_PRODUCT_FOLDER` read through `reviera.epd`, with its marked-up
+/// PDF. Writes on the server only the prompt sets and the marked-up copy the service makes.
+#[test]
+fn field_sets_published_to_a_real_fileengine() {
+    let var = |k: &str| std::env::var(k).ok().filter(|v| !v.trim().is_empty());
+    let (Some(url), Some(key), Some(secret), Some(folder)) = (var("REVIERA_FILEENGINE_URL"), var("REVIERA_FILEENGINE_KEY"), var("REVIERA_FILEENGINE_SECRET"), var("REVIERA_FILEENGINE_PRODUCT_FOLDER")) else {
+        eprintln!("REVIERA_FILEENGINE_URL, _KEY, _SECRET and _PRODUCT_FOLDER are not all set: skipped");
+        return;
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = new_app(dir.path());
+    let conn = run(&mut app, "fileengine.connect", json!({ "url": url })).unwrap()["id"].as_str().unwrap().to_owned();
+    run(&mut app, "fileengine.sign_in", json!({ "connection_id": conn, "key": key, "secret": secret })).unwrap();
+
+    let first = run(&mut app, "docs.publish_field_sets", json!({ "connection_id": conn })).unwrap();
+    eprintln!("first publish: {}", serde_json::to_string_pretty(&first).unwrap());
+    for p in first.as_array().unwrap() {
+        assert!(p["prompt_set"].is_object(), "{}: not published: {}", p["set"], p["note"]);
+        assert!(p["prompt_set"]["id"].as_str().is_some_and(|s| !s.is_empty()), "{}: no id", p["set"]);
+    }
+    let again = run(&mut app, "docs.publish_field_sets", json!({ "connection_id": conn })).unwrap();
+    eprintln!("second publish: {}", serde_json::to_string_pretty(&again).unwrap());
+    for (a, b) in first.as_array().unwrap().iter().zip(again.as_array().unwrap()) {
+        assert_eq!(b["changed"], false, "{}: an unchanged definition made a new revision", b["set"]);
+        assert_eq!(a["prompt_set"]["id"], b["prompt_set"]["id"]);
+        assert_eq!(a["prompt_set"]["revision"], b["prompt_set"]["revision"]);
+    }
+
+    let f = run(&mut app, "fileengine.browse", json!({ "connection_id": conn, "path": folder })).unwrap();
+    run(&mut app, "file.new", json!({})).unwrap();
+    add_wall(&mut app);
+    let material = "Gypsum board, Type X 5/8 in";
+    run(&mut app, "docs.link", json!({ "material": material, "connection_id": conn, "folder_uid": f["folder_uid"] })).unwrap();
+    let r = run(&mut app, "docs.extract", json!({ "material": material, "set": "epd" })).unwrap();
+    eprintln!("prompt set: {}\nnote: {}", r["prompt_set"], r["note"]);
+    for d in r["documents"].as_array().unwrap() {
+        eprintln!("{}: markup {}", d["name"], d["markup"]);
+    }
+    assert_eq!(r["prompt_set"]["id"], first[0]["prompt_set"]["id"], "read through reviera.epd");
+    let found = r["documents"][0]["fields"].as_array().unwrap().iter().filter(|v| v["found"] == true).count();
+    assert!(found >= 3, "only {found} values found");
+}
+
 /// Without FileEngine: a material documented from a folder on this computer, its documents typed,
 /// its values entered by hand (with the EPD's carbon factor), in IFC as a file:// reference; then,
 /// with a connection, the local folder published to FileEngine and the model relinked to it.

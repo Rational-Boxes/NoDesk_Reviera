@@ -220,6 +220,7 @@ Any source that fails this test is rejected. Rejections are noted in the session
   - Checked the live server: `/csai/v1/prompt-sets` and `/csai/v1/extract/models` answer 404, so prompt sets are not deployed there yet.
 - **Findings:** the routes, the `fileengine.prompt_set.v1` shape, field types and limits, and the refusals (`managed_in_builder`, `locked`, 410 retired with `replaced_by`). Reviera's review points are §11.9 items 42–48.
 - **Clean-room:** no FileEngine implementation code was copied; Reviera talks to the services over HTTP only, and the fake server in `clients/fileengine` is written from the documented interface. No new sources; the design is the owner's own project.
+- **Live verification (same day, after the owner deployed prompt sets):** signed in with the owner's regenerated service key (kept in environment variables for the run only). Found no `reviera.*` sets (`GET /csai/v1/prompt-sets?q=reviera`). `docs.publish_field_sets` then created `reviera.epd` and `reviera.hpd` (revision 1, `managed: application`), and publishing again changed nothing. The CertainTeed EPD and HPD in *Engineering › Reviera test › Product Library* were read through the sets (14 values found). The EPD's marked-up copy was written (all eight fields located, each with its page), and a member's key downloads it from `GET /api/v1/files/{uid}/content`, which answers review item 46.
 
 ---
 

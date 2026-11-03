@@ -894,9 +894,12 @@ one key and scope shared with the REST door. Points from the desktop side:
 ### 11.9 Extraction prompt sets (`EXTRACTION_PROMPT_SETS.md`), reviewed 2026-11-02
 
 Reviewed against csai's branch `feat/extraction-prompt-sets` (plan b2a0da4…058372a,
-implementation P1–P3 5046600…ca04a2b) and folder_actions P3–P4. The live server does not have it
-yet: `/csai/v1/prompt-sets` and `/csai/v1/extract/models` answer 404, which Reviera reads as
-"no prompt sets" and falls back.
+implementation P1–P3 5046600…ca04a2b) and folder_actions P3–P4. The branch was merged to master
+(20c85c3) with no interface changes after ca04a2b, and deployed on Proxima File Vault on
+2026-11-02. That day Reviera created `reviera.epd` and `reviera.hpd` there for the first time
+(revision 1 each; publishing again changed nothing) and read the CertainTeed EPD and HPD in
+*Engineering › Reviera test › Product Library* through them. A server without prompt sets
+answers 404, which Reviera reads as "no prompt sets" and falls back.
 
 **What it gives Reviera:**
 - one definition per field set, shared by the desktop, the cache and automation;
@@ -908,7 +911,7 @@ yet: `/csai/v1/prompt-sets` and `/csai/v1/extract/models` answer 404, which Revi
 Earlier items it settles:
 - 34 (dates): `date` fields compile to `format: date` with an ISO 8601 hint;
 - 36 (schema contract): the field types and limits are now defined;
-- 32 (where the page comes from): partly, since the markup locator reports a page.
+- 32 (where the page comes from): partly. The markup reports, per field, whether its quote was located, how (`exact`, `words`) and on which page; live, all eight EPD fields were located.
 
 Points from the desktop side:
 
@@ -931,7 +934,10 @@ Points from the desktop side:
 46. **Reading the marked-up PDF** (*check*). Each item's `markup` has the sidecar's `uid` and
     name. Can a member read that hidden child through the REST door
     (`GET /api/v1/files/{uid}/content`) with their own key? Reviera would then open it at the
-    page beside the review table.
+    page beside the review table. **Answered (live, 2026-11-02): yes.** The sidecar is a child
+    of the document (`parent_uid` is the PDF's uid), and a member's key downloads it. The review
+    dialog's *Open Marked-up PDF* opens it; opening at the page waits on a viewer Reviera can
+    direct (the system viewer is given only the file).
 47. **Retired sets stay retired** (*note*). A retired application-managed slug answers 410 to
     every later publish, so a newer Reviera cannot bring it back; only an editor can. That is the
     intended editor control. Reviera falls back to the schema, so those extractions emit

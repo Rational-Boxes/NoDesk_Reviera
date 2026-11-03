@@ -23,6 +23,7 @@ const RELOAD: i32 = 7407;
 const OPEN_DOC: i32 = 7408;
 const ENTER: i32 = 7409;
 const PUBLISH: i32 = 7410;
+const OPEN_MARKUP: i32 = 7411;
 
 const DOC_TYPES: &[&str] = &["EPD", "HPD", "specification", "certification", "installation", "O&M", "warranty", "SDS", "drawing", "other"];
 
@@ -183,17 +184,35 @@ struct Accepted {
     carbon: bool,
 }
 
-fn review(frame: &Frame, run: &Value) -> Option<Accepted> {
+/// The review dialog's choices, kept while it is closed to open a marked-up PDF and shown again.
+#[derive(Default)]
+struct ReviewState {
+    rows: Option<Vec<usize>>,
+    to_folder: bool,
+    carbon: Option<bool>,
+}
+
+enum Reviewed {
+    Apply(Accepted),
+    /// Open the marked-up PDF with this uid, then review again.
+    OpenMarkup(String),
+    Cancel,
+}
+
+fn review(frame: &Frame, run: &Value, state: &mut ReviewState) -> Reviewed {
     let epd = run["set"] == "epd";
     let title = format!("{} values read from the documents", run["set"].as_str().unwrap_or("").to_uppercase());
     let dialog = Dialog::builder(frame, &title).with_style(DialogStyle::DefaultDialogStyle | DialogStyle::ResizeBorder).build();
     // One row per field and document it was found in; then the fields found nowhere.
     let mut rows = Vec::new();
     let mut keys: Vec<Option<String>> = Vec::new();
+    // The document each row was read from, for its marked-up PDF.
+    let mut row_doc: Vec<Option<usize>> = Vec::new();
     let docs = run["documents"].as_array().cloned().unwrap_or_default();
     let several = docs.len() > 1;
-    for d in &docs {
+    for (di, d) in docs.iter().enumerate() {
         for f in d["fields"].as_array().into_iter().flatten().filter(|f| f["found"] == true) {
+            row_doc.push(Some(di));
             rows.push(vec![
                 f["label"].as_str().unwrap_or("").to_owned(),
                 shown(&f["value"]),
@@ -215,11 +234,12 @@ fn review(frame: &Frame, run: &Value) -> Option<Accepted> {
     for m in &missing {
         rows.push(vec![m.clone(), "not found".into(), String::new(), "No supporting quote in the documents: check by hand".into(), String::new()]);
         keys.push(None);
+        row_doc.push(None);
     }
     let view = list(&dialog, &[("Value", 150), ("Read", 180), ("Unit", 100), ("Quote", 380), ("Document", 260)], &rows, false);
     view.set_min_size(Size::new(1080, 300));
     for (k, key) in keys.iter().enumerate() {
-        if key.is_some() {
+        if state.rows.as_ref().map_or(key.is_some(), |r| r.contains(&k)) {
             view.set_item_state(k as i64, ListItemState::Selected, ListItemState::Selected);
         }
     }
@@ -232,7 +252,7 @@ fn review(frame: &Frame, run: &Value) -> Option<Accepted> {
     }
     let marked: Vec<String> = docs.iter().filter(|d| d["markup"]["status"] == "written").map(|d| format!("{} ({})", d["name"].as_str().unwrap_or(""), d["markup"]["name"].as_str().unwrap_or(""))).collect();
     if !marked.is_empty() {
-        server.push_str(&format!("\nMarked-up PDF with the evidence highlighted, beside the document on FileEngine: {}", marked.join("; ")));
+        server.push_str(&format!("\nMarked-up PDF with the evidence highlighted, beside the document on FileEngine: {}. Open Marked-up PDF shows the one for the selected value's document.", marked.join("; ")));
     }
     let note = StaticText::builder(&dialog)
         .with_label(&format!(
@@ -245,9 +265,16 @@ fn review(frame: &Frame, run: &Value) -> Option<Accepted> {
     note.wrap(1080);
     let to_folder = CheckBox::builder(&dialog).with_label("Also write them to the documentation folder's metadata on FileEngine").build();
     let carbon = CheckBox::builder(&dialog).with_label("Use the GWP A1–A3 as the material's embodied-carbon factor").build();
-    carbon.set_value(epd);
+    to_folder.set_value(state.to_folder);
+    carbon.set_value(epd && state.carbon.unwrap_or(true));
     carbon.enable(epd);
     let buttons = BoxSizer::builder(Orientation::Horizontal).build();
+    if !marked.is_empty() {
+        let b = Button::builder(&dialog).with_label("Open Marked-up PDF").build();
+        let d = dialog;
+        b.on_click(move |_| d.end_modal(OPEN_MARKUP));
+        buttons.add(&b, 0, SizerFlag::empty(), 0);
+    }
     buttons.add_stretch_spacer(1);
     let cancel = Button::builder(&dialog).with_id(ID_CANCEL).with_label("Cancel").build();
     let ok = Button::builder(&dialog).with_id(ID_OK).with_label("Apply").build();
@@ -261,12 +288,22 @@ fn review(frame: &Frame, run: &Value) -> Option<Accepted> {
     sizer.add_sizer(&buttons, 0, SizerFlag::Expand | SizerFlag::All, 12);
     dialog.set_sizer_and_fit(sizer, true);
     dialog.set_escape_id(ID_CANCEL);
-    let ok = dialog.show_modal() == ID_OK;
-    let mut fields: Vec<String> = selected(&view).into_iter().filter_map(|k| keys.get(k).cloned().flatten()).collect();
+    let code = dialog.show_modal();
+    let rows = selected(&view);
+    *state = ReviewState { rows: Some(rows.clone()), to_folder: to_folder.get_value(), carbon: Some(carbon.get_value()) };
+    let mut fields: Vec<String> = rows.iter().filter_map(|&k| keys.get(k).cloned().flatten()).collect();
     fields.dedup();
-    let out = Accepted { fields, to_folder: to_folder.get_value(), carbon: epd && carbon.get_value() };
     dialog.destroy();
-    ok.then_some(out)
+    match code {
+        ID_OK => Reviewed::Apply(Accepted { fields, to_folder: state.to_folder, carbon: epd && state.carbon == Some(true) }),
+        OPEN_MARKUP => {
+            // The selected value's document, else the first with a marked-up PDF.
+            let has = |di: usize| docs[di]["markup"]["status"] == "written";
+            let di = rows.iter().filter_map(|&k| row_doc.get(k).copied().flatten()).find(|&di| has(di)).or_else(|| (0..docs.len()).find(|&di| has(di)));
+            di.and_then(|di| docs[di]["markup"]["uid"].as_str()).map_or(Reviewed::Cancel, |u| Reviewed::OpenMarkup(u.to_owned()))
+        }
+        _ => Reviewed::Cancel,
+    }
 }
 
 impl Gui {
@@ -424,7 +461,20 @@ impl Gui {
                             continue;
                         }
                     };
-                    if let Some(a) = review(&frame, &run) {
+                    let mut state = ReviewState::default();
+                    let accepted = loop {
+                        match review(&frame, &run, &mut state) {
+                            Reviewed::Apply(a) => break Some(a),
+                            Reviewed::Cancel => break None,
+                            Reviewed::OpenMarkup(uid) => match self.run("docs.document_path", json!({ "material": name, "file_uid": uid })) {
+                                Ok(p) => {
+                                    launch_default_application(p.as_str().unwrap_or(""));
+                                }
+                                Err(e) => error(&frame, &format!("The marked-up PDF was not opened: {e}")),
+                            },
+                        }
+                    };
+                    if let Some(a) = accepted {
                         if a.fields.is_empty() {
                             note = "Nothing was kept.".into();
                             continue;
