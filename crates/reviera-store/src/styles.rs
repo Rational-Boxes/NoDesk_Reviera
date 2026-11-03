@@ -5,7 +5,10 @@
 //! among them), so a model of white walls on white floors is hard to read. On save, every body
 //! item of a product or type that has no `IfcStyledItem` gets one, with the colour Reviera's own
 //! views give its class ([`reviera_core::display_colors`]): an `IfcSurfaceStyle` with an
-//! `IfcSurfaceStyleShading` (and its transparency), one per colour, shared by every item.
+//! `IfcSurfaceStyleRendering` (and its transparency), one per colour, shared by every item.
+//! Rendering, not the plain `IfcSurfaceStyleShading`: IFC2X3 has transparency only there, and
+//! web-ifc (xeokit's IFC conversion) reads it only there, so a shading's translucent windows
+//! came out opaque. Reviera's own older shadings are turned into renderings when a file is read.
 //!
 //! Styles written by other tools, or by the user's own materials, are never changed. Reviera's
 //! default styled items are named [`TAG`], so a later save can recognise them; ones whose item
@@ -41,13 +44,37 @@ struct Styles {
 }
 
 impl Styles {
-    fn read(ifc: &IfcModel) -> Result<Self> {
+    fn read(ifc: &mut IfcModel) -> Result<Self> {
         let all = ifc.entities_of_type("IfcSurfaceStyle")?;
         let ids: Vec<StepId> = all.iter().map(|e| e.id).collect();
+        // Plain shadings (not renderings), which an earlier Reviera wrote.
+        let plain: HashSet<StepId> = ifc.entities_of_type("IfcSurfaceStyleShading")?.into_iter().filter(|e| e.class.eq_ignore_ascii_case("IfcSurfaceStyleShading")).map(|e| e.id).collect();
         let mut by_class = HashMap::new();
         for (id, e) in ids.iter().zip(ifc.attributes_many(&ids)?) {
             if let Some(class) = e.string("Name").and_then(|n| n.strip_prefix(STYLE_PREFIX)) {
                 by_class.insert(class.to_owned(), *id);
+                let inner = e.refs("Styles");
+                let old: Vec<StepId> = inner.iter().copied().filter(|s| plain.contains(s)).collect();
+                if old.is_empty() {
+                    // Reviera's own rendering: brought to the current table's colour.
+                    for s in inner {
+                        refresh(ifc, s, &class_color(class))?;
+                    }
+                } else {
+                    let rendering = rendering(ifc, &class_color(class))?;
+                    ifc.set_attribute(*id, "Styles", &AttrValue::List(vec![r(rendering)]))?;
+                    for s in old {
+                        if ifc.referenced_by(s, "IfcSurfaceStyle")?.is_empty() {
+                            let colour = ifc.attributes_many(&[s])?.remove(0).refs("SurfaceColour");
+                            ifc.remove(s)?;
+                            for c in colour {
+                                if ifc.referenced_by(c, "IfcSurfaceStyleShading")?.is_empty() {
+                                    ifc.remove(c)?;
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
         Ok(Self { by_class })
@@ -58,14 +85,7 @@ impl Styles {
         if let Some(id) = self.by_class.get(class) {
             return Ok(*id);
         }
-        // Rounded: the table's f32 values would otherwise print as 0.9300000071525574.
-        let [red, green, blue, alpha] = class_color(class).map(|v| (f64::from(v) * 1000.0).round() / 1000.0);
-        let colour = create(ifc, "IfcColourRgb", &[("Red", AttrValue::Real(red)), ("Green", AttrValue::Real(green)), ("Blue", AttrValue::Real(blue))])?;
-        let mut shading = vec![("SurfaceColour", r(colour))];
-        if alpha < 1.0 {
-            shading.push(("Transparency", AttrValue::Real(1.0 - alpha)));
-        }
-        let shading = create(ifc, "IfcSurfaceStyleShading", &shading)?;
+        let shading = rendering(ifc, &class_color(class))?;
         let style = create(
             ifc,
             "IfcSurfaceStyle",
@@ -75,6 +95,36 @@ impl Styles {
         Ok(style)
     }
 
+}
+
+/// Sets a Reviera rendering's colour and transparency to `rgba` where they differ.
+fn refresh(ifc: &mut IfcModel, rendering: StepId, rgba: &[f32; 4]) -> Result<()> {
+    let [red, green, blue, alpha] = rgba.map(|v| (f64::from(v) * 1000.0).round() / 1000.0);
+    let e = ifc.attributes_many(&[rendering])?.remove(0);
+    let transparency = if alpha < 1.0 { AttrValue::Real(((1.0 - alpha) * 1000.0).round() / 1000.0) } else { AttrValue::Null };
+    if e.get("Transparency") != &transparency {
+        ifc.set_attribute(rendering, "Transparency", &transparency)?;
+    }
+    for c in e.refs("SurfaceColour") {
+        for (name, v) in [("Red", red), ("Green", green), ("Blue", blue)] {
+            if ifc.attribute(c, name)? != AttrValue::Real(v) {
+                ifc.set_attribute(c, name, &AttrValue::Real(v))?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// An `IfcSurfaceStyleRendering` of an RGBA colour, its transparency set below full opacity.
+fn rendering(ifc: &mut IfcModel, rgba: &[f32; 4]) -> Result<StepId> {
+    // Rounded: the table's f32 values would otherwise print as 0.9300000071525574.
+    let [red, green, blue, alpha] = rgba.map(|v| (f64::from(v) * 1000.0).round() / 1000.0);
+    let colour = create(ifc, "IfcColourRgb", &[("Red", AttrValue::Real(red)), ("Green", AttrValue::Real(green)), ("Blue", AttrValue::Real(blue))])?;
+    let mut attrs = vec![("SurfaceColour", r(colour)), ("ReflectanceMethod", AttrValue::Enum("NOTDEFINED".into()))];
+    if alpha < 1.0 {
+        attrs.push(("Transparency", AttrValue::Real(((1.0 - alpha) * 1000.0).round() / 1000.0)));
+    }
+    create(ifc, "IfcSurfaceStyleRendering", &attrs)
 }
 
 /// The items of an element's body representations (its own, or its type's maps).

@@ -118,3 +118,111 @@ fn ifc4x3_models_are_coloured_too() {
     assert!(by["IfcWall"].iter().all(|(n, _)| n == "Reviera default: IfcWall"), "{by:?}");
     assert!(by["IfcWindow"].iter().any(|(n, t)| n == "Reviera default: IfcWindow:glass" && *t > 0.5), "{by:?}");
 }
+
+#[test]
+fn a_file_saved_before_default_styles_gets_them_unedited() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("old.ifc");
+    let (mut project, doc) = model(Schema::Ifc4, &path);
+    project.save(&doc).unwrap();
+    // As an older Reviera wrote it: no styles at all.
+    let mut ifc = IfcModel::open(&path).unwrap();
+    for class in ["IfcStyledItem", "IfcSurfaceStyle", "IfcSurfaceStyleShading"] {
+        for e in ifc.entities_of_type(class).unwrap() {
+            ifc.remove(e.id).unwrap();
+        }
+    }
+    ifc.write(&path).unwrap();
+    assert!(IfcModel::open(&path).unwrap().entities_of_type("IfcStyledItem").unwrap().is_empty());
+
+    // Opened and saved with no edit: coloured, windows translucent.
+    let (mut project, doc, _) = LocalProject::open(&path).unwrap();
+    project.save(&doc).unwrap();
+    let ifc = IfcModel::open(&path).unwrap();
+    let by = styles_by_class(&ifc);
+    assert!(by["IfcWall"].iter().all(|(n, _)| n == "Reviera default: IfcWall"), "{by:?}");
+    // The window whole (its parts are split only when it is written again), translucent.
+    assert!(by["IfcWindow"].iter().all(|(n, t)| n.starts_with("Reviera default: IfcWindow") && *t > 0.4), "{by:?}");
+    let styled = ifc.entities_of_type("IfcStyledItem").unwrap().len();
+    // Saved again unedited: nothing added.
+    project.save(&doc).unwrap();
+    assert_eq!(IfcModel::open(&path).unwrap().entities_of_type("IfcStyledItem").unwrap().len(), styled);
+}
+
+/// The classes of the styles Reviera's default surface styles hold.
+fn default_style_classes(ifc: &IfcModel) -> Vec<String> {
+    let styles: Vec<StepId> = ifc.entities_of_type("IfcSurfaceStyle").unwrap().into_iter().map(|e| e.id).collect();
+    let mut out = Vec::new();
+    for s in ifc.attributes_many(&styles).unwrap() {
+        if s.string("Name").is_some_and(|n| n.starts_with("Reviera default")) {
+            for inner in s.refs("Styles") {
+                out.push(ifc.class_of(inner).unwrap());
+            }
+        }
+    }
+    out
+}
+
+#[test]
+fn styles_are_renderings_so_viewers_see_glass() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("glass.ifc");
+    let (mut project, doc) = model(Schema::Ifc4, &path);
+    project.save(&doc).unwrap();
+    let ifc = IfcModel::open(&path).unwrap();
+    let classes = default_style_classes(&ifc);
+    assert!(!classes.is_empty() && classes.iter().all(|c| c.eq_ignore_ascii_case("IfcSurfaceStyleRendering")), "{classes:?}");
+
+    // A file an earlier Reviera styled with plain shadings: they become renderings, colour and
+    // transparency kept, nothing left behind.
+    let mut ifc = IfcModel::open(&path).unwrap();
+    let renderings: Vec<StepId> = ifc.entities_of_type("IfcSurfaceStyleRendering").unwrap().into_iter().map(|e| e.id).collect();
+    for rid in renderings {
+        let old = ifc.attributes_many(&[rid]).unwrap().remove(0);
+        let shading = ifc.create("IfcSurfaceStyleShading").unwrap();
+        ifc.set_attribute(shading, "SurfaceColour", &AttrValue::Ref(old.refs("SurfaceColour")[0].0)).unwrap();
+        if let AttrValue::Real(t) = old.get("Transparency") {
+            ifc.set_attribute(shading, "Transparency", &AttrValue::Real(*t)).unwrap();
+        }
+        for style in ifc.referenced_by(rid, "IfcSurfaceStyle").unwrap() {
+            ifc.set_attribute(style, "Styles", &AttrValue::List(vec![AttrValue::Ref(shading.0)])).unwrap();
+        }
+        ifc.remove(rid).unwrap();
+    }
+    ifc.write(&path).unwrap();
+    assert!(default_style_classes(&IfcModel::open(&path).unwrap()).iter().all(|c| c.eq_ignore_ascii_case("IfcSurfaceStyleShading")));
+    let colours = IfcModel::open(&path).unwrap().entities_of_type("IfcColourRgb").unwrap().len();
+
+    let (mut project, doc, _) = LocalProject::open(&path).unwrap();
+    project.save(&doc).unwrap();
+    let ifc = IfcModel::open(&path).unwrap();
+    let classes = default_style_classes(&ifc);
+    assert!(classes.iter().all(|c| c.eq_ignore_ascii_case("IfcSurfaceStyleRendering")), "{classes:?}");
+    assert!(ifc.entities_of_type("IfcSurfaceStyleShading").unwrap().iter().all(|e| !e.class.eq_ignore_ascii_case("IfcSurfaceStyleShading")), "old shadings removed");
+    assert_eq!(ifc.entities_of_type("IfcColourRgb").unwrap().len(), colours, "old colours removed");
+    let by = styles_by_class(&ifc);
+    assert!(by["IfcWindow"].iter().any(|(n, t)| n == "Reviera default: IfcWindow:glass" && *t > 0.5), "{by:?}");
+}
+
+#[test]
+fn reviera_default_colours_follow_the_table() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("recolour.ifc");
+    let (mut project, doc) = model(Schema::Ifc4, &path);
+    project.save(&doc).unwrap();
+    // The wall style as an earlier table had it: red.
+    let wall_colour = |ifc: &IfcModel| {
+        let style = ifc.entities_of_type("IfcSurfaceStyle").unwrap().into_iter().find(|e| e.name.as_deref() == Some("Reviera default: IfcWall")).unwrap().id;
+        let rendering = ifc.attributes_many(&[style]).unwrap().remove(0).refs("Styles")[0];
+        let colour = ifc.attributes_many(&[rendering]).unwrap().remove(0).refs("SurfaceColour")[0];
+        (colour, ifc.attribute(colour, "Red").unwrap())
+    };
+    let mut ifc = IfcModel::open(&path).unwrap();
+    let (colour, red) = wall_colour(&ifc);
+    ifc.set_attribute(colour, "Red", &AttrValue::Real(1.0)).unwrap();
+    ifc.write(&path).unwrap();
+
+    let (mut project, doc, _) = LocalProject::open(&path).unwrap();
+    project.save(&doc).unwrap();
+    assert_eq!(wall_colour(&IfcModel::open(&path).unwrap()).1, red);
+}

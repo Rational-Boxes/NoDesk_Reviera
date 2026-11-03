@@ -49,8 +49,8 @@ pub fn class_color(class: &str) -> [f32; 4] {
     }
     let c = class.strip_suffix("StandardCase").unwrap_or(class);
     match c {
-        "IfcWall" => [0.85, 0.83, 0.78, 1.0],
-        "IfcSlab" => [0.70, 0.70, 0.72, 1.0],
+        "IfcWall" => [0.80, 0.74, 0.64, 1.0],
+        "IfcSlab" => [0.58, 0.58, 0.62, 1.0],
         "IfcCovering" => [0.93, 0.93, 0.90, 1.0],
         "IfcRoof" => [0.62, 0.30, 0.22, 1.0],
         "IfcWindow" => [0.55, 0.75, 0.90, 0.55],

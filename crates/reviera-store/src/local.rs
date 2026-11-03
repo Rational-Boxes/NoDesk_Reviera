@@ -88,6 +88,9 @@ pub struct LocalProject {
     /// Project-level RXD documents to write with the next save (view state and the like), by
     /// path. Setting them does not make the project dirty.
     pending_docs: BTreeMap<String, Value>,
+    /// Whether this session's saves have given unstyled items their default styles yet: a file
+    /// saved before default styles existed gets them on its first save, edited or not.
+    styles_checked: bool,
 }
 
 impl std::fmt::Debug for LocalProject {
@@ -354,6 +357,7 @@ impl LocalProject {
             rxd_paths,
             length_scale,
             pending_docs: BTreeMap::new(),
+            styles_checked: false,
         };
         Ok((local, doc, report))
     }
@@ -836,8 +840,12 @@ impl LocalProject {
         // Booleans last: they reshape bodies the writers above made.
         if !touched.is_empty() {
             self.write_csg(doc)?;
-            // Last: colours for whatever the writers above left unstyled.
+        }
+        // Last: colours for whatever the writers above left unstyled, and on a session's first
+        // save for a file written before default styles.
+        if !touched.is_empty() || !self.styles_checked {
             crate::styles::write_default_styles(&mut self.ifc)?;
+            self.styles_checked = true;
         }
 
         for id in dirty {
