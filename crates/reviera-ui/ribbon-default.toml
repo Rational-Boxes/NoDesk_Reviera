@@ -856,13 +856,13 @@ help = "Choose which annotation this 3D view shows as floating labels: text note
 id = "bcf.create_topic"
 label = "New Issue"
 icon = "issue_new"
-help = "Make a BCF issue from the active 3D view (its camera, cut and hidden or isolated elements) and the selection (COL-BCF-001)"
+help = "Raise an issue from the active 3D view (its camera, cut, hidden or isolated elements, the selection and a snapshot), where the model's issues are kept: its issue server, FileEngine, or the model (COL-BCF-001, COL-BCF-004)"
 
 [[action]]
 id = "bcf.list"
 label = "Issues"
 icon = "issues"
-help = "The model's BCF issues: show an issue's viewpoint, edit it, comment, add the view, delete (COL-BCF-001)"
+help = "Show the docked Issues pane: every issue on the model, open and resolved, wherever kept (COL-BCF-004)"
 
 [[action]]
 id = "bcf.import"
@@ -893,7 +893,13 @@ id = "ui.pane.issues"
 toggle = true
 label = "Issues"
 icon = "clash"
-help = "The model's issues, docked: for a model on FileEngine, the ones people raised on it there (in its 3D viewer or here), read when it opens; otherwise its BCF issues. See the snapshot and comments, Show the viewpoint, reply, resolve, or raise a new issue from the 3D view (COL-BCF-004, COL-FE-009)"
+help = "The model's issues, docked (float or dock it anywhere): on its issue server (OpenConstructionERP or another BCF API server), on FileEngine for a model opened from there, or kept with the model; read when it opens. Every issue, open and resolved (greyed, ✓), with a status filter and search; the snapshot, description and comments; Show the viewpoint, reply, resolve or reopen, edit, add a view, delete, raise a new issue from the 3D view, and publish the model's own issues to the server (COL-BCF-004, COL-BCF-002, COL-FE-009)"
+
+[[action]]
+id = "ui.issue_server"
+label = "Issue Server..."
+icon = "issues"
+help = "Keep this model's issues on a project of a BCF issue server (OpenConstructionERP, or any BCF API 3.0 or 2.1 server), read and written there both ways; add servers and sign in (COL-BCF-002)"
 
 [[action]]
 id = "ui.pane.clash"
@@ -4168,7 +4174,7 @@ tools = [
   { action = "clearance.set_rule_set" },
   { action = "ui.pane.issues", size = "large" },
   { action = "bcf.create_topic", size = "large" },
-  { action = "bcf.list", size = "large" },
+  { action = "ui.issue_server", size = "small" },
   { action = "bcf.import", size = "small" },
   { action = "bcf.export", size = "small" },
   { action = "bcf.export_viewpoint", size = "small" },

@@ -3,11 +3,15 @@
 
 //! File › Open From FileEngine…, Save to FileEngine… and FileEngine Version History…
 //! (COL-FE-001…004): the connections, with Add Connection…, Sign In…, Sign Out and Remove; the
-//! chosen connection's folders and models, entered by double-click, with Up; Open, or (saving)
+//! chosen connection's folders and models, entered by double-click, with Up (in the same window);
+//! Open, or (saving)
 //! a name, New Folder… and Save Here. Sign In asks for the service credential FileEngine
 //! generated (masked, never shown again) and whether to remember it in the system keychain. When
 //! Ctrl+S finds that someone else saved first, [`Gui::fileengine_conflict`] offers a copy beside
 //! it, overwriting, or opening theirs read-only.
+
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use serde_json::{Value, json};
 use wxdragon::prelude::*;
@@ -52,8 +56,8 @@ struct Shown<'a> {
     conn: Option<usize>,
     /// The folder's `fileengine.browse` answer, when signed in.
     folder: Option<&'a Value>,
-    /// The folders above, top first (for the path line).
-    path: &'a [String],
+    /// The folders entered, top first: (uid, name).
+    stack: &'a [(String, String)],
     note: &'a str,
     /// Saving: the name field's value.
     save_name: Option<&'a str>,
@@ -62,6 +66,9 @@ struct Shown<'a> {
 
 struct Closed {
     code: i32,
+    /// Where the browser was when it closed (folders are entered without closing it).
+    stack: Vec<(String, String)>,
+    folder: Option<Value>,
     conn: Option<usize>,
     entry: Option<usize>,
     name: String,
@@ -116,19 +123,65 @@ fn list(dialog: &Dialog, columns: &[(&str, i32)], rows: &[Vec<String>], selected
 }
 
 fn buttons(dialog: &Dialog, items: &[(i32, &str, &str, bool)]) -> BoxSizer {
+    buttons_kept(dialog, items).0
+}
+
+/// [`buttons`], and the buttons by code.
+fn buttons_kept(dialog: &Dialog, items: &[(i32, &str, &str, bool)]) -> (BoxSizer, Vec<(i32, Button)>) {
     let r = BoxSizer::builder(Orientation::Horizontal).build();
+    let mut kept = Vec::new();
     for (code, label, tip, on) in items {
         let b = Button::builder(dialog).with_label(label).build();
         b.set_tooltip(tip);
         b.enable(*on);
         let (d, code) = (*dialog, *code);
-        b.on_click(move |_| d.end_modal(code));
+        if code != UP {
+            b.on_click(move |_| d.end_modal(code));
+        }
         r.add(&b, 0, SizerFlag::Right, 4);
+        kept.push((code, b));
     }
-    r
+    (r, kept)
 }
 
-fn browser(frame: &Frame, s: &Shown<'_>) -> Closed {
+fn entry_rows(entries: &[Value]) -> Vec<Vec<String>> {
+    entries
+        .iter()
+        .map(|e| {
+            let folder = e["folder"].as_bool() == Some(true);
+            vec![
+                if folder { format!("📁 {}", e["name"].as_str().unwrap_or("")) } else { e["name"].as_str().unwrap_or("").to_owned() },
+                if folder { String::new() } else { size(e["size"].as_u64().unwrap_or(0)) },
+                e["modified_at"].as_i64().filter(|&t| t > 0).map(changed).unwrap_or_default(),
+                e["modified_by"].as_str().filter(|m| !m.is_empty()).or(e["owner"].as_str()).unwrap_or("").to_owned(),
+                if e["working_copy"].as_bool() == Some(true) { "Yes".into() } else { String::new() },
+            ]
+        })
+        .collect()
+}
+
+fn fill(l: &ListCtrl, rows: &[Vec<String>]) {
+    l.delete_all_items();
+    for (k, row) in rows.iter().enumerate() {
+        l.insert_item(k as i64, &row[0], None);
+        for (c, text) in row.iter().enumerate().skip(1) {
+            l.set_item_text_by_column(k as i64, c as i32, text);
+        }
+    }
+}
+
+fn folder_line(stack: &[(String, String)]) -> String {
+    format!("Folder: /{}", stack.iter().map(|(_, n)| n.as_str()).collect::<Vec<_>>().join("/"))
+}
+
+/// A step in the folders, taken inside the browser.
+enum Step {
+    Into(String, String),
+    Up,
+}
+
+fn browser(frame: &Frame, s: &Shown<'_>, nav: Option<reviera_app::fileengine::Browser>) -> Closed {
+    let nav_ok = nav.is_some();
     let title = match s.mode {
         Mode::Save => "Save to FileEngine",
         Mode::Open => "Open From FileEngine",
@@ -156,36 +209,24 @@ fn browser(frame: &Frame, s: &Shown<'_>) -> Closed {
     choice.on_selection_changed(move |_| d.end_modal(RELOAD));
 
     let entries: &[Value] = s.folder.and_then(|f| f["entries"].as_array()).map_or(&[], Vec::as_slice);
-    let rows: Vec<Vec<String>> = entries
-        .iter()
-        .map(|e| {
-            let folder = e["folder"].as_bool() == Some(true);
-            vec![
-                if folder { format!("📁 {}", e["name"].as_str().unwrap_or("")) } else { e["name"].as_str().unwrap_or("").to_owned() },
-                if folder { String::new() } else { size(e["size"].as_u64().unwrap_or(0)) },
-                e["modified_at"].as_i64().filter(|&t| t > 0).map(changed).unwrap_or_default(),
-                e["modified_by"].as_str().filter(|m| !m.is_empty()).or(e["owner"].as_str()).unwrap_or("").to_owned(),
-                if e["working_copy"].as_bool() == Some(true) { "Yes".into() } else { String::new() },
-            ]
-        })
-        .collect();
-    let where_ = StaticText::builder(&dialog).with_label(&format!("Folder: /{}", s.path.join("/"))).build();
+    let rows = entry_rows(entries);
+    let where_ = StaticText::builder(&dialog).with_label(&folder_line(s.stack)).build();
     let view = list(&dialog, &[("Name", 320), ("Size", 80), ("Changed (UTC)", 130), ("By", 200), ("Here", 50)], &rows, None);
     view.set_min_size(Size::new(760, 320));
-    let d = dialog;
-    view.on_item_activated(move |_| d.end_modal(ENTER));
     let note = StaticText::builder(&dialog).with_label(s.note).build();
     note.wrap(760);
+    // Where the browser is; folders are entered and left here, without closing it.
+    let state = Rc::new(RefCell::new((s.stack.to_vec(), s.folder.cloned())));
 
     let connected = s.conn.and_then(|k| s.connections.get(k)).is_some_and(|x| x["connected"].as_bool() == Some(true));
     let has = s.conn.is_some_and(|k| k < s.connections.len());
     let writable = s.folder.is_some_and(|f| f["writable"].as_bool() == Some(true));
-    let conn_row = buttons(&dialog, &[
+    let (conn_row, mut kept) = buttons_kept(&dialog, &[
         (ADD, "Add Connection…", "Add a FileEngine server by its address", true),
         (SIGN_IN, "Sign In…", "Sign in with the credential FileEngine generated for this app", has),
         (SIGN_OUT, "Sign Out", "End the session; the stored credential can be forgotten too", connected),
         (REMOVE, "Remove", "Remove the connection and delete its stored credential", has),
-        (UP, "Up", "The folder above", connected && !s.path.is_empty()),
+        (UP, "Up", "The folder above", connected && !s.stack.is_empty()),
     ]);
     let name_field = s.save_name.map(|n| {
         let t = TextCtrl::builder(&dialog).with_value(n).build();
@@ -197,11 +238,74 @@ fn browser(frame: &Frame, s: &Shown<'_>) -> Closed {
         let l = StaticText::builder(&dialog).with_label("Name").build();
         last.add(&l, 0, SizerFlag::AlignCenterVertical | SizerFlag::Right, 6);
         last.add(t, 0, SizerFlag::Right, 8);
-        last.add_sizer(&buttons(&dialog, &[(NEW_FOLDER, "New Folder…", "Make a folder here", connected && writable), (SAVE, "Save Here", "Save the project as this model in this folder", connected && writable)]), 0, SizerFlag::empty(), 0);
+        let (row, b) = buttons_kept(&dialog, &[(NEW_FOLDER, "New Folder…", "Make a folder here", connected && writable), (SAVE, "Save Here", "Save the project as this model in this folder", connected && writable)]);
+        kept.extend(b);
+        last.add_sizer(&row, 0, SizerFlag::empty(), 0);
     } else if let Mode::Pick(_) = s.mode {
-        last.add_sizer(&buttons(&dialog, &[(PICK, "Choose This Folder", "Choose the folder shown (double-click a folder to go into it)", connected && s.folder.is_some() && !s.path.is_empty())]), 0, SizerFlag::empty(), 0);
+        let (row, b) = buttons_kept(&dialog, &[(PICK, "Choose This Folder", "Choose the folder shown (double-click a folder to go into it)", connected && s.folder.is_some() && !s.stack.is_empty())]);
+        kept.extend(b);
+        last.add_sizer(&row, 0, SizerFlag::empty(), 0);
     } else {
-        last.add_sizer(&buttons(&dialog, &[(OPEN, "Open", "Open the chosen model (a working copy is kept on this computer)", connected && !entries.is_empty())]), 0, SizerFlag::empty(), 0);
+        let (row, b) = buttons_kept(&dialog, &[(OPEN, "Open", "Open the chosen model (a working copy is kept on this computer)", connected && !entries.is_empty())]);
+        kept.extend(b);
+        last.add_sizer(&row, 0, SizerFlag::empty(), 0);
+    }
+    // Entering a folder, or going up, lists it here.
+    let step: Rc<dyn Fn(Step)> = {
+        let (state, view, where_, note, kept) = (state.clone(), view, where_, note, kept.clone());
+        let models_only = matches!(s.mode, Mode::Pick(_));
+        let nav = nav.map(Rc::new);
+        let default_note = s.note.to_owned();
+        Rc::new(move |step: Step| {
+            let Some(nav) = &nav else { return };
+            let mut stack = state.borrow().0.clone();
+            match step {
+                Step::Into(uid, name) => stack.push((uid, name)),
+                Step::Up => {
+                    stack.pop();
+                }
+            }
+            match nav.browse(stack.last().map(|(u, _)| u.as_str()), models_only) {
+                Ok(out) => {
+                    let v = serde_json::to_value(out).unwrap_or_default();
+                    let entries = v["entries"].as_array().cloned().unwrap_or_default();
+                    fill(&view, &entry_rows(&entries));
+                    where_.set_label(&folder_line(&stack));
+                    note.set_label(&default_note);
+                    note.wrap(760);
+                    let writable = v["writable"].as_bool() == Some(true);
+                    for (code, b) in &kept {
+                        match *code {
+                            UP => b.enable(!stack.is_empty()),
+                            NEW_FOLDER | SAVE => b.enable(writable),
+                            PICK => b.enable(!stack.is_empty()),
+                            OPEN => b.enable(!entries.is_empty()),
+                            _ => {}
+                        }
+                    }
+                    *state.borrow_mut() = (stack, Some(v));
+                }
+                Err(e) => {
+                    note.set_label(&format!("The folder could not be listed: {e}"));
+                    note.wrap(760);
+                }
+            }
+        })
+    };
+    {
+        let (d, state, step) = (dialog, state.clone(), step.clone());
+        view.on_item_activated(move |e| {
+            let k = e.get_item_index().max(0) as usize;
+            let folder = state.borrow().1.as_ref().and_then(|f| f["entries"].get(k)).filter(|e| e["folder"] == true).map(|e| (e["uid"].as_str().unwrap_or("").to_owned(), e["name"].as_str().unwrap_or("").to_owned()));
+            match folder {
+                Some((uid, name)) if nav_ok => step(Step::Into(uid, name)),
+                _ => d.end_modal(ENTER),
+            }
+        });
+    }
+    if let Some((_, up)) = kept.iter().find(|(c, _)| *c == UP) {
+        let (d, step) = (dialog, step.clone());
+        up.on_click(move |_| if nav_ok { step(Step::Up) } else { d.end_modal(UP) });
     }
     last.add_stretch_spacer(1);
     let close = Button::builder(&dialog).with_id(ID_CANCEL).with_label("Close").build();
@@ -217,8 +321,11 @@ fn browser(frame: &Frame, s: &Shown<'_>) -> Closed {
     dialog.set_sizer_and_fit(sizer, true);
     dialog.set_escape_id(ID_CANCEL);
     let code = dialog.show_modal();
+    let (stack, folder) = state.borrow().clone();
     let out = Closed {
         code,
+        stack,
+        folder,
         conn: choice.get_selection().map(|i| i as usize).filter(|_| !names.is_empty()),
         entry: usize::try_from(view.get_first_selected_item()).ok(),
         name: name_field.map(|t| t.get_value()).unwrap_or_default(),
@@ -304,10 +411,15 @@ impl Gui {
                     "Double-click a folder to open it. Open downloads the chosen model and opens it; Ctrl+S saves it back as a new version.".into()
                 };
             }
-            let path: Vec<String> = stack.iter().map(|(_, n)| n.clone()).collect();
-            let shown = Shown { connections: &connections, conn, folder: folder.as_ref(), path: &path, note: &note, save_name: save.then_some(name.as_str()), mode };
-            let closed = browser(&frame, &shown);
+            let nav = id.as_deref().filter(|_| connected && folder.is_some()).and_then(|id| self.app.fileengine_mut().browser(id).ok());
+            let shown = Shown { connections: &connections, conn, folder: folder.as_ref(), stack: &stack, note: &note, save_name: save.then_some(name.as_str()), mode };
+            let closed = browser(&frame, &shown, nav);
             note.clear();
+            // The folder it closed in.
+            if closed.conn == conn {
+                stack = closed.stack.clone();
+                folder = closed.folder.clone();
+            }
             if save {
                 name = closed.name.trim().to_owned();
             }
@@ -482,11 +594,9 @@ impl Gui {
                     (false, false) => format!("Opened {name} (version {}).", stamp(o["link"]["version"].as_str().unwrap_or(""))),
                 };
                 frame.set_status_text(&msg, 0);
-                // Its issues on FileEngine: the pane opens when there are any.
-                match o["issues"].as_u64() {
-                    Some(n) if n > 0 => self.show_issues_pane(),
-                    _ => self.refresh_issues(false),
-                }
+                // Its issues (on FileEngine, or its issue server): the pane opens when there are
+                // any, open or resolved.
+                self.issues_after_open();
                 true
             }
             Err(e) => {

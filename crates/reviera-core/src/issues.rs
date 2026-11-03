@@ -120,7 +120,7 @@ impl Topic {
 
 /// The fields `bcf.create_topic` and `bcf.update_topic` set; a field left out is kept (an empty
 /// text clears it).
-#[derive(Debug, Clone, Default, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct TopicFields {
     pub title: Option<String>,
@@ -595,6 +595,11 @@ pub struct Lists {
 }
 
 pub fn lists(store: &Store) -> Lists {
+    lists_of(&all(store).into_iter().map(|(_, t)| t).collect::<Vec<_>>())
+}
+
+/// Reviera's default lists and every value `topics` use.
+pub fn lists_of(topics: &[Topic]) -> Lists {
     let mut l = Lists {
         topic_types: TYPES.iter().map(|s| (*s).to_owned()).collect(),
         statuses: STATUSES.iter().map(|s| (*s).to_owned()).collect(),
@@ -608,7 +613,7 @@ pub fn lists(store: &Store) -> Lists {
             v.push(x.clone());
         }
     };
-    for (_, t) in all(store) {
+    for t in topics {
         add(&mut l.topic_types, &t.topic_type);
         add(&mut l.statuses, &t.status);
         add(&mut l.priorities, &t.priority);

@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Reviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Reviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 863 numbered requirements (320 P0 · 329 P1 · 207 P2 · 7 P3), 2,291 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 864 numbered requirements (320 P0 · 329 P1 · 208 P2 · 7 P3), 2,306 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,291 commands; 863 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,306 commands; 864 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -27210,6 +27210,7 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
   - `fileengine.resolve_issue` resolves the issue on the version open (or reopens it).
   - `fileengine.new_issue` raises an issue from a 3D view: its camera (as navigated, else saved, else fitted to the model), cut, hidden or isolated elements, selection and snapshot, on the version open.
 - **The Issues pane** (COL-BCF-004), docked at the bottom, opens when a FileEngine model with issues opens. It lists the issues, with the chosen one's snapshot and comments, and offers Show, Reply…, Resolve/Reopen, New Issue…, Refresh, and a filter (all, open, resolved). For a model not on FileEngine, it shows the model's own BCF topics. It follows the active model. While it is shown, a FileEngine model's issues are read again every minute, and the status bar reports new issues, new replies, and issues resolved or reopened. Live updates over the discussion service's WebSocket would replace the poll.
+- **Both ways, every way it opens** *(built 2026-11-03)*. The issues are read, and the Issues pane opened when there are any (open or resolved; it used to open only for open ones, so a model whose issues were all resolved looked as if it had none), whether the model opens from the FileEngine browser or from its working copy (File › Open, Recent, crash recovery). The model's own BCF topics (from clash checks, the bathroom checks or a BCF import) are listed beside the server's, marked *This model only*, and `issues.publish` (Publish to Server) puts each on FileEngine once: a thread titled as the topic, anchored to its first viewpoint (planes turned, snapshot kept), the description and fields as the opening comment and its comments after it, with author and date; resolved topics are resolved there. The topic GUID → thread id map is kept beside the working copy (`published-issues.json`). FileEngine threads have a title and comments only: field edits, extra views and deletion are refused with a reason (`issues.not_supported`).
 - **Crash recovery.** Opening a model whose working copy holds unsaved work from a session that ended unexpectedly offers to restore it, or to discard it and open the model from the server. Nothing is downloaded over it first.
 
 **Acceptance criteria.**
@@ -28274,6 +28275,8 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 
 **Commands.** `bcf.issues_pane() -> ()` shows the pane (UI only); `bcf.set_extensions(lists{types?, statuses?, priorities?, labels?, stages?, users?}, replacements?{}) -> ()`; the pane uses `bcf.list`, `bcf.create_topic`, `bcf.update_topic`, `bcf.add_comment`, `bcf.add_viewpoint`, `bcf.delete_topic`, `bcf.import`, `bcf.export` (COL-BCF-001) and `bcf.apply_viewpoint` (COL-BCF-003).
 
+*Built (2026-11-03), one pane for every source:* the pane works through `issues.*` (COL-BCF-002), so it shows a model's issues wherever they are kept: a bound BCF API project, FileEngine, or the model's own topics, with the model's own topics not on the server listed beside them (*This model only*, in blue) and Publish to Server. Every issue is listed, open first: resolved and closed ones stay in the list, greyed, their status marked ✓ (open ones ●). A status filter (all, open, resolved) and a search box (title, description, comments, type, priority, assignee, labels) filter it. Columns: issue, status, type, priority, assigned to, raised by, changed, replies, kept. Toolbar: Show, Reply…, Resolve/Reopen, Edit…, Add View, Delete (each enabled when the issue's source allows it), New Issue… (with type, priority, assignee, due date, labels and stage where kept; *keep it only with this model* when on a server), Publish to Server, Refresh, Import BCF…, Export BCF… (`issues.export_bcf`: every issue, server ones included, or those the filter shows) and Issue Server…. The detail shows the snapshot, the fields, the description and the comments. The pane is an AUI pane that floats and docks anywhere (it was already; the old modal *Issues* dialog behind View › Coordination › Issues is gone, and that command now shows the pane). View › Coordination › New Issue raises the issue where the model's issues are kept. Not yet: the per-field filters and *Me*, thumbnails in the list, editing fields in place, several viewpoints shown per issue, *Manage lists…*, canvas markers.
+
 **Acceptance criteria.**
 - [ ] Filtering by *Assignee = Me* and *Status = Open* shows exactly the matching topics, and the filter is restored after reopening the project.
 - [ ] Editing a topic's status in the pane and pressing Ctrl+Z restores the previous status.
@@ -28315,6 +28318,12 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 - **Agents:** MCP agents use the same `bcf.*` commands. Server credentials are never exposed to them (COL-CORE-005).
 
 **Data (IFC/RXD).** Cached topics in `coordination/issues` (kinds `issue.topic`, `issue.extensions`), each with `server: {connection, guid, modified}`. Connection profiles and tokens are client state (COL-API-001), never stored in the model.
+
+*Built (2026-11-03), first build (preliminary: checked against an in-memory server answering as OpenConstructionERP's BCF API 3.0 does; no live BCF API server tested yet):*
+- **Client.** `clients/opencde` (MIT, `reviera-opencde`), blocking, over HTTPS (plain http only to this computer unless allowed). `Client::connect` finds the BCF API from a server's root or its base: the Foundation API's `foundation/versions` when offered, else `bcf/`, `api/v1/bcf/` (OpenConstructionERP) and `api/bcf/`, trying 3.0 then 2.1 with `current-user`; a refused sign-in is reported as such, not as "not found". Sign-in: a bearer token as given, HTTP Basic, or an e-mail and password posted as JSON to a login address that answers `access_token` (OpenConstructionERP's `api/v1/users/auth/login/` by default), renewed with its `refresh_token` and asked for again when refused. Lists are read bare (the standard) or wrapped (`{"items": …}`, as OpenConstructionERP answers); topics are paged with `$top`/`$skip` where the server pages. PUT, which replaces a topic, sends the server's copy with the changed fields.
+- **Servers and bindings** (`coordination.add_server`, `.servers`, `.sign_in`, `.remove_server`, `.projects`, `.bind`, `.unbind`, `.status`): per-user settings (`coordination.json`); the password or token in the OS keychain (or for the session), never returned and never written to the model. A model is bound to a project by its file, so binding does not change it; a bound model's issues are the project's even when the model was opened from FileEngine. `coordination.remove_server` is not offered to agents.
+- **Issues, wherever kept** (`issues.list`, `.show`, `.snapshot`, `.comment`, `.set_status`, `.update`, `.new`, `.add_view`, `.delete`, `.publish`, `.export_bcf`): one shape for a BCF server's topics, FileEngine's threads (COL-FE-009) and the model's own topics (COL-BCF-001). `issues.list` lists all, open and resolved (`resolved`: Resolved, Closed, Done, Fixed, Completed), open first, with `status` and `text` filters, counts, the lists for forms (the server's extensions, else Reviera's defaults and every value in use), and what the server allows. A server's topics are read with their comments (viewpoints again only when a topic's modification date changed) and kept beside the model (`<data>/reviera/coordination/<server>/<project>.json`) to read offline. Resolving picks the status the project's list has for it (Closed, Resolved, Done; reopening: Open, ReOpened …). New issues and added views carry the 3D view's viewpoint and snapshot (with no 3D view, none). `issues.publish` puts the model's own topics on the server with their GUIDs, fields, viewpoints, snapshots and comments (other authors' names and dates written into the text), skipping those already there, so publishing twice changes nothing; the model keeps its copies. `issues.export_bcf` writes every issue, wherever kept, as a BCF 3.0 or 2.1 archive (`bcf_topics::write_archive`, shared with `bcf.export`). `issues.delete` is not offered to agents.
+- **Not yet:** OAuth 2 through the Foundation API's auth discovery, events and history, related topics, document references and documents, files information, the per-object permission flags beyond whole-source abilities, the offline write queue with conflicts, incremental sync by modification date, *Sync now* and automatic sync on local change (the pane reads every minute), copying topics between bindings.
 
 **Commands.** `bcf.api_connect(url, profile_name?) -> connection_id`; `bcf.api_list_projects(connection_id) -> project[]` (query); `bcf.api_bind_project(connection_id, project_id) -> ()`; `bcf.api_unbind(keep_local_copy=true) -> ()`; `bcf.api_sync(connection_id?) -> sync_report`; `bcf.api_status() -> {connection, last_sync, queued_changes, conflicts}` (query); `bcf.api_resolve_conflict(topic_id, field, use: server|local) -> ()`; `bcf.api_disconnect(connection_id) -> ()`.
 
@@ -28847,12 +28856,18 @@ Every command below is registered once and is available from the UI, Lua and MCP
 | `bcf.list` | filter? | topic_summary[] | No | COL-BCF-001 |
 | `bcf.issues_pane` | — | () | No | COL-BCF-004 |
 | `bcf.set_extensions` | lists{types?, statuses?, priorities?, labels?, stages?, users?}, replacements?{} | () | Yes | COL-BCF-004 |
-| `bcf.api_connect` | url, profile_name? | connection_id | No | COL-BCF-002 |
-| `bcf.api_list_projects` | connection_id | project[] | No (query) | COL-BCF-002 |
-| `bcf.api_bind_project` | connection_id, project_id | () | No | COL-BCF-002 |
-| `bcf.api_unbind` | keep_local_copy=true | () | No | COL-BCF-002 |
+| `coordination.add_server` *(built as; was `bcf.api_connect`)* | name, url, auth: login\|token\|basic\|none, user?, login_url?, secret?, remember=true, allow_http=false | server | No | COL-BCF-002 |
+| `coordination.projects` *(was `bcf.api_list_projects`)* | server_id | project[] | No (query) | COL-BCF-002 |
+| `coordination.bind` *(was `bcf.api_bind_project`)* | document_id?, server_id, project_id | binding | No | COL-BCF-002 |
+| `coordination.unbind` *(was `bcf.api_unbind`)* | document_id? | () | No | COL-BCF-002 |
 | `bcf.api_sync` | connection_id? | sync_report | No | COL-BCF-002 |
-| `bcf.api_status` | — | {connection, last_sync, queued_changes, conflicts} | No (query) | COL-BCF-002 |
+| `coordination.status` *(was `bcf.api_status`)* | document_id? | {source: model\|fileengine\|bcf_api, server, project, binding} | No (query) | COL-BCF-002 |
+| `coordination.servers` / `.sign_in` / `.remove_server` | — / server_id, secret / server_id | server[] / server / () | No | COL-BCF-002 |
+| `issues.list` | document_id?, refresh=true, status: all\|open\|resolved, text? | {source, issues[], total, open, resolved, local, offline, server_can, lists} | No (query) | COL-BCF-004 |
+| `issues.show` / `.snapshot` | id, target_view_id? / id | import_report / base64? | Yes / No | COL-BCF-004 |
+| `issues.comment` / `.set_status` / `.update` | id, text / id, resolved / id, fields | issue | Yes | COL-BCF-004 |
+| `issues.new` / `.add_view` | title?, text, fields?, view_id?, in_model=false / id, view_id? | issue | Yes | COL-BCF-004 |
+| `issues.delete` / `.publish` / `.export_bcf` | id / ids[]? / path, ids[]?, version | () / publish_report / export_report | Yes / No / No | COL-BCF-004 |
 | `bcf.api_resolve_conflict` | topic_id, field, use: server\|local | () | Yes | COL-BCF-002 |
 | `bcf.api_disconnect` | connection_id | () | No | COL-BCF-002 |
 | `bcf.set_workflow` | rules | () | Yes | COL-BCF-005 |
@@ -29551,7 +29566,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2292 unique commands** in 428 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2306 unique commands** in 430 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -29588,7 +29603,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `assembly` | 16 |
 | `assemblytemplate` | 1 |
 | `bath` | 24 |
-| `bcf` | 34 |
+| `bcf` | 29 |
 | `beam` | 6 |
 | `beam_system` | 5 |
 | `bending_detail` | 1 |
@@ -29635,6 +29650,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `contour` | 1 |
 | `coord` | 15 |
 | `coordinates` | 6 |
+| `coordination` | 8 |
 | `coordreview` | 6 |
 | `copymonitor` | 8 |
 | `curtain` | 7 |
@@ -29745,6 +29761,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `inplace` | 5 |
 | `insert` | 4 |
 | `instance` | 5 |
+| `issues` | 11 |
 | `job` | 4 |
 | `journal` | 1 |
 | `keynote` | 5 |
@@ -30122,14 +30139,9 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `bath.waterproofing` | 3 | element_ids? | {extents, wall_area, floor_area} | No | ARC-BATH-012 |
 | `bcf.add_comment` | 6 | topic_id, text, viewpoint?: current\ | none | comment_id | Yes |
 | `bcf.add_viewpoint` | 6 | topic_id, view_id? | viewpoint_id | Yes | COL-BCF-001 |
-| `bcf.api_bind_project` | 6 | connection_id, project_id | () | No | COL-BCF-002 |
-| `bcf.api_connect` | 6 | url, profile_name? | connection_id | No | COL-BCF-002 |
 | `bcf.api_disconnect` | 6 | connection_id | () | No | COL-BCF-002 |
-| `bcf.api_list_projects` | 6 | connection_id | project[] | No (query) | COL-BCF-002 |
 | `bcf.api_resolve_conflict` | 6 | topic_id, field, use: server\ | local | () | Yes |
-| `bcf.api_status` | 6 | — | {connection, last_sync, queued_changes, conflicts} | No (query) | COL-BCF-002 |
 | `bcf.api_sync` | 6 | connection_id? | sync_report | No | COL-BCF-002 |
-| `bcf.api_unbind` | 6 | keep_local_copy=true | () | No | COL-BCF-002 |
 | `bcf.apply_viewpoint` | 6 | viewpoint_id, target_view_id? | view_id | No | COL-BCF-003 |
 | `bcf.bulk_update` | 6 | topic_ids[], fields | () | Yes | COL-BCF-005 |
 | `bcf.create_topic` | 6 | title, description?, fields?, view_id?, element_ids[]? | topic_id | Yes | COL-BCF-001 |
@@ -30379,6 +30391,14 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `coordinates.set_crs` | 2 | epsg_code | — | Yes | DM-LOC-001 |
 | `coordinates.set_project_base_point` | 2 | point, angle_to_true_north? | — | Yes | DM-LOC-001 |
 | `coordinates.set_survey_point` | 2 | point, shared_coords | — | Yes | DM-LOC-001 |
+| `coordination.add_server` | 6 | name, url, auth: login\ | token\ | basic\ | none, user?, login_url?, secret?, remember=true, allow_http=false |
+| `coordination.bind` | 6 | document_id?, server_id, project_id | binding | No | COL-BCF-002 |
+| `coordination.projects` | 6 | server_id | project[] | No (query) | COL-BCF-002 |
+| `coordination.remove_server` | 6 | — / server_id, secret / server_id | server[] / server / () | No | COL-BCF-002 |
+| `coordination.servers` | 6 | — / server_id, secret / server_id | server[] / server / () | No | COL-BCF-002 |
+| `coordination.sign_in` | 6 | — / server_id, secret / server_id | server[] / server / () | No | COL-BCF-002 |
+| `coordination.status` | 6 | document_id? | {source: model\ | fileengine\ | bcf_api, server, project, binding} |
+| `coordination.unbind` | 6 | document_id? | () | No | COL-BCF-002 |
 | `coordreview.list` | 6 | link_instance_id?, status? | review_item[] | No | COL-CM-002 |
 | `coordreview.report` | 6 | path, format: html\ | csv, filter? | () | No |
 | `coordreview.resolve` | 6 | item_ids[], action: postpone\ | reject\ | accept\ | modify, comment? |
@@ -30947,6 +30967,17 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `instance.pick_new_host` | 2 | element_id, host_id, face_ref? | — | Yes | DM-INST-001 |
 | `instance.place` | 2 | type_id, placement, host_id?, level_id?, params? | element_id | Yes | DM-INST-001 |
 | `instance.place_adaptive` | 2 | type_id, points[], hosts?[] | element_id | Yes | DM-INST-001 |
+| `issues.add_view` | 6 | title?, text, fields?, view_id?, in_model=false / id, view_id? | issue | Yes | COL-BCF-004 |
+| `issues.comment` | 6 | id, text / id, resolved / id, fields | issue | Yes | COL-BCF-004 |
+| `issues.delete` | 6 | id / ids[]? / path, ids[]?, version | () / publish_report / export_report | Yes / No / No | COL-BCF-004 |
+| `issues.export_bcf` | 6 | id / ids[]? / path, ids[]?, version | () / publish_report / export_report | Yes / No / No | COL-BCF-004 |
+| `issues.list` | 6 | document_id?, refresh=true, status: all\ | open\ | resolved, text? | {source, issues[], total, open, resolved, local, offline, server_can, lists} |
+| `issues.new` | 6 | title?, text, fields?, view_id?, in_model=false / id, view_id? | issue | Yes | COL-BCF-004 |
+| `issues.publish` | 6 | id / ids[]? / path, ids[]?, version | () / publish_report / export_report | Yes / No / No | COL-BCF-004 |
+| `issues.set_status` | 6 | id, text / id, resolved / id, fields | issue | Yes | COL-BCF-004 |
+| `issues.show` | 6 | id, target_view_id? / id | import_report / base64? | Yes / No | COL-BCF-004 |
+| `issues.snapshot` | 6 | id, target_view_id? / id | import_report / base64? | Yes / No | COL-BCF-004 |
+| `issues.update` | 6 | id, text / id, resolved / id, fields | issue | Yes | COL-BCF-004 |
 | `job.cancel` | 5 | job_id | () | No | DOC-OUT-013 |
 | `job.list` | 5 | — | job_summary[] | No | DOC-OUT-013 |
 | `job.status` | 5 | job_id | status | No | DOC-OUT-013 |

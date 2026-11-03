@@ -20,6 +20,7 @@ reviera-compute-proto = { workspace = true, features = ["subscription"] }
 keyring.workspace = true
 reviera-bimserver.workspace = true
 reviera-fileengine.workspace = true
+reviera-opencde.workspace = true
 prost = "0.14.4"
 reviera-ifc.workspace = true
 reviera-store.workspace = true
@@ -36,6 +37,7 @@ zip = { version = "8.3", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
 reviera-fileengine = { workspace = true, features = ["fake"] }
+reviera-opencde = { workspace = true, features = ["fake"] }
 glam.workspace = true
 tempfile.workspace = true
 

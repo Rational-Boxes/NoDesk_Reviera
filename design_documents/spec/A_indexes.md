@@ -214,7 +214,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2292 unique commands** in 428 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2306 unique commands** in 430 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -251,7 +251,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `assembly` | 16 |
 | `assemblytemplate` | 1 |
 | `bath` | 24 |
-| `bcf` | 34 |
+| `bcf` | 29 |
 | `beam` | 6 |
 | `beam_system` | 5 |
 | `bending_detail` | 1 |
@@ -298,6 +298,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `contour` | 1 |
 | `coord` | 15 |
 | `coordinates` | 6 |
+| `coordination` | 8 |
 | `coordreview` | 6 |
 | `copymonitor` | 8 |
 | `curtain` | 7 |
@@ -408,6 +409,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `inplace` | 5 |
 | `insert` | 4 |
 | `instance` | 5 |
+| `issues` | 11 |
 | `job` | 4 |
 | `journal` | 1 |
 | `keynote` | 5 |
@@ -785,14 +787,9 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `bath.waterproofing` | 3 | element_ids? | {extents, wall_area, floor_area} | No | ARC-BATH-012 |
 | `bcf.add_comment` | 6 | topic_id, text, viewpoint?: current\ | none | comment_id | Yes |
 | `bcf.add_viewpoint` | 6 | topic_id, view_id? | viewpoint_id | Yes | COL-BCF-001 |
-| `bcf.api_bind_project` | 6 | connection_id, project_id | () | No | COL-BCF-002 |
-| `bcf.api_connect` | 6 | url, profile_name? | connection_id | No | COL-BCF-002 |
 | `bcf.api_disconnect` | 6 | connection_id | () | No | COL-BCF-002 |
-| `bcf.api_list_projects` | 6 | connection_id | project[] | No (query) | COL-BCF-002 |
 | `bcf.api_resolve_conflict` | 6 | topic_id, field, use: server\ | local | () | Yes |
-| `bcf.api_status` | 6 | — | {connection, last_sync, queued_changes, conflicts} | No (query) | COL-BCF-002 |
 | `bcf.api_sync` | 6 | connection_id? | sync_report | No | COL-BCF-002 |
-| `bcf.api_unbind` | 6 | keep_local_copy=true | () | No | COL-BCF-002 |
 | `bcf.apply_viewpoint` | 6 | viewpoint_id, target_view_id? | view_id | No | COL-BCF-003 |
 | `bcf.bulk_update` | 6 | topic_ids[], fields | () | Yes | COL-BCF-005 |
 | `bcf.create_topic` | 6 | title, description?, fields?, view_id?, element_ids[]? | topic_id | Yes | COL-BCF-001 |
@@ -1042,6 +1039,14 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `coordinates.set_crs` | 2 | epsg_code | — | Yes | DM-LOC-001 |
 | `coordinates.set_project_base_point` | 2 | point, angle_to_true_north? | — | Yes | DM-LOC-001 |
 | `coordinates.set_survey_point` | 2 | point, shared_coords | — | Yes | DM-LOC-001 |
+| `coordination.add_server` | 6 | name, url, auth: login\ | token\ | basic\ | none, user?, login_url?, secret?, remember=true, allow_http=false |
+| `coordination.bind` | 6 | document_id?, server_id, project_id | binding | No | COL-BCF-002 |
+| `coordination.projects` | 6 | server_id | project[] | No (query) | COL-BCF-002 |
+| `coordination.remove_server` | 6 | — / server_id, secret / server_id | server[] / server / () | No | COL-BCF-002 |
+| `coordination.servers` | 6 | — / server_id, secret / server_id | server[] / server / () | No | COL-BCF-002 |
+| `coordination.sign_in` | 6 | — / server_id, secret / server_id | server[] / server / () | No | COL-BCF-002 |
+| `coordination.status` | 6 | document_id? | {source: model\ | fileengine\ | bcf_api, server, project, binding} |
+| `coordination.unbind` | 6 | document_id? | () | No | COL-BCF-002 |
 | `coordreview.list` | 6 | link_instance_id?, status? | review_item[] | No | COL-CM-002 |
 | `coordreview.report` | 6 | path, format: html\ | csv, filter? | () | No |
 | `coordreview.resolve` | 6 | item_ids[], action: postpone\ | reject\ | accept\ | modify, comment? |
@@ -1610,6 +1615,17 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `instance.pick_new_host` | 2 | element_id, host_id, face_ref? | — | Yes | DM-INST-001 |
 | `instance.place` | 2 | type_id, placement, host_id?, level_id?, params? | element_id | Yes | DM-INST-001 |
 | `instance.place_adaptive` | 2 | type_id, points[], hosts?[] | element_id | Yes | DM-INST-001 |
+| `issues.add_view` | 6 | title?, text, fields?, view_id?, in_model=false / id, view_id? | issue | Yes | COL-BCF-004 |
+| `issues.comment` | 6 | id, text / id, resolved / id, fields | issue | Yes | COL-BCF-004 |
+| `issues.delete` | 6 | id / ids[]? / path, ids[]?, version | () / publish_report / export_report | Yes / No / No | COL-BCF-004 |
+| `issues.export_bcf` | 6 | id / ids[]? / path, ids[]?, version | () / publish_report / export_report | Yes / No / No | COL-BCF-004 |
+| `issues.list` | 6 | document_id?, refresh=true, status: all\ | open\ | resolved, text? | {source, issues[], total, open, resolved, local, offline, server_can, lists} |
+| `issues.new` | 6 | title?, text, fields?, view_id?, in_model=false / id, view_id? | issue | Yes | COL-BCF-004 |
+| `issues.publish` | 6 | id / ids[]? / path, ids[]?, version | () / publish_report / export_report | Yes / No / No | COL-BCF-004 |
+| `issues.set_status` | 6 | id, text / id, resolved / id, fields | issue | Yes | COL-BCF-004 |
+| `issues.show` | 6 | id, target_view_id? / id | import_report / base64? | Yes / No | COL-BCF-004 |
+| `issues.snapshot` | 6 | id, target_view_id? / id | import_report / base64? | Yes / No | COL-BCF-004 |
+| `issues.update` | 6 | id, text / id, resolved / id, fields | issue | Yes | COL-BCF-004 |
 | `job.cancel` | 5 | job_id | () | No | DOC-OUT-013 |
 | `job.list` | 5 | — | job_summary[] | No | DOC-OUT-013 |
 | `job.status` | 5 | job_id | status | No | DOC-OUT-013 |

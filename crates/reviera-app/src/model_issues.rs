@@ -177,7 +177,7 @@ pub(crate) fn issue_of(t: &Value) -> Issue {
 }
 
 /// The open document's FileEngine link (or `document_id`'s).
-fn linked(app: &App, document_id: Option<DocumentId>) -> Result<(DocumentId, Link, std::path::PathBuf)> {
+pub(crate) fn linked(app: &App, document_id: Option<DocumentId>) -> Result<(DocumentId, Link, std::path::PathBuf)> {
     let id = match document_id {
         Some(id) => id,
         None => app.active().ok_or_else(|| bad("document.none", "no document is open"))?,
@@ -187,7 +187,7 @@ fn linked(app: &App, document_id: Option<DocumentId>) -> Result<(DocumentId, Lin
     Ok((id, link, path))
 }
 
-fn cache_path(path: &std::path::Path) -> std::path::PathBuf {
+pub(crate) fn cache_path(path: &std::path::Path) -> std::path::PathBuf {
     path.with_file_name(CACHE)
 }
 
@@ -356,9 +356,18 @@ host!(FeNewIssue, "fileengine.new_issue", "Raise an issue on a FileEngine model"
     }
     let (view, vp) = crate::bcf_topics::capture_view(app, &p.view_id)?;
     let snapshot = crate::bcf_topics::snapshot_png(app, view);
+    let title = p.title.filter(|t| !t.trim().is_empty()).unwrap_or_default();
+    let tid = open_thread(app, &link, &title, &text, &vp, snapshot)?;
+    refreshed(app, Some(id), &tid)
+});
+
+/// Opens a thread on the linked model, anchored as FileEngine's viewer anchors one: the
+/// viewpoint `vp` with its snapshot (base64 PNG), on the version open here. Its id.
+pub(crate) fn open_thread(app: &mut App, link: &Link, title: &str, text: &str, vp: &Viewpoint, snapshot: Option<String>) -> Result<String> {
     let mut viewpoint = bcf::to_json(&turned(vp.clone()));
     if let Some(png) = snapshot {
-        viewpoint["snapshot"] = json!({ "snapshot_type": "png", "snapshot_data": format!("data:image/png;base64,{png}") });
+        let kind = if png.starts_with("/9j/") { "jpg" } else { "png" };
+        viewpoint["snapshot"] = json!({ "snapshot_type": kind, "snapshot_data": format!("data:image/{};base64,{png}", if kind == "jpg" { "jpeg" } else { "png" }) });
     }
     let anchor = json!({
         "kind": "model-viewpoint",
@@ -367,9 +376,12 @@ host!(FeNewIssue, "fileengine.new_issue", "Raise an issue on a FileEngine model"
         "object_refs": vp.selection.iter().map(|g| json!({ "id": g })).collect::<Vec<_>>(),
         "model_source": { "kind": "model" },
     });
-    let title = p.title.filter(|t| !t.trim().is_empty()).unwrap_or_default();
     let body = json!({ "title": title, "body": text, "version": link.version, "anchor": anchor });
     let t = app.fileengine.with(&link.connection_id, |c| c.open_thread(&link.uid, &body))?;
-    let tid = t["id"].as_str().unwrap_or_default().to_owned();
-    refreshed(app, Some(id), &tid)
-});
+    Ok(t["id"].as_str().unwrap_or_default().to_owned())
+}
+
+/// Adds a comment to a thread on the linked model.
+pub(crate) fn comment(app: &mut App, link: &Link, thread_id: &str, text: &str) -> Result<()> {
+    app.fileengine.with(&link.connection_id, |c| c.add_comment(thread_id, text)).map(drop)
+}

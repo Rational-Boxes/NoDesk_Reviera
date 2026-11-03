@@ -275,53 +275,70 @@ impl HostCommand for BcfExport {
             None => issues::all(s).into_iter().map(|(_, t)| t).collect(),
         };
         let lists = issues::lists(s);
-        let file = std::fs::File::create(&p.path).map_err(|e| bad("bcf.write", format!("{}: {e}", p.path)))?;
-        let mut zip = zip::ZipWriter::new(file);
-        let opts = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
-        let io = |e: std::io::Error| bad("bcf.write", e.to_string());
-        let zerr = |e: zip::result::ZipError| bad("bcf.write", e.to_string());
-        zip.start_file("bcf.version", opts).map_err(zerr)?;
-        zip.write_all(bcf_archive::version_xml(version).as_bytes()).map_err(io)?;
-        if version == Version::V3_0 {
-            zip.start_file("extensions.xml", opts).map_err(zerr)?;
-            zip.write_all(bcf_archive::extensions_xml(&lists).as_bytes()).map_err(io)?;
-        }
-        let (mut comments, mut viewpoints, mut snapshots) = (0, 0, 0);
-        for t in &topics {
-            // Each snapshot kept, beside its viewpoint; a name without a picture is left out.
-            let mut t = t.clone();
-            let mut pictures = Vec::new();
-            for v in &mut t.viewpoints {
-                match (issues::snapshot(s, &v.guid), &v.snapshot) {
-                    (Some(bytes), name) => {
-                        let name = name.clone().unwrap_or_else(|| format!("{}.png", v.guid));
-                        v.snapshot = Some(name.clone());
-                        pictures.push((name, bytes));
-                    }
-                    (None, _) => v.snapshot = None,
-                }
-            }
-            let t = &t;
-            zip.start_file(format!("{}/markup.bcf", t.guid), opts).map_err(zerr)?;
-            zip.write_all(bcf_archive::markup_xml(t, version).as_bytes()).map_err(io)?;
-            for (name, bytes) in &pictures {
-                zip.start_file(format!("{}/{name}", t.guid), zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored)).map_err(zerr)?;
-                zip.write_all(bytes).map_err(io)?;
-                snapshots += 1;
-            }
-            for v in &t.viewpoints {
-                let mut vp = v.viewpoint.clone();
-                vp.guid = Some(v.guid.clone());
-                zip.start_file(format!("{}/{}.bcfv", t.guid, v.guid), opts).map_err(zerr)?;
-                let xml = if version == Version::V2_1 { bcf::to_xml_2_1(&vp) } else { bcf::to_xml(&vp) };
-                zip.write_all(xml.as_bytes()).map_err(io)?;
-            }
-            comments += t.comments.len();
-            viewpoints += t.viewpoints.len();
-        }
-        zip.finish().map_err(zerr)?;
-        Ok(ExportReport { topics: topics.len(), comments, viewpoints, snapshots, version: version.id().to_owned() })
+        // Each snapshot kept, beside its viewpoint.
+        let topics: Vec<WithSnapshots> = topics
+            .into_iter()
+            .map(|t| {
+                let pictures = t.viewpoints.iter().filter_map(|v| Some((v.guid.clone(), issues::snapshot(s, &v.guid)?))).collect();
+                (t, pictures)
+            })
+            .collect();
+        write_archive(&p.path, version, &lists, &topics)
     }
+}
+
+/// A topic with its snapshots (by viewpoint GUID).
+pub(crate) type WithSnapshots = (Topic, Vec<(String, Vec<u8>)>);
+
+/// Writes `topics` as a BCF archive at `path`, each with its snapshots.
+pub(crate) fn write_archive(path: &str, version: Version, lists: &issues::Lists, topics: &[WithSnapshots]) -> Result<ExportReport> {
+    let file = std::fs::File::create(path).map_err(|e| bad("bcf.write", format!("{path}: {e}")))?;
+    let mut zip = zip::ZipWriter::new(file);
+    let opts = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+    let io = |e: std::io::Error| bad("bcf.write", e.to_string());
+    let zerr = |e: zip::result::ZipError| bad("bcf.write", e.to_string());
+    zip.start_file("bcf.version", opts).map_err(zerr)?;
+    zip.write_all(bcf_archive::version_xml(version).as_bytes()).map_err(io)?;
+    if version == Version::V3_0 {
+        zip.start_file("extensions.xml", opts).map_err(zerr)?;
+        zip.write_all(bcf_archive::extensions_xml(lists).as_bytes()).map_err(io)?;
+    }
+    let (mut comments, mut viewpoints, mut snapshots) = (0, 0, 0);
+    for (t, kept) in topics {
+        // A name without a picture is left out.
+        let mut t = t.clone();
+        let mut pictures = Vec::new();
+        for v in &mut t.viewpoints {
+            match (kept.iter().find(|(g, _)| g.eq_ignore_ascii_case(&v.guid)), &v.snapshot) {
+                (Some((_, bytes)), name) => {
+                    let ext = if bytes.starts_with(&[0xff, 0xd8]) { "jpg" } else { "png" };
+                    let name = name.clone().unwrap_or_else(|| format!("{}.{ext}", v.guid));
+                    v.snapshot = Some(name.clone());
+                    pictures.push((name, bytes));
+                }
+                (None, _) => v.snapshot = None,
+            }
+        }
+        let t = &t;
+        zip.start_file(format!("{}/markup.bcf", t.guid), opts).map_err(zerr)?;
+        zip.write_all(bcf_archive::markup_xml(t, version).as_bytes()).map_err(io)?;
+        for (name, bytes) in &pictures {
+            zip.start_file(format!("{}/{name}", t.guid), zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored)).map_err(zerr)?;
+            zip.write_all(bytes).map_err(io)?;
+            snapshots += 1;
+        }
+        for v in &t.viewpoints {
+            let mut vp = v.viewpoint.clone();
+            vp.guid = Some(v.guid.clone());
+            zip.start_file(format!("{}/{}.bcfv", t.guid, v.guid), opts).map_err(zerr)?;
+            let xml = if version == Version::V2_1 { bcf::to_xml_2_1(&vp) } else { bcf::to_xml(&vp) };
+            zip.write_all(xml.as_bytes()).map_err(io)?;
+        }
+        comments += t.comments.len();
+        viewpoints += t.viewpoints.len();
+    }
+    zip.finish().map_err(zerr)?;
+    Ok(ExportReport { topics: topics.len(), comments, viewpoints, snapshots, version: version.id().to_owned() })
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]

@@ -3196,6 +3196,7 @@ dependencies = [
  "reviera-ifc",
  "reviera-livestore",
  "reviera-lua",
+ "reviera-opencde",
  "reviera-render",
  "reviera-render-wgpu",
  "reviera-store",
@@ -3391,8 +3392,12 @@ version = "0.1.0"
 name = "reviera-opencde"
 version = "0.1.0"
 dependencies = [
- "reviera-core",
- "reviera-net",
+ "reqwest",
+ "reviera-opencde",
+ "rustls",
+ "rustls-platform-verifier 0.6.2",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

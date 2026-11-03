@@ -99,7 +99,7 @@ pub struct Connections {
     data: Option<PathBuf>,
     session_only: bool,
     session: HashMap<String, String>,
-    clients: HashMap<String, Client>,
+    clients: HashMap<String, std::sync::Arc<Client>>,
     /// This session's product data extraction runs (`docs.extract`), by id.
     runs: HashMap<String, crate::docs::Run>,
     /// The field sets published as prompt sets this session, by connection and set.
@@ -188,13 +188,22 @@ impl Connections {
         self.load()?.connections.into_iter().find(|p| p.id == id).ok_or_else(|| bad("fileengine.no_connection", format!("no FileEngine connection {id:?}; fileengine.list_connections lists them")))
     }
 
-    fn client_for(&mut self, p: &Profile) -> Result<&mut Client> {
+    fn client_for(&mut self, p: &Profile) -> Result<&std::sync::Arc<Client>> {
         if !self.clients.contains_key(&p.id) {
             let mut c = Client::new(&p.url, p.allow_http).map_err(failed)?;
             c.set_tenant(p.tenant.clone());
-            self.clients.insert(p.id.clone(), c);
+            self.clients.insert(p.id.clone(), std::sync::Arc::new(c));
         }
-        Ok(self.clients.get_mut(&p.id).expect("inserted"))
+        Ok(&self.clients[&p.id])
+    }
+
+    /// A handle that lists connection `id`'s folders, signed in, for a window that browses
+    /// them while the app is busy showing it (the FileEngine browser).
+    pub fn browser(&mut self, id: &str) -> Result<Browser> {
+        let root = self.root().ok();
+        let client = self.with(id, |_| Ok(()))
+            .and_then(|()| self.clients.get(id).cloned().ok_or_else(|| bad("fileengine.not_signed_in", "not signed in")))?;
+        Ok(Browser { client, root, conn: id.to_owned() })
     }
 
     /// Runs `f` on a signed-in client for connection `id`, signing in with the stored credential
@@ -379,7 +388,7 @@ fn connection_out(s: &Connections, p: &Profile) -> ConnectionOut {
         user: p.user.clone(),
         signed_in_tenant: p.signed_in_tenant.clone(),
         secret: s.storage(&p.id),
-        connected: s.clients.get(&p.id).is_some_and(Client::signed_in),
+        connected: s.clients.get(&p.id).is_some_and(|c| c.signed_in()),
     }
 }
 
@@ -617,24 +626,45 @@ host!(FeBrowse, "fileengine.browse", "List a FileEngine folder",
     [Network, Read], BrowseParams, BrowseOut, |app, caller, p| {
     let root = app.fileengine.root().ok();
     let conn = p.connection_id.clone();
-    let (folder, entries, writable) = app.fileengine.with(&p.connection_id, |c| {
-        let folder = match (&p.folder_uid, &p.path) {
-            (Some(uid), _) => c.stat(uid)?,
-            (None, Some(path)) => c.resolve(path)?,
-            (None, None) => Node { uid: reviera_fileengine::ROOT.into(), kind: reviera_fileengine::Kind::Directory, ..Node::default() },
-        };
-        if !folder.is_dir() {
-            return Err(reviera_fileengine::Error { kind: ErrorKind::Conflict, status: None, message: format!("{} is a file, not a folder", folder.name), detail: None });
-        }
-        let entries = c.list(&folder.uid, false)?;
-        let writable = c.can(&folder.uid, "w").unwrap_or(false);
-        Ok((folder, entries, writable))
-    })?;
+    app.fileengine.with(&p.connection_id, |c| browse(c, root.as_deref(), &conn, p.folder_uid.as_deref(), p.path.as_deref(), p.models_only))
+});
+
+/// Lists connection `id`'s folders (`fileengine.browse`) without the app.
+pub struct Browser {
+    client: std::sync::Arc<Client>,
+    root: Option<PathBuf>,
+    conn: String,
+}
+
+impl std::fmt::Debug for Browser {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Browser").field("conn", &self.conn).finish_non_exhaustive()
+    }
+}
+
+impl Browser {
+    /// A folder's contents, as `fileengine.browse` answers (the top folder for `None`).
+    pub fn browse(&self, folder_uid: Option<&str>, models_only: bool) -> Result<BrowseOut> {
+        browse(&self.client, self.root.as_deref(), &self.conn, folder_uid, None, models_only).map_err(failed)
+    }
+}
+
+fn browse(c: &Client, root: Option<&Path>, conn: &str, folder_uid: Option<&str>, path: Option<&str>, models_only: bool) -> reviera_fileengine::Result<BrowseOut> {
+    let folder = match (folder_uid, path) {
+        (Some(uid), _) => c.stat(uid)?,
+        (None, Some(path)) => c.resolve(path)?,
+        (None, None) => Node { uid: reviera_fileengine::ROOT.into(), kind: reviera_fileengine::Kind::Directory, ..Node::default() },
+    };
+    if !folder.is_dir() {
+        return Err(reviera_fileengine::Error { kind: ErrorKind::Conflict, status: None, message: format!("{} is a file, not a folder", folder.name), detail: None });
+    }
+    let entries = c.list(&folder.uid, false)?;
+    let writable = c.can(&folder.uid, "w").unwrap_or(false);
     let mut out: Vec<EntryOut> = entries
         .into_iter()
-        .filter(|e| !e.deleted && (e.is_dir() || !p.models_only || is_model(&e.name)))
+        .filter(|e| !e.deleted && (e.is_dir() || !models_only || is_model(&e.name)))
         .map(|e| EntryOut {
-            working_copy: !e.is_dir() && root.as_ref().is_some_and(|r| r.join(&conn).join(&e.uid).join(STATE).is_file()),
+            working_copy: !e.is_dir() && root.is_some_and(|r| r.join(conn).join(&e.uid).join(STATE).is_file()),
             model: !e.is_dir() && is_model(&e.name),
             folder: e.is_dir(),
             versions: e.version_count,
@@ -648,7 +678,7 @@ host!(FeBrowse, "fileengine.browse", "List a FileEngine folder",
         .collect();
     out.sort_by(|a, b| b.folder.cmp(&a.folder).then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase())));
     Ok(BrowseOut { folder_name: if folder.uid == reviera_fileengine::ROOT { String::new() } else { folder.name }, parent_uid: folder.parent_uid, folder_uid: folder.uid, writable, entries: out })
-});
+}
 
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -1008,7 +1038,7 @@ host!(FeStatus, "fileengine.status", "Tell whether the project is on FileEngine"
     [Read], Option<StatusParams>, StatusOut, |app, caller, p| {
     let id = app.resolve(p.and_then(|p| p.document_id))?;
     let link = link_of(app.get(id)?.project.path());
-    let connected = link.as_ref().is_some_and(|l| app.fileengine.clients.get(&l.connection_id).is_some_and(Client::signed_in));
+    let connected = link.as_ref().is_some_and(|l| app.fileengine.clients.get(&l.connection_id).is_some_and(|c| c.signed_in()));
     Ok(StatusOut { linked: link.is_some(), link, connected })
 });
 

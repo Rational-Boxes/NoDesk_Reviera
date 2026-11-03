@@ -178,7 +178,7 @@ pub struct ImportParams {
     pub view_id: Option<ElementRef>,
 }
 
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct ImportReport {
     pub view_id: ElementId,
     pub section_box: bool,

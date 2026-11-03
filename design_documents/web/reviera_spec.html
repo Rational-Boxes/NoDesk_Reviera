@@ -173,7 +173,7 @@ td code { white-space: nowrap; }
         <div class="tb-cell"><span class="tb-label">Revision</span><span class="tb-value">0.1 · Draft</span></div>
         <div class="tb-cell"><span class="tb-label">Date</span><span class="tb-value tb-num">2026-10-12</span></div>
         <div class="tb-cell"><span class="tb-label">Requirements</span><span class="tb-value tb-num">864</span></div>
-        <div class="tb-cell"><span class="tb-label">Commands</span><span class="tb-value tb-num">2,292</span></div>
+        <div class="tb-cell"><span class="tb-label">Commands</span><span class="tb-value tb-num">2,306</span></div>
         <div class="tb-cell"><span class="tb-label">Licence</span><span class="tb-value">GPL-3.0-or-later</span></div>
         <div class="tb-cell last-row"><span class="tb-label">Stack</span><span class="tb-value">IFC · Rust · OCCT · wx · LuaJIT · MCP</span></div>
         <div class="tb-cell last-row" style="grid-column: span 3"><span class="tb-label">By priority</span>
@@ -185,7 +185,7 @@ td code { white-space: nowrap; }
 <p><strong>Document:</strong> Functional and technical specification of Reviera, an open-source BIM authoring application
 <strong>Functional reference:</strong> Autodesk® Revit® 2026/2027 (described from public sources only; see <code>RESEARCH_LOG.md</code>)
 <strong>Licence of Reviera:</strong> GPL-3.0-or-later
-<strong>Version:</strong> 0.1 (draft) · 2026-10-16 · <strong>Size:</strong> 863 numbered requirements (320 P0 · 329 P1 · 207 P2 · 7 P3), 2,291 commands</p>
+<strong>Version:</strong> 0.1 (draft) · 2026-10-16 · <strong>Size:</strong> 864 numbered requirements (320 P0 · 329 P1 · 208 P2 · 7 P3), 2,306 commands</p>
 <blockquote>
 <p><strong>Clean-room statement.</strong> This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in <code>SOURCE_REGISTER.md</code>. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.</p>
 <p><strong>Independence statement.</strong> BIM Reviera is an independent, original application. It is in no way a copy or clone of any existing product, and it does not set out to read or write any existing product's closed, proprietary formats (such as RVT and RFA); IFC is its native format. An existing application was researched, from public sources only, to establish the workflows and user-interface conventions that the industry's users already know, so they can work in Reviera without relearning their trade. Beyond that research, Reviera implements its own features and enhancements: its architecture, native IFC storage, scripting and AI integration, remote computation and analysis, and many of its modelling tools are its own design. Interchange formats used across the industry, such as DWG and DXF, are supported only through open-source libraries, for interoperability.</p>
@@ -254,7 +254,7 @@ td code { white-space: nowrap; }
 </tr>
 <tr>
 <td>A</td>
-<td>Appendix A: requirement summary, shared commands, consolidated command index (2,291 commands; 863 requirements)</td>
+<td>Appendix A: requirement summary, shared commands, consolidated command index (2,306 commands; 864 requirements)</td>
 </tr>
 </tbody>
 </table></div>
@@ -49690,6 +49690,7 @@ Deleting an instance uses <code>element.delete</code> (Chapter 2).</p>
   - <code>fileengine.resolve_issue</code> resolves the issue on the version open (or reopens it).
   - <code>fileengine.new_issue</code> raises an issue from a 3D view: its camera (as navigated, else saved, else fitted to the model), cut, hidden or isolated elements, selection and snapshot, on the version open.
 - <strong>The Issues pane</strong> (COL-BCF-004), docked at the bottom, opens when a FileEngine model with issues opens. It lists the issues, with the chosen one's snapshot and comments, and offers Show, Reply…, Resolve/Reopen, New Issue…, Refresh, and a filter (all, open, resolved). For a model not on FileEngine, it shows the model's own BCF topics. It follows the active model. While it is shown, a FileEngine model's issues are read again every minute, and the status bar reports new issues, new replies, and issues resolved or reopened. Live updates over the discussion service's WebSocket would replace the poll.
+- <strong>Both ways, every way it opens</strong> <em>(built 2026-11-03)</em>. The issues are read, and the Issues pane opened when there are any (open or resolved; it used to open only for open ones, so a model whose issues were all resolved looked as if it had none), whether the model opens from the FileEngine browser or from its working copy (File › Open, Recent, crash recovery). The model's own BCF topics (from clash checks, the bathroom checks or a BCF import) are listed beside the server's, marked <em>This model only</em>, and <code>issues.publish</code> (Publish to Server) puts each on FileEngine once: a thread titled as the topic, anchored to its first viewpoint (planes turned, snapshot kept), the description and fields as the opening comment and its comments after it, with author and date; resolved topics are resolved there. The topic GUID → thread id map is kept beside the working copy (<code>published-issues.json</code>). FileEngine threads have a title and comments only: field edits, extra views and deletion are refused with a reason (<code>issues.not_supported</code>).
 - <strong>Crash recovery.</strong> Opening a model whose working copy holds unsaved work from a session that ended unexpectedly offers to restore it, or to discard it and open the model from the server. Nothing is downloaded over it first.</p>
 <p><strong>Acceptance criteria.</strong>
 - [x] Against the fake server, an issue raised in the viewer is read on open (the model unchanged), shown with its element selected, replied to, resolved on the open version and reopened. One raised from a 3D view reaches the server with a camera, its turned planes and its element. The issues read offline from the copy.
@@ -50706,6 +50707,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 - <strong>Permissions for agents:</strong> MCP agents can read topics with <code>bcf.list</code>; creating, editing or deleting needs the model-edit permission.</p>
 <p><strong>Data (IFC/RXD).</strong> Topics, comments, viewpoints and extension lists: RXD document <code>coordination/issues</code> (kind <code>issue.topic</code> per topic and <code>issue.extensions</code> for the lists), snapshots as RXD assets (COL-BCF-001). Pane layout and filters are user settings.</p>
 <p><strong>Commands.</strong> <code>bcf.issues_pane() -&gt; ()</code> shows the pane (UI only); <code>bcf.set_extensions(lists{types?, statuses?, priorities?, labels?, stages?, users?}, replacements?{}) -&gt; ()</code>; the pane uses <code>bcf.list</code>, <code>bcf.create_topic</code>, <code>bcf.update_topic</code>, <code>bcf.add_comment</code>, <code>bcf.add_viewpoint</code>, <code>bcf.delete_topic</code>, <code>bcf.import</code>, <code>bcf.export</code> (COL-BCF-001) and <code>bcf.apply_viewpoint</code> (COL-BCF-003).</p>
+<p><em>Built (2026-11-03), one pane for every source:</em> the pane works through <code>issues.*</code> (COL-BCF-002), so it shows a model's issues wherever they are kept: a bound BCF API project, FileEngine, or the model's own topics, with the model's own topics not on the server listed beside them (<em>This model only</em>, in blue) and Publish to Server. Every issue is listed, open first: resolved and closed ones stay in the list, greyed, their status marked ✓ (open ones ●). A status filter (all, open, resolved) and a search box (title, description, comments, type, priority, assignee, labels) filter it. Columns: issue, status, type, priority, assigned to, raised by, changed, replies, kept. Toolbar: Show, Reply…, Resolve/Reopen, Edit…, Add View, Delete (each enabled when the issue's source allows it), New Issue… (with type, priority, assignee, due date, labels and stage where kept; <em>keep it only with this model</em> when on a server), Publish to Server, Refresh, Import BCF…, Export BCF… (<code>issues.export_bcf</code>: every issue, server ones included, or those the filter shows) and Issue Server…. The detail shows the snapshot, the fields, the description and the comments. The pane is an AUI pane that floats and docks anywhere (it was already; the old modal <em>Issues</em> dialog behind View › Coordination › Issues is gone, and that command now shows the pane). View › Coordination › New Issue raises the issue where the model's issues are kept. Not yet: the per-field filters and <em>Me</em>, thumbnails in the list, editing fields in place, several viewpoints shown per issue, <em>Manage lists…</em>, canvas markers.</p>
 <p><strong>Acceptance criteria.</strong>
 - [ ] Filtering by <em>Assignee = Me</em> and <em>Status = Open</em> shows exactly the matching topics, and the filter is restored after reopening the project.
 - [ ] Editing a topic's status in the pane and pressing Ctrl+Z restores the previous status.
@@ -50742,6 +50744,11 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 - <strong>Several servers:</strong> one project can be bound to one BCF API project at a time. Topics can be copied between bindings, or to and from BCF files.
 - <strong>Agents:</strong> MCP agents use the same <code>bcf.*</code> commands. Server credentials are never exposed to them (COL-CORE-005).</p>
 <p><strong>Data (IFC/RXD).</strong> Cached topics in <code>coordination/issues</code> (kinds <code>issue.topic</code>, <code>issue.extensions</code>), each with <code>server: {connection, guid, modified}</code>. Connection profiles and tokens are client state (COL-API-001), never stored in the model.</p>
+<p><em>Built (2026-11-03), first build (preliminary: checked against an in-memory server answering as OpenConstructionERP's BCF API 3.0 does; no live BCF API server tested yet):</em>
+- <strong>Client.</strong> <code>clients/opencde</code> (MIT, <code>reviera-opencde</code>), blocking, over HTTPS (plain http only to this computer unless allowed). <code>Client::connect</code> finds the BCF API from a server's root or its base: the Foundation API's <code>foundation/versions</code> when offered, else <code>bcf/</code>, <code>api/v1/bcf/</code> (OpenConstructionERP) and <code>api/bcf/</code>, trying 3.0 then 2.1 with <code>current-user</code>; a refused sign-in is reported as such, not as "not found". Sign-in: a bearer token as given, HTTP Basic, or an e-mail and password posted as JSON to a login address that answers <code>access_token</code> (OpenConstructionERP's <code>api/v1/users/auth/login/</code> by default), renewed with its <code>refresh_token</code> and asked for again when refused. Lists are read bare (the standard) or wrapped (<code>{"items": …}</code>, as OpenConstructionERP answers); topics are paged with <code>$top</code>/<code>$skip</code> where the server pages. PUT, which replaces a topic, sends the server's copy with the changed fields.
+- <strong>Servers and bindings</strong> (<code>coordination.add_server</code>, <code>.servers</code>, <code>.sign_in</code>, <code>.remove_server</code>, <code>.projects</code>, <code>.bind</code>, <code>.unbind</code>, <code>.status</code>): per-user settings (<code>coordination.json</code>); the password or token in the OS keychain (or for the session), never returned and never written to the model. A model is bound to a project by its file, so binding does not change it; a bound model's issues are the project's even when the model was opened from FileEngine. <code>coordination.remove_server</code> is not offered to agents.
+- <strong>Issues, wherever kept</strong> (<code>issues.list</code>, <code>.show</code>, <code>.snapshot</code>, <code>.comment</code>, <code>.set_status</code>, <code>.update</code>, <code>.new</code>, <code>.add_view</code>, <code>.delete</code>, <code>.publish</code>, <code>.export_bcf</code>): one shape for a BCF server's topics, FileEngine's threads (COL-FE-009) and the model's own topics (COL-BCF-001). <code>issues.list</code> lists all, open and resolved (<code>resolved</code>: Resolved, Closed, Done, Fixed, Completed), open first, with <code>status</code> and <code>text</code> filters, counts, the lists for forms (the server's extensions, else Reviera's defaults and every value in use), and what the server allows. A server's topics are read with their comments (viewpoints again only when a topic's modification date changed) and kept beside the model (<code>&lt;data&gt;/reviera/coordination/&lt;server&gt;/&lt;project&gt;.json</code>) to read offline. Resolving picks the status the project's list has for it (Closed, Resolved, Done; reopening: Open, ReOpened …). New issues and added views carry the 3D view's viewpoint and snapshot (with no 3D view, none). <code>issues.publish</code> puts the model's own topics on the server with their GUIDs, fields, viewpoints, snapshots and comments (other authors' names and dates written into the text), skipping those already there, so publishing twice changes nothing; the model keeps its copies. <code>issues.export_bcf</code> writes every issue, wherever kept, as a BCF 3.0 or 2.1 archive (<code>bcf_topics::write_archive</code>, shared with <code>bcf.export</code>). <code>issues.delete</code> is not offered to agents.
+- <strong>Not yet:</strong> OAuth 2 through the Foundation API's auth discovery, events and history, related topics, document references and documents, files information, the per-object permission flags beyond whole-source abilities, the offline write queue with conflicts, incremental sync by modification date, <em>Sync now</em> and automatic sync on local change (the pane reads every minute), copying topics between bindings.</p>
 <p><strong>Commands.</strong> <code>bcf.api_connect(url, profile_name?) -&gt; connection_id</code>; <code>bcf.api_list_projects(connection_id) -&gt; project[]</code> (query); <code>bcf.api_bind_project(connection_id, project_id) -&gt; ()</code>; <code>bcf.api_unbind(keep_local_copy=true) -&gt; ()</code>; <code>bcf.api_sync(connection_id?) -&gt; sync_report</code>; <code>bcf.api_status() -&gt; {connection, last_sync, queued_changes, conflicts}</code> (query); <code>bcf.api_resolve_conflict(topic_id, field, use: server|local) -&gt; ()</code>; <code>bcf.api_disconnect(connection_id) -&gt; ()</code>.</p>
 <p><strong>Acceptance criteria.</strong>
 - [ ] Against the open-source reference implementation of the OpenCDE APIs and at least one commercial BCF API server, a topic with two viewpoints, a snapshot and a comment created in Reviera appears on the server with its camera, components and image. A comment added on the server appears in Reviera after the next sync.
@@ -52397,29 +52404,29 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>COL-BCF-004</td>
 </tr>
 <tr>
-<td><code>bcf.api_connect</code></td>
-<td>url, profile_name?</td>
-<td>connection_id</td>
+<td><code>coordination.add_server</code> <em>(built as; was <code>bcf.api_connect</code>)</em></td>
+<td>name, url, auth: login|token|basic|none, user?, login_url?, secret?, remember=true, allow_http=false</td>
+<td>server</td>
 <td>No</td>
 <td>COL-BCF-002</td>
 </tr>
 <tr>
-<td><code>bcf.api_list_projects</code></td>
-<td>connection_id</td>
+<td><code>coordination.projects</code> <em>(was <code>bcf.api_list_projects</code>)</em></td>
+<td>server_id</td>
 <td>project[]</td>
 <td>No (query)</td>
 <td>COL-BCF-002</td>
 </tr>
 <tr>
-<td><code>bcf.api_bind_project</code></td>
-<td>connection_id, project_id</td>
-<td>()</td>
+<td><code>coordination.bind</code> <em>(was <code>bcf.api_bind_project</code>)</em></td>
+<td>document_id?, server_id, project_id</td>
+<td>binding</td>
 <td>No</td>
 <td>COL-BCF-002</td>
 </tr>
 <tr>
-<td><code>bcf.api_unbind</code></td>
-<td>keep_local_copy=true</td>
+<td><code>coordination.unbind</code> <em>(was <code>bcf.api_unbind</code>)</em></td>
+<td>document_id?</td>
 <td>()</td>
 <td>No</td>
 <td>COL-BCF-002</td>
@@ -52432,11 +52439,53 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>COL-BCF-002</td>
 </tr>
 <tr>
-<td><code>bcf.api_status</code></td>
-<td>—</td>
-<td>{connection, last_sync, queued_changes, conflicts}</td>
+<td><code>coordination.status</code> <em>(was <code>bcf.api_status</code>)</em></td>
+<td>document_id?</td>
+<td>{source: model|fileengine|bcf_api, server, project, binding}</td>
 <td>No (query)</td>
 <td>COL-BCF-002</td>
+</tr>
+<tr>
+<td><code>coordination.servers</code> / <code>.sign_in</code> / <code>.remove_server</code></td>
+<td>— / server_id, secret / server_id</td>
+<td>server[] / server / ()</td>
+<td>No</td>
+<td>COL-BCF-002</td>
+</tr>
+<tr>
+<td><code>issues.list</code></td>
+<td>document_id?, refresh=true, status: all|open|resolved, text?</td>
+<td>{source, issues[], total, open, resolved, local, offline, server_can, lists}</td>
+<td>No (query)</td>
+<td>COL-BCF-004</td>
+</tr>
+<tr>
+<td><code>issues.show</code> / <code>.snapshot</code></td>
+<td>id, target_view_id? / id</td>
+<td>import_report / base64?</td>
+<td>Yes / No</td>
+<td>COL-BCF-004</td>
+</tr>
+<tr>
+<td><code>issues.comment</code> / <code>.set_status</code> / <code>.update</code></td>
+<td>id, text / id, resolved / id, fields</td>
+<td>issue</td>
+<td>Yes</td>
+<td>COL-BCF-004</td>
+</tr>
+<tr>
+<td><code>issues.new</code> / <code>.add_view</code></td>
+<td>title?, text, fields?, view_id?, in_model=false / id, view_id?</td>
+<td>issue</td>
+<td>Yes</td>
+<td>COL-BCF-004</td>
+</tr>
+<tr>
+<td><code>issues.delete</code> / <code>.publish</code> / <code>.export_bcf</code></td>
+<td>id / ids[]? / path, ids[]?, version</td>
+<td>() / publish_report / export_report</td>
+<td>Yes / No / No</td>
+<td>COL-BCF-004</td>
 </tr>
 <tr>
 <td><code>bcf.api_resolve_conflict</code></td>
@@ -54741,7 +54790,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tbody>
 </table></div>
 <h2 id="a3-consolidated-command-index">A.3 Consolidated command index</h2>
-<p><strong>2292 unique commands</strong> in 428 domains. Every command is exposed automatically to the UI, to Lua (<code>reviera.&lt;domain&gt;.&lt;verb&gt;</code>) and to MCP (<code>&lt;domain&gt;_&lt;verb&gt;</code>), subject to its permission class.</p>
+<p><strong>2306 unique commands</strong> in 430 domains. Every command is exposed automatically to the UI, to Lua (<code>reviera.&lt;domain&gt;.&lt;verb&gt;</code>) and to MCP (<code>&lt;domain&gt;_&lt;verb&gt;</code>), subject to its permission class.</p>
 <div class="tbl"><table>
 <thead>
 <tr>
@@ -54884,7 +54933,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tr>
 <tr>
 <td><code>bcf</code></td>
-<td style="text-align: right;">34</td>
+<td style="text-align: right;">29</td>
 </tr>
 <tr>
 <td><code>beam</code></td>
@@ -55069,6 +55118,10 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <tr>
 <td><code>coordinates</code></td>
 <td style="text-align: right;">6</td>
+</tr>
+<tr>
+<td><code>coordination</code></td>
+<td style="text-align: right;">8</td>
 </tr>
 <tr>
 <td><code>coordreview</code></td>
@@ -55509,6 +55562,10 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <tr>
 <td><code>instance</code></td>
 <td style="text-align: right;">5</td>
+</tr>
+<tr>
+<td><code>issues</code></td>
+<td style="text-align: right;">11</td>
 </tr>
 <tr>
 <td><code>job</code></td>
@@ -57565,35 +57622,11 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>COL-BCF-001</td>
 </tr>
 <tr>
-<td><code>bcf.api_bind_project</code></td>
-<td>6</td>
-<td>connection_id, project_id</td>
-<td>()</td>
-<td>No</td>
-<td>COL-BCF-002</td>
-</tr>
-<tr>
-<td><code>bcf.api_connect</code></td>
-<td>6</td>
-<td>url, profile_name?</td>
-<td>connection_id</td>
-<td>No</td>
-<td>COL-BCF-002</td>
-</tr>
-<tr>
 <td><code>bcf.api_disconnect</code></td>
 <td>6</td>
 <td>connection_id</td>
 <td>()</td>
 <td>No</td>
-<td>COL-BCF-002</td>
-</tr>
-<tr>
-<td><code>bcf.api_list_projects</code></td>
-<td>6</td>
-<td>connection_id</td>
-<td>project[]</td>
-<td>No (query)</td>
 <td>COL-BCF-002</td>
 </tr>
 <tr>
@@ -57605,26 +57638,10 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>Yes</td>
 </tr>
 <tr>
-<td><code>bcf.api_status</code></td>
-<td>6</td>
-<td>—</td>
-<td>{connection, last_sync, queued_changes, conflicts}</td>
-<td>No (query)</td>
-<td>COL-BCF-002</td>
-</tr>
-<tr>
 <td><code>bcf.api_sync</code></td>
 <td>6</td>
 <td>connection_id?</td>
 <td>sync_report</td>
-<td>No</td>
-<td>COL-BCF-002</td>
-</tr>
-<tr>
-<td><code>bcf.api_unbind</code></td>
-<td>6</td>
-<td>keep_local_copy=true</td>
-<td>()</td>
 <td>No</td>
 <td>COL-BCF-002</td>
 </tr>
@@ -59619,6 +59636,70 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>—</td>
 <td>Yes</td>
 <td>DM-LOC-001</td>
+</tr>
+<tr>
+<td><code>coordination.add_server</code></td>
+<td>6</td>
+<td>name, url, auth: login\</td>
+<td>token\</td>
+<td>basic\</td>
+<td>none, user?, login_url?, secret?, remember=true, allow_http=false</td>
+</tr>
+<tr>
+<td><code>coordination.bind</code></td>
+<td>6</td>
+<td>document_id?, server_id, project_id</td>
+<td>binding</td>
+<td>No</td>
+<td>COL-BCF-002</td>
+</tr>
+<tr>
+<td><code>coordination.projects</code></td>
+<td>6</td>
+<td>server_id</td>
+<td>project[]</td>
+<td>No (query)</td>
+<td>COL-BCF-002</td>
+</tr>
+<tr>
+<td><code>coordination.remove_server</code></td>
+<td>6</td>
+<td>— / server_id, secret / server_id</td>
+<td>server[] / server / ()</td>
+<td>No</td>
+<td>COL-BCF-002</td>
+</tr>
+<tr>
+<td><code>coordination.servers</code></td>
+<td>6</td>
+<td>— / server_id, secret / server_id</td>
+<td>server[] / server / ()</td>
+<td>No</td>
+<td>COL-BCF-002</td>
+</tr>
+<tr>
+<td><code>coordination.sign_in</code></td>
+<td>6</td>
+<td>— / server_id, secret / server_id</td>
+<td>server[] / server / ()</td>
+<td>No</td>
+<td>COL-BCF-002</td>
+</tr>
+<tr>
+<td><code>coordination.status</code></td>
+<td>6</td>
+<td>document_id?</td>
+<td>{source: model\</td>
+<td>fileengine\</td>
+<td>bcf_api, server, project, binding}</td>
+</tr>
+<tr>
+<td><code>coordination.unbind</code></td>
+<td>6</td>
+<td>document_id?</td>
+<td>()</td>
+<td>No</td>
+<td>COL-BCF-002</td>
 </tr>
 <tr>
 <td><code>coordreview.list</code></td>
@@ -64163,6 +64244,94 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>element_id</td>
 <td>Yes</td>
 <td>DM-INST-001</td>
+</tr>
+<tr>
+<td><code>issues.add_view</code></td>
+<td>6</td>
+<td>title?, text, fields?, view_id?, in_model=false / id, view_id?</td>
+<td>issue</td>
+<td>Yes</td>
+<td>COL-BCF-004</td>
+</tr>
+<tr>
+<td><code>issues.comment</code></td>
+<td>6</td>
+<td>id, text / id, resolved / id, fields</td>
+<td>issue</td>
+<td>Yes</td>
+<td>COL-BCF-004</td>
+</tr>
+<tr>
+<td><code>issues.delete</code></td>
+<td>6</td>
+<td>id / ids[]? / path, ids[]?, version</td>
+<td>() / publish_report / export_report</td>
+<td>Yes / No / No</td>
+<td>COL-BCF-004</td>
+</tr>
+<tr>
+<td><code>issues.export_bcf</code></td>
+<td>6</td>
+<td>id / ids[]? / path, ids[]?, version</td>
+<td>() / publish_report / export_report</td>
+<td>Yes / No / No</td>
+<td>COL-BCF-004</td>
+</tr>
+<tr>
+<td><code>issues.list</code></td>
+<td>6</td>
+<td>document_id?, refresh=true, status: all\</td>
+<td>open\</td>
+<td>resolved, text?</td>
+<td>{source, issues[], total, open, resolved, local, offline, server_can, lists}</td>
+</tr>
+<tr>
+<td><code>issues.new</code></td>
+<td>6</td>
+<td>title?, text, fields?, view_id?, in_model=false / id, view_id?</td>
+<td>issue</td>
+<td>Yes</td>
+<td>COL-BCF-004</td>
+</tr>
+<tr>
+<td><code>issues.publish</code></td>
+<td>6</td>
+<td>id / ids[]? / path, ids[]?, version</td>
+<td>() / publish_report / export_report</td>
+<td>Yes / No / No</td>
+<td>COL-BCF-004</td>
+</tr>
+<tr>
+<td><code>issues.set_status</code></td>
+<td>6</td>
+<td>id, text / id, resolved / id, fields</td>
+<td>issue</td>
+<td>Yes</td>
+<td>COL-BCF-004</td>
+</tr>
+<tr>
+<td><code>issues.show</code></td>
+<td>6</td>
+<td>id, target_view_id? / id</td>
+<td>import_report / base64?</td>
+<td>Yes / No</td>
+<td>COL-BCF-004</td>
+</tr>
+<tr>
+<td><code>issues.snapshot</code></td>
+<td>6</td>
+<td>id, target_view_id? / id</td>
+<td>import_report / base64?</td>
+<td>Yes / No</td>
+<td>COL-BCF-004</td>
+</tr>
+<tr>
+<td><code>issues.update</code></td>
+<td>6</td>
+<td>id, text / id, resolved / id, fields</td>
+<td>issue</td>
+<td>Yes</td>
+<td>COL-BCF-004</td>
 </tr>
 <tr>
 <td><code>job.cancel</code></td>

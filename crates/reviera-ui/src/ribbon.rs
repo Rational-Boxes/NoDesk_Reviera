@@ -69,6 +69,7 @@ pub const UI_ACTIONS: &[&str] = &[
     "panel.settings",
     "ui.pane.clash",
     "ui.pane.issues",
+    "ui.issue_server",
     "ui.pane.analytical_checks",
     "ui.pane.results",
     "load_case.manage",

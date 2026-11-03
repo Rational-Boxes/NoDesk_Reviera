@@ -226,7 +226,11 @@ impl Gui {
                 .map(|o| o.result.as_u64().unwrap_or_default());
         }
         match opened {
-            Ok(id) => self.show_document(id, &frame),
+            Ok(id) => {
+                self.show_document(id, &frame);
+                // A working copy of a FileEngine model, or a model on an issue server: its issues.
+                self.issues_after_open();
+            }
             Err(e) => error(&frame, &format!("Could not open {}:\n{e}", path.display())),
         }
     }

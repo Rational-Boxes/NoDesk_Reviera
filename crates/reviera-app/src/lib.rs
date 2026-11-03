@@ -12,6 +12,7 @@ pub mod bimserver;
 pub mod fileengine;
 pub mod docs;
 pub mod model_issues;
+pub mod coordination;
 pub mod profiling;
 pub mod bcf_topics;
 pub mod spots;
@@ -284,6 +285,8 @@ pub struct App {
     bimserver: bimserver::Servers,
     /// FileEngine connections, credentials and sessions (`fileengine.*`).
     fileengine: fileengine::Connections,
+    /// BCF API issue servers and the models bound to them (`coordination.*`, `issues.*`).
+    coordination: coordination::Servers,
     /// A window is there to capture views (DM-MCP-004).
     window: bool,
     /// View captures asked of the window.
@@ -325,6 +328,7 @@ impl App {
             subscriptions: subscriptions::Subscriptions::default(),
             bimserver: bimserver::Servers::default(),
             fileengine: fileengine::Connections::default(),
+            coordination: coordination::Servers::default(),
             window: false,
             image_requests: Vec::new(),
         }

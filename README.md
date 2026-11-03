@@ -1532,6 +1532,27 @@ simulation sessions, and the first engine runners (see [Not built yet](#not-buil
   `bcf.lists`; COL-BCF-001). The Clash Detection pane's Issues button makes an issue of each open
   clash, boxed round it with both elements selected and a snapshot; made again, it adds only the
   new clashes (`bcf.from_clash`, COL-BCF-005).
+- **Issues pane and issue servers** (COL-BCF-004, COL-BCF-002, built 2026-11-03): the docked
+  Issues pane (Window › Issues, View › Coordination › Issues; float or dock it like the other
+  panes) lists every issue on the model, open and resolved alike (resolved ones greyed and marked
+  ✓), with a status filter and a search box, wherever the issues are kept: a project on a **BCF
+  API issue server** the model is bound to (Issue Server…: OpenConstructionERP, or any BCF API
+  3.0 or 2.1 server, found from its address, signed in with an e-mail and password, a token or
+  HTTP Basic, the secret in the OS keychain), FileEngine for a model opened from there, or the
+  model's own BCF topics. Show, Reply…, Resolve/Reopen, Edit…, Add View, Delete and New Issue…
+  write to where the issue is kept, both ways; the model's own topics (clash checks, imports, made
+  before binding) are listed beside a server's, marked, until Publish to Server puts them there
+  (a BCF server keeps their GUIDs, so they are never duplicated); Export BCF… writes them all,
+  server issues included. A server's issues are read whenever the model opens (also from File ›
+  Open or Recent), kept beside it for reading offline, and read again every minute while the pane
+  is shown (`issues.list`, `.show`, `.snapshot`, `.comment`, `.set_status`, `.update`, `.new`,
+  `.add_view`, `.delete`, `.publish`, `.export_bcf`; `coordination.add_server`, `.servers`,
+  `.sign_in`, `.remove_server`, `.projects`, `.bind`, `.unbind`, `.status`). The BCF API client is
+  MIT (`clients/opencde`). *Preliminary for OpenConstructionERP*: checked against an in-memory
+  server that answers as its BCF API does, not yet against a running one. **Not yet:** OAuth 2
+  sign-in through the Foundation API, topic events and history, related topics, document
+  references, an offline write queue with conflict resolution, the project's lists as edited
+  extensions.
 - **Model Tree** (MT): Project › Site › Building › storeys › categories › elements, with hosted
   elements under their hosts; its context menu selects, hides, isolates or boxes whole branches
   (`model.tree`).
@@ -1854,15 +1875,16 @@ area by area (reviewed against the spec on 2026-10-15).
 
   **Local documents built** (COL-FE-006, -007, -010): FileEngine is optional. A material can link to a folder on this computer instead; its files are listed with their types and modified-time versions, opened in their usual application, and exported as a `file:///` `IfcDocumentReference`. *Enter Values...* types in a field set's values, checked and written with the document as their source, carbon factor included (`docs.enter_values`). The report can be saved to a file. When a FileEngine connection exists, File › Publish Local Documents to FileEngine... (offered only while the project has local document folders) uploads them with their types and optionally relinks the model's materials and value sources to the uploaded files in one undo step (`docs.local_collections`, `docs.publish_local`).
 
-  **Issues on FileEngine models built** (COL-FE-009): opening a model reads the issues people raised on it in FileEngine's 3D viewer (discussion threads with a viewpoint, snapshot, elements and measurements) and opens the docked Issues pane (Window › Issues, COL-BCF-004): Show applies the viewpoint in the 3D view, Reply…, Resolve and New Issue… (from the 3D view, with a snapshot) write back to the server; the issues stay on the server, kept beside the working copy for reading offline, so the model is never changed by them (`fileengine.issues`, `show_issue`, `comment_issue`, `resolve_issue`, `new_issue`). FileEngine's viewer anchors put a clipping plane's direction on the kept side (BCF's is the cut side): Reviera turns them round both ways.
+  **Issues on FileEngine models built** (COL-FE-009): opening a model reads the issues people raised on it in FileEngine's 3D viewer (discussion threads with a viewpoint, snapshot, elements and measurements) and opens the docked Issues pane (Window › Issues, COL-BCF-004): Show applies the viewpoint in the 3D view, Reply…, Resolve and New Issue… (from the 3D view, with a snapshot) write back to the server; the issues stay on the server, kept beside the working copy for reading offline, so the model is never changed by them (`fileengine.issues`, `show_issue`, `comment_issue`, `resolve_issue`, `new_issue`). FileEngine's viewer anchors put a clipping plane's direction on the kept side (BCF's is the cut side): Reviera turns them round both ways. Since 2026-11-03 the pane opens when a FileEngine model with any issues (open or resolved) opens, whether from the FileEngine browser or from its working copy (File › Open, Recent); the model's own BCF topics (clash checks, BCF imports) are listed beside the server's and go to FileEngine as threads with Publish to Server (`issues.publish`), once each.
 
-  Checked against the live Proxima File Vault server, with a public EPD and HPD of a real product and the AC20-FZK-Haus model's issues. **Not yet:** publish sets and share links, BCF-API, live issue updates, Component Libraries (the later phases), field sets beyond EPD and HPD, the docked Documents pane, thumbnails, single sign-on, and transfers off the UI thread.
+  Checked against the live Proxima File Vault server, with a public EPD and HPD of a real product and the AC20-FZK-Haus model's issues. **Not yet:** publish sets and share links, FileEngine's own BCF-API door (its projection store is not deployed; Reviera uses the discussion service), live issue updates over WebSocket, Component Libraries (the later phases), field sets beyond EPD and HPD, the docked Documents pane, thumbnails, single sign-on, and transfers off the UI thread.
 
 - **Coordination**: clash tests (COL-CLASH), automatic pipe and duct penetrations (MEP-PEN-001),
   bathroom fixture clear floor spaces and turning spaces, ISO 21542. For BCF issues: the docked
-  Issues pane (COL-BCF-004; a dialog for now), the project's lists as edited
-  extensions, issues from review items and warnings, document references, component colouring, BCF API sync
-  with a server (COL-BCF-002).
+  Issues pane's per-field filters (type, priority, assignee, label) and in-pane field editing,
+  the project's lists as edited extensions, issues from review items and warnings, document
+  references, component colouring, BCF API OAuth 2 sign-in, events, and an offline write queue
+  (COL-BCF-002).
 - **Documentation**: crop regions beyond rectangles (sketched shapes, breaks,
   rotation), jogged sections, interior elevation markers, opening a view
   from its marker; schedule filters in the Filter dialog beyond one condition (several are taken by `schedule.set_filters`), grouping and calculated fields; title block families,
