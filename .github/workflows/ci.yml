@@ -42,7 +42,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: third_party/install
-          key: ifcopenshell-fedora43-${{ hashFiles('tools/build-ifcopenshell.sh') }}
+          key: ifcopenshell-fedora43-${{ hashFiles('tools/build-ifcopenshell.sh', 'tools/patches/**') }}
 
       - name: Build IfcOpenShell
         if: steps.ifcos.outputs.cache-hit != 'true'
