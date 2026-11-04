@@ -488,6 +488,29 @@ impl Gui {
         }
     }
 
+    /// A folder to write files into (NC files): chosen in the system's dialog, or a FileEngine
+    /// folder as a `fileengine://` address (each file a new version of the one there).
+    pub(crate) fn save_folder_target(&mut self, title: &str) -> Option<String> {
+        self.open_folder_target(title)
+    }
+
+    /// Writes `bytes` to `target`: a file on this computer, or a FileEngine address (written
+    /// here first, then published as a new version of the file of that name; COL-FE-012).
+    pub(crate) fn save_bytes_to(&mut self, target: &str, bytes: &[u8]) -> Result<(), String> {
+        let Some(rest) = target.strip_prefix("fileengine://") else {
+            return std::fs::write(target, bytes).map_err(|e| e.to_string());
+        };
+        let mut parts = rest.splitn(3, '/');
+        let (Some(conn), Some(folder), Some(name)) = (parts.next(), parts.next(), parts.next()) else {
+            return Err(format!("{target} is not a FileEngine file address"));
+        };
+        let local = std::env::temp_dir().join(format!("riviera-{}-{name}", std::process::id()));
+        std::fs::write(&local, bytes).map_err(|e| e.to_string())?;
+        let r = self.run("fileengine.publish", json!({ "connection_id": conn, "folder_uid": folder, "path": local, "name": name, "replace": true }));
+        let _ = std::fs::remove_file(&local);
+        r.map(|_| ())
+    }
+
     /// A folder to read (a plugin folder): chosen in the system's dialog, or, where a FileEngine
     /// connection exists and FileEngine is chosen, a FileEngine folder as a `fileengine://`
     /// address.

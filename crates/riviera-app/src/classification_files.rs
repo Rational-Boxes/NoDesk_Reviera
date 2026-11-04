@@ -206,7 +206,7 @@ impl HostCommand for KeynotesReload {
     type Host = App;
     type Params = Empty;
     type Output = KeynotesReport;
-    const META: CommandMeta = meta("keynotes.reload", "Reload the keynote file", "Reads the project's keynote file again (after it changed on disk).", &[Effect::FileRead, Effect::Edit]);
+    const META: CommandMeta = meta("keynotes.reload", "Reload the keynote file", "Reads the project's keynote file again (after it changed on disk, or on FileEngine for one loaded from there).", &[Effect::FileRead, Effect::Edit]);
 
     fn run(&self, app: &mut App, caller: &Caller, _: Empty) -> Result<KeynotesReport> {
         let doc = app.active().ok_or_else(|| bad("document.none", "no document is open"))?;
@@ -214,6 +214,11 @@ impl HostCommand for KeynotesReload {
         if path.is_empty() {
             return Err(bad("keynotes.none", "the project has no keynote file; load one first"));
         }
+        // A keynote file loaded from FileEngine is read again as it is on the server now.
+        let path = match crate::fe_paths::refresh_cached(app, Path::new(&path))? {
+            Some(p) => p.to_string_lossy().into_owned(),
+            None => path,
+        };
         load_keynotes(app, caller, &path)
     }
 }

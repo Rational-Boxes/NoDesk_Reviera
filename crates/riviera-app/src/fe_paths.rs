@@ -280,6 +280,20 @@ pub fn fetch(app: &mut App, text: &str, set: bool) -> Result<PathBuf> {
     Ok(path)
 }
 
+/// A file read earlier from FileEngine into the cache (`<cache>/files/<connection>/<uid>/<name>`),
+/// brought up to the newest version on the server; `None` for any other path, or for a copy of
+/// a version asked for by name (`<uid>@<version>`), which stays as it is.
+pub fn refresh_cached(app: &mut App, path: &Path) -> Result<Option<PathBuf>> {
+    let root = app.fileengine.cache_root()?.join("files");
+    let Ok(rel) = path.strip_prefix(&root) else { return Ok(None) };
+    let parts: Vec<String> = rel.components().map(|c| c.as_os_str().to_string_lossy().into_owned()).collect();
+    let [conn, uid, _name] = parts.as_slice() else { return Ok(None) };
+    if uid.contains('@') {
+        return Ok(None);
+    }
+    fetch(app, &format!("{SCHEME}{conn}/{uid}"), false).map(Some)
+}
+
 fn run(app: &mut App, name: &str, mut args: Value, caller: &Caller, found: Vec<(String, Role, String)>) -> Result<Outcome> {
     let cache = app.fileengine.cache_root()?;
     let mut outgoing = Vec::new();

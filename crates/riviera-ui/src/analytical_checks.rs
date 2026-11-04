@@ -480,16 +480,7 @@ impl Gui {
         let Some(r) = self.checks_pane.as_ref().and_then(|p| p.report.clone()) else {
             return self.frame.set_status_text("Run a check first", 0);
         };
-        let dialog = FileDialog::builder(&self.frame)
-            .with_message("Export Analytical Checks")
-            .with_wildcard("CSV files (*.csv)|*.csv")
-            .with_style(FileDialogStyle::Save | FileDialogStyle::OverwritePrompt)
-            .with_default_file("analytical checks.csv")
-            .build();
-        if dialog.show_modal() != ID_OK {
-            return;
-        }
-        let Some(path) = dialog.get_path() else {
+        let Some(path) = self.save_target("Export Analytical Checks", "CSV files (*.csv)|*.csv", "analytical checks.csv") else {
             return;
         };
         let quote = |s: &str| format!("\"{}\"", s.replace('"', "\"\""));
@@ -522,7 +513,7 @@ impl Gui {
                 quote(i["key"].as_str().unwrap_or_default()),
             ));
         }
-        match std::fs::write(&path, out) {
+        match self.save_bytes_to(&path, out.as_bytes()) {
             Ok(()) => self
                 .frame
                 .set_status_text(&format!("Exported {} issue(s) to {path}", issues.len()), 0),

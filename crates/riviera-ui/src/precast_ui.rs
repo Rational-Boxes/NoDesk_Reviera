@@ -441,14 +441,12 @@ impl Gui {
             }
             EXPORT | IMPORT => {
                 let save = answer == EXPORT;
-                let d = FileDialog::builder(&frame)
-                    .with_message(if save { "Export Precast Configuration" } else { "Import Precast Configuration" })
-                    .with_wildcard("Precast configuration (*.json)|*.json")
-                    .with_style(if save { FileDialogStyle::Save | FileDialogStyle::OverwritePrompt } else { FileDialogStyle::Open | FileDialogStyle::FileMustExist })
-                    .build();
-                if d.show_modal() == ID_OK
-                    && let Some(path) = d.get_path()
-                {
+                let chosen = if save {
+                    self.save_target("Export Precast Configuration", "Precast configuration (*.json)|*.json", "precast configuration.json")
+                } else {
+                    self.open_target("Import Precast Configuration", "Precast configuration (*.json)|*.json")
+                };
+                if let Some(path) = chosen {
                     let r = self.run(if save { "precast_config.export" } else { "precast_config.import" }, json!({ "file": path }));
                     match (r, save) {
                         (Ok(_), true) => frame.set_status_text(&format!("Exported to {path}"), 0),

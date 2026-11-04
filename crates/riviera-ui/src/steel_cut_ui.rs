@@ -246,11 +246,7 @@ impl Gui {
     /// Steel › NC Export.
     pub(crate) fn steel_nc_export(&mut self) {
         let frame = self.frame;
-        let d = DirDialog::builder(&frame, "Export DSTV NC1 Files To", "").build();
-        if d.show_modal() != ID_OK {
-            return;
-        }
-        let Some(folder) = d.get_path() else { return };
+        let Some(folder) = self.save_folder_target("Export DSTV NC1 Files To") else { return };
         let r = self.run("steel_nc.export", json!({ "folder": folder, "overwrite": true }));
         match r {
             Ok(files) => {

@@ -229,20 +229,7 @@ impl Gui {
         } else {
             ("Export Report", "Markdown files (*.md)|*.md", "riviera-performance.md", "profiler.export_report")
         };
-        let parent = self.profiler.as_ref().map(|w| w.dialog);
-        let dialog = match &parent {
-            Some(p) => FileDialog::builder(p),
-            None => FileDialog::builder(&frame),
-        }
-        .with_message(title)
-        .with_wildcard(wildcard)
-        .with_style(FileDialogStyle::Save | FileDialogStyle::OverwritePrompt)
-        .with_default_file(file)
-        .build();
-        if dialog.show_modal() != ID_OK {
-            return;
-        }
-        let Some(path) = dialog.get_path() else { return };
+        let Some(path) = self.save_target(title, wildcard, file) else { return };
         match self.run(cmd, json!({ "path": path })) {
             Ok(o) => frame.set_status_text(&format!("Wrote {path} ({} bytes)", o["bytes"]), 0),
             Err(e) => error(&frame, &format!("Not written:\n{e}")),

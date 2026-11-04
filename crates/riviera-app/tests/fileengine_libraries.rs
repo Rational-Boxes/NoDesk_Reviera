@@ -162,7 +162,11 @@ fn parameter_libraries_scripts_and_keynotes_on_fileengine() {
     ok(&mut ann, "fileengine.publish", json!({ "connection_id": conn, "folder_uid": eng, "path": notes }));
     ok(&mut ann, "file.new", json!({}));
     let k = ok(&mut ann, "keynotes.load", json!({ "path": format!("fileengine://{conn}/{eng}/keynotes.txt") }));
-    assert!(k.to_string().contains('2') || k.to_string().contains("A1"), "{k:#}");
+    assert_eq!(k["entries"], 2, "{k:#}");
+    // Changed on the server: reloading reads the new version.
+    let kuid = fake.uid_of("Engineering/keynotes.txt").unwrap();
+    fake.write_as(&kuid, b"A\tGeneral\t\nA1\tSee specification\tA\nA2\tSee drawings\tA\n", "bob@acme.test");
+    assert_eq!(ok(&mut ann, "keynotes.reload", json!({}))["entries"], 3);
 }
 
 /// Large library items are fetched when placed, not when the library is read (COL-FE-017).
