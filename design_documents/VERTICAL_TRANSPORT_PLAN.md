@@ -7,7 +7,9 @@ Built so far (2026-11-03): steps 1–2 for passenger elevators: the rule packs (
 elevator sized from its capacity with its shaft, walls and entrances (ARC-VT-002), its hoistway
 and landing zones (ARC-VT-003) and Check Elevators (ARC-VT-004), with the sample *Elevators in an
 office core*; then step 3: hospital, freight and vehicle elevators (ARC-VT-005) and small lifts
-(ARC-VT-006), with the sample *Hospital, freight and small lifts*. What is left is listed under each requirement's *Not yet*.
+(ARC-VT-006), with the sample *Hospital, freight and small lifts*; then step 4: power and heat
+estimates (ARC-VT-007), machine spaces and equipment (ARC-VT-008) and the elevator schedule
+(ARC-VT-009), shown in *Elevators in an office core*. What is left is listed under each requirement's *Not yet*.
 **Owner's requests:**
 - 2026-11-01: "Elevators, both passenger and freight." and "For elevators include ornamental
   version like glass enclosed."

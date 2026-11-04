@@ -404,6 +404,10 @@ pub struct CatalogueCar {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub entrance: Option<Entrance>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub voltage: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub phases: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub persons: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub r#use: Option<String>,
@@ -431,6 +435,28 @@ pub struct PitOverhead {
     pub overhead_above_car: Option<f64>,
 }
 
+/// Planning estimates of power and heat, and the spaces for the machine and controller.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct Services {
+    pub balance: f64,
+    pub traction_efficiency: f64,
+    pub hydraulic_efficiency: f64,
+    pub car_mass_ratio: f64,
+    pub traction_heat: f64,
+    pub hydraulic_heat: f64,
+    pub voltage: f64,
+    pub phases: u8,
+    pub power_factor: f64,
+    /// Width (out from the hoistway), depth and height.
+    pub closet: [f64; 3],
+    pub pump_room: [f64; 3],
+    pub machine_room_height: f64,
+    #[serde(default)]
+    pub machine_room_margin: f64,
+    pub source: String,
+    pub confidence: Confidence,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Sizing {
     pub cars: Vec<CatalogueCar>,
@@ -442,6 +468,8 @@ pub struct Sizing {
     pub door_height: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub persons_kg: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub services: Option<Services>,
     pub source: String,
     pub confidence: Confidence,
 }
@@ -734,9 +762,39 @@ pub struct Sized {
     pub overhead: f64,
     /// The pack the defaults came from.
     pub sizing_pack: String,
+    /// Planning estimates of the motor's power and heat (ARC-VT-007).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub power: Option<Power>,
     /// What the sizing had to assume or could not meet.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub notes: Vec<String>,
+}
+
+/// Planning estimates of an elevator's electrical load and heat, from its load and speed; a
+/// product's data replaces them.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct Power {
+    /// Motor power (kW).
+    pub motor_kw: f64,
+    /// Full-load current at the supply voltage (A).
+    pub current: f64,
+    pub voltage: f64,
+    pub phases: u8,
+    /// Apparent power (VA), the load on its circuit.
+    pub va: f64,
+    /// Heat released into the machine space (kW).
+    pub heat_kw: f64,
+}
+
+/// The estimate for a car of `load` kg at `speed` m/s.
+pub fn power_estimate(v: &Services, drive: Drive, load: f64, speed: f64, voltage: f64, phases: u8) -> Power {
+    const G: f64 = 9.81;
+    let traction = matches!(drive, Drive::MrlTraction | Drive::Traction);
+    // Traction lifts the load less the counterweight's balance; hydraulic lifts car and load.
+    let watts = if traction { (1.0 - v.balance) * load * G * speed / v.traction_efficiency } else { (1.0 + v.car_mass_ratio) * load * G * speed / v.hydraulic_efficiency };
+    let va = watts / v.power_factor;
+    let current = va / (voltage * if phases == 3 { 3f64.sqrt() } else { 1.0 });
+    Power { motor_kw: watts / 1000.0, current, voltage, phases, va, heat_kw: watts / 1000.0 * if traction { v.traction_heat } else { v.hydraulic_heat } }
 }
 
 /// The first sizing pack in use.
@@ -879,6 +937,7 @@ pub fn size(packs: &[Pack], p: &SizeParams) -> Result<Sized> {
         ElevatorKind::Freight | ElevatorKind::Vehicle => p.class.or(base.and_then(|c| c.class)).or(Some(if kind == ElevatorKind::Vehicle { LoadingClass::B } else { LoadingClass::A })),
         _ => None,
     };
+    let power = sz.services.as_ref().map(|v| power_estimate(v, p.drive, load, speed, base.and_then(|c| c.voltage).unwrap_or(v.voltage), base.and_then(|c| c.phases).unwrap_or(v.phases)));
     let persons = if kind.carries_people() { (load / sz.persons_kg.unwrap_or(75.0)).floor() as u32 } else { 0 };
     Ok(Sized {
         kind,
@@ -896,6 +955,7 @@ pub fn size(packs: &[Pack], p: &SizeParams) -> Result<Sized> {
         pit,
         overhead,
         sizing_pack: pack.id.clone(),
+        power,
         notes,
     })
 }
@@ -932,6 +992,45 @@ pub struct Elevator {
     /// where the front wall leaves too little room for the leaves to slide.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub entrance_x: Option<f64>,
+    /// Its machine and controller (GlobalIds).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub equipment: Vec<String>,
+    /// The space they need (ARC-VT-008).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub machine_space: Option<MachineSpace>,
+}
+
+/// What kind of space an elevator's machine and controller need.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum MachineSpaceKind {
+    /// A controller closet beside the hoistway at the top landing (machine-room-less).
+    Closet,
+    /// A machine room beside the hoistway at the lowest landing (hydraulic).
+    PumpRoom,
+    /// A machine room over the hoistway (traction).
+    MachineRoom,
+}
+
+/// A box in the elevator's frame: across, into the hoistway, and up from a level.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct MachineSpace {
+    pub kind: MachineSpaceKind,
+    pub x: V2,
+    pub y: V2,
+    /// The level it stands on (GlobalId) and its floor above that level.
+    pub level: String,
+    pub offset: f64,
+    pub height: f64,
+}
+
+/// Which side of the hoistway the machine and controller go, as you face its entrance.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Side {
+    Left,
+    #[default]
+    Right,
 }
 
 impl Elevator {
@@ -1003,6 +1102,12 @@ pub struct CreateParams {
     /// Hoistway wall thickness (default 0.2 m).
     #[schemars(extend("x-reviera-data-type" = "length"))]
     pub wall_thickness: Option<f64>,
+    /// Place the controller (and a hydraulic elevator's power unit) in the space they need
+    /// (default true).
+    pub equipment: Option<bool>,
+    /// Which side of the hoistway, as you face its entrance (default right).
+    #[serde(default)]
+    pub equipment_side: Side,
 }
 
 /// What `elevator.create` made.
@@ -1013,6 +1118,8 @@ pub struct Created {
     pub shaft: ElementId,
     pub walls: Vec<ElementId>,
     pub entrances: Vec<ElementId>,
+    /// The controller, and a hydraulic elevator's power unit.
+    pub equipment: Vec<ElementId>,
     #[serde(flatten)]
     pub sized: Sized,
 }
@@ -1038,6 +1145,20 @@ fn car_type(txn: &mut Transaction<'_>, s: &Sized) -> Result<ElementId> {
             e.params.insert("@ElementType".into(), o.into());
         })?;
     }
+    Ok(id)
+}
+
+/// An equipment type (`width × depth × height`, its front toward −y and back on the origin),
+/// made the first time.
+fn equipment_type(txn: &mut Transaction<'_>, name: &str, category: crate::mesh_objects::Category, object_type: &str, size: [f64; 3], connectors: Vec<crate::mep::Connector>) -> Result<ElementId> {
+    if let Some(e) = txn.store().iter().find(|e| e.name.as_deref() == Some(name) && crate::mesh_objects::mesh_object_type(e).is_some()) {
+        return Ok(e.id());
+    }
+    let (p, t) = cuboid([-size[0] / 2.0, size[0] / 2.0], [-size[1], 0.0], [0.0, size[2]]);
+    let id = crate::mesh_objects::create_generated_type(txn, name, category, &p, &t, [0.45, 0.47, 0.5, 1.0], connectors, Some("USERDEFINED"))?;
+    txn.modify(id, |e| {
+        e.params.insert("@ElementType".into(), object_type.into());
+    })?;
     Ok(id)
 }
 
@@ -1114,6 +1235,8 @@ pub(crate) fn create(txn: &mut Transaction<'_>, p: CreateParams) -> Result<Creat
         entrances: Vec::new(),
         space_below: p.size.space_below,
         entrance_x: None,
+        equipment: Vec::new(),
+        machine_space: None,
     };
 
     // The car, on the lowest level.
@@ -1254,6 +1377,51 @@ pub(crate) fn create(txn: &mut Transaction<'_>, p: CreateParams) -> Result<Creat
         }
     }
 
+    // The machine and controller, in the space they need.
+    let mut equipment = Vec::new();
+    if p.equipment.unwrap_or(true)
+        && let Some(v) = sizing_pack(&packs)?.1.services.clone()
+    {
+        let side = if p.equipment_side == Side::Left { -1.0 } else { 1.0 };
+        let [w, d] = sized.hoistway;
+        let tt = if make_walls { t } else { 0.0 };
+        let out = w / 2.0 + tt;
+        let ordered = |a: f64, b: f64| if a <= b { [a, b] } else { [b, a] };
+        let (space, level) = match sized.drive {
+            Drive::MrlTraction => (MachineSpace { kind: MachineSpaceKind::Closet, x: ordered(side * out, side * (out + v.closet[0])), y: [-tt, -tt + v.closet[1]], level: top.guid.clone(), offset: 0.0, height: v.closet[2] }, top),
+            Drive::Hydraulic | Drive::Holeless => (MachineSpace { kind: MachineSpaceKind::PumpRoom, x: ordered(side * out, side * (out + v.pump_room[0])), y: [-tt, -tt + v.pump_room[1]], level: base.guid.clone(), offset: 0.0, height: v.pump_room[2] }, base),
+            Drive::Traction => {
+                let m = out + v.machine_room_margin;
+                (MachineSpace { kind: MachineSpaceKind::MachineRoom, x: [-m, m], y: [-tt, d + tt + v.machine_room_margin], level: top.guid.clone(), offset: sized.overhead, height: v.machine_room_height }, top)
+            }
+        };
+        // The controller against the space's back, facing the landing; a power unit beside it.
+        let power = sized.power.clone().expect("sizing with services gives power");
+        let controller = equipment_type(txn, "Elevator Controller", crate::mesh_objects::Category::ElectricalEquipment, "ELEVATOR_CONTROLLER", [0.6, 0.3, 2.0], vec![crate::mep::power("Power", [0.0, -0.15, 2.0], [0.0, 0.0, 1.0], crate::mep::FlowDirection::In, power.voltage, power.phases, power.va, "Motor")])?;
+        let mut parts = vec![(controller, [space.x[0] + 0.4, space.y[1]])];
+        if space.kind == MachineSpaceKind::PumpRoom {
+            let pump = equipment_type(txn, "Hydraulic Power Unit", crate::mesh_objects::Category::Pump, "HYDRAULIC_POWER_UNIT", [1.2, 0.8, 1.5], Vec::new())?;
+            parts.push((pump, [space.x[1] - 0.7, space.y[1]]));
+        }
+        for (ty, at) in parts {
+            let id = crate::mesh_objects::place(
+                txn,
+                crate::mesh_objects::PlaceParams {
+                    type_id: ElementRef::Id(ty),
+                    point: el.at(at[0], at[1]),
+                    level: ElementRef::Id(level.id),
+                    offset: space.offset,
+                    rotation: p.rotation,
+                    mirror: false,
+                    scale: 1.0,
+                },
+            )?;
+            el.equipment.push(member(txn, id)?);
+            equipment.push(id);
+        }
+        el.machine_space = Some(space);
+    }
+
     let data = serde_json::to_value(&el).expect("serialises");
     let props = properties(&el);
     txn.modify(car, |e| {
@@ -1261,7 +1429,7 @@ pub(crate) fn create(txn: &mut Transaction<'_>, p: CreateParams) -> Result<Creat
         e.params.insert(DATA_KEY.into(), data);
         e.params.extend(props);
     })?;
-    Ok(Created { elevator: car, shaft, walls, entrances, sized: el.sized.clone() })
+    Ok(Created { elevator: car, shaft, walls, entrances, equipment, sized: el.sized.clone() })
 }
 
 /// An elevator's property sets: IFC's capacity and clear car size, and `Reviera_Elevator`.
@@ -1289,6 +1457,14 @@ pub fn properties(el: &Elevator) -> Vec<(String, Value)> {
         ("Reviera_Elevator.Kind".into(), label(serde_json::to_value(s.kind).expect("serialises"))),
     ]
     .into_iter()
+    .chain(s.power.iter().flat_map(|w| {
+        [
+            ("Reviera_Elevator.MotorPower".into(), measure("IfcPowerMeasure", w.motor_kw * 1000.0)),
+            ("Reviera_Elevator.FullLoadCurrent".into(), measure("IfcElectricCurrentMeasure", w.current)),
+            ("Reviera_Elevator.SupplyVoltage".into(), measure("IfcElectricVoltageMeasure", w.voltage)),
+            ("Reviera_Elevator.HeatRelease".into(), measure("IfcPowerMeasure", w.heat_kw * 1000.0)),
+        ]
+    }))
     .chain(s.class.map(|c| ("Reviera_Elevator.LoadingClass".into(), label(serde_json::to_value(c).expect("serialises")))))
     .collect()
 }
@@ -1317,7 +1493,7 @@ pub(crate) fn delete(txn: &mut Transaction<'_>, p: ElevatorParams) -> Result<usi
     let store = txn.store().clone();
     let (car, el) = car_of(&store, &p.elevator)?;
     let mut n = 0;
-    for g in el.entrances.iter().chain(&el.walls).chain(std::iter::once(&el.shaft)) {
+    for g in el.entrances.iter().chain(&el.equipment).chain(&el.walls).chain(std::iter::once(&el.shaft)) {
         if let Some(id) = by_guid(txn.store(), g) {
             txn.delete(id)?;
             n += 1;
@@ -1380,6 +1556,17 @@ pub fn zones(store: &Store) -> Vec<Clearance> {
             mesh: frame_box(&el, [-w / 2.0, w / 2.0], [0.0, d], z0 - el.sized.pit, z1 + el.sized.overhead),
             door_swing_forbidden: false,
         });
+        if let Some(m) = &el.machine_space
+            && let Some(zl) = z(&m.level)
+        {
+            out.push(Clearance {
+                element: car,
+                kind: ClearanceKind::MachineSpace,
+                rule: format!("{:?} space", m.kind).to_lowercase(),
+                mesh: frame_box(&el, m.x, m.y, zl + m.offset, zl + m.offset + m.height),
+                door_swing_forbidden: false,
+            });
+        }
         for pack in &packs {
             let Some(l) = pack.landing.as_ref().filter(|_| el.sized.kind.carries_people()) else { continue };
             let x = el.door_x();
@@ -1601,7 +1788,7 @@ mod tests {
         let defs: Value = serde_json::from_str(include_str!("../../../schemas/psets/reviera-psets-1.json")).unwrap();
         let set = defs["property_sets"].as_array().unwrap().iter().find(|s| s["name"] == "Reviera_Elevator").expect("Reviera_Elevator");
         let us: Vec<Pack> = shipped().iter().filter(|p| p.id == "practice_us").cloned().collect();
-        let el = Elevator { sized: size(&us, &SizeParams::default()).unwrap(), point: [0.0; 2], rotation: 0.0, levels: vec![], wall_thickness: 0.2, shaft: String::new(), walls: vec![], entrances: vec![], space_below: false, entrance_x: None };
+        let el = Elevator { sized: size(&us, &SizeParams::default()).unwrap(), point: [0.0; 2], rotation: 0.0, levels: vec![], wall_thickness: 0.2, shaft: String::new(), walls: vec![], entrances: vec![], space_below: false, entrance_x: None, equipment: vec![], machine_space: None };
         for (key, value) in properties(&el) {
             let Some(name) = key.strip_prefix("Reviera_Elevator.") else { continue };
             let def = set["properties"].as_array().unwrap().iter().find(|p| p["name"] == name).unwrap_or_else(|| panic!("{name} is not published"));

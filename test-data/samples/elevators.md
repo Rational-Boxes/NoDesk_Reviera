@@ -22,14 +22,21 @@ Start with **File › New**. In **Manage › Model Properties** leave the **Buil
    Five storeys need the stretcher, so the 3500 lb car comes: 2032 × 1651 mm for 21 persons, in
    a 2591 × 2108 mm hoistway with a 1524 mm pit and a 4115 mm overhead. The status bar gives
    these sizes. The shaft cuts all five floors, and the walls go from the pit floor to the
-   overhead, with a sliding entrance on every level. Place the second elevator the same way at
-   `13.041, 7`: one hoistway and two walls along, 50 mm clear.
+   overhead, with a sliding entrance on every level. Its controller stands in a 1219 × 508 mm
+   closet beside the hoistway on Level 5: choose *Equipment* on the *Left* for this one. Place
+   the second elevator the same way at `13.041, 7` with its equipment on the *Right*: one
+   hoistway and two walls along, 50 mm clear. The status bar gives each motor's estimated power,
+   about 12.2 kW.
 3. **A hydraulic elevator to Level 2.** Elevator again, *Serves up to* Level 2, drive
    *Hydraulic*, speed 0.5, rotation −90, entrance point `4, 7`. Two storeys need no stretcher, so
    the ADA's side-door minimum gives the 2000 lb car (1727 × 1295 mm), with a 1219 mm pit and a
-   3734 mm overhead. Its landing faces west.
-4. **Check.** **Architecture › Circulation › Check Elevators** finds no problems. **View ›
-   Coordination › Check Clearances** finds nothing in the hoistways. Switch a 3D view's virtual
+   3734 mm overhead. Its landing faces west, and its pump unit and controller stand in a
+   2184 × 2172 mm pump room beside it on Level 1.
+4. **Schedule.** **View › Create › Schedules**, category *Transport Elements*: one row per car
+   with its stops, load, persons, speed, drive, car, hoistway, pit, overhead, motor power and
+   heat. Name it *Elevator Schedule*.
+5. **Check.** **Architecture › Circulation › Check Elevators** finds no problems. **View ›
+   Coordination › Check Clearances** finds nothing in the hoistways or machine spaces. Switch a 3D view's virtual
    volumes to *Translucent* to see each hoistway (violet) from pit to overhead.
 
 Try it: draw a wall across a hoistway on Level 3, and Check Clearances reports it in the
@@ -38,6 +45,9 @@ hoistway. Or make an elevator with a 1500 × 1200 mm car (`elevator.create` with
 3002.4.
 
 ## Gaps
+
+- **[gap]** Power and heat are planning estimates from the load and speed; enter the maker's
+  figures when a product is chosen.
 
 - **[gap]** An elevator cannot be edited in place yet: delete it (`elevator.delete`, given the
   car or any wall) and make it again.

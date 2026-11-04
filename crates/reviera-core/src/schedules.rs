@@ -242,6 +242,24 @@ pub fn available_fields(store: &Store, category: &str) -> Vec<FieldInfo> {
             info("grow.share", "Growing Share", false),
             info("grow.length", "Run Length", false),
         ]),
+        // Elevators and lifts (ARC-VT-009): one row per car.
+        "cat.transport" => out.extend([
+            info("vt.kind", "Kind", false),
+            info("vt.load", "Rated Load", true),
+            info("vt.persons", "Persons", true),
+            info("vt.speed", "Speed", false),
+            info("vt.drive", "Drive", false),
+            info("vt.stops", "Stops", false),
+            info("vt.car", "Car (W × D × H)", false),
+            info("vt.door", "Door (W × H)", false),
+            info("vt.hoistway", "Hoistway (W × D)", false),
+            info("vt.pit", "Pit", false),
+            info("vt.overhead", "Overhead", false),
+            info("vt.machine", "Machine Space", false),
+            info("vt.power", "Motor Power", true),
+            info("vt.current", "Full-Load Current", true),
+            info("vt.heat", "Heat Release", true),
+        ]),
         "cat.roofs" => out.extend([
             info("roof.area", "Area", true),
             info("roof.volume", "Volume", true),
@@ -299,6 +317,7 @@ pub fn default_fields(category: &str) -> Vec<&'static str> {
             "room.perimeter",
             "room.volume",
         ],
+        "cat.transport" => vec!["param:elem.mark", "vt.kind", "level", "vt.stops", "vt.load", "vt.persons", "vt.speed", "vt.drive", "vt.car", "vt.hoistway", "vt.pit", "vt.overhead", "vt.power", "vt.heat"],
         "cat.doors" => vec![
             "param:elem.mark",
             "type",
@@ -441,6 +460,39 @@ impl<'a> Context<'a> {
 }
 
 impl Context<'_> {
+    /// Elevators' fields (ARC-VT-009), from the data on their car.
+    fn transport(&self, e: &Element, key: &str) -> Cell {
+        let Some(el) = crate::elevators::elevator(e) else {
+            return Context::text("");
+        };
+        let s = &el.sized;
+        let mm = |v: f64| format!("{:.0}", v * 1000.0);
+        let number = |v: f64, text: String| Cell { text, value: Some(v), editable: false };
+        match key {
+            "vt.kind" => Context::text(s.kind.label()),
+            "vt.load" => number(s.load, format!("{:.0} kg", s.load)),
+            "vt.persons" => number(f64::from(s.persons), s.persons.to_string()),
+            "vt.speed" => number(s.speed, format!("{:.2} m/s", s.speed)),
+            "vt.drive" => Context::text(s.drive.label()),
+            "vt.stops" => number(el.levels.len() as f64, el.levels.len().to_string()),
+            "vt.car" => Context::text(format!("{} × {} × {}", mm(s.car[0]), mm(s.car[1]), mm(s.car[2]))),
+            "vt.door" => Context::text(format!("{} × {}", mm(s.door_size[0]), mm(s.door_size[1]))),
+            "vt.hoistway" => Context::text(format!("{} × {}", mm(s.hoistway[0]), mm(s.hoistway[1]))),
+            "vt.pit" => self.fmt(s.pit, "length"),
+            "vt.overhead" => self.fmt(s.overhead, "length"),
+            "vt.machine" => Context::text(match el.machine_space.as_ref().map(|m| m.kind) {
+                Some(crate::elevators::MachineSpaceKind::Closet) => "Controller closet",
+                Some(crate::elevators::MachineSpaceKind::PumpRoom) => "Pump room",
+                Some(crate::elevators::MachineSpaceKind::MachineRoom) => "Machine room over",
+                None => "",
+            }),
+            "vt.power" => s.power.as_ref().map_or_else(|| Context::text(""), |w| number(w.motor_kw, format!("{:.1} kW", w.motor_kw))),
+            "vt.current" => s.power.as_ref().map_or_else(|| Context::text(""), |w| number(w.current, format!("{:.1} A at {:.0} V", w.current, w.voltage))),
+            "vt.heat" => s.power.as_ref().map_or_else(|| Context::text(""), |w| number(w.heat_kw, format!("{:.1} kW", w.heat_kw))),
+            _ => Context::text(""),
+        }
+    }
+
     /// Ducts' and pipes' fields: size and length, then the kept network results.
     fn mep(&self, e: &Element, key: &str) -> Cell {
         let Some(s) = crate::mep_runs::segment_recipe(e) else {
@@ -587,6 +639,7 @@ impl Context<'_> {
                     editable: crate::rooms::room_recipe(e).is_some(),
                 }
             }
+            k if k.starts_with("vt.") => self.transport(e, k),
             k if k.starts_with("glz.") => self.glazed(e, k),
             k if k.starts_with("grow.") => self.growing(e, k),
             k if k.starts_with("space.") => {

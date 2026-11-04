@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Reviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Reviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 870 numbered requirements (320 P0 · 335 P1 · 208 P2 · 7 P3), 2,315 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 873 numbered requirements (320 P0 · 335 P1 · 211 P2 · 7 P3), 2,315 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,315 commands; 870 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,315 commands; 873 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -14021,6 +14021,59 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 
 *Built (2026-11-03):* as ARC-VT-005. Not yet: A18.1's 1500 mm limit for an unenclosed platform, inclined platform lifts and stairlifts (plan §5), home lifts to England's M4(3) through-floor liftway, counter-height landing zones for dumbwaiters.
 
+### 3.7a.7 Power and heat estimates
+**ID:** ARC-VT-007 · **Priority:** P2 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §4.4; research/16 H3, H4, O (N-D1, N-D3); owner direction on logical extrapolations (2026-10-25)
+
+**Purpose.** Give the electrical and mechanical designers a first figure for each elevator's supply and heat while no product is chosen, said plainly to be an estimate.
+
+**Behaviour & rules.**
+- **An extrapolation, marked as such.** No maker's kVA, full-load current or heat table was found in public sources (research/16 H3, N-D1). The sizing pack's `services` block therefore gives a planning method, recorded for expert review (E-85):
+  - **traction** (MRL or with a machine room): motor power = (1 − balance) × rated load × g × speed ÷ efficiency, with the counterweight balancing 45 % of the load and 70 % efficiency;
+  - **hydraulic** (holed or holeless): motor power = (car mass + rated load) × g × speed ÷ efficiency, the car's own mass taken as its rated load and 80 % efficiency. This matches the one public project read: 1000 kg at 1 m/s on a 24 kW motor (S2386);
+  - apparent power = motor power ÷ the power factor (0.85); full-load current = apparent power ÷ (√3 × voltage) for three phases, or ÷ voltage for one;
+  - heat released = 30 % of the motor power for traction (VA's rule of thumb, research/16 H4) and 60 % for hydraulic (in line with the residential tank figures).
+- **Supply.** 480 V three-phase under `practice_us`, 400 V under `practice_en`; a catalogue car may give its own (LULA 208 V three-phase; home elevator 230 V and platform lift 120 V, single-phase).
+- The estimates are returned with the sizes (`power`: motor kW, current, voltage, phases, VA, heat kW), written to `Reviera_Elevator` (MotorPower, FullLoadCurrent, SupplyVoltage, HeatRelease), carried as the load of the controller's power connector (ARC-VT-008), and shown in the elevator schedule (ARC-VT-009).
+
+**Acceptance criteria.**
+- [x] A 3500 lb MRL car at 1.0 m/s is estimated at 0.55 × 1588 × 9.81 ÷ 0.7 ≈ 12.2 kW; a 2000 lb hydraulic car at 0.5 m/s at 2 × 907 × 9.81 × 0.5 ÷ 0.8 ≈ 11.1 kW, releasing 60 % of it as heat.
+
+*Built (2026-11-03):* in `elevators::power_estimate`. Not yet: entering a product's own figures over the estimates, regenerative drives, starts per hour and duty, the machine-room temperature and ventilation rule (Washington's CFM formula, research/16 H4).
+
+### 3.7a.8 Machine spaces and equipment
+**ID:** ARC-VT-008 · **Priority:** P2 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §4.4; research/16 A9, H2, L2, L3 (Z21)
+
+**Purpose.** Reserve the room an elevator's machine and controller need, and put the equipment there so that the electrical designer can feed it.
+
+**Behaviour & rules.**
+- **The space by drive** (`services` in the sizing pack), on the side of the hoistway chosen (`equipment_side`, right by default, as you face the entrance):
+  - **machine-room-less traction**: a controller closet beside the hoistway at the top landing, its front on the hoistway's front face (1219 × 508 mm, 2134 mm high under `practice_us`, after KONE's remote closet);
+  - **hydraulic**: a pump room beside the hoistway at the lowest landing (2184 × 2172 mm, 2286 mm high, after TKE's submersible unit room);
+  - **traction with a machine room**: a room over the hoistway, on the overhead, as wide as the hoistway with its walls plus 406 mm (DoD), 2134 mm high.
+- **Equipment** (`equipment`, true by default): an *Elevator Controller* (an `IfcElectricDistributionBoard` USERDEFINED `ELEVATOR_CONTROLLER`, 600 × 300 × 2000 mm) against the space's back, facing the landing, with a power connector (load class *Motor*) carrying the estimate of ARC-VT-007; and in a pump room a *Hydraulic Power Unit* (an `IfcPump` USERDEFINED `HYDRAULIC_POWER_UNIT`, 1200 × 800 × 1500 mm). Both are members of the elevator, deleted with it.
+- **The machine space is a virtual volume** (kind *elevator machine space*, orange), from its floor to its height: only the elevator's own members may be in it, so a wall or duct drawn through it is reported by `clearance.check`. Its walls and door are left to the designer.
+
+**Data (IFC mapping).** The equipment as above; the space as ARC-MOD-031.
+
+**Acceptance criteria.**
+- [x] An MRL elevator gets a controller in a closet at its top landing; a hydraulic one a pump unit and controller in a pump room at its lowest; a traction one a machine room over its overhead; nothing overlaps.
+- [x] The controller's connector is 480 V, three-phase, class *Motor*, with the estimated VA.
+
+*Built (2026-11-03):* in `elevator.create`, and the Elevator dialog's *Controller and machine* (right, left or none). Not yet: the traction machine itself, working clearances in front of the controller (Z21), disconnects, the sump and pit ladder, and placing equipment where it would collide (it is placed regardless and reported).
+
+### 3.7a.9 Elevator schedule
+**ID:** ARC-VT-009 · **Priority:** P2 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §10; DOC-SCH (schedules)
+
+**Purpose.** List the elevators as the elevator consultant and the maker need them.
+
+**Behaviour & rules.**
+- Schedules of the category *Transport Elements* (`cat.transport`) have one row per car, with the fields `vt.kind`, `vt.load`, `vt.persons`, `vt.speed`, `vt.drive`, `vt.stops`, `vt.car` (width × depth × height, mm), `vt.door`, `vt.hoistway`, `vt.pit`, `vt.overhead`, `vt.machine` (the machine space), `vt.power`, `vt.current` and `vt.heat`, besides Mark, Level, Type and the common fields. A new one shows Mark, Kind, Level, Stops, Rated Load, Persons, Speed, Drive, Car, Hoistway, Pit, Overhead, Motor Power and Heat Release. Rated load, persons, power, current and heat total.
+
+**Acceptance criteria.**
+- [x] A schedule of *Transport Elements* lists each car with its hoistway (for example "2591 × 2108") and its estimated motor power.
+
+*Built (2026-11-03):* in `schedules`. Not yet: hoistway section and plan sheets dimensioned automatically (plan §10).
+
 ---
 
 ## 3.8 Openings
@@ -16354,8 +16407,8 @@ All commands below are registered once in the command registry and exposed autom
 | `vt.set_rule_packs` | packs? (none for automatic) | — | Yes | ARC-VT-001 |
 | `vt.add_rule_pack` | pack | id | Yes | ARC-VT-001 |
 | `vt.remove_rule_pack` | id | — | Yes | ARC-VT-001 |
-| `elevator.size` | kind?, class?, load?, speed?, drive?, door?, car_width?, car_depth?, car_height?, door_width?, door_height?, storeys?, space_below? | {kind, class, load, persons, speed, drive, door, car, door_size, entrance, sill, hoistway, pit, overhead, sizing_pack, notes} | No (query) | ARC-VT-002 |
-| `elevator.create` | point, rotation?, base_level, top_level, (as `elevator.size`), walls?, wall_thickness? | {elevator, shaft, walls, entrances, sizes} | Yes | ARC-VT-002 |
+| `elevator.size` | kind?, class?, load?, speed?, drive?, door?, car_width?, car_depth?, car_height?, door_width?, door_height?, storeys?, space_below? | {kind, class, load, persons, speed, drive, door, car, door_size, entrance, sill, hoistway, pit, overhead, sizing_pack, power, notes} | No (query) | ARC-VT-002 |
+| `elevator.create` | point, rotation?, base_level, top_level, (as `elevator.size`), walls?, wall_thickness?, equipment?, equipment_side? | {elevator, shaft, walls, entrances, equipment, sizes} | Yes | ARC-VT-002 |
 | `elevator.list` | — | [{elevator, name, levels, sizes, members}] | No (query) | ARC-VT-002 |
 | `elevator.delete` | elevator | count | Yes | ARC-VT-002 |
 | `elevator.check` | elevators? | finding[] | No (query) | ARC-VT-004 |
@@ -29526,14 +29579,14 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 39 | 8 | 0 | 123 |
 | DM | 91 | 65 | 34 | 3 | 193 |
-| ARC | 77 | 95 | 20 | 1 | 193 |
+| ARC | 77 | 95 | 23 | 1 | 196 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 28 | 0 | 29 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
 | COL | 8 | 50 | 12 | 1 | 71 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **335** | **208** | **7** | **870** |
+| **Total** | **320** | **335** | **211** | **7** | **873** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -29588,7 +29641,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.2a Reviera-originated features
 
-137 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
+138 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
 
 | Requirement | Ch | Feature |
 |-------------|----|---------|
@@ -29691,6 +29744,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | ARC-STAIR-007 | 3 | 3.7.6a Stairs through floors: completing to the level above, openings and railings |
 | ARC-RAIL-003 | 3 | 3.7.8b Railing openings and gates |
 | ARC-DECK-001 | 3 | 3.7.8a Decks |
+| ARC-VT-009 | 3 | 3.7a.9 Elevator schedule |
 | ARC-BATH-018 | 3 | 3.9a.18 Bathroom elevations and schedules |
 | ARC-BATH-019 | 3 | 3.9a.19 Bathroom compliance report |
 | ARC-MOD-030 | 3 | 3.12.2a Volume overlaps, virtual volumes and their resolution |
@@ -30756,10 +30810,10 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `element.update_to_face` | 3 | element_ids | — | Yes | ARC-MASS-003 |
 | `elevationmarker.set_directions` | 5 | marker_id, directions[] | view_ids[] | Yes | DOC-VIEW-003 |
 | `elevator.check` | 3 | elevators? | finding[] | No (query) | ARC-VT-004 |
-| `elevator.create` | 3 | point, rotation?, base_level, top_level, (as `elevator.size`), walls?, wall_thickness? | {elevator, shaft, walls, entrances, sizes} | Yes | ARC-VT-002 |
+| `elevator.create` | 3 | point, rotation?, base_level, top_level, (as `elevator.size`), walls?, wall_thickness?, equipment?, equipment_side? | {elevator, shaft, walls, entrances, equipment, sizes} | Yes | ARC-VT-002 |
 | `elevator.delete` | 3 | elevator | count | Yes | ARC-VT-002 |
 | `elevator.list` | 3 | — | [{elevator, name, levels, sizes, members}] | No (query) | ARC-VT-002 |
-| `elevator.size` | 3 | kind?, class?, load?, speed?, drive?, door?, car_width?, car_depth?, car_height?, door_width?, door_height?, storeys?, space_below? | {kind, class, load, persons, speed, drive, door, car, door_size, entrance, sill, hoistway, pit, overhead, sizing_pack, notes} | No (query) | ARC-VT-002 |
+| `elevator.size` | 3 | kind?, class?, load?, speed?, drive?, door?, car_width?, car_depth?, car_height?, door_width?, door_height?, storeys?, space_below? | {kind, class, load, persons, speed, drive, door, car, door_size, entrance, sill, hoistway, pit, overhead, sizing_pack, power, notes} | No (query) | ARC-VT-002 |
 | `embodied_carbon.compare` | 4 | job_id_a, job_id_b | report | No | ANA-CARB-001 |
 | `embodied_carbon.export` | 4 | job_id, path, format: "csv"\ | "json"\ | "html" | — |
 | `embodied_carbon.import_factors` | 4 | path, format: "ilcd"\ | "csv" | library_id | Yes |

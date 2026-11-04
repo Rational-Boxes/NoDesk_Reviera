@@ -10,7 +10,9 @@ Start with **File › New** and leave the **Building Code** at *International Bu
 
 Every lift below comes from **Architecture › Circulation › Elevator** in the Level 1 plan. Choose
 its **Kind**, the level it **serves up to**, and type the entrance point (or click it). Leave the
-load and speed empty: each kind takes the first car of its catalogue and its usual speed.
+load and speed empty: each kind takes the first car of its catalogue and its usual speed. The
+lifts stand close together, so set **Controller and machine** to *None* for each (the sample
+*Elevators in an office core* shows controllers and machine spaces).
 
 1. **Vehicle elevator.** *Vehicle*, up to Level 2, drive *Hydraulic*, at `2.2, 1`: a class B
    8000 lb car, 2438 × 6426 mm. Its entrances are 8 ft openings, because vertical bi-parting doors

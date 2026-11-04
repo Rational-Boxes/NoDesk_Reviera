@@ -37,6 +37,7 @@ impl Gui {
         let door = f.choice("Doors", &["As the car comes".to_owned(), "Side opening".to_owned(), "Centre opening".to_owned()], 0);
         let rotation = f.text("Rotation (°)", "0", "0: the landing is toward the bottom of the plan; counter-clockwise");
         let walls = f.choice("Hoistway walls", &["Yes".to_owned(), "No".to_owned()], 0);
+        let equipment = f.choice("Controller and machine", &["On the right".to_owned(), "On the left".to_owned(), "None".to_owned()], 0);
         let at = f.text("Entrance point (x, y)", "", "Empty: click in the plan at the middle of the entrance");
         let ok = f.show(
             &format!("Sized under the vertical-transport rule packs in use, from {} up; the shaft cuts the floors between. Then click the middle of its entrance.", plan.level_name),
@@ -51,6 +52,8 @@ impl Gui {
             "drive": drive,
             "rotation": num(&rotation).unwrap_or(0.0).to_radians(),
             "walls": walls.get_selection() != Some(1),
+            "equipment": equipment.get_selection() != Some(2),
+            "equipment_side": if equipment.get_selection() == Some(1) { "left" } else { "right" },
         });
         if let Some(l) = num(&load) {
             args["load"] = json!(l);
@@ -92,7 +95,7 @@ impl Gui {
         let mm = |v: &Value| v.as_f64().map_or(0.0, |x| x * 1000.0);
         frame.set_status_text(
             &format!(
-                "{}: {} kg, {} persons; car {:.0} × {:.0} mm; hoistway {:.0} × {:.0} mm, pit {:.0} mm, overhead {:.0} mm ({}); Check Elevators finds {problems} error(s)",
+                "{}: {} kg, {} persons; car {:.0} × {:.0} mm; hoistway {:.0} × {:.0} mm, pit {:.0} mm, overhead {:.0} mm{} ({}); Check Elevators finds {problems} error(s)",
                 made["kind"].as_str().unwrap_or("elevator"),
                 made["load"],
                 made["persons"],
@@ -102,6 +105,7 @@ impl Gui {
                 mm(&made["hoistway"][1]),
                 mm(&made["pit"]),
                 mm(&made["overhead"]),
+                made["power"]["motor_kw"].as_f64().map(|k| format!("; motor about {k:.1} kW")).unwrap_or_default(),
                 made["sizing_pack"].as_str().unwrap_or_default()
             ),
             0,

@@ -12,6 +12,8 @@ serves. <b>Check Elevators</b> then says which rule a car breaks. The sample
   <a href="#sizes">How it is sized</a>
   <a href="#parts">What it is made of</a>
   <a href="#kinds">Hospital, freight and small lifts</a>
+  <a href="#services">Controller, machine space and power</a>
+  <a href="#schedule">Elevator schedule</a>
   <a href="#zones">Hoistway and landing zones</a>
   <a href="#check">Check Elevators</a>
   <a href="#packs">Rule packs</a>
@@ -65,6 +67,25 @@ kind's catalogue cars, with their own hoistway, pit and overhead:</p>
 <p>Freight and vehicle doors (vertical bi-parting) and two-speed side-opening doors are drawn as
 openings in the hoistway wall until Reviera models them.</p>
 
+<h2 id="services">Controller, machine space and power</h2>
+<p>Each elevator gets its controller, and a hydraulic one its power unit, in the space its drive
+needs, on the side you choose (<b>Controller and machine</b>; <i>None</i> leaves them out):</p>
+<ul>
+  <li>machine-room-less traction: a closet beside the hoistway at the top landing;</li>
+  <li>hydraulic: a pump room beside the hoistway at the lowest landing;</li>
+  <li>traction with a machine room: a room over the hoistway.</li>
+</ul>
+<p>The space is a virtual volume (orange) that Check Clearances keeps clear; its walls and door
+are yours to draw. The controller has a power connector, so it can be put on a circuit and
+appears in panel schedules. Its load, the motor's power and full-load current and the heat it
+gives off are <b>planning estimates</b> from the load and speed: no maker publishes these
+openly. Replace them with the maker's figures when a product is chosen.</p>
+
+<h2 id="schedule">Elevator schedule</h2>
+<p><b>View › Create › Schedules</b> of <i>Transport Elements</i> lists every car: kind, stops,
+rated load, persons, speed, drive, car, hoistway, pit, overhead, the machine space, motor power,
+current and heat.</p>
+
 <h2 id="zones">Hoistway and landing zones</h2>
 <p>Each elevator has virtual volumes: its <b>hoistway</b> (violet), from the pit floor to the
 overhead, which nothing but the elevator's own parts may enter, and a <b>landing</b> (green) in
@@ -96,7 +117,7 @@ with a shipped pack's id replaces it in this project.</p>
 <p>ASME A17.1 and EN 81-20 were read only through state adoptions, inspection checklists and
 makers' guides, so their rules are advisory. Not yet built: editing an elevator in place, rear
 entrances, vertical bi-parting and telescopic doors, machine rooms, pit ladders, hall fixtures,
-banks of elevators and escalators.</p>
+banks of elevators and escalators; power and heat are estimates.</p>
 
 <h2 id="scripts">Scripts and agents</h2>
 <p>Everything above is a command: <code>vt.rule_packs</code>, <code>vt.set_rule_packs</code>,

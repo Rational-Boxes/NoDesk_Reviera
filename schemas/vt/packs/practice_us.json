@@ -5,7 +5,7 @@
   "jurisdiction": "US",
   "edition": "Otis Gen3, KONE MonoSpace 500, Schindler 3300/330A, TKE endura/evolution and Hollister-Whitney planning guides, 2015–2024; hospital, freight and vehicle cars from TK Elevator, Canton (Nidec) and Otis freight guides; LULA, residence, platform-lift and dumbwaiter cars from Garaventa, Savaria, Excelevator, Matot and California Title 8",
   "layer": "recommended",
-  "notes": "Generic, maker-style defaults for sizing a new elevator: where makers differ, the larger value (research/16 M6). A chosen product's own sizes replace them. Overheads are for an 8 ft (2438 mm) cab; a taller cab adds its extra height. Freight and vehicle entrances are openings until vertical bi-parting doors are modelled; LULA, residence and platform-lift entrances are swinging doors. Small-lift hoistways without a maker's figure are judgement (EXPERT_REVIEW E-84).",
+  "notes": "Generic, maker-style defaults for sizing a new elevator: where makers differ, the larger value (research/16 M6). A chosen product's own sizes replace them. Overheads are for an 8 ft (2438 mm) cab; a taller cab adds its extra height. Freight and vehicle entrances are openings until vertical bi-parting doors are modelled; LULA, residence and platform-lift entrances are swinging doors. Small-lift hoistways without a maker's figure are judgement (EXPERT_REVIEW E-84). Power and heat are planning estimates from the load and speed (services; EXPERT_REVIEW E-85), not maker data: no maker's kVA, current or heat tables were found.",
   "sizing": {
     "cars": [
       {
@@ -43,7 +43,9 @@
         ],
         "pit": 0.076,
         "overhead": 2.286,
-        "use": "750 lb vertical platform lift, 36 × 60 in"
+        "use": "750 lb vertical platform lift, 36 × 60 in",
+        "voltage": 120,
+        "phases": 1
       },
       {
         "load": 454,
@@ -61,7 +63,9 @@
         ],
         "pit": 0.254,
         "overhead": 2.438,
-        "use": "1000 lb home elevator, 36 × 54 in"
+        "use": "1000 lb home elevator, 36 × 54 in",
+        "voltage": 230,
+        "phases": 1
       },
       {
         "load": 635,
@@ -79,7 +83,9 @@
         ],
         "pit": 0.355,
         "overhead": 3.429,
-        "use": "1400 lb LULA, 48 × 54 in"
+        "use": "1400 lb LULA, 48 × 54 in",
+        "voltage": 208,
+        "phases": 3
       },
       {
         "load": 907,
@@ -342,6 +348,31 @@
     "door_height": 2.134,
     "persons_kg": 75,
     "source": "S1505 S1506 S1508 S1512 S1513 S1567 S1570 S1571 S1572 S1514 S1576 S1577 S1594 S1596",
-    "confidence": "secondary"
+    "confidence": "secondary",
+    "services": {
+      "balance": 0.45,
+      "traction_efficiency": 0.7,
+      "hydraulic_efficiency": 0.8,
+      "car_mass_ratio": 1.0,
+      "traction_heat": 0.3,
+      "hydraulic_heat": 0.6,
+      "power_factor": 0.85,
+      "voltage": 480,
+      "phases": 3,
+      "closet": [
+        1.219,
+        0.508,
+        2.134
+      ],
+      "pump_room": [
+        2.184,
+        2.172,
+        2.286
+      ],
+      "machine_room_height": 2.134,
+      "machine_room_margin": 0.406,
+      "source": "S1506 S1512 S1521 S1606 S2386 S1678",
+      "confidence": "advisory"
+    }
   }
 }

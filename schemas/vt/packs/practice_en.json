@@ -148,6 +148,31 @@
     "door_height": 2.1,
     "persons_kg": 75,
     "source": "S1507 S1559 S1637 S1662 S1675 S1638",
-    "confidence": "secondary"
+    "confidence": "secondary",
+    "services": {
+      "balance": 0.45,
+      "traction_efficiency": 0.7,
+      "hydraulic_efficiency": 0.8,
+      "car_mass_ratio": 1.0,
+      "traction_heat": 0.3,
+      "hydraulic_heat": 0.6,
+      "power_factor": 0.85,
+      "voltage": 400,
+      "phases": 3,
+      "closet": [
+        1.2,
+        0.5,
+        2.1
+      ],
+      "pump_room": [
+        2.2,
+        2.2,
+        2.3
+      ],
+      "machine_room_height": 2.1,
+      "machine_room_margin": 0.4,
+      "source": "S1507 S1639 S2386 S1678",
+      "confidence": "advisory"
+    }
   }
 }

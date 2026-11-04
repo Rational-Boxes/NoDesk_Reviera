@@ -77,9 +77,9 @@ fn an_elevator_is_sized_made_written_and_deleted() {
     assert!(text.contains("IFCTRANSPORTELEMENT(") && text.contains(".ELEVATOR."), "no elevator in the file");
     assert!(text.contains("'Pset_TransportElementElevator'") && text.contains("'Reviera_Elevator'"));
 
-    // Deleted as one: car, shaft, four walls and four entrances.
+    // Deleted as one: car, shaft, four walls, four entrances and the controller.
     let car = made["elevator"].clone();
-    assert_eq!(ok(&mut app, "elevator.delete", json!({ "elevator": made["walls"][2] })), 10);
+    assert_eq!(ok(&mut app, "elevator.delete", json!({ "elevator": made["walls"][2] })), 11);
     assert_eq!(ok(&mut app, "elevator.list", json!({})), json!([]));
     assert!(run(&mut app, "elevator.delete", json!({ "elevator": car })).is_err());
 }
@@ -121,7 +121,8 @@ fn freight_hospital_vehicle_and_small_lifts() {
     let mut app = new_app(dir.path());
     let (levels, _) = building(&mut app);
     let make = |app: &mut App, x: f64, y: f64, kind: &str, top: usize, more: Value| {
-        let mut args = json!({ "point": [x, y], "base_level": levels[0], "top_level": levels[top], "kind": kind });
+        // Packed close together, so without their machine spaces (tested on their own).
+        let mut args = json!({ "point": [x, y], "base_level": levels[0], "top_level": levels[top], "kind": kind, "equipment": false });
         args.as_object_mut().unwrap().extend(more.as_object().unwrap().clone());
         ok(app, "elevator.create", args)
     };
@@ -159,9 +160,9 @@ fn freight_hospital_vehicle_and_small_lifts() {
 
     // A LULA rising more than 25 ft, a freight car loaded below its class, and a dumbwaiter car
     // too tall are reported.
-    ok(&mut app, "elevator.create", json!({ "point": [2.0, 1.0], "base_level": levels[0], "top_level": levels[3], "kind": "lula" }));
-    ok(&mut app, "elevator.create", json!({ "point": [7.0, 1.0], "base_level": levels[0], "top_level": levels[1], "kind": "freight", "load": 1000, "car_width": 2.4, "car_depth": 3.0, "class": "c2" }));
-    ok(&mut app, "elevator.create", json!({ "point": [7.0, 7.0], "base_level": levels[0], "top_level": levels[1], "kind": "dumbwaiter", "car_height": 1.5 }));
+    ok(&mut app, "elevator.create", json!({ "point": [2.0, 1.0], "base_level": levels[0], "top_level": levels[3], "kind": "lula", "equipment": false }));
+    ok(&mut app, "elevator.create", json!({ "point": [7.0, 1.0], "base_level": levels[0], "top_level": levels[1], "kind": "freight", "load": 1000, "car_width": 2.4, "car_depth": 3.0, "class": "c2", "equipment": false }));
+    ok(&mut app, "elevator.create", json!({ "point": [7.0, 7.0], "base_level": levels[0], "top_level": levels[1], "kind": "dumbwaiter", "car_height": 1.5, "equipment": false }));
     let f = ok(&mut app, "elevator.check", json!({}));
     let got: Vec<(&str, &str)> = f.as_array().unwrap().iter().map(|x| (x["kind"].as_str().unwrap(), x["rule"].as_str().unwrap())).collect();
     assert!(got.contains(&("limit", "ASME A17.1 5.2 (LULA)")), "{f:#}");
@@ -169,4 +170,48 @@ fn freight_hospital_vehicle_and_small_lifts() {
     assert!(got.contains(&("limit", "California Title 8 §3079 (dumbwaiter)")), "{f:#}");
     let class = f.as_array().unwrap().iter().find(|x| x["kind"] == "freight_class").unwrap();
     assert!((class["required"].as_f64().unwrap() - 2.4 * 3.0 * 244.0).abs() < 1e-6);
+}
+
+#[test]
+fn machine_spaces_controllers_power_and_the_schedule() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = new_app(dir.path());
+    let (levels, _) = building(&mut app);
+    // An MRL car (controller closet at the top landing), a traction car with a machine room over
+    // it, and a hydraulic car (pump room at the lowest landing), well apart.
+    let mrl = ok(&mut app, "elevator.create", json!({ "point": [2.0, 2.0], "base_level": levels[0], "top_level": levels[3] }));
+    let traction = ok(&mut app, "elevator.create", json!({ "point": [6.0, 2.0], "base_level": levels[0], "top_level": levels[2], "drive": "traction", "equipment_side": "left" }));
+    let hydraulic = ok(&mut app, "elevator.create", json!({ "point": [9.0, 9.0], "base_level": levels[0], "top_level": levels[1], "drive": "hydraulic", "rotation": std::f64::consts::PI }));
+    assert_eq!(mrl["equipment"].as_array().unwrap().len(), 1);
+    assert_eq!(hydraulic["equipment"].as_array().unwrap().len(), 2);
+
+    // The estimates: traction lifts the load less the 45 % balance at 70 %; hydraulic lifts car
+    // and load at 80 %.
+    let kw = |m: &Value| m["power"]["motor_kw"].as_f64().unwrap();
+    assert!((kw(&mrl) - 0.55 * 1588.0 * 9.81 * 1.0 / 0.7 / 1000.0).abs() < 1e-9);
+    assert!((kw(&hydraulic) - 2.0 * 907.0 * 9.81 * 0.5 / 0.8 / 1000.0).abs() < 1e-9, "{}", kw(&hydraulic));
+    assert!((hydraulic["power"]["heat_kw"].as_f64().unwrap() - 0.6 * kw(&hydraulic)).abs() < 1e-9);
+
+    // Each machine space is a virtual volume where the equipment stands, clear of everything else.
+    let spaces = ok(&mut app, "clearance.list", json!({}));
+    let spaces: Vec<&Value> = spaces.as_array().unwrap().iter().filter(|c| c["kind"] == "machine_space").collect();
+    assert_eq!(spaces.len(), 3);
+    let room = spaces.iter().find(|c| c["element"] == traction["elevator"]).unwrap();
+    assert!((room["min"][2].as_f64().unwrap() - (7.0 + traction["overhead"].as_f64().unwrap())).abs() < 1e-6, "{room}");
+    let overlaps = ok(&mut app, "overlap.find", json!({}));
+    assert_eq!(overlaps["overlaps"], json!([]), "{overlaps:#}");
+    assert_eq!(intrusions(&mut app), Vec::<Value>::new());
+
+    // The controller's power connector carries the load, so a circuit can feed it.
+    let ctl = mrl["equipment"][0].clone();
+    let ports = ok(&mut app, "connector.list", json!({ "element_id": ctl }));
+    let port = &ports.as_array().unwrap()[0]["connector"]["electrical"];
+    assert_eq!((port["voltage"].as_f64(), port["poles"].as_u64(), port["load_classification"].as_str()), (Some(480.0), Some(3), Some("Motor")), "{ports:#}");
+    assert!((port["load"][0].as_f64().unwrap() - mrl["power"]["va"].as_f64().unwrap()).abs() < 1e-6);
+
+    // The schedule lists every car with its sizes and estimates.
+    let sched = ok(&mut app, "schedule.create", json!({ "category": "cat.transport" }));
+    let table = ok(&mut app, "schedule.get_table", json!({ "schedule_id": sched }));
+    let text = table.to_string();
+    assert!(text.contains("Elevator") && text.contains("2591 × 2108") && text.contains("kW"), "{table:#}");
 }

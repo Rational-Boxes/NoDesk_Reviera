@@ -26,8 +26,10 @@ for _, l in ipairs(levels) do
   reviera.floor.create{ loops = { loop }, level_id = l }
 end
 
+-- The lifts are packed close together, so they are made without their controllers and machine
+-- spaces (the sample `elevators` shows those).
 local function lift(x, y, kind, top, more)
-  local args = { point = { x, y }, base_level = levels[1], top_level = levels[top], kind = kind }
+  local args = { point = { x, y }, base_level = levels[1], top_level = levels[top], kind = kind, equipment = false }
   for k, v in pairs(more or {}) do args[k] = v end
   return reviera.elevator.create(args)
 end

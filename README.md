@@ -723,7 +723,14 @@ tools and the datums.
   counter-loading dumbwaiter, each from its makers' catalogue car with its own hoistway, pit,
   overhead and entrance (sliding, swinging onto the landing, or an opening). Check Elevators adds
   freight loading classes (A17.1 2.16.2.2) and each kind's limits on area, load, rise and car
-  height (A17.1, A18.1, California Title 8). Not built yet for elevators: editing in place, rear
+  height (A17.1, A18.1, California Title 8).
+- **Elevator services and schedule** (ARC-VT-007…009): each elevator gets its controller (an
+  `IfcElectricDistributionBoard` with a *Motor* power connector) and, for hydraulic cars, a power
+  unit, in the space its drive needs, shown as a virtual volume: a controller closet at the top
+  landing (MRL), a pump room at the lowest (hydraulic) or a machine room over the hoistway
+  (traction). Motor power, full-load current and heat are planning estimates from the load and
+  speed, marked as such (no maker tables were found). Schedules of *Transport Elements* list
+  each car with its sizes and estimates. Not built yet for elevators: editing in place, rear
   entrances, vertical bi-parting and telescopic doors, machine rooms, hall fixtures, banks,
   panoramic cars; escalators and moving walks, stairlifts, people movers, funiculars and ropeways
   (planned).
@@ -1748,7 +1755,8 @@ sample:
   segment.
 - **Elevators in an office core** (`elevators.ifc`): five storeys under the IBC with a pair of
   3500 lb passenger elevators sized for the stretcher and a two-stop hydraulic elevator, each with
-  its shaft, hoistway walls and entrances; Check Elevators and Check Clearances find nothing.
+  its shaft, hoistway walls, entrances, controller and machine space, and an elevator schedule
+  with power and heat estimates; Check Elevators and Check Clearances find nothing.
 - **Hospital, freight and small lifts** (`lifts.ifc`): a four-storey clinic and service building
   with a hospital elevator, freight and vehicle elevators, a LULA, a home elevator, a platform lift
   and a dumbwaiter; Check Elevators gives one note.

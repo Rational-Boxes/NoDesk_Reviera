@@ -1011,7 +1011,16 @@ fn the_elevators_sample_keeps_its_cars_and_hoistways() {
         let el = reviera_core::elevators::elevator(s.get(reviera_core::ElementId(e["elevator"].as_u64().unwrap())).unwrap()).unwrap();
         assert_eq!((el.walls.len(), el.entrances.len()), (4, el.levels.len()));
     }
-    // Nothing in the hoistways or landings, nothing overlapping, nothing to report.
+    // Controllers in closets at the top for the pair, pump unit and controller in a pump room for
+    // the hydraulic car; the schedule's three rows give each motor's estimated power.
+    let mut equipment: Vec<usize> = list.iter().map(|e| e["equipment"].as_array().map_or(0, Vec::len)).collect();
+    equipment.sort();
+    assert_eq!(equipment, [1, 1, 2]);
+    let sched = s.iter().find(|e| e.name.as_deref() == Some("Elevator Schedule")).expect("the schedule").id();
+    let t = ok(&mut app, "schedule.get_table", json!({ "schedule_id": sched.0 }));
+    assert_eq!(t["rows"].as_array().map(Vec::len), Some(3), "{t:#}");
+    assert!(t.to_string().contains("12.2 kW"), "{t:#}");
+    // Nothing in the hoistways, landings or machine spaces, nothing overlapping, nothing to report.
     assert_eq!(ok(&mut app, "elevator.check", json!({})), json!([]));
     assert_eq!(ok(&mut app, "clearance.check", json!({})), json!([]));
 }

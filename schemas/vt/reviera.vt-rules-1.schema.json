@@ -362,6 +362,17 @@
                   "opening"
                 ],
                 "description": "The landing entrance: a sliding automatic door (default), a swinging door, or an opening for doors or gates Reviera does not model yet (vertical bi-parting, slide-up)."
+              },
+              "voltage": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "This car's supply voltage, in place of the services default."
+              },
+              "phases": {
+                "enum": [
+                  1,
+                  3
+                ]
               }
             }
           }
@@ -460,6 +471,134 @@
         },
         "confidence": {
           "$ref": "#/$defs/confidence"
+        },
+        "services": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Planning estimates of an elevator's power and heat, and the spaces its machine and controller need, until a product's own data replaces them.",
+          "required": [
+            "balance",
+            "traction_efficiency",
+            "hydraulic_efficiency",
+            "car_mass_ratio",
+            "traction_heat",
+            "hydraulic_heat",
+            "voltage",
+            "phases",
+            "power_factor",
+            "closet",
+            "pump_room",
+            "machine_room_height",
+            "source",
+            "confidence"
+          ],
+          "properties": {
+            "balance": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Counterweight balance as a share of the rated load (traction)."
+            },
+            "traction_efficiency": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1
+            },
+            "hydraulic_efficiency": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1
+            },
+            "car_mass_ratio": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "The car's own mass as a share of its rated load (hydraulic cars lift both)."
+            },
+            "traction_heat": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Heat released as a share of the motor power (traction)."
+            },
+            "hydraulic_heat": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Heat released as a share of the motor power (hydraulic)."
+            },
+            "voltage": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Supply voltage."
+            },
+            "phases": {
+              "enum": [
+                1,
+                3
+              ]
+            },
+            "power_factor": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1
+            },
+            "closet": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              ],
+              "items": false,
+              "minItems": 3,
+              "description": "A machine-room-less elevator's controller closet beside the hoistway at the top landing: width, depth and height."
+            },
+            "pump_room": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              ],
+              "items": false,
+              "minItems": 3,
+              "description": "A hydraulic elevator's machine room beside the hoistway at the lowest landing: width, depth and height."
+            },
+            "machine_room_height": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Clear height of a traction elevator's machine room over the hoistway."
+            },
+            "machine_room_margin": {
+              "type": "number",
+              "minimum": 0,
+              "description": "How much wider than the hoistway (with its walls) a machine room over it is."
+            },
+            "source": {
+              "$ref": "#/$defs/source"
+            },
+            "confidence": {
+              "$ref": "#/$defs/confidence"
+            }
+          }
         }
       }
     },

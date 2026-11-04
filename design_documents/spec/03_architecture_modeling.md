@@ -3797,6 +3797,59 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 
 *Built (2026-11-03):* as ARC-VT-005. Not yet: A18.1's 1500 mm limit for an unenclosed platform, inclined platform lifts and stairlifts (plan §5), home lifts to England's M4(3) through-floor liftway, counter-height landing zones for dumbwaiters.
 
+### 3.7a.7 Power and heat estimates
+**ID:** ARC-VT-007 · **Priority:** P2 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §4.4; research/16 H3, H4, O (N-D1, N-D3); owner direction on logical extrapolations (2026-10-25)
+
+**Purpose.** Give the electrical and mechanical designers a first figure for each elevator's supply and heat while no product is chosen, said plainly to be an estimate.
+
+**Behaviour & rules.**
+- **An extrapolation, marked as such.** No maker's kVA, full-load current or heat table was found in public sources (research/16 H3, N-D1). The sizing pack's `services` block therefore gives a planning method, recorded for expert review (E-85):
+  - **traction** (MRL or with a machine room): motor power = (1 − balance) × rated load × g × speed ÷ efficiency, with the counterweight balancing 45 % of the load and 70 % efficiency;
+  - **hydraulic** (holed or holeless): motor power = (car mass + rated load) × g × speed ÷ efficiency, the car's own mass taken as its rated load and 80 % efficiency. This matches the one public project read: 1000 kg at 1 m/s on a 24 kW motor (S2386);
+  - apparent power = motor power ÷ the power factor (0.85); full-load current = apparent power ÷ (√3 × voltage) for three phases, or ÷ voltage for one;
+  - heat released = 30 % of the motor power for traction (VA's rule of thumb, research/16 H4) and 60 % for hydraulic (in line with the residential tank figures).
+- **Supply.** 480 V three-phase under `practice_us`, 400 V under `practice_en`; a catalogue car may give its own (LULA 208 V three-phase; home elevator 230 V and platform lift 120 V, single-phase).
+- The estimates are returned with the sizes (`power`: motor kW, current, voltage, phases, VA, heat kW), written to `Reviera_Elevator` (MotorPower, FullLoadCurrent, SupplyVoltage, HeatRelease), carried as the load of the controller's power connector (ARC-VT-008), and shown in the elevator schedule (ARC-VT-009).
+
+**Acceptance criteria.**
+- [x] A 3500 lb MRL car at 1.0 m/s is estimated at 0.55 × 1588 × 9.81 ÷ 0.7 ≈ 12.2 kW; a 2000 lb hydraulic car at 0.5 m/s at 2 × 907 × 9.81 × 0.5 ÷ 0.8 ≈ 11.1 kW, releasing 60 % of it as heat.
+
+*Built (2026-11-03):* in `elevators::power_estimate`. Not yet: entering a product's own figures over the estimates, regenerative drives, starts per hour and duty, the machine-room temperature and ventilation rule (Washington's CFM formula, research/16 H4).
+
+### 3.7a.8 Machine spaces and equipment
+**ID:** ARC-VT-008 · **Priority:** P2 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §4.4; research/16 A9, H2, L2, L3 (Z21)
+
+**Purpose.** Reserve the room an elevator's machine and controller need, and put the equipment there so that the electrical designer can feed it.
+
+**Behaviour & rules.**
+- **The space by drive** (`services` in the sizing pack), on the side of the hoistway chosen (`equipment_side`, right by default, as you face the entrance):
+  - **machine-room-less traction**: a controller closet beside the hoistway at the top landing, its front on the hoistway's front face (1219 × 508 mm, 2134 mm high under `practice_us`, after KONE's remote closet);
+  - **hydraulic**: a pump room beside the hoistway at the lowest landing (2184 × 2172 mm, 2286 mm high, after TKE's submersible unit room);
+  - **traction with a machine room**: a room over the hoistway, on the overhead, as wide as the hoistway with its walls plus 406 mm (DoD), 2134 mm high.
+- **Equipment** (`equipment`, true by default): an *Elevator Controller* (an `IfcElectricDistributionBoard` USERDEFINED `ELEVATOR_CONTROLLER`, 600 × 300 × 2000 mm) against the space's back, facing the landing, with a power connector (load class *Motor*) carrying the estimate of ARC-VT-007; and in a pump room a *Hydraulic Power Unit* (an `IfcPump` USERDEFINED `HYDRAULIC_POWER_UNIT`, 1200 × 800 × 1500 mm). Both are members of the elevator, deleted with it.
+- **The machine space is a virtual volume** (kind *elevator machine space*, orange), from its floor to its height: only the elevator's own members may be in it, so a wall or duct drawn through it is reported by `clearance.check`. Its walls and door are left to the designer.
+
+**Data (IFC mapping).** The equipment as above; the space as ARC-MOD-031.
+
+**Acceptance criteria.**
+- [x] An MRL elevator gets a controller in a closet at its top landing; a hydraulic one a pump unit and controller in a pump room at its lowest; a traction one a machine room over its overhead; nothing overlaps.
+- [x] The controller's connector is 480 V, three-phase, class *Motor*, with the estimated VA.
+
+*Built (2026-11-03):* in `elevator.create`, and the Elevator dialog's *Controller and machine* (right, left or none). Not yet: the traction machine itself, working clearances in front of the controller (Z21), disconnects, the sump and pit ladder, and placing equipment where it would collide (it is placed regardless and reported).
+
+### 3.7a.9 Elevator schedule
+**ID:** ARC-VT-009 · **Priority:** P2 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §10; DOC-SCH (schedules)
+
+**Purpose.** List the elevators as the elevator consultant and the maker need them.
+
+**Behaviour & rules.**
+- Schedules of the category *Transport Elements* (`cat.transport`) have one row per car, with the fields `vt.kind`, `vt.load`, `vt.persons`, `vt.speed`, `vt.drive`, `vt.stops`, `vt.car` (width × depth × height, mm), `vt.door`, `vt.hoistway`, `vt.pit`, `vt.overhead`, `vt.machine` (the machine space), `vt.power`, `vt.current` and `vt.heat`, besides Mark, Level, Type and the common fields. A new one shows Mark, Kind, Level, Stops, Rated Load, Persons, Speed, Drive, Car, Hoistway, Pit, Overhead, Motor Power and Heat Release. Rated load, persons, power, current and heat total.
+
+**Acceptance criteria.**
+- [x] A schedule of *Transport Elements* lists each car with its hoistway (for example "2591 × 2108") and its estimated motor power.
+
+*Built (2026-11-03):* in `schedules`. Not yet: hoistway section and plan sheets dimensioned automatically (plan §10).
+
 ---
 
 ## 3.8 Openings
@@ -6130,8 +6183,8 @@ All commands below are registered once in the command registry and exposed autom
 | `vt.set_rule_packs` | packs? (none for automatic) | — | Yes | ARC-VT-001 |
 | `vt.add_rule_pack` | pack | id | Yes | ARC-VT-001 |
 | `vt.remove_rule_pack` | id | — | Yes | ARC-VT-001 |
-| `elevator.size` | kind?, class?, load?, speed?, drive?, door?, car_width?, car_depth?, car_height?, door_width?, door_height?, storeys?, space_below? | {kind, class, load, persons, speed, drive, door, car, door_size, entrance, sill, hoistway, pit, overhead, sizing_pack, notes} | No (query) | ARC-VT-002 |
-| `elevator.create` | point, rotation?, base_level, top_level, (as `elevator.size`), walls?, wall_thickness? | {elevator, shaft, walls, entrances, sizes} | Yes | ARC-VT-002 |
+| `elevator.size` | kind?, class?, load?, speed?, drive?, door?, car_width?, car_depth?, car_height?, door_width?, door_height?, storeys?, space_below? | {kind, class, load, persons, speed, drive, door, car, door_size, entrance, sill, hoistway, pit, overhead, sizing_pack, power, notes} | No (query) | ARC-VT-002 |
+| `elevator.create` | point, rotation?, base_level, top_level, (as `elevator.size`), walls?, wall_thickness?, equipment?, equipment_side? | {elevator, shaft, walls, entrances, equipment, sizes} | Yes | ARC-VT-002 |
 | `elevator.list` | — | [{elevator, name, levels, sizes, members}] | No (query) | ARC-VT-002 |
 | `elevator.delete` | elevator | count | Yes | ARC-VT-002 |
 | `elevator.check` | elevators? | finding[] | No (query) | ARC-VT-004 |

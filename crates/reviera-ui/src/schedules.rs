@@ -46,6 +46,7 @@ const CATEGORIES: &[(&str, &str)] = &[
     ("cat.floors", "Floors"),
     ("cat.ceilings", "Ceilings"),
     ("cat.roofs", "Roofs"),
+    ("cat.transport", "Transport Elements (elevators and lifts)"),
 ];
 
 impl Gui {
