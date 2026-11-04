@@ -51,7 +51,15 @@ pub fn record(path: &Path) -> Option<FileSync> {
 }
 
 fn keep(path: &Path, r: &FileSync) -> Result<()> {
-    std::fs::write(sidecar(path), serde_json::to_string_pretty(r).expect("serialises")).map_err(io)
+    std::fs::write(sidecar(path), serde_json::to_string_pretty(r).expect("serialises")).map_err(io)?;
+    // The content as synced: the base of a merge.
+    std::fs::copy(path, base_path(path)).map_err(io)?;
+    Ok(())
+}
+
+fn base_path(path: &Path) -> PathBuf {
+    let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    path.with_file_name(format!(".{name}.riviera-base"))
 }
 
 /// The stable local copy of `name` in FileEngine folder `folder_uid`.
@@ -87,6 +95,26 @@ pub fn adopt(app: &mut App, path: &Path, conn: &str, uid: &str) -> Result<()> {
     let version = app.fileengine.with(conn, |c| c.stat(uid))?.version;
     let bytes = std::fs::read(path).map_err(io)?;
     keep(path, &FileSync { connection_id: conn.to_owned(), uid: uid.to_owned(), version, sha256: sha(&bytes) })
+}
+
+/// Sends a synced file's changes back as a new version, merging them with someone else's newer
+/// version with `merge(base, mine, theirs)` (which returns the merged content and the conflicts);
+/// the merge is written here too. Returns whether anything was sent, and the conflicts.
+pub fn push_merged(app: &mut App, path: &Path, merge: impl FnOnce(&[u8], &[u8], &[u8]) -> Result<(Vec<u8>, Vec<String>)>) -> Result<(bool, Vec<String>)> {
+    match push(app, path) {
+        Err(e) if e.code == "fileengine.conflict" => {
+            let r = record(path).expect("a synced file");
+            let base = std::fs::read(base_path(path)).map_err(io)?;
+            let mine = std::fs::read(path).map_err(io)?;
+            let theirs = app.fileengine.with(&r.connection_id, |c| c.read(&r.uid))?;
+            let (merged, conflicts) = merge(&base, &mine, &theirs)?;
+            std::fs::write(path, &merged).map_err(io)?;
+            app.fileengine.with(&r.connection_id, |c| c.write_file(&r.uid, path))?;
+            adopt(app, path, &r.connection_id, &r.uid)?;
+            Ok((true, conflicts))
+        }
+        other => other.map(|sent| (sent, Vec::new())),
+    }
 }
 
 /// Sends a synced file's changes back as a new version; `false` when `path` is not a synced file

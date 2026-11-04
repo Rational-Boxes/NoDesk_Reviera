@@ -247,6 +247,54 @@ pub fn check_against(new: &Library, old: &Library) -> Result<()> {
     Ok(())
 }
 
+/// Merges `mine` into `theirs` against `base` (COL-FE-014): definitions by GUID and groups by id;
+/// what `mine` changed from `base` is taken over `theirs`, the rest is `theirs`, and the library's
+/// details likewise. Returns the merge and the definitions and groups both changed differently
+/// (`mine` kept). Definitions are never dropped: one `mine` removed stays if `theirs` changed it.
+pub fn merge(base: &Library, mine: &Library, theirs: &Library) -> (Library, Vec<String>) {
+    let mut out = theirs.clone();
+    let mut conflicts = Vec::new();
+    if mine.library != base.library {
+        if theirs.library != base.library && theirs.library != mine.library {
+            conflicts.push("library details".to_owned());
+        }
+        out.library = mine.library.clone();
+    }
+    // Groups by id.
+    for g in &mine.groups {
+        let b = base.groups.iter().find(|x| x.id == g.id);
+        if b == Some(g) {
+            continue;
+        }
+        match out.groups.iter_mut().find(|x| x.id == g.id) {
+            Some(t) => {
+                if b.is_some_and(|b| t != b) && t != g {
+                    conflicts.push(format!("group {}", g.name));
+                }
+                *t = g.clone();
+            }
+            None => out.groups.push(g.clone()),
+        }
+    }
+    // Definitions by GUID.
+    for d in &mine.definitions {
+        let b = base.definitions.iter().find(|x| x.guid == d.guid);
+        if b == Some(d) {
+            continue;
+        }
+        match out.definitions.iter_mut().find(|x| x.guid == d.guid) {
+            Some(t) => {
+                if b.is_some_and(|b| t != b) && t != d {
+                    conflicts.push(format!("{} ({})", d.name, d.guid));
+                }
+                *t = d.clone();
+            }
+            None => out.definitions.push(d.clone()),
+        }
+    }
+    (out, conflicts)
+}
+
 /// The library as written: sorted keys, 2-space indentation, a final newline.
 pub fn write(lib: &Library) -> String {
     fn sort(v: Value) -> Value {
@@ -420,5 +468,32 @@ mod tests {
         assert_eq!(d[0].guid, "3b0d2a4e-5f61-4c7a-9e2b-1d0c8f6a7b51");
         assert_eq!(d[0].tooltip, "the rating");
         assert_eq!(legacy_type("autodesk.spec.aec:length-2.0.0"), Some("length"));
+    }
+}
+
+#[cfg(test)]
+mod merge_tests {
+    use super::*;
+
+    fn def(guid: &str, name: &str) -> Definition {
+        serde_json::from_value(serde_json::json!({ "guid": guid, "name": name, "data_type": "text" })).unwrap()
+    }
+
+    #[test]
+    fn edits_from_both_sides_merge_by_guid() {
+        let mut base = Library::new("Lib");
+        base.definitions.push(def("0f9b6c1e-0000-4000-8000-000000000001", "Acoustic Class"));
+        let mut mine = base.clone();
+        mine.definitions.push(def("0f9b6c1e-0000-4000-8000-000000000002", "Finish"));
+        let mut theirs = base.clone();
+        theirs.definitions.push(def("0f9b6c1e-0000-4000-8000-000000000003", "Fire Rating"));
+        let (m, conflicts) = merge(&base, &mine, &theirs);
+        assert_eq!(m.definitions.len(), 3);
+        assert!(conflicts.is_empty());
+        // The same definition renamed on both sides: mine kept, reported.
+        mine.definitions[0].name = "Acoustic class (mine)".into();
+        theirs.definitions[0].name = "Acoustic class (theirs)".into();
+        let (m, conflicts) = merge(&base, &mine, &theirs);
+        assert_eq!((m.definitions[0].name.as_str(), conflicts.len()), ("Acoustic class (mine)", 1));
     }
 }

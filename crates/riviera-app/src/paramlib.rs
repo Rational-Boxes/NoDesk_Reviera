@@ -78,9 +78,21 @@ impl App {
         let dir = cache_dir(self);
         let _ = std::fs::create_dir_all(&dir);
         let _ = std::fs::write(dir.join(format!("{id}.json")), paramlib::write(&l.lib));
-        // A library opened from FileEngine goes back as a new version (COL-FE-014).
+        // A library opened from FileEngine goes back as a new version (COL-FE-014), merged by
+        // definition GUID with anyone else's newer one; the merge becomes the open library.
         let path = self.libraries.get(id).expect("open").path.clone();
-        crate::fe_files::push(self, &path)?;
+        crate::fe_files::push_merged(self, &path, |base, mine, theirs| {
+            let text = |b: &[u8]| String::from_utf8_lossy(b).into_owned();
+            let (merged, conflicts) = paramlib::merge(&paramlib::parse(&text(base))?, &paramlib::parse(&text(mine))?, &paramlib::parse(&text(theirs))?);
+            paramlib::check(&merged)?;
+            Ok((paramlib::write(&merged).into_bytes(), conflicts))
+        })?;
+        if let Ok(text) = std::fs::read_to_string(&path)
+            && let Ok(lib) = paramlib::parse(&text)
+            && let Some(l) = self.libraries.get_mut(id)
+        {
+            l.lib = lib;
+        }
         Ok(())
     }
 }

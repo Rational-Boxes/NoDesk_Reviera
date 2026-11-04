@@ -135,11 +135,14 @@ fn parameter_libraries_scripts_and_keynotes_on_fileengine() {
     let bconn = connected(&mut bob, &fake);
     let opened = ok(&mut bob, "paramlib.open", json!({ "path_or_url": format!("fileengine://{bconn}/{eng}/acme.rplib.json") }));
     assert_eq!((opened["name"].as_str(), opened["definitions"].as_u64()), (Some("Acme parameters"), Some(1)));
-    // Bob adds one; Ann, who opened the older version, is refused rather than overwriting it.
+    // Bob adds one; Ann, who opened the older version, adds another: merged by GUID, both kept,
+    // and Ann's open library becomes the merge.
     ok(&mut bob, "paramlib.definition.add", json!({ "library_id": lib, "def": { "name": "Fire Rating", "data_type": "text", "ifc": { "pset": "ACME_Common", "property": "FireRating" } } }));
-    let e = run(&mut ann, "paramlib.definition.add", json!({ "library_id": lib, "def": { "name": "Finish", "data_type": "text", "ifc": { "pset": "ACME_Common", "property": "Finish" } } })).unwrap_err();
-    assert_eq!(e.code, "fileengine.conflict", "{e:?}");
-    assert!(String::from_utf8(fake.content(&uid).unwrap()).unwrap().contains("Fire Rating"));
+    ok(&mut ann, "paramlib.definition.add", json!({ "library_id": lib, "def": { "name": "Finish", "data_type": "text", "ifc": { "pset": "ACME_Common", "property": "Finish" } } }));
+    let on_server = String::from_utf8(fake.content(&uid).unwrap()).unwrap();
+    assert!(on_server.contains("Fire Rating") && on_server.contains("Finish") && on_server.contains("Acoustic Class"), "{on_server}");
+    let listed = ok(&mut ann, "paramlib.list", json!({}));
+    assert!(listed.to_string().contains("\"definitions\":3"), "{listed}");
 
     // A plugin folder imported from FileEngine, and a keynote file.
     let src = dir.path().join("plugin");

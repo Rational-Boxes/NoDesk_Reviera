@@ -27754,16 +27754,16 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 **Behaviour & rules.**
 - **Files kept open** (`x-riviera-file` `read_sync`, `write_sync`): a parameter library opened from FileEngine (`paramlib.open`) or made there (`paramlib.create`) has a stable copy in the per-user cache (`<data>/riviera/fileengine/synced/<connection>/<folder uid>/<name>`) with a sidecar naming its connection, uid, version and SHA-256.
   - Opening brings the copy up to date, unless it holds changes not yet sent, which are kept.
-  - Every save of the library (each definition or group edit) sends it back as a new version, only over the version it was opened at. When someone saved meanwhile, the save is refused with `fileengine.conflict` and the change is kept in the copy, to be made again after opening the newer one.
+  - Every save of the library (each definition or group edit) sends it back as a new version. When someone saved meanwhile, the two are merged against the copy as it was last synced: definitions by GUID and groups by id, this side's changes over theirs, everything else theirs (a definition both changed differently keeps this side's). The merge is checked, uploaded, and becomes the open library.
 - **Files or folders** (`read_any`): `script.import` takes a `.lua` file or a plugin folder on FileEngine; a folder is mirrored as COL-FE-013's libraries are and imported from the mirror.
 - **Also read from FileEngine** (`read`): `keynotes.load` (the cached copy is kept as the keynote file, so `keynotes.reload` re-reads it; loading from FileEngine again takes the newest), and a remote-analysis subscription's CA certificate.
 - **In the window:** Parameter Libraries' *Open…*, *New…*, *Import* and *Export*, *Load Keynotes*, *Run Script…* and *Import into Library* (a script, or a plugin folder) offer FileEngine when a connection exists.
 
 **Acceptance criteria.**
-- [x] Against the fake server: a parameter library made on FileEngine uploads, and a definition added goes back as a new version; another machine opens it by folder and name and adds one; the first machine's next edit, made over the older version, is refused with `fileengine.conflict` and the server keeps the second machine's; a plugin folder on FileEngine imports into the script library; a keynote file loads from FileEngine.
+- [x] Against the fake server: a parameter library made on FileEngine uploads, and a definition added goes back as a new version; another machine opens it by folder and name and adds one; the first machine's next edit, made over the older version, is merged: the server and the first machine's open library then hold all three definitions; a plugin folder on FileEngine imports into the script library; a keynote file loads from FileEngine.
 - [x] Live (2026-11-04): a parameter library made on FileEngine, edited, and opened on a second machine.
 
-*Built (2026-11-04):* `riviera_app::fe_files` and the three marks; 60 commands marked in all. Not yet: merging parameter-library edits by definition GUID instead of refusing, `keynotes.reload` fetching the newest from FileEngine, `docs.link` and `docs.publish_local` (they take FileEngine folders through their own fields).
+*Built (2026-11-04):* `riviera_app::fe_files` and the three marks; 60 commands marked in all. Not yet: reporting the definitions both sides changed in the window, `keynotes.reload` fetching the newest from FileEngine, `docs.link` and `docs.publish_local` (they take FileEngine folders through their own fields).
 
 ### Publish sets
 **ID:** COL-FE-015 · **Priority:** P2 · **Ref:** FILEENGINE_INTEGRATION §7a (*Publish sets*)
