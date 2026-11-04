@@ -51,12 +51,14 @@ pub struct Settings {
     pub clearance: f64,
     /// Category keys whose elements are not obstacles (`cat.furniture`…).
     pub ignored_categories: Vec<String>,
+    /// Along a stair's flights in an egress route (m/s; ANA-ROUTE-004).
+    pub stair_speed: f64,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         // Provisional values for expert review (EXPERT_REVIEW E-35).
-        Settings { zone_bottom: 0.2, zone_top: 2.0, walking_speed: 1.3, clearance: 0.3, ignored_categories: Vec::new() }
+        Settings { zone_bottom: 0.2, zone_top: 2.0, walking_speed: 1.3, clearance: 0.3, ignored_categories: Vec::new(), stair_speed: 0.6 }
     }
 }
 
@@ -92,7 +94,8 @@ pub fn path_data(e: &Element) -> Option<PathData> {
     (d.kind == KIND).then_some(d)
 }
 
-type Poly = Vec<[f64; 2]>;
+/// An obstacle's outline in plan, grown by the clearance.
+pub type Poly = Vec<[f64; 2]>;
 
 /// Grows a convex outline (counter-clockwise) by `r`: each edge moved out by `r`, each corner an
 /// arc of chords whose sides touch the true arc from outside.
@@ -482,6 +485,8 @@ pub struct SettingsParams {
     pub walking_speed: Option<f64>,
     pub clearance: Option<f64>,
     pub ignored_categories: Option<Vec<String>>,
+    /// Along a stair's flights in an egress route (m/s).
+    pub stair_speed: Option<f64>,
 }
 
 /// `route_settings.set`.
@@ -499,6 +504,9 @@ pub(crate) fn set_settings(txn: &mut Transaction<'_>, p: SettingsParams) -> Resu
     if let Some(v) = p.clearance {
         s.clearance = v;
     }
+    if let Some(v) = p.stair_speed {
+        s.stair_speed = v;
+    }
     if let Some(v) = p.ignored_categories {
         if let Some(bad_key) = v.iter().find(|k| crate::categories::category(k).is_none()) {
             return Err(bad("route.category", format!("{bad_key:?} is not a category key")));
@@ -508,8 +516,8 @@ pub(crate) fn set_settings(txn: &mut Transaction<'_>, p: SettingsParams) -> Resu
     if !(s.zone_bottom >= 0.0 && s.zone_top > s.zone_bottom && s.zone_top <= 10.0) {
         return Err(bad("route.settings", "the zone runs from a bottom of 0 m or more to a higher top, at most 10 m"));
     }
-    if !(s.walking_speed > 0.0 && s.walking_speed <= 10.0) || !(0.0..=3.0).contains(&s.clearance) {
-        return Err(bad("route.settings", "the walking speed runs from above 0 to 10 m/s and the clearance from 0 to 3 m"));
+    if !(s.walking_speed > 0.0 && s.walking_speed <= 10.0) || !(s.stair_speed > 0.0 && s.stair_speed <= 10.0) || !(0.0..=3.0).contains(&s.clearance) {
+        return Err(bad("route.settings", "the walking and stair speeds run from above 0 to 10 m/s and the clearance from 0 to 3 m"));
     }
     let pid = txn.store().iter().find(|e| e.class == "IfcProject").map(Element::id).ok_or_else(|| bad("project.missing", "the model has no project"))?;
     let v = serde_json::to_value(&s).expect("serialises");

@@ -4990,6 +4990,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         }),
         "path_of_travel.update" => with(gui, Gui::update_paths),
         "route_settings.set" => with(gui, Gui::route_settings_dialog),
+        "egress.route" => with(gui, Gui::egress_route_dialog),
         "path_of_travel.list" => with(gui, Gui::paths_dialog),
         "circuit.set_locked" => with(gui, Gui::toggle_circuit_lock),
         "circuit.disconnect_panel" => with(gui, Gui::disconnect_circuit_panel),

@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Riviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Riviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 891 numbered requirements (320 P0 · 343 P1 · 221 P2 · 7 P3), 2,332 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 892 numbered requirements (320 P0 · 343 P1 · 222 P2 · 7 P3), 2,333 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Riviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Riviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,332 commands; 891 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,333 commands; 892 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -14276,7 +14276,7 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 **Acceptance criteria.**
 - [x] A transit escalator between levels 6 m apart is heavy duty at 0.65 m/s with two run-off zones; a building escalator beside it has none.
 
-*Built (2026-11-04):* in `reviera_core::escalators`. Not yet: airport-specific rules (trolley walks, queue depths before walks in series), run-off to gatelines (8–12 m, the NR flow formula), transition radii, a stair beside every bank of two or more units.
+*Built (2026-11-04):* in `riviera_core::escalators`. Not yet: airport-specific rules (trolley walks, queue depths before walks in series), run-off to gatelines (8–12 m, the NR flow formula), transition radii, a stair beside every bank of two or more units.
 
 ### 3.7a.21 Station unit counts and escalators in egress
 **ID:** ARC-VT-021 · **Priority:** P2 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §9; research/16 P2, P4 (*unit-count checks*, *egress mode*), Conflict on egress counting
@@ -22413,6 +22413,24 @@ The job runs in the background with a notification. Spaces that no system serves
 - [ ] A one-way indicator that points against the direct route forces the path to take an alternative door.
 - [ ] Ignoring the Furniture category lets paths pass through furniture.
 
+### 4.12.13a Egress routes across levels
+**ID:** ANA-ROUTE-004 · **Priority:** P2 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §9 (*Egress*); owner direction (2026-11-04: "Egress and transit"); research/16 P2, P4
+
+**Purpose.** Find the way out from a point on one level to an exit on another, by the stairs, and by escalators where the code counts them, with its length and time.
+
+**Behaviour & rules.**
+- `egress.route(start: {point, level}, end: {point, level}, mode?)` returns the quickest route by time:
+  - **on each level** the shortest walk round its obstacles, as a path of travel (ANA-ROUTE-001), at the walking speed;
+  - **between levels** a stair, from 0.4 m before its first riser on its base level to 0.4 m beyond its last on its top level, its length along the middle of its flights and landings, at the **stair speed** (route settings, default 0.6 m/s along the flights);
+  - **escalators** under `mode` `nfpa130` or `scdf` (ARC-VT-021): from 0.6 m beyond each end of the truss, walked as a stair; under `ibc` (default) never.
+- It returns the legs walked on each level (their points and lengths), the stairs and escalators taken (levels, length, time), and the total length and time. With no route (a point inside an obstacle, or no stair between the levels) it is refused (`route.no_route`).
+- `route_settings.set` takes `stair_speed`. **In the window:** Analyze › Route Analysis › *Egress Route* (levels and points typed, the escalator rule chosen) reports the route leg by leg.
+
+**Acceptance criteria.**
+- [x] From the far end of an upper level to an exit beyond a wall on the level below, the route walks to the stair's head, takes the stair and goes round the wall's open end; its time is the walks at 1.3 m/s and the stair at 0.6 m/s. With an escalator nearer, the IBC route still takes the stair and the NFPA 130 route the escalator, sooner. Between levels with no stair it is refused.
+
+*Built (2026-11-04):* `riviera_core::egress_route` and the window's Egress Route; the sample *Escalators in a transit station*. Not yet: drawing the route in the plans, picking the points in the view, lifts (evacuation and firefighting lifts with their waits), ramps, the floor openings over stairwells as obstacles, occupant loads and exit capacity (flow through doors and stairs), platform clearing times.
+
 ### 4.12.14 Interference check (cross-reference)
 **ID:** ANA-CLASH-001 · **Priority:** P1 · **Ref:** research/03 §13.6
 
@@ -23219,6 +23237,7 @@ Every command below is registered once in the command registry and is exposed au
 | `path_of_travel.update` | ids[] \| "all_in_view" | — | Yes | ANA-ROUTE-001 |
 | `path_of_travel.add_waypoint` | id, point, index? | — | Yes | ANA-ROUTE-001 |
 | `route_settings.set` | params | — | Yes | ANA-ROUTE-002 |
+| `egress.route` | start: {point, level}, end: {point, level}, mode? | {legs, links, length, time} | No (query) | ANA-ROUTE-004 |
 | `route.reveal_obstacles` | view_id, on: bool | — | No | ANA-ROUTE-002 |
 | `path_of_travel.create_multiple` | view_id, starts[], ends[], min_separation | ids[] | Yes | ANA-ROUTE-002 |
 | `one_way_indicator.place` | view_id, point, direction | id | Yes | ANA-ROUTE-002 |
@@ -29942,11 +29961,11 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 | ARC | 77 | 101 | 29 | 1 | 208 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
-| ANA | 0 | 1 | 28 | 0 | 29 |
+| ANA | 0 | 1 | 29 | 0 | 30 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
 | COL | 8 | 52 | 16 | 1 | 77 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **343** | **221** | **7** | **891** |
+| **Total** | **320** | **343** | **222** | **7** | **892** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -30152,7 +30171,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2332 unique commands** in 434 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2333 unique commands** in 435 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -30269,6 +30288,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `duct_size_table` | 1 |
 | `edit` | 3 |
 | `editrequest` | 6 |
+| `egress` | 1 |
 | `electrical_analytical` | 3 |
 | `electrical_equipment` | 1 |
 | `electrical_load_area` | 2 |
@@ -31128,6 +31148,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `editrequest.list` | 6 | — | request[] | No | COL-OWN-003 |
 | `editrequest.manage` | 6 | — | () | No | COL-OWN-003 |
 | `editrequest.retract` | 6 | request_id | () | No | COL-OWN-003 |
+| `egress.route` | 4 | start: {point, level}, end: {point, level}, mode? | {legs, links, length, time} | No (query) | ANA-ROUTE-004 |
 | `electrical_analytical.add_node` | 4 | kind, parent_id?, distribution_system_id? | id | Yes | MEP-ELEC-020 |
 | `electrical_analytical.rollup` | 4 | root_id | report | No | MEP-ELEC-020 |
 | `electrical_analytical.set_phases` | 4 | node_id, mapping | — | Yes | MEP-ELEC-020 |

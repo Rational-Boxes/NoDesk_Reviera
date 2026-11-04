@@ -3292,6 +3292,12 @@ icon = "update_paths"
 help = "Work every path of travel in this plan out again after the model changed (ANA-ROUTE-001)"
 
 [[action]]
+id = "egress.route"
+label = "Egress Route"
+icon = "route_settings"
+help = "The quickest route from a point on one level to an exit on another: each level walked round its obstacles, the stairs between levels, and escalators where the egress mode counts them (ANA-ROUTE-004)"
+
+[[action]]
 id = "route_settings.set"
 label = "Route Settings"
 icon = "route_settings"
@@ -3977,6 +3983,7 @@ tools = [
   { action = "path_of_travel.update", size = "small" },
   { action = "route_settings.set", size = "small" },
   { action = "path_of_travel.list", size = "small" },
+  { action = "egress.route", size = "small" },
 ]
 
 [[tab.panel]]

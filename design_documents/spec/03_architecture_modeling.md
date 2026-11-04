@@ -4050,7 +4050,7 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 **Acceptance criteria.**
 - [x] A transit escalator between levels 6 m apart is heavy duty at 0.65 m/s with two run-off zones; a building escalator beside it has none.
 
-*Built (2026-11-04):* in `reviera_core::escalators`. Not yet: airport-specific rules (trolley walks, queue depths before walks in series), run-off to gatelines (8–12 m, the NR flow formula), transition radii, a stair beside every bank of two or more units.
+*Built (2026-11-04):* in `riviera_core::escalators`. Not yet: airport-specific rules (trolley walks, queue depths before walks in series), run-off to gatelines (8–12 m, the NR flow formula), transition radii, a stair beside every bank of two or more units.
 
 ### 3.7a.21 Station unit counts and escalators in egress
 **ID:** ARC-VT-021 · **Priority:** P2 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §9; research/16 P2, P4 (*unit-count checks*, *egress mode*), Conflict on egress counting

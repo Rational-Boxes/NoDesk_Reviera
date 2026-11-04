@@ -23,7 +23,15 @@ level at 7.0 m (the concourse) above the platform, and a 70 × 24 m **Architectu
      of tread with the worst unit out, up to half the platform's required capacity;
    - under the IBC they never count.
 
+4. **A stair.** **Architecture › Stair**, 1500 mm wide, from `4, 19` to `14.64, 19` up to the
+   concourse, then **Modify | Stairs › Stair Openings**.
+5. **The way out.** **Analyze › Route Analysis › Egress Route**:
+   - from the platform at `64, 4` to the concourse at `64, 20`;
+   - *Escalators* "Not counted (IBC)": the route walks to the west end, climbs the stair and
+     comes back east;
+   - "Counted (NFPA 130)": it takes the up escalator, and is quicker.
+
 ## Gaps
 
 - **[gap]** No escalator traffic or egress dialog yet.
-- **[gap]** Platform clearing times and egress routes across levels are not worked out yet.
+- **[gap]** Platform clearing times are not worked out yet, and a route is reported, not drawn.

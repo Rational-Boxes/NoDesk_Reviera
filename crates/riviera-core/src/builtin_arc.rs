@@ -578,6 +578,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(EscalatorTraffic),
         registry.add(PublishSaveSet),
         registry.add(LibraryUpdates),
+        registry.add(EgressRoute),
         registry.add(LibraryReloadItem),
         registry.add(PublishListSets),
         registry.add(PublishRemoveSet),
@@ -7446,4 +7447,18 @@ edit_command!(
     crate::library::ReloadItemParams,
     (),
     crate::library::reload_item
+);
+
+read_command!(
+    EgressRoute,
+    "egress.route",
+    "Egress route across levels",
+    "The quickest route from `start` to `end`, each a point on a level (ANA-ROUTE-004): on each level the \
+     shortest walk round its obstacles (the path-of-travel engine and settings), between levels the stairs \
+     (at the stair speed along their flights), and escalators too where the egress `mode` counts them \
+     (`nfpa130`, `scdf`; ARC-VT-021). Returns the legs walked on each level, the stairs and escalators taken, \
+     and the total length and time.",
+    crate::egress_route::RouteParams,
+    crate::egress_route::Route,
+    crate::egress_route::route
 );

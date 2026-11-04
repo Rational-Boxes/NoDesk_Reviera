@@ -155,6 +155,7 @@ pub fn toolset_of(command: &str) -> String {
             | "mep_color_legend"
             | "embodied_carbon"
             | "path_of_travel"
+            | "egress"
             | "route_settings"
             | "solar"
             | "energy_model"

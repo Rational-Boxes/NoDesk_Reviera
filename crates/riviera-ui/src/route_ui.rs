@@ -12,7 +12,7 @@ use riviera_core::ElementId;
 use riviera_core::path_of_travel as pot;
 use riviera_render::annotation::{Label, label_strokes};
 use riviera_render::plan::Lines;
-use serde_json::json;
+use serde_json::{Value, json};
 use wxdragon::prelude::*;
 
 use super::{Gui, error};
@@ -66,6 +66,7 @@ impl Gui {
         let bottom = f.text("Zone bottom (m)", &format!("{}", s.zone_bottom), "Above the level");
         let top = f.text("Zone top (m)", &format!("{}", s.zone_top), "Above the level");
         let speed = f.text("Walking speed (m/s)", &format!("{}", s.walking_speed), "");
+        let stair = f.text("Stair speed (m/s)", &format!("{}", s.stair_speed), "Along a stair's flights, for egress routes across levels");
         let clear = f.text("Clearance (m)", &format!("{}", s.clearance), "Kept from obstacles");
         let ignored = f.text("Ignored categories", &s.ignored_categories.join(", "), "Category keys, e.g. cat.furniture");
         if !f.show("Run Update Paths afterwards to re-route existing paths.", "OK") {
@@ -74,11 +75,58 @@ impl Gui {
         }
         let num = |t: &TextCtrl| t.get_value().trim().replace(',', ".").parse::<f64>().ok();
         let cats: Vec<String> = ignored.get_value().split([',', ' ']).filter(|k| !k.trim().is_empty()).map(|k| k.trim().to_owned()).collect();
-        let args = json!({ "zone_bottom": num(&bottom), "zone_top": num(&top), "walking_speed": num(&speed), "clearance": num(&clear), "ignored_categories": cats });
+        let args = json!({ "zone_bottom": num(&bottom), "zone_top": num(&top), "walking_speed": num(&speed), "clearance": num(&clear), "ignored_categories": cats, "stair_speed": num(&stair) });
         f.dialog.destroy();
         if let Err(e) = self.run("route_settings.set", args) {
             error(&frame, &e);
         }
+    }
+
+    /// Analyze › Route Analysis › Egress Route (ANA-ROUTE-004): the quickest route from a point on
+    /// one level to a point on another, by the stairs (and escalators where the egress mode counts
+    /// them), reported leg by leg.
+    pub(crate) fn egress_route_dialog(&mut self) {
+        let frame = self.frame;
+        let levels: Vec<Value> = self.run("level.list", json!({})).ok().and_then(|v| v.as_array().cloned()).unwrap_or_default();
+        if levels.len() < 2 {
+            return error(&frame, "An egress route runs between levels: the model needs two or more.");
+        }
+        let names: Vec<String> = levels.iter().map(|l| l["name"].as_str().unwrap_or("").to_owned()).collect();
+        let f = super::reinforcement_ui::Form::new(&frame, "Egress Route");
+        let from_level = f.choice("From level", &names, names.len() - 1);
+        let from = f.text("From point (x, y)", "", "Metres, in that level's plan");
+        let to_level = f.choice("To level", &names, 0);
+        let to = f.text("To point (x, y)", "", "Metres: the exit");
+        let mode = f.choice("Escalators", &["Not counted (IBC)".to_owned(), "Counted (NFPA 130)".to_owned(), "Counted (SCDF)".to_owned()], 0);
+        let ok = f.show("Walks each level round its obstacles (Route Settings) and takes the stairs between levels.", "Find Route");
+        let point = |t: &TextCtrl| -> Option<[f64; 2]> {
+            let v: Vec<f64> = t.get_value().split([',', ' ']).filter_map(|s| s.trim().parse().ok()).collect();
+            (v.len() == 2).then(|| [v[0], v[1]])
+        };
+        let (a, b) = (point(&from), point(&to));
+        let la = levels[from_level.get_selection().unwrap_or(0) as usize]["id"].clone();
+        let lb = levels[to_level.get_selection().unwrap_or(0) as usize]["id"].clone();
+        let m = ["ibc", "nfpa130", "scdf"][mode.get_selection().unwrap_or(0) as usize];
+        f.dialog.destroy();
+        if !ok {
+            return;
+        }
+        let (Some(a), Some(b)) = (a, b) else { return error(&frame, "Give both points as x, y.") };
+        let r = match self.run("egress.route", json!({ "start": { "point": a, "level": la }, "end": { "point": b, "level": lb }, "mode": m })) {
+            Ok(r) => r,
+            Err(e) => return error(&frame, &format!("No route:\n{e}")),
+        };
+        let name = |id: &Value| levels.iter().find(|l| l["id"] == *id).and_then(|l| l["name"].as_str()).unwrap_or("?").to_owned();
+        let mut lines = Vec::new();
+        let (legs, links) = (r["legs"].as_array().cloned().unwrap_or_default(), r["links"].as_array().cloned().unwrap_or_default());
+        for (k, g) in legs.iter().enumerate() {
+            lines.push(format!("Walk on {}: {:.1} m", name(&g["level"]), g["length"].as_f64().unwrap_or(0.0)));
+            if let Some(l) = links.get(k) {
+                lines.push(format!("{} from {} to {}: {:.1} m, {:.0} s", if l["kind"] == "escalator" { "Escalator" } else { "Stair" }, name(&l["from"]), name(&l["to"]), l["length"].as_f64().unwrap_or(0.0), l["time"].as_f64().unwrap_or(0.0)));
+            }
+        }
+        lines.push(format!("\nIn all {:.1} m, {:.0} s ({:.1} min)", r["length"].as_f64().unwrap_or(0.0), r["time"].as_f64().unwrap_or(0.0), r["time"].as_f64().unwrap_or(0.0) / 60.0));
+        MessageDialog::builder(&frame, &lines.join("\n"), "Egress Route").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build().show_modal();
     }
 
     /// Paths of Travel: a list with length and time.
