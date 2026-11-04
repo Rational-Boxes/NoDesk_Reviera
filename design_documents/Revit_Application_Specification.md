@@ -27718,6 +27718,7 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 **Acceptance criteria.**
 - [x] Against the fake server: `bcf.export` to a FileEngine address uploads the archive with its metadata (`riviera.output`, `riviera.published_at`, `ifc.project_guid`), and again adds a version of the same file; `bcf.import` reads from an address by uid and by folder and name; an OBJ is read from its FileEngine folder with its MTL (inspected exactly as the local copy); COBie as CSV into a FileEngine folder uploads each file; a file address without a name, and an unknown connection, stop the command before it runs.
 - [x] 43 commands mark their path parameters, and a test checks the list.
+- [x] Live (Proxima File Vault, 2026-11-04, `fileengine_live`): a BCF export to an address, again as a new version, and read back.
 
 *Built (2026-11-04):* `riviera_app::fe_paths` (at `App::execute`, so the window, Lua and agents alike), the `x-riviera-file` marks, `save_target` and `open_target` in the window with the browser's file pick. Not yet: Component and parameter libraries on FileEngine (§7b), `keynotes.load` (it keeps the file's path for reloading), `script.import` and `docs.link` folders, the analysis-tools and steel dialogs that choose folders, a FileEngine place in the PDF dialog's sheet sets, retrying a failed upload from the status bar, and publish sets and share links (§7a).
 
@@ -27741,6 +27742,7 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 
 **Acceptance criteria.**
 - [x] Against the fake server: a library made on FileEngine (`library.create` with an address) uploads its manifest; `library.import_files` of an OBJ uploads the item, its MTL and the manifest entry; a second machine's `library.open` mirrors it, lists and places the item; items added from both machines all stay in the manifest; a manifest changed on the server between a pull and a push is merged entry by entry (the description from one side, an item's name from the other); `library.delete_items` moves the item into `.deleted` on the server.
+- [x] Live (Proxima File Vault, 2026-11-04, `fileengine_live`): a library made in a FileEngine folder, an OBJ with its MTL imported, opened and placed from on a second machine.
 
 *Built (2026-11-04):* `riviera_app::fe_library` (mirror, pull, push, merge) and the `library_read`/`library_write` marks resolved in `fe_paths`, for 11 more commands; the panel's FileEngine Open and New. *Not yet:* downloading items on demand instead of the whole library (updates: COL-FE-016), the Incoming review folder.
 
@@ -27759,6 +27761,7 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 
 **Acceptance criteria.**
 - [x] Against the fake server: a parameter library made on FileEngine uploads, and a definition added goes back as a new version; another machine opens it by folder and name and adds one; the first machine's next edit, made over the older version, is refused with `fileengine.conflict` and the server keeps the second machine's; a plugin folder on FileEngine imports into the script library; a keynote file loads from FileEngine.
+- [x] Live (2026-11-04): a parameter library made on FileEngine, edited, and opened on a second machine.
 
 *Built (2026-11-04):* `riviera_app::fe_files` and the three marks; 60 commands marked in all. Not yet: merging parameter-library edits by definition GUID instead of refusing, `keynotes.reload` fetching the newest from FileEngine, `docs.link` and `docs.publish_local` (they take FileEngine folders through their own fields).
 
@@ -27775,6 +27778,7 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 
 **Acceptance criteria.**
 - [x] Against the fake server: a set of the BCF issues, COBie and a schedule is saved with the model and survives saving and reopening; publishing it uploads three files (COBie as one workbook); publishing it again adds a version of each; an output whose command fails is reported while the others publish.
+- [x] Live (2026-11-04): a publish set of BCF issues and COBie published twice, the second time as new versions.
 
 *Built (2026-11-04):* `riviera_core::publish_sets` (`publish.save_set`, `publish.list_sets`, `publish.remove_set`), `publish.run` in `riviera_app::publish`, and File › Publish to FileEngine…. *Not yet:* sheets as PDF in the window's choice (scripts can name `export.pdf`), share links in the publish step (FileEngine's share door is not deployed), a status-bar retry of failed uploads.
 
@@ -27791,6 +27795,7 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 
 **Acceptance criteria.**
 - [x] Against the fake server: a component placed from a FileEngine library is current; after the item changes on the server it is changed (one placed); reloading makes it current.
+- [x] Live (2026-11-04): an item changed on the server is seen as changed on another machine and reloaded.
 
 *Built (2026-11-04):* `library.updates`, `library.reload_item`, and the window's Library Updates. Not yet: the Properties palette's *Update available* on a selected type, the comparison shown before reloading (DM-LIB-001), IFC model fragments.
 
