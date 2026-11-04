@@ -16,8 +16,11 @@ context is still to come); then step 6 (2026-11-04): stairlifts and inclined pla
 (ARC-VT-013), their running envelope and landings (ARC-VT-014) and Check Stairlifts (ARC-VT-015),
 with the sample *Stairlifts and platform stairlifts in a parish hall and its house*. The commands
 are `stairlift.create` (with a `kind`) rather than §5's `stairlift.place` and
-`platform_stairlift.place`, matching `elevator.create` and `escalator.create`. What is left is
-listed under each requirement's *Not yet*.
+`platform_stairlift.place`, matching `elevator.create` and `escalator.create`; then step 7:
+panoramic cars and glass hoistways (ARC-VT-016) and the glass checks (ARC-VT-017), with the
+sample *Panoramic lifts in a hotel atrium*, as `car_glass` and `hoistway` options of
+`elevator.create` rather than a separate `elevator.panoramic` (banks wait for ARC-GRP-004). What
+is left is listed under each requirement's *Not yet*.
 **Owner's requests:**
 - 2026-11-01: "Elevators, both passenger and freight." and "For elevators include ornamental
   version like glass enclosed."

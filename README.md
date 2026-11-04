@@ -743,7 +743,15 @@ tools and the datums.
   intrusions more finely. Not built yet: crisscross arrangements, wellway protection, the airport
   and transit context, intersection guards. Not built yet for elevators: editing in place, rear
   entrances, vertical bi-parting and telescopic doors, machine rooms, hall fixtures, banks,
-  panoramic cars; people movers, funiculars and ropeways (planned).
+  people movers, funiculars and ropeways (planned).
+- **Panoramic cars and glass hoistways** (ARC-VT-016/017): the Elevator dialog's *Car glass*
+  glazes the rear, or the rear and sides, with laminated glass sized for its panels (EN 81-20
+  Table 9 under the EN packs) and weighed for the cab; a glazed traction car's counterweight
+  moves to the side (+300 mm hoistway width). *Hoistway: glass* makes the sides and rear curtain
+  walls of laminated glass on steel posts, the front a wall with the entrances. Check Elevators
+  notes IBC 2409's fire-rated glazing for glass hoistways over two levels. Not built yet: glazed
+  fronts and glass landing doors, partially enclosed hoistways and their guard heights,
+  counterweight screens, solar gain of exterior shafts.
 - **Stairlifts and platform stairlifts** (ARC-VT-013…015): Architecture › Circulation › Stairlift
   puts a seated stairlift or a wheelchair platform lift (`IfcTransportElement` USERDEFINED
   STAIRLIFT or INCLINEDPLATFORMLIFT) on one side of the selected stair, its rail following the
@@ -1789,6 +1797,10 @@ sample:
   storeys under the IBC with a seated stairlift on the house's stair, a platform lift on straight
   rails on the hall's stair and one on a curved rail on its turning back stair; each stair keeps
   its width, and Check Stairlifts and Check Clearances find nothing.
+- **Panoramic lifts in a hotel atrium** (`panoramic.ifc`): four storeys under the IBC with a
+  panoramic car glazed at the rear and sides in a glass hoistway, a rear-glazed car in a walled
+  hoistway, and a glass hydraulic lift to the mezzanine; Check Elevators gives one note (the
+  glass hoistway's fire-rated glazing).
 - **Editing tools** (`modify_tools.ifc`): every Modify tab tool's result side by side, from align,
   mirror and the arrays to trim/extend, split and pinning, a component created and placed
   again, and a layered wall's parts divided, merged and excluded.

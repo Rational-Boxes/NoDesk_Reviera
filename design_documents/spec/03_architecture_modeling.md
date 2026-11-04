@@ -3968,6 +3968,44 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 
 *Built (2026-11-04):* `stairlift.check`, and Architecture › Circulation › Check Stairlifts. Not yet: the stair width measured between handrails where they project more than 100 mm, the LA plan-check fields (top overrun, footrest gap), per-occupancy NFPA 101 widths, Australia's 810 × 1200 mm platform (NCC), and the Canadian packs.
 
+### 3.7a.16 Panoramic cars and glass hoistways
+**ID:** ARC-VT-016 · **Priority:** P2 · **Ref:** owner requirement (2026-11-01, panoramic and glass elevators added to the research); `VERTICAL_TRANSPORT_PLAN.md` §4.2 (`elevator.panoramic`), §12a answer 8; research/16 Part F, N-P1, N-P2, N-E3
+
+**Purpose.** Glaze an elevator's car and hoistway as observation and atrium lifts are built, with the glass sized and weighed, and the hoistway as wide as a side counterweight needs.
+
+**Behaviour & rules.**
+- **`car_glass`** on `elevator.size` and `elevator.create`: `none` (default), `rear`, or `rear_sides`. The glazed panels are the rear wall (car width) and the side walls (car depth), each as high as the car.
+  - **Thickness**: laminated, the larger of the glass sizing's default (10.76 mm, 5 + 5 + 0.76) and what each pack's table asks for the largest panel's inscribed circle (its width or height, whichever is less). EN 81-20 Table 9 (toughened laminated, fixed on all edges): 8.76 mm up to 1 m, 10.76 mm up to 2 m; beyond the table its last row, with a note that pendulum tests (EN 81-50) decide.
+  - **Mass**: area × thickness × 2.5 kg per m² per mm, for the cab-weight allowance.
+  - **Handrail**: where a pack gives one (EN 81-20: 0.9–1.1 m, fixed independently of the glass), a note.
+  - **Counterweight**: a glazed traction car (MRL or machine room) has its counterweight at the side, so its hoistway is wider by the glass sizing's allowance (300 mm, after Schindler's rear-glass hoistways); hydraulic cars are unchanged.
+  - The car's type is named for its glass and shown translucent.
+- **`hoistway`** on `elevator.create`: `walls` (default) or `glass`. A glass hoistway keeps the front wall and its entrances, and makes the sides and rear as curtain walls (ARC-CW-001) of the glass sizing's type, *Glass Hoistway*: laminated glass (10.8 mm) on steel posts (50 × 110 mm) as border and interior mullions, posts at most the lesser of the fixing spacing (1.5 m) and the largest pane's width (1.3 m) apart, transoms at most the largest pane's height (2.5 m) apart; from the pit floor to the overhead, clear of the front wall's ends and of each other's posts. They are members, deleted with the elevator. A glass hoistway needs `walls`.
+- Generic sizes come from the packs' `glass_sizing` (`practice_us`, `practice_en`); the structural values are flagged defaults (E-88).
+
+**Data (IFC mapping).** The curtain walls are `IfcCurtainWall` with their posts (`IfcMember` MULLION) and panes (`IfcPlate` CURTAIN_PANEL). `Reviera_Elevator` gains CarGlass, CarGlassThickness, CarGlassMass and GlassHoistway.
+
+**Acceptance criteria.**
+- [x] A 1100 × 2200 mm rear panel takes 10.76 mm under EN 81-20 with the handrail note; a 2.1 m panel is beyond the table and noted; only a glazed traction car's hoistway widens, by 300 mm.
+- [x] A rear-and-sides glazed MRL car in a glass hoistway over three levels overlaps nothing and has nothing in its zones; the file has three curtain walls and the glass properties; deleting the elevator deletes them.
+
+*Built (2026-11-04):* in `reviera_core::panoramic` and `elevator.create`; the Elevator dialog's *Car glass* and *Hoistway*; the sample *Panoramic lifts in a hotel atrium*. Not yet: a glazed front with glass landing doors (IBC 2409.2.2's 60 %), 270° and curved cars, partially enclosed hoistways with their guard heights (EN 81-20 5.2.5.2.3: 3.5 m at the landing side, 2.5 m within 0.5 m of moving parts, down to 1.1 m at 2 m; California 8 ft within 4 ft), counterweight screens, observation landings, rail-bracket loads on the posts, wind on exterior shafts, and solar gain and ventilation of exterior glass shafts.
+
+### 3.7a.17 The glass checks
+**ID:** ARC-VT-017 · **Priority:** P2 · **Ref:** research/16 F1, F3, N-E3
+
+**Purpose.** Say where an elevator's glass falls short of the packs in use.
+
+**Behaviour & rules.**
+- `elevator.check` gains findings of kind *glass*, from each pack in use with glass rules (`glass` in a pack):
+  - **car glass** thinner than the pack's table asks for the largest panel's inscribed circle (as when a car sized under the US packs is checked under EN 81-20);
+  - **a glass hoistway** serving more levels than the pack's `rated_hoistway_levels` (IBC: 2): glass in a rated hoistway must be fire-rated glazing (IBC 2409.2.1, §716), unless the authority accepts the elevator unenclosed (an atrium, 712.1.7; two stories, 712.1.9). Advisory, so a note.
+
+**Acceptance criteria.**
+- [x] Under the IBC, a glass hoistway over three or four levels gives one glass note; one over two levels gives none.
+
+*Built (2026-11-04):* in `elevator.check`. Not yet: pane sizes against the glass's largest pane when a type is edited, IBC 2409.3 vision-panel areas, and the exterior-shaft thermal check.
+
 ---
 
 ## 3.8 Openings
@@ -6301,8 +6339,8 @@ All commands below are registered once in the command registry and exposed autom
 | `vt.set_rule_packs` | packs? (none for automatic) | — | Yes | ARC-VT-001 |
 | `vt.add_rule_pack` | pack | id | Yes | ARC-VT-001 |
 | `vt.remove_rule_pack` | id | — | Yes | ARC-VT-001 |
-| `elevator.size` | kind?, class?, load?, speed?, drive?, door?, car_width?, car_depth?, car_height?, door_width?, door_height?, storeys?, space_below? | {kind, class, load, persons, speed, drive, door, car, door_size, entrance, sill, hoistway, pit, overhead, sizing_pack, power, notes} | No (query) | ARC-VT-002 |
-| `elevator.create` | point, rotation?, base_level, top_level, (as `elevator.size`), walls?, wall_thickness?, equipment?, equipment_side? | {elevator, shaft, walls, entrances, equipment, sizes} | Yes | ARC-VT-002 |
+| `elevator.size` | kind?, class?, load?, speed?, drive?, door?, car_width?, car_depth?, car_height?, door_width?, door_height?, storeys?, car_glass?, space_below? | {kind, class, load, persons, speed, drive, door, car, door_size, entrance, sill, hoistway, pit, overhead, sizing_pack, glazing, power, notes} | No (query) | ARC-VT-002, ARC-VT-016 |
+| `elevator.create` | point, rotation?, base_level, top_level, (as `elevator.size`), walls?, wall_thickness?, equipment?, equipment_side?, hoistway? | {elevator, shaft, walls, entrances, equipment, sizes} | Yes | ARC-VT-002, ARC-VT-016 |
 | `elevator.list` | — | [{elevator, name, levels, sizes, members}] | No (query) | ARC-VT-002 |
 | `elevator.delete` | elevator | count | Yes | ARC-VT-002 |
 | `elevator.check` | elevators? | finding[] | No (query) | ARC-VT-004 |

@@ -125,5 +125,25 @@
     },
     "source": "S1660 S1673 S2391",
     "confidence": "advisory"
+  },
+  "glass": {
+    "id": "EN 81-20 5.4.3 Table 9; 5.2.1.8.3",
+    "description": "Car walls of laminated glass fixed on all edges: toughened laminated at least 8 mm (4 + 4 + 0.76) for a panel whose inscribed circle is up to 1 m, 10 mm (5 + 5 + 0.76) up to 2 m; beyond, pendulum tests. A handrail 0.9–1.1 m above the floor, fixed independently of the glass, where glass reaches below 1.1 m. Well glass is laminated.",
+    "car_glass": [
+      [
+        1.0,
+        0.00876
+      ],
+      [
+        2.0,
+        0.01076
+      ]
+    ],
+    "handrail": [
+      0.9,
+      1.1
+    ],
+    "source": "S2401 S2402 S1663",
+    "confidence": "secondary"
   }
 }

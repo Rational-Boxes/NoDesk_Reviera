@@ -2,11 +2,12 @@
 // Copyright (C) 2026 Reviera contributors
 
 //! Architecture › Circulation › Elevator (ARC-VT-002): the elevator's capacity, drive and the
-//! levels it serves, then a click in a plan at the middle of its entrance (or a typed point).
-//! Check Elevators (ARC-VT-004) lists `elevator.check`'s findings and selects and frames the
-//! elevator picked. Escalator (ARC-VT-010) and Check Escalators (ARC-VT-012) do the same for
-//! escalators and moving walks; Stairlift (ARC-VT-013) puts a seated or platform lift on the
-//! selected stair, and Check Stairlifts (ARC-VT-015) lists `stairlift.check`'s findings.
+//! levels it serves, its car glass and glass hoistway (ARC-VT-016), then a click in a plan at the
+//! middle of its entrance (or a typed point). Check Elevators (ARC-VT-004) lists
+//! `elevator.check`'s findings and selects and frames the elevator picked. Escalator (ARC-VT-010)
+//! and Check Escalators (ARC-VT-012) do the same for escalators and moving walks; Stairlift
+//! (ARC-VT-013) puts a seated or platform lift on the selected stair, and Check Stairlifts
+//! (ARC-VT-015) lists `stairlift.check`'s findings.
 
 use serde_json::{Value, json};
 use wxdragon::prelude::*;
@@ -38,7 +39,8 @@ impl Gui {
         let speed = f.text("Speed (m/s)", "", "Empty: 1.0, or 0.5 for hydraulic drives; small lifts take their own");
         let door = f.choice("Doors", &["As the car comes".to_owned(), "Side opening".to_owned(), "Centre opening".to_owned()], 0);
         let rotation = f.text("Rotation (°)", "0", "0: the landing is toward the bottom of the plan; counter-clockwise");
-        let walls = f.choice("Hoistway walls", &["Yes".to_owned(), "No".to_owned()], 0);
+        let car_glass = f.choice("Car glass", &["None".to_owned(), "Rear (panoramic)".to_owned(), "Rear and sides".to_owned()], 0);
+        let walls = f.choice("Hoistway", &["Walls".to_owned(), "Glass at the sides and rear, on steel posts".to_owned(), "No walls".to_owned()], 0);
         let equipment = f.choice("Controller and machine", &["On the right".to_owned(), "On the left".to_owned(), "None".to_owned()], 0);
         let at = f.text("Entrance point (x, y)", "", "Empty: click in the plan at the middle of the entrance");
         let ok = f.show(
@@ -47,13 +49,16 @@ impl Gui {
         );
         let num = |t: &TextCtrl| t.get_value().trim().parse::<f64>().ok();
         let drive = ["mrl_traction", "traction", "hydraulic", "holeless"][drive.get_selection().unwrap_or(0) as usize];
+        let glass = ["none", "rear", "rear_sides"][car_glass.get_selection().unwrap_or(0) as usize];
         let mut args = json!({
             "command": "elevator.create",
             "kind": kinds[kind.get_selection().unwrap_or(0) as usize],
             "top_level": above[top.get_selection().unwrap_or(0) as usize]["id"],
             "drive": drive,
             "rotation": num(&rotation).unwrap_or(0.0).to_radians(),
-            "walls": walls.get_selection() != Some(1),
+            "walls": walls.get_selection() != Some(2),
+            "hoistway": if walls.get_selection() == Some(1) { "glass" } else { "walls" },
+            "car_glass": glass,
             "equipment": equipment.get_selection() != Some(2),
             "equipment_side": if equipment.get_selection() == Some(1) { "left" } else { "right" },
         });

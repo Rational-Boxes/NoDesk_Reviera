@@ -215,3 +215,46 @@ fn machine_spaces_controllers_power_and_the_schedule() {
     let text = table.to_string();
     assert!(text.contains("Elevator") && text.contains("2591 × 2108") && text.contains("kW"), "{table:#}");
 }
+
+#[test]
+fn panoramic_cars_and_glass_hoistways() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = new_app(dir.path());
+    let (levels, _) = building(&mut app);
+
+    // A rear-glazed MRL car in a glass hoistway over three levels: its counterweight goes to the
+    // side (300 mm wider), its rear panel takes 10.76 mm laminated glass, and the sides and rear
+    // are glass on steel posts while the front wall keeps the entrances.
+    let plain = ok(&mut app, "elevator.size", json!({ "storeys": 3 }));
+    let made = ok(&mut app, "elevator.create", json!({ "point": [4.0, 3.0], "base_level": levels[0], "top_level": levels[2], "car_glass": "rear", "hoistway": "glass", "equipment": false }));
+    assert!((made["hoistway"][0].as_f64().unwrap() - plain["hoistway"][0].as_f64().unwrap() - 0.3).abs() < 1e-9, "{made:#}");
+    assert_eq!(made["glazing"]["thickness"], 0.01076);
+    assert_eq!(made["walls"].as_array().unwrap().len(), 4);
+    assert_eq!(made["entrances"].as_array().unwrap().len(), 3);
+    let overlaps = ok(&mut app, "overlap.find", json!({}));
+    assert_eq!(overlaps["overlaps"], json!([]), "{overlaps:#}");
+    assert_eq!(intrusions(&mut app), Vec::<Value>::new());
+    // Under the IBC, three levels of glass hoistway is a note: fire-rated glazing unless the
+    // authority accepts it unenclosed.
+    let f = ok(&mut app, "elevator.check", json!({ "elevators": [made["elevator"]] }));
+    let glass: Vec<&Value> = f.as_array().unwrap().iter().filter(|x| x["kind"] == "glass").collect();
+    assert_eq!(glass.len(), 1, "{f:#}");
+    assert_eq!(glass[0]["severity"], "note");
+
+    // Written with the curtain walls and the glass values; deleted with them.
+    let path = dir.path().join("panoramic.ifc");
+    ok(&mut app, "file.save_as", json!({ "path": path }));
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert_eq!(text.matches("IFCCURTAINWALL(").count(), 3);
+    assert!(text.contains("'CarGlassThickness'") && text.contains("'GlassHoistway'"));
+    ok(&mut app, "elevator.delete", json!({ "elevator": made["elevator"] }));
+    ok(&mut app, "file.save", json!({}));
+    assert_eq!(std::fs::read_to_string(&path).unwrap().matches("IFCCURTAINWALL(").count(), 0);
+
+    // A glass hoistway needs its walls on.
+    assert!(run(&mut app, "elevator.create", json!({ "point": [4.0, 3.0], "base_level": levels[0], "top_level": levels[2], "hoistway": "glass", "walls": false })).is_err());
+    // A hydraulic car keeps its hoistway: no counterweight to move.
+    let hyd = ok(&mut app, "elevator.size", json!({ "storeys": 2, "drive": "hydraulic", "car_glass": "rear_sides" }));
+    let hyd0 = ok(&mut app, "elevator.size", json!({ "storeys": 2, "drive": "hydraulic" }));
+    assert_eq!(hyd["hoistway"], hyd0["hoistway"]);
+}

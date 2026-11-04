@@ -139,6 +139,19 @@
     ]
   },
   {
+    "name": "panoramic",
+    "title": "Panoramic lifts in a hotel atrium",
+    "group": "Architecture",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "panoramic.lua"
+        }
+      }
+    ]
+  },
+  {
     "name": "escalators",
     "title": "Escalators and moving walks in a department store",
     "group": "Architecture",

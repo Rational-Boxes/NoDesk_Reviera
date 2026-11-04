@@ -14,6 +14,7 @@ serves. <b>Check Elevators</b> then says which rule a car breaks. The sample
   <a href="#kinds">Hospital, freight and small lifts</a>
   <a href="#services">Controller, machine space and power</a>
   <a href="#schedule">Elevator schedule</a>
+  <a href="#glass">Panoramic cars and glass hoistways</a>
   <a href="#zones">Hoistway and landing zones</a>
   <a href="#check">Check Elevators</a>
   <a href="#packs">Rule packs</a>
@@ -86,6 +87,26 @@ openly. Replace them with the maker's figures when a product is chosen.</p>
 rated load, persons, speed, drive, car, hoistway, pit, overhead, the machine space, motor power,
 current and heat.</p>
 
+<h2 id="glass">Panoramic cars and glass hoistways</h2>
+<p>In the Elevator dialog, <b>Car glass</b> glazes the car's rear, or its rear and sides, and
+<b>Hoistway</b> can be <i>glass at the sides and rear, on steel posts</i>. The sample
+<a href="reviera:sample/panoramic">Panoramic lifts in a hotel atrium</a> shows both.</p>
+<ul>
+  <li>The car glass is laminated: 10.76 mm (5 + 5 + 0.76) unless a pack asks more. Under EN 81-20
+  its thickness follows Table 9 by each panel's inscribed circle (8.76 mm up to 1 m, 10.76 mm up
+  to 2 m; beyond, pendulum tests decide), and a handrail 0.9–1.1 m above the floor is noted. The
+  glass is weighed at 2.5 kg per m² per mm, for the cab weight.</li>
+  <li>A glazed traction car's counterweight moves to the side, so its hoistway is 300 mm wider. A
+  hydraulic car has no counterweight and keeps its size.</li>
+  <li>A glass hoistway's sides and rear are curtain walls of 10.8 mm laminated glass on
+  50 × 110 mm steel posts, at most 1.3 m apart (fixings at most 1.5 m apart, and the largest pane
+  of that glass), with transoms at most 2.5 m apart. The front is a wall with the landing
+  entrances. They are deleted with the elevator.</li>
+  <li>Under the IBC, Check Elevators notes a glass hoistway serving more than two levels: glass in
+  a rated hoistway must be fire-rated glazing, unless the authority accepts the elevator
+  unenclosed, as in an atrium.</li>
+</ul>
+
 <h2 id="zones">Hoistway and landing zones</h2>
 <p>Each elevator has virtual volumes: its <b>hoistway</b> (violet), from the pit floor to the
 overhead, which nothing but the elevator's own parts may enter, and a <b>landing</b> (green) in
@@ -117,7 +138,9 @@ with a shipped pack's id replaces it in this project.</p>
 <p>ASME A17.1 and EN 81-20 were read only through state adoptions, inspection checklists and
 makers' guides, so their rules are advisory. Not yet built: editing an elevator in place, rear
 entrances, vertical bi-parting and telescopic doors, machine rooms, pit ladders, hall fixtures,
-banks of elevators and escalators; power and heat are estimates.</p>
+banks of elevators and escalators; a glazed front with glass landing doors, partially enclosed
+(open) hoistways and their guard heights, counterweight screens, and the solar gain of exterior
+glass shafts. Power and heat are estimates, and so is the glass hoistway's structure.</p>
 
 <h2 id="scripts">Scripts and agents</h2>
 <p>Everything above is a command: <code>vt.rule_packs</code>, <code>vt.set_rule_packs</code>,

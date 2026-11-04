@@ -1425,6 +1425,128 @@
           "$ref": "#/$defs/confidence"
         }
       }
+    },
+    "glass": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Glass rules for panoramic cars and glass hoistways (ARC-VT-017).",
+      "required": [
+        "id",
+        "source",
+        "confidence"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "car_glass": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "minItems": 2,
+            "maxItems": 2,
+            "description": "[inscribed circle, least thickness] (m)"
+          },
+          "description": "The least laminated car-wall glass by the panel's inscribed circle, rising."
+        },
+        "handrail": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "A handrail band above the car floor where car glass reaches below its top (m)."
+        },
+        "rated_hoistway_levels": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "A glass hoistway serving more levels than this is noted as needing fire-rated glazing."
+        },
+        "source": {
+          "$ref": "#/$defs/source"
+        },
+        "confidence": {
+          "$ref": "#/$defs/confidence"
+        }
+      }
+    },
+    "glass_sizing": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Generic panoramic car and glass hoistway sizes (ARC-VT-016).",
+      "required": [
+        "counterweight_side",
+        "car_glass",
+        "shaft_glass",
+        "post",
+        "post_spacing",
+        "max_pane",
+        "glass_density",
+        "source",
+        "confidence"
+      ],
+      "properties": {
+        "counterweight_side": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Added to a traction hoistway's width when the car's rear is glazed."
+        },
+        "car_glass": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Car glass where no table asks more (m)."
+        },
+        "shaft_glass": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Hoistway glass (m)."
+        },
+        "post": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "Steel post width along the wall and depth through it (m)."
+        },
+        "post_spacing": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "The most between posts (m)."
+        },
+        "max_pane": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "The largest hoistway pane, width × height (m)."
+        },
+        "glass_density": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "kg per m² per mm of thickness."
+        },
+        "source": {
+          "$ref": "#/$defs/source"
+        },
+        "confidence": {
+          "$ref": "#/$defs/confidence"
+        }
+      }
     }
   },
   "$defs": {

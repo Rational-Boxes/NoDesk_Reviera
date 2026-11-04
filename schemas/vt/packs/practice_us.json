@@ -690,5 +690,22 @@
     "no_exit_enclosure": true,
     "source": "S2482",
     "confidence": "advisory"
+  },
+  "glass_sizing": {
+    "counterweight_side": 0.3,
+    "car_glass": 0.01076,
+    "shaft_glass": 0.0108,
+    "post": [
+      0.05,
+      0.11
+    ],
+    "post_spacing": 1.5,
+    "max_pane": [
+      1.3,
+      2.5
+    ],
+    "glass_density": 2.5,
+    "source": "S1509 S1678 S2401 S2402",
+    "confidence": "secondary"
   }
 }

@@ -512,6 +512,10 @@ pub struct Pack {
     pub stairlift: Option<crate::stairlifts::Rules>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stairlift_sizing: Option<crate::stairlifts::Sizing>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub glass: Option<crate::panoramic::Rules>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub glass_sizing: Option<crate::panoramic::Sizing>,
 }
 
 fn validator() -> &'static jsonschema::Validator {
@@ -737,6 +741,9 @@ pub struct SizeParams {
     pub door_height: Option<f64>,
     /// How many levels it serves, for the stretcher rule; default 2.
     pub storeys: Option<u32>,
+    /// A panoramic car glazed at the rear, or the rear and sides (ARC-VT-016); default none.
+    #[serde(default)]
+    pub car_glass: crate::panoramic::CarGlass,
     /// Occupied space below the pit: counterweight safeties make the hoistway deeper.
     #[serde(default)]
     pub space_below: bool,
@@ -771,6 +778,9 @@ pub struct Sized {
     pub overhead: f64,
     /// The pack the defaults came from.
     pub sizing_pack: String,
+    /// A panoramic car's glazing (ARC-VT-016).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub glazing: Option<crate::panoramic::CarGlazing>,
     /// Planning estimates of the motor's power and heat (ARC-VT-007).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub power: Option<Power>,
@@ -942,6 +952,13 @@ pub fn size(packs: &[Pack], p: &SizeParams) -> Result<Sized> {
             (row.pit, overhead)
         }
     };
+    // A glazed rear moves a traction car's counterweight to the side (ARC-VT-016).
+    let add = crate::panoramic::hoistway_add(packs, p.car_glass, p.drive);
+    let hoistway = [hoistway[0] + add, hoistway[1]];
+    if add > 0.0 {
+        notes.push(format!("the glazed car's counterweight goes to the side: the hoistway is {:.0} mm wider", add * 1000.0));
+    }
+    let glazing = crate::panoramic::car_glazing(packs, p.car_glass, [car_w, car_d, car_h], &mut notes);
     let class = match kind {
         ElevatorKind::Freight | ElevatorKind::Vehicle => p.class.or(base.and_then(|c| c.class)).or(Some(if kind == ElevatorKind::Vehicle { LoadingClass::B } else { LoadingClass::A })),
         _ => None,
@@ -964,6 +981,7 @@ pub fn size(packs: &[Pack], p: &SizeParams) -> Result<Sized> {
         pit,
         overhead,
         sizing_pack: pack.id.clone(),
+        glazing,
         power,
         notes,
     })
@@ -1007,6 +1025,9 @@ pub struct Elevator {
     /// The space they need (ARC-VT-008).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub machine_space: Option<MachineSpace>,
+    /// What encloses the hoistway: walls, or glass at the sides and rear (ARC-VT-016).
+    #[serde(default)]
+    pub hoistway_enclosure: crate::panoramic::Hoistway,
 }
 
 /// What kind of space an elevator's machine and controller need.
@@ -1116,6 +1137,10 @@ pub struct CreateParams {
     /// Which side of the hoistway, as you face its entrance (default right).
     #[serde(default)]
     pub equipment_side: Side,
+    /// Walls on all four sides (default), or glass on steel posts at the sides and rear, the
+    /// front a wall with the entrances (ARC-VT-016); glass needs `walls`.
+    #[serde(default)]
+    pub hoistway: crate::panoramic::Hoistway,
 }
 
 /// What `elevator.create` made.
@@ -1141,13 +1166,19 @@ fn cuboid(x: V2, y: V2, z: V2) -> (Vec<[f64; 3]>, Vec<[u32; 3]>) {
 
 /// The car type for these sizes, made the first time.
 fn car_type(txn: &mut Transaction<'_>, s: &Sized) -> Result<ElementId> {
-    let name = format!("{} car {:.0} × {:.0} × {:.0}", s.kind.label(), s.car[0] * 1000.0, s.car[1] * 1000.0, s.car[2] * 1000.0);
+    let glazed = match s.glazing.as_ref().map(|g| g.glass) {
+        Some(crate::panoramic::CarGlass::Rear) => ", glass rear",
+        Some(crate::panoramic::CarGlass::RearSides) => ", glass rear and sides",
+        _ => "",
+    };
+    let name = format!("{} car {:.0} × {:.0} × {:.0}{glazed}", s.kind.label(), s.car[0] * 1000.0, s.car[1] * 1000.0, s.car[2] * 1000.0);
     if let Some(e) = txn.store().iter().find(|e| e.name.as_deref() == Some(name.as_str()) && crate::mesh_objects::mesh_object_type(e).is_some()) {
         return Ok(e.id());
     }
     let (p, t) = cuboid([-s.car[0] / 2.0, s.car[0] / 2.0], [0.0, s.car[1]], [0.0, s.car[2]]);
     let (predefined, object_type) = s.kind.ifc();
-    let id = crate::mesh_objects::create_generated_type(txn, &name, crate::mesh_objects::Category::Transport, &p, &t, [0.72, 0.74, 0.78, 1.0], Vec::new(), Some(predefined))?;
+    let colour = if glazed.is_empty() { [0.72, 0.74, 0.78, 1.0] } else { [0.62, 0.78, 0.86, 0.45] };
+    let id = crate::mesh_objects::create_generated_type(txn, &name, crate::mesh_objects::Category::Transport, &p, &t, colour, Vec::new(), Some(predefined))?;
     if let Some(o) = object_type {
         txn.modify(id, |e| {
             e.params.insert("@ElementType".into(), o.into());
@@ -1245,6 +1276,7 @@ pub(crate) fn create(txn: &mut Transaction<'_>, p: CreateParams) -> Result<Creat
         entrance_x: None,
         equipment: Vec::new(),
         machine_space: None,
+        hoistway_enclosure: p.hoistway,
     };
 
     // The car, on the lowest level.
@@ -1273,6 +1305,9 @@ pub(crate) fn create(txn: &mut Transaction<'_>, p: CreateParams) -> Result<Creat
     // The shaft: pit floor to the overhead above the top landing. With walls it takes their
     // outer faces, so that the floors stop at the continuous hoistway walls.
     let make_walls = p.walls.unwrap_or(true);
+    if p.hoistway == crate::panoramic::Hoistway::Glass && !make_walls {
+        return Err(bad("vt.params", "a glass hoistway is made with its walls; leave `walls` on"));
+    }
     let outline = if make_walls {
         let [w, d] = sized.hoistway;
         vec![el.at(-w / 2.0 - t, -t), el.at(w / 2.0 + t, -t), el.at(w / 2.0 + t, d + t), el.at(-w / 2.0 - t, d + t)]
@@ -1301,7 +1336,38 @@ pub(crate) fn create(txn: &mut Transaction<'_>, p: CreateParams) -> Result<Creat
         let [w, d] = sized.hoistway;
         let h = t / 2.0;
         let corners = [el.at(-w / 2.0 - h, -h), el.at(w / 2.0 + h, -h), el.at(w / 2.0 + h, d + h), el.at(-w / 2.0 - h, d + h)];
+        let glass = match p.hoistway {
+            crate::panoramic::Hoistway::Glass => {
+                let (_, gs) = crate::panoramic::sizing(&packs).ok_or_else(|| bad("vt.no_sizing", "no rule pack in use gives glass hoistway sizes (add practice_us or practice_en)"))?;
+                let gs = gs.clone();
+                Some((crate::panoramic::hoistway_type(txn, &gs)?, gs))
+            }
+            crate::panoramic::Hoistway::Walls => None,
+        };
         for k in 0..4 {
+            if let (Some((gt, gs)), true) = (&glass, k > 0) {
+                // Glass at the sides and rear on steel posts, clear of the front wall's ends and
+                // of each other's posts at the rear corners.
+                let (x, y0, y1) = (w / 2.0 + h, 0.005, d + h - gs.post[1] / 2.0 - 0.005);
+                let (a, b) = match k {
+                    1 => (el.at(x, y0), el.at(x, y1)),
+                    2 => (corners[2], corners[3]),
+                    _ => (el.at(-x, y1), el.at(-x, y0)),
+                };
+                let args = json!({
+                    "type_id": gt.0,
+                    "curve": { "start": a, "end": b },
+                    "base_level": base.id.0,
+                    "base_offset": -sized.pit,
+                    "top_constraint": { "level": top.id.0 },
+                    "top_offset": sized.overhead,
+                });
+                let id = crate::curtain::create(txn, serde_json::from_value(args).map_err(|e| bad("vt.params", e.to_string()))?)?;
+                txn.modify(id, |e| e.name = Some("Glass Hoistway".into()))?;
+                el.walls.push(member(txn, id)?);
+                walls.push(id);
+                continue;
+            }
             let args = json!({
                 "curve": { "line": { "start": corners[k], "end": corners[(k + 1) % 4] } },
                 "base_level": base.id.0,
@@ -1474,6 +1540,14 @@ pub fn properties(el: &Elevator) -> Vec<(String, Value)> {
         ]
     }))
     .chain(s.class.map(|c| ("Reviera_Elevator.LoadingClass".into(), label(serde_json::to_value(c).expect("serialises")))))
+    .chain(s.glazing.iter().flat_map(|g| {
+        [
+            ("Reviera_Elevator.CarGlass".into(), label(serde_json::to_value(g.glass).expect("serialises"))),
+            ("Reviera_Elevator.CarGlassThickness".into(), measure("IfcPositiveLengthMeasure", g.thickness)),
+            ("Reviera_Elevator.CarGlassMass".into(), measure("IfcMassMeasure", g.mass)),
+        ]
+    }))
+    .chain(std::iter::once(("Reviera_Elevator.GlassHoistway".into(), measure("IfcBoolean", el.hoistway_enclosure == crate::panoramic::Hoistway::Glass))))
     .collect()
 }
 
@@ -1623,6 +1697,9 @@ pub enum FindingKind {
     FreightClass,
     /// The car's area, load, height or the rise is beyond its kind's limit.
     Limit,
+    /// Car glass thinner than the pack's table, or a glass hoistway that may need fire-rated
+    /// glazing (ARC-VT-017).
+    Glass,
 }
 
 /// One finding of `elevator.check`.
@@ -1738,6 +1815,19 @@ pub(crate) fn check(store: &Store, p: Option<CheckParams>) -> Result<Vec<Finding
                     out.push(f);
                 }
             }
+            if let Some(g) = &pack.glass {
+                if let Some(z) = &s.glazing
+                    && let Some(need) = crate::panoramic::table_thickness(&g.car_glass, z.circle).filter(|t| z.thickness < t - 1e-6)
+                {
+                    let mut f = finding(pack, FindingKind::Glass, *car, &g.id, &g.description, g.confidence, &g.source, format!("{:.2} mm car glass is thinner than the {:.2} mm laminated glass a panel of {:.2} m inscribed circle needs", z.thickness * 1000.0, need * 1000.0, z.circle));
+                    f.measured = Some(z.thickness);
+                    f.required = Some(need);
+                    out.push(f);
+                }
+                if let Some(n) = g.rated_hoistway_levels.filter(|n| el.hoistway_enclosure == crate::panoramic::Hoistway::Glass && el.levels.len() as u32 > *n) {
+                    out.push(finding(pack, FindingKind::Glass, *car, &g.id, &g.description, g.confidence, &g.source, format!("a glass hoistway serving {} levels (more than {n}) needs fire-rated glazing unless the authority accepts it unenclosed, as in an atrium", el.levels.len())));
+                }
+            }
             for l in pack.limits.iter().filter(|l| l.kinds.contains(&s.kind)) {
                 let checks = [("car area", area, l.max_area, "m²"), ("rated load", s.load, l.max_load, "kg"), ("rise", rise, l.max_rise, "m"), ("car height", s.car[2], l.max_height, "m")];
                 for (what, value, max, unit) in checks {
@@ -1793,6 +1883,8 @@ mod tests {
                 .chain(p.escalator.as_ref().map(|f| &f.source))
                 .chain(p.escalator_sizing.as_ref().map(|f| &f.source))
                 .chain(p.stairlift.as_ref().map(|f| &f.source))
+                .chain(p.glass.as_ref().map(|f| &f.source))
+                .chain(p.glass_sizing.as_ref().map(|f| &f.source))
                 .chain(p.stairlift_sizing.iter().flat_map(|f| std::iter::once(&f.source).chain(std::iter::once(&f.seated.source)).chain(f.platforms.iter().map(|x| &x.source))));
             for s in sources.into_iter().flatten().chain(more).flat_map(|s| s.split(' ')) {
                 assert!(register.contains(&format!("| {s} |")), "{}: {s} is not in the register", p.id);
@@ -1805,7 +1897,9 @@ mod tests {
         let defs: Value = serde_json::from_str(include_str!("../../../schemas/psets/reviera-psets-1.json")).unwrap();
         let set = defs["property_sets"].as_array().unwrap().iter().find(|s| s["name"] == "Reviera_Elevator").expect("Reviera_Elevator");
         let us: Vec<Pack> = shipped().iter().filter(|p| p.id == "practice_us").cloned().collect();
-        let el = Elevator { sized: size(&us, &SizeParams::default()).unwrap(), point: [0.0; 2], rotation: 0.0, levels: vec![], wall_thickness: 0.2, shaft: String::new(), walls: vec![], entrances: vec![], space_below: false, entrance_x: None, equipment: vec![], machine_space: None };
+        // A glazed car, so that its glass's values are written too.
+        let sized = size(&us, &SizeParams { car_glass: crate::panoramic::CarGlass::Rear, ..SizeParams::default() }).unwrap();
+        let el = Elevator { sized, point: [0.0; 2], rotation: 0.0, levels: vec![], wall_thickness: 0.2, shaft: String::new(), walls: vec![], entrances: vec![], space_below: false, entrance_x: None, equipment: vec![], machine_space: None, hoistway_enclosure: crate::panoramic::Hoistway::Glass };
         for (key, value) in properties(&el) {
             let Some(name) = key.strip_prefix("Reviera_Elevator.") else { continue };
             let def = set["properties"].as_array().unwrap().iter().find(|p| p["name"] == name).unwrap_or_else(|| panic!("{name} is not published"));

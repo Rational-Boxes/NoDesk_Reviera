@@ -128,7 +128,11 @@
         { "name": "MotorPower", "measure": "IfcPowerMeasure", "unit": "W", "description": "Motor power: a planning estimate from the load and speed (ARC-VT-007) until the maker's figure replaces it." },
         { "name": "FullLoadCurrent", "measure": "IfcElectricCurrentMeasure", "unit": "A", "description": "Full-load current at the supply voltage (planning estimate)." },
         { "name": "SupplyVoltage", "measure": "IfcElectricVoltageMeasure", "unit": "V", "description": "Supply voltage." },
-        { "name": "HeatRelease", "measure": "IfcPowerMeasure", "unit": "W", "description": "Heat released into the machine space or hoistway (planning estimate) for its ventilation or cooling." }
+        { "name": "HeatRelease", "measure": "IfcPowerMeasure", "unit": "W", "description": "Heat released into the machine space or hoistway (planning estimate) for its ventilation or cooling." },
+        { "name": "CarGlass", "measure": "IfcLabel", "description": "Where a panoramic car is glazed: rear or rear_sides." },
+        { "name": "CarGlassThickness", "measure": "IfcPositiveLengthMeasure", "unit": "m", "description": "Laminated car glass thickness, the most any pack's table asks for its panels." },
+        { "name": "CarGlassMass", "measure": "IfcMassMeasure", "unit": "kg", "description": "The car glass's mass (2.5 kg per m² per mm); planning value for the cab weight." },
+        { "name": "GlassHoistway", "measure": "IfcBoolean", "description": "The hoistway is glazed at the sides and rear on steel posts." }
       ]
     },
     {

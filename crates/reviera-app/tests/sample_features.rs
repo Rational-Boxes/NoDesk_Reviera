@@ -1042,6 +1042,29 @@ fn the_lifts_sample_keeps_each_kind() {
 }
 
 #[test]
+fn the_panoramic_sample_keeps_its_glass_cars_and_hoistways() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "panoramic");
+    let list = ok(&mut app, "elevator.list", json!({}));
+    let mut cars: Vec<(String, String, bool)> = list
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| (e["drive"].as_str().unwrap().to_owned(), e["glazing"]["glass"].as_str().unwrap().to_owned(), e["hoistway_enclosure"] == "glass"))
+        .collect();
+    cars.sort();
+    assert_eq!(cars, [("hydraulic".to_owned(), "rear_sides".to_owned(), true), ("mrl_traction".to_owned(), "rear".to_owned(), false), ("mrl_traction".to_owned(), "rear_sides".to_owned(), true)]);
+    // Two glass hoistways of three curtain walls each survive the round trip as members.
+    let s = store(&app);
+    let curtains = s.iter().filter(|e| reviera_core::curtain::curtain_recipe(e).is_some()).count();
+    assert_eq!(curtains, 6);
+    // One note: the four-level glass hoistway's fire-rated glazing; nothing in the way.
+    let f = ok(&mut app, "elevator.check", json!({}));
+    assert_eq!(f.as_array().unwrap().iter().map(|x| (x["kind"].as_str().unwrap(), x["severity"].as_str().unwrap())).collect::<Vec<_>>(), [("glass", "note")]);
+    assert_eq!(ok(&mut app, "clearance.check", json!({})), json!([]));
+}
+
+#[test]
 fn the_escalators_sample_keeps_its_units_and_openings() {
     let work = tempfile::tempdir().unwrap();
     let mut app = open(work.path(), "escalators");

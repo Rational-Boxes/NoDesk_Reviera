@@ -144,5 +144,12 @@
     ],
     "source": "S2481 S0869",
     "confidence": "verified"
+  },
+  "glass": {
+    "id": "IBC 2409.2, 2409.4; 712.1.7, 712.1.9",
+    "description": "Glass in hoistway enclosures and cars is laminated (ANSI Z97.1 / CPSC 16 CFR 1201, Class A); in a rated hoistway it is fire-rated glazing (§716). An elevator in an atrium, or connecting only two stories, may be unenclosed: the authority decides.",
+    "rated_hoistway_levels": 2,
+    "source": "S1532",
+    "confidence": "advisory"
   }
 }

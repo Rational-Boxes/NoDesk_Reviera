@@ -137,6 +137,7 @@ pub mod view_overrides;
 pub mod origin;
 pub mod overlap;
 pub mod overlap_accept;
+pub mod panoramic;
 pub mod paramlib;
 pub mod parameters;
 pub mod parts;
