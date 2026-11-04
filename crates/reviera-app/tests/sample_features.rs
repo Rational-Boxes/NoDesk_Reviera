@@ -996,6 +996,27 @@ fn the_bathrooms_sample_keeps_its_rooms() {
 }
 
 #[test]
+fn the_elevators_sample_keeps_its_cars_and_hoistways() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "elevators");
+    let list = ok(&mut app, "elevator.list", json!({}));
+    let list = list.as_array().unwrap();
+    // Two 3500 lb cars serving five levels, and a 2000 lb hydraulic car serving two.
+    let mut cars: Vec<(f64, usize, String)> = list.iter().map(|e| (f(&e["load"]), e["levels"].as_array().unwrap().len(), e["drive"].as_str().unwrap().to_owned())).collect();
+    cars.sort_by(|a, b| a.0.total_cmp(&b.0));
+    assert_eq!(cars, [(907.0, 2, "hydraulic".to_owned()), (1588.0, 5, "mrl_traction".to_owned()), (1588.0, 5, "mrl_traction".to_owned())]);
+    // Each member is still there after the round trip: 4 walls and an entrance per level.
+    let s = store(&app);
+    for e in list {
+        let el = reviera_core::elevators::elevator(s.get(reviera_core::ElementId(e["elevator"].as_u64().unwrap())).unwrap()).unwrap();
+        assert_eq!((el.walls.len(), el.entrances.len()), (4, el.levels.len()));
+    }
+    // Nothing in the hoistways or landings, nothing overlapping, nothing to report.
+    assert_eq!(ok(&mut app, "elevator.check", json!({})), json!([]));
+    assert_eq!(ok(&mut app, "clearance.check", json!({})), json!([]));
+}
+
+#[test]
 fn the_washrooms_sample_keeps_its_core_and_lockers() {
     let work = tempfile::tempdir().unwrap();
     let mut app = open(work.path(), "washrooms");

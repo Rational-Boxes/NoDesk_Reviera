@@ -106,6 +106,24 @@
         { "name": "EnergySaving", "measure": "IfcNormalisedRatioMeasure", "description": "Share of the heating energy saved while closed (published, at night)." },
         { "name": "Porous", "measure": "IfcBoolean", "description": "Air passes through the fabric." }
       ]
+    },
+    {
+      "name": "Reviera_Elevator",
+      "description": "An elevator's sizes and drive as Reviera sized them (spec ARC-VT-002), on the car (IfcTransportElement ELEVATOR). IFC's Pset_TransportElementCommon and Pset_TransportElementElevator hold its capacity and clear car size; these are the values they lack. A chosen product's own values replace them.",
+      "applicable_classes": ["IfcTransportElement", "IfcTransportElementType"],
+      "properties": [
+        { "name": "RatedSpeed", "measure": "IfcLinearVelocityMeasure", "unit": "m/s", "description": "Rated speed." },
+        { "name": "DriveType", "measure": "IfcLabel", "description": "How the car is driven.", "values": ["mrl_traction", "traction", "hydraulic", "holeless"] },
+        { "name": "DoorOperation", "measure": "IfcLabel", "description": "How the car and landing doors open: to one side, or from the centre.", "values": ["side", "centre"] },
+        { "name": "DoorClearWidth", "measure": "IfcPositiveLengthMeasure", "unit": "m", "description": "Clear width of the car and landing doors." },
+        { "name": "DoorClearHeight", "measure": "IfcPositiveLengthMeasure", "unit": "m", "description": "Clear height of the car and landing doors." },
+        { "name": "HoistwayWidth", "measure": "IfcPositiveLengthMeasure", "unit": "m", "description": "Inside width of the hoistway." },
+        { "name": "HoistwayDepth", "measure": "IfcPositiveLengthMeasure", "unit": "m", "description": "Inside depth of the hoistway." },
+        { "name": "PitDepth", "measure": "IfcPositiveLengthMeasure", "unit": "m", "description": "From the lowest landing's floor down to the pit floor." },
+        { "name": "Overhead", "measure": "IfcPositiveLengthMeasure", "unit": "m", "description": "From the top landing's floor up to the underside of the structure above the hoistway." },
+        { "name": "StopsServed", "measure": "IfcCountMeasure", "description": "How many levels the elevator serves." },
+        { "name": "SizingPack", "measure": "IfcLabel", "description": "The vertical-transport rule pack the sizes came from (ARC-VT-001), until a product replaces them." }
+      ]
     }
   ]
 }

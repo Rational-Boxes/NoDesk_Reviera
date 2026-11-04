@@ -81,10 +81,12 @@ pub enum Category {
     ElectricAppliance,
     /// Steam generators and other humidifiers (ARC-BATH-015).
     Humidifier,
+    /// Elevators, escalators and other people movers (ARC-VT-002).
+    Transport,
 }
 
 impl Category {
-    pub const ALL: [Category; 26] = [
+    pub const ALL: [Category; 27] = [
         Category::GenericModel,
         Category::Furniture,
         Category::Column,
@@ -111,6 +113,7 @@ impl Category {
         Category::Alarm,
         Category::ElectricAppliance,
         Category::Humidifier,
+        Category::Transport,
     ];
 
     pub fn label(self) -> &'static str {
@@ -141,6 +144,7 @@ impl Category {
             Category::Alarm => "Alarm",
             Category::ElectricAppliance => "Electric Appliance",
             Category::Humidifier => "Humidifier",
+            Category::Transport => "Transport Element",
         }
     }
 
@@ -173,6 +177,7 @@ impl Category {
             Category::Alarm => "IfcAlarm",
             Category::ElectricAppliance => "IfcElectricAppliance",
             Category::Humidifier => "IfcHumidifier",
+            Category::Transport => "IfcTransportElement",
         }
     }
 
@@ -205,6 +210,7 @@ impl Category {
             Category::Alarm => "IfcAlarmType",
             Category::ElectricAppliance => "IfcElectricApplianceType",
             Category::Humidifier => "IfcHumidifierType",
+            Category::Transport => "IfcTransportElementType",
         }
     }
 

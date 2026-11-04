@@ -706,6 +706,19 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
 The Structure epic has begun (spec Chapter 4 §4.1). A **Structure** tab carries the structural
 tools and the datums.
 
+- **Elevators** (ARC-VT-001…004; the first part of the vertical-transport toolset in
+  `design_documents/VERTICAL_TRANSPORT_PLAN.md`): Architecture › Circulation › Elevator sizes an
+  elevator under vertical-transport rule packs chosen from the building code (`us_ibc_ada`,
+  `us_a17`, `practice_us`; `en81`, `en81_70`, `england_adm`, `practice_en`; MIT schema in
+  `schemas/vt/`): the smallest car that meets the accessibility packs and, from four storeys
+  under the IBC, takes the stretcher; then its hoistway, pit and overhead. It makes the car (an
+  `IfcTransportElement` ELEVATOR with `Reviera_Elevator` and IFC's transport property sets), a
+  shaft cutting every floor from the pit to the overhead, hoistway walls and a sliding entrance
+  at each level. Hoistways and landings are virtual volumes checked by Check Clearances; Check
+  Elevators reports car area against load (A17.1, EN 81-20, advisory), accessible car sizes and
+  the stretcher. Not built yet: editing in place, rear entrances, freight, hospital and vehicle
+  cars, small lifts, machine rooms, hall fixtures, banks, panoramic cars; escalators and moving
+  walks, stairlifts, people movers, funiculars and ropeways (planned).
 - **Structural columns**: Column (`SC`) places load-bearing columns in plans; **At Grids** puts
   one at every crossing of the grid lines you select (a window in a plan now selects grids), in
   one undo step. Shapes are rectangular, round, I, channel, angle, tee and rectangular or round
@@ -1725,6 +1738,9 @@ sample:
   dimension and parameters, a shared parameter, Uniclass codes, keynotes, saved selections as
   IfcGroups, the project location with a survey point and CRS, an Office space type and a pipe
   segment.
+- **Elevators in an office core** (`elevators.ifc`): five storeys under the IBC with a pair of
+  3500 lb passenger elevators sized for the stretcher and a two-stop hydraulic elevator, each with
+  its shaft, hoistway walls and entrances; Check Elevators and Check Clearances find nothing.
 - **Editing tools** (`modify_tools.ifc`): every Modify tab tool's result side by side, from align,
   mirror and the arrays to trim/extend, split and pinning, a component created and placed
   again, and a layered wall's parts divided, merged and excluded.

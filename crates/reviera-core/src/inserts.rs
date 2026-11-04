@@ -828,7 +828,7 @@ impl Solid {
 pub type Leaf = ([f64; 2], [f64; 2], [f64; 2], bool);
 
 /// How far sliding leaves lap past the jambs (and so travel past them).
-const SLIDE_LAP: f64 = 0.05;
+pub(crate) const SLIDE_LAP: f64 = 0.05;
 
 /// A leaf's boxes: one solid leaf, or a storefront leaf's stiles, rails and glass.
 fn leaf_boxes(

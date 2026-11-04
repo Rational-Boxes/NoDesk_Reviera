@@ -1398,6 +1398,14 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "overlaps" => format!(
             r#"<rect x="4" y="9" width="15" height="15" fill="{f}" {s}/><rect x="13" y="4" width="15" height="15" fill="none" {sa}/><path d="M13 9h6v10h-6z" fill="{a}" {s}/>"#
         ),
+        // An elevator car in its hoistway, with arrows up and down.
+        "elevator" => format!(
+            r#"<rect x="4" y="3" width="24" height="26" fill="none" {s}/><rect x="8" y="9" width="16" height="16" fill="{f}" {s}/><path d="M16 4v4M13 7l3-3 3 3" {sa}/><path d="M12 13l2-2 2 2M16 21l2 2 2-2M14 11v6M18 23v-6" {sa}/>"#
+        ),
+        // An elevator car with a tick.
+        "elevator_check" => format!(
+            r#"<rect x="4" y="3" width="18" height="24" fill="none" {s}/><rect x="7" y="8" width="12" height="14" fill="{f}" {s}/><path d="M18 22l4 4 7-9" fill="none" {sa} stroke-width="2.5"/>"#
+        ),
         // A WC in plan, its tank against the wall, and its clear space dashed in front.
         "bath_check" => format!(
             r#"<path d="M4 3h24" {s}/><rect x="11" y="4" width="10" height="4" fill="{f}" {s}/><ellipse cx="16" cy="13" rx="4.5" ry="5" fill="{f}" {s}/><rect x="6" y="19" width="20" height="9" fill="none" {sa} stroke-dasharray="3 2"/>"#

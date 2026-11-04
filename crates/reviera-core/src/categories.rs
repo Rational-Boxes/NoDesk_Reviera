@@ -218,6 +218,14 @@ pub const CATEGORIES: &[Category] = &[
         true,
     ),
     cat(
+        "cat.transport",
+        "Transport Elements",
+        Some("IfcTransportElement"),
+        Some("IfcTransportElementType"),
+        Some("Pset_TransportElementCommon"),
+        true,
+    ),
+    cat(
         "cat.plumbing_fixtures",
         "Plumbing Fixtures",
         Some("IfcSanitaryTerminal"),

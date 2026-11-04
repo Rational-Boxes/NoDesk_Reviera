@@ -556,6 +556,15 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(BathSchedules),
         registry.add(TileCreate),
         registry.add(TileSummary),
+        registry.add(VtRulePacks),
+        registry.add(VtSetRulePacks),
+        registry.add(VtAddRulePack),
+        registry.add(VtRemoveRulePack),
+        registry.add(ElevatorSize),
+        registry.add(ElevatorCreate),
+        registry.add(ElevatorList),
+        registry.add(ElevatorDelete),
+        registry.add(ElevatorCheck),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -7105,4 +7114,117 @@ read_command!(
     crate::tiles::SummaryParams,
     Vec<crate::tiles::SummaryRow>,
     crate::tiles::summary
+);
+
+read_command!(
+    VtRulePacks,
+    "vt.rule_packs",
+    "List the vertical-transport rule packs",
+    "Lists the vertical-transport rule packs the project can use (ARC-VT-001): the ones that ship (`us_ibc_ada`, \
+     `us_a17`, `practice_us`, `en81`, `en81_70`, `england_adm`, `practice_en`), each replaced by a project pack \
+     of its id, then the project's own; each with its layer, jurisdiction, edition and rules, whether it is in \
+     use, and whether it ships with Reviera.",
+    Option<crate::elevators::NoParams>,
+    Vec<crate::elevators::PackInfo>,
+    crate::elevators::list_rule_packs
+);
+
+edit_command!(
+    VtSetRulePacks,
+    "vt.set_rule_packs",
+    "Choose the vertical-transport rule packs",
+    "Chooses the vertical-transport rule packs the project uses, by id (ARC-VT-001); none to choose them from \
+     the building code: the US packs under the IBC or IRC, England's under Approved Document K, the EN packs \
+     otherwise.",
+    "Vertical Transport Rules",
+    crate::elevators::SetPacksParams,
+    (),
+    crate::elevators::set_rule_packs
+);
+
+edit_command!(
+    VtAddRulePack,
+    "vt.add_rule_pack",
+    "Add a vertical-transport rule pack",
+    "Adds a rule pack following `reviera.vt-rules-1` to the project (ARC-VT-001), replacing the project's or a \
+     shipped pack of the same id. Returns its id.",
+    "Add Vertical Transport Rules",
+    crate::elevators::AddPackParams,
+    String,
+    crate::elevators::add_rule_pack
+);
+
+edit_command!(
+    VtRemoveRulePack,
+    "vt.remove_rule_pack",
+    "Remove a vertical-transport rule pack",
+    "Removes one of the project's own vertical-transport rule packs (ARC-VT-001); a shipped pack it replaced \
+     comes back.",
+    "Remove Vertical Transport Rules",
+    crate::elevators::RemovePackParams,
+    (),
+    crate::elevators::remove_rule_pack
+);
+
+read_command!(
+    ElevatorSize,
+    "elevator.size",
+    "Size an elevator",
+    "Gives the sizes an elevator would get under the rule packs in use, without making it (ARC-VT-002): its rated \
+     load and persons, car and door, hoistway, pit and overhead, the sizing pack they came from, and anything it \
+     had to assume. Left out, the load is the smallest catalogue car that meets the accessibility packs and, \
+     where one is needed (`storeys`), takes the stretcher.",
+    crate::elevators::SizeParams,
+    crate::elevators::Sized,
+    crate::elevators::size_command
+);
+
+edit_command!(
+    ElevatorCreate,
+    "elevator.create",
+    "Make an elevator",
+    "Makes an elevator serving every level from `base_level` to `top_level` (ARC-VT-002), sized as \
+     `elevator.size`: its car (an IfcTransportElement ELEVATOR) on the lowest level, a shaft opening from the \
+     pit floor to the overhead that cuts every floor between, hoistway walls round it (unless `walls` is \
+     false) and a sliding automatic landing entrance at each level. `point` is the middle of the hoistway's \
+     inside front face; at rotation 0 the landing is toward -y.",
+    "Elevator",
+    crate::elevators::CreateParams,
+    crate::elevators::Created,
+    crate::elevators::create
+);
+
+read_command!(
+    ElevatorList,
+    "elevator.list",
+    "List the elevators",
+    "Lists the model's elevators (ARC-VT-002): each car, the levels it serves, its sizes and its members.",
+    Option<crate::elevators::NoParams>,
+    Vec<crate::elevators::ElevatorInfo>,
+    crate::elevators::list
+);
+
+edit_command!(
+    ElevatorDelete,
+    "elevator.delete",
+    "Delete an elevator",
+    "Deletes an elevator, given its car or any member (ARC-VT-002): its landing entrances, hoistway walls, \
+     shaft opening and car. Returns how many elements were deleted.",
+    "Delete Elevator",
+    crate::elevators::ElevatorParams,
+    usize,
+    crate::elevators::delete
+);
+
+read_command!(
+    ElevatorCheck,
+    "elevator.check",
+    "Check elevators against the rule packs",
+    "Checks elevators against the vertical-transport rule packs in use (ARC-VT-004): car area against rated \
+     load, accessible car and door sizes, and that an elevator serving every floor takes the stretcher. A \
+     finding from a recommended pack or an advisory rule is a note. Intrusions into hoistways and landings \
+     are reported by `clearance.check`.",
+    Option<crate::elevators::CheckParams>,
+    Vec<crate::elevators::Finding>,
+    crate::elevators::check
 );

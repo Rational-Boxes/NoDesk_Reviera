@@ -3,6 +3,10 @@
 **Status:** Draft 0.2 · 2026-11-03 · building started. The owner (2026-11-03): "Go with your
 recommended defaults and start building elevators". The answers to §12 are therefore the
 recommended ones, recorded in §12a, until the owner says otherwise.
+Built so far (2026-11-03): steps 1–2 for passenger elevators: the rule packs (ARC-VT-001), the
+elevator sized from its capacity with its shaft, walls and entrances (ARC-VT-002), its hoistway
+and landing zones (ARC-VT-003) and Check Elevators (ARC-VT-004), with the sample *Elevators in an
+office core*. What is left is listed under each requirement's *Not yet*.
 **Owner's requests:**
 - 2026-11-01: "Elevators, both passenger and freight." and "For elevators include ornamental
   version like glass enclosed."

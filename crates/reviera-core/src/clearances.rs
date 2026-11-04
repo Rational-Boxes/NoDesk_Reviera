@@ -71,6 +71,11 @@ pub enum ClearanceKind {
     ElectricalZone,
     /// A waterproofed wall or floor area round a fixture (ARC-BATH-012): shown, not kept clear.
     Waterproofing,
+    /// An elevator's hoistway, pit floor to overhead (ARC-VT-003): kept clear of anything but
+    /// the elevator's own members.
+    Hoistway,
+    /// The clear floor space in front of an elevator's landing entrance (ARC-VT-003).
+    ElevatorLanding,
 }
 
 impl ClearanceKind {
@@ -84,6 +89,8 @@ impl ClearanceKind {
             Self::FixtureSpace => "Clearance:fixture_space/3d",
             Self::ElectricalZone => "Clearance:electrical_zone/3d",
             Self::Waterproofing => "Clearance:waterproofing/3d",
+            Self::Hoistway => "Clearance:hoistway/3d",
+            Self::ElevatorLanding => "Clearance:elevator_landing/3d",
         }
     }
 
@@ -96,6 +103,8 @@ impl ClearanceKind {
             Self::FixtureSpace => "fixture clear space",
             Self::ElectricalZone => "electrical zone",
             Self::Waterproofing => "waterproofing",
+            Self::Hoistway => "hoistway",
+            Self::ElevatorLanding => "elevator landing",
         }
     }
 }
@@ -282,12 +291,16 @@ pub fn all(store: &Store) -> Vec<Clearance> {
         mesh: x.mesh(),
         door_swing_forbidden: false,
     }));
+    out.extend(crate::elevators::zones(store));
     out
 }
 
 /// Whether an element may stand in a virtual volume of this kind: grab bars, rails and
 /// accessories in a fixture's clear space (ADA 2010 604.3.2, UPC 402.5).
 pub fn may_share(store: &Store, kind: ClearanceKind, other: ElementId) -> bool {
+    if matches!(kind, ClearanceKind::Hoistway | ClearanceKind::ElevatorLanding) {
+        return crate::elevators::may_share(store, other);
+    }
     kind == ClearanceKind::FixtureSpace
         && store
             .get(other)

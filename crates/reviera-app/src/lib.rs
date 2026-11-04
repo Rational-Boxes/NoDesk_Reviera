@@ -500,6 +500,8 @@ impl App {
                 reviera_core::clearances::ClearanceKind::DoorSwing => [1.0, 0.62, 0.08, 0.3],
                 reviera_core::clearances::ClearanceKind::FixtureSpace => [0.2, 0.75, 0.35, 0.22],
                 reviera_core::clearances::ClearanceKind::ElectricalZone => [1.0, 0.85, 0.1, 0.16],
+                reviera_core::clearances::ClearanceKind::Hoistway => [0.55, 0.35, 0.85, 0.12],
+                reviera_core::clearances::ClearanceKind::ElevatorLanding => [0.2, 0.75, 0.35, 0.22],
                 reviera_core::clearances::ClearanceKind::Waterproofing => [0.15, 0.45, 0.95, 0.3],
                 _ => [0.1, 0.62, 1.0, 0.22],
             };

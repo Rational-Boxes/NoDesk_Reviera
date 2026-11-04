@@ -792,6 +792,18 @@ icon = "tiles"
 help = "Set out tiles on the selected wall's face or a floor: tile size, joint, from the middle or a corner, stack or half bond; full and cut tiles drawn and counted (ARC-BATH-020)"
 
 [[action]]
+id = "ui.elevator"
+label = "Elevator"
+icon = "elevator"
+help = "An elevator sized under the vertical-transport rule packs in use (Model Properties or vt.set_rule_packs): its car, a shaft cutting the floors from the pit to the overhead, hoistway walls and an entrance at each level served; then click the middle of its entrance in a plan (ARC-VT-002)"
+
+[[action]]
+id = "elevator.check"
+label = "Check Elevators"
+icon = "elevator_check"
+help = "Check elevators under the vertical-transport rule packs in use: car area against rated load, accessible car and door sizes, the stretcher; pick a finding to select and frame the elevator. Check Clearances lists what stands in hoistways and landings (ARC-VT-004)"
+
+[[action]]
 id = "ui.toilet_core"
 label = "Toilet Core"
 icon = "bathroom_layout"
@@ -3537,6 +3549,8 @@ tools = [
   { action = "ramp.create", size = "large" },
   { action = "railing.create", size = "large" },
   { action = "deck.create", size = "large" },
+  { action = "ui.elevator", size = "large" },
+  { action = "elevator.check", size = "small" },
 ]
 
 [[tab.panel]]
@@ -4729,6 +4743,7 @@ items = [
   "room.place", "room.place_automatically", "-",
   "roof.create_extrusion", "slabedge.create", "enclosure.create", "roof.create_geodesic", "growing.layout", "growing.lights", "-",
   "ui.place_bathroom_component", "ui.bathroom_layout", "ui.toilet_core", "ui.locker_room", "ui.sauna", "ui.steam_room", "ui.tiles", "ui.shower_falls", "ui.waterproofing", "ui.make_product", "ui.swap_for_product", "ui.product_documents", "bath.place_grab_bars", "bath.check", "ui.fixture_count", "-",
+  "ui.elevator", "elevator.check", "-",
   "opening.create_wall", "opening.create_vertical", "opening.create_by_face", "opening.create_shaft", "-",
   "grid.create", "level.create", "refplane.create", "modelline.create", "-",
   "workplane.set", "workplane.show",

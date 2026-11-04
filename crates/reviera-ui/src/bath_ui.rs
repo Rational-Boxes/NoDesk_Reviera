@@ -197,6 +197,9 @@ impl Gui {
         let command = args.as_object_mut().and_then(|o| o.remove("command")).and_then(|c| c.as_str().map(str::to_owned)).unwrap_or_else(|| "bath.layout".to_owned());
         match self.app.execute(&command, args, &super::user()) {
             Ok(out) => {
+                if command == "elevator.create" {
+                    return self.elevator_made(&out.result);
+                }
                 if out.result.is_u64() {
                     // A tile layout: its counts.
                     self.refresh_scene(&frame);

@@ -51,6 +51,7 @@ mod notes;
 mod openings;
 mod overlaps;
 mod bath_ui;
+mod elevator_ui;
 mod parts;
 mod path_arrays;
 mod radial;
@@ -4769,6 +4770,11 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "railing.create_on_stair" => with(gui, Gui::rail_stairs),
         "overlap.find" => with(gui, Gui::check_overlaps),
         "bath.check" => with(gui, Gui::check_bathrooms),
+        "elevator.check" => with(gui, Gui::check_elevators),
+        "ui.elevator" => with(gui, |g| {
+            g.place_elevator();
+            focus(g);
+        }),
         "bath.place_grab_bars" => with(gui, Gui::place_grab_bars),
         "ui.place_bathroom_component" => with(gui, Gui::place_bathroom_component),
         "ui.make_product" => with(gui, Gui::make_product),

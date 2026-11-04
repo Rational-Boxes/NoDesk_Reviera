@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Reviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Reviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 864 numbered requirements (320 P0 · 329 P1 · 208 P2 · 7 P3), 2,306 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 868 numbered requirements (320 P0 · 333 P1 · 208 P2 · 7 P3), 2,315 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,306 commands; 864 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,315 commands; 868 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -13866,6 +13866,120 @@ These are view annotation and are specified in the DOC chapter. This chapter req
 
 ---
 
+## 3.7a Vertical transportation: elevators
+
+Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-03: "Go with your recommended defaults and start building elevators"), planned in `VERTICAL_TRANSPORT_PLAN.md` and researched in `research/16_elevators.md` (sources S1505–S1684 and S2383–S2538). An elevator is made of ordinary elements sized by **rule packs**, as bathrooms are (§3.9a): the sizes, the accessibility minimums and the code limits are data with their jurisdiction, edition, source and confidence. This section covers passenger elevators. Freight, service and vehicle elevators, small lifts, panoramic cars, banks, escalators and moving walks, stairlifts, people movers, funiculars and ropeways follow, in the order of the plan's §11.
+
+### 3.7a.1 Vertical-transport rule packs
+**ID:** ARC-VT-001 · **Priority:** P1 · **Ref:** owner requirement (2026-11-03); `VERTICAL_TRANSPORT_PLAN.md` §3, §12a; research/16 Parts A, D, K, L
+
+**Purpose.** Keep every elevator rule and sizing default with its jurisdiction, edition, source and confidence, so that a check says exactly which rule a design breaks, and a user can add a local amendment or an office standard without changing Reviera.
+
+**Behaviour & rules.**
+- **A rule pack** is a JSON file following `schemas/vt/reviera.vt-rules-1.schema.json` (MIT). Its header is the bathroom packs' (`id`, title, jurisdiction, edition, **layer**: `minimum`, `accessible` or `recommended`), so that both can later join one rules schema (KITCHENS_PLAN Question 1). It may hold:
+  - **car_area**: the maximum inside car area for a rated load (kg → m²), interpolated linearly between rows, optionally growing by a fixed area per load beyond the last row;
+  - **accessible_car**: minimum car width, depth and door width, in options of which a car must meet one, each with the door centred, to one side, or anywhere; and an optional turning circle that also passes;
+  - **stretcher**: a stretcher's length, width and corner radius, and the number of storeys from which an elevator serving every floor must take it;
+  - **landing**: the clear floor space in front of each entrance;
+  - **call_buttons**: the height band of hall call buttons (kept for when hall fixtures are modelled);
+  - **door_width**: a minimum door width;
+  - **sizing**: generic, maker-style defaults: catalogue cars by rated load (door kind, car and door size), hoistway allowances (width by door kind, depth, rear entrance, space below the pit), pit and overhead by drive and speed (an overhead, or the car height plus a margin), car and door heights, and the mass per person.
+
+  Each rule has an ID (its clause), a source ID from `SOURCE_REGISTER.md` and a confidence: `verified`, `secondary` or `advisory`. Rules known only through adoptions, checklists and makers (ASME A17.1, EN 81-20) are `advisory`.
+- **Packs that ship** (values in research/16 A1–A8, A6, D2–D7, D10 and O):
+
+| Pack | Layer | Covers |
+|---|---|---|
+| `us_ibc_ada` | accessible | ADA 2010 Table 407.4.1 car and door sizes (centred door 2030 × 1295 mm, 1065 mm door; side door 1725 × 1295 mm; any door 1370 × 2030 or 1525 × 1525 mm; 899 mm doors) and the 1525 mm turning circle; IBC 3002.4 stretcher 610 × 2134 mm, 127 mm corners, from 4 storeys; the 760 × 1220 mm clear floor space at the call buttons; call buttons 380–1220 mm |
+| `us_a17` | minimum (advisory) | ASME A17.1 Table 2.16.1.1 maximum car area, 2000–6000 lb, as restated by makers and the VA |
+| `practice_us` | recommended | US maker-style cars (2000–4000 lb), hoistway allowances (+559 mm width, +457 mm depth), pit and overhead by drive and speed |
+| `en81` | minimum (advisory) | EN 81-20 Table 6 maximum car area, 100–2500 kg, +0.16 m² per 100 kg beyond |
+| `en81_70` | accessible | EN 81-70:2021 type 2 car, 1100 × 1400 mm, 900 mm door |
+| `england_adm` | accessible | Approved Document M vol. 2: car 1100 × 1400 mm, 800 mm door; 1500 × 1500 mm landing; call buttons 900–1100 mm |
+| `practice_en` | recommended | EN maker-style cars (450–2500 kg), allowances, pit and headroom by speed |
+
+- **Choosing packs.** A project uses the packs it names (`vt.set_rule_packs`), or by default packs chosen from its building code (DM-CODE-001): `us_ibc_ada`, `us_a17` and `practice_us` under the IBC or IRC; `en81`, `en81_70`, `england_adm` and `practice_en` under England's; `en81`, `en81_70` and `practice_en` otherwise.
+- **Project packs.** `vt.add_rule_pack` adds a pack to the project (checked against the schema; an `id` that ships replaces the shipped one for this project), and `vt.remove_rule_pack` removes it. They are kept in RXD on the project (`rxd:vt_rule_packs`). A pack whose car-area rows fall in load or area, whose call-button band is upside down, or whose pit and overhead rows give neither or both overhead forms, is refused (`vt.pack_range`).
+
+**Data (IFC mapping).** RXD only: `rxd:vt_rules` and `rxd:vt_rule_packs` on `IfcProject`.
+
+**Acceptance criteria.**
+- [x] Every shipped pack follows the published schema, and every rule names a source in `SOURCE_REGISTER.md`.
+- [x] A project on the IBC uses `us_ibc_ada`, `us_a17` and `practice_us` without being told; naming packs uses only those.
+- [x] A pack whose car-area rows fall in load is refused.
+
+*Built (2026-11-03):* `reviera_core::elevators`, the schema and the seven packs in `schemas/vt/`. Not yet: a model-properties page for choosing packs (the commands do it), Hong Kong and the other advisory packs of research/16 L1.
+
+### 3.7a.2 Elevators sized from their capacity
+**ID:** ARC-VT-002 · **Priority:** P1 · **Ref:** owner requirement (2026-11-01, 2026-11-03); `VERTICAL_TRANSPORT_PLAN.md` §4.1–4.2; research/16 A2–A8, D3–D4, L2, L4 G-1
+
+**Purpose.** Lay out an elevator from what it must carry, with its hoistway, pit and overhead, so that the building's core is the right size from the first sketch and a maker's product can replace the defaults later.
+
+**Behaviour & rules.**
+- **Sizing** (`elevator.size`, and inside `elevator.create`). From the rule packs in use:
+  - With no rated load given, the car is the smallest catalogue car of the first sizing pack that meets every accessibility pack in use and, where the elevator serves at least the stretcher rule's storeys, takes the stretcher. A load given picks the smallest catalogue car at least that load. A car width and depth given (with a load) are used as they are.
+  - **Hoistway** = car width + the allowance for its door kind; car depth + the depth allowance (+ the allowance for occupied space below the pit, `space_below`).
+  - **Pit and overhead** from the pack's row for the drive (MRL traction by default) at the lowest speed band holding the speed (1.0 m/s by default). An overhead given for a standard car height grows by any extra car height.
+  - Persons = rated load ÷ the pack's mass per person (75 kg), rounded down.
+  - What the sizing had to assume (no car meets the accessibility packs, a load above the catalogue) is returned as notes.
+- **The assembly** (`elevator.create`), serving every level from the base level to the top level:
+  - **The car**, a custom object (`IfcTransportElement` ELEVATOR, category *Transport Element*) on the lowest level served, a box of the car's inside size. It carries the elevator's data (RXD `rxd:elevator`) and stands for the elevator.
+  - **A shaft opening** (ARC-OPEN-004) from the pit floor (the lowest level less the pit) to the overhead above the top level, named *Elevator Hoistway*. It cuts every floor in between, including floors added later. With walls, it takes the walls' outer faces, so the floors stop at the continuous hoistway walls; without, the hoistway's inside.
+  - **Hoistway walls** (unless `walls` is false): four walls of an *Elevator Hoistway* wall type of the given thickness (200 mm by default), from the pit floor to the overhead, their inside faces on the hoistway.
+  - **A landing entrance at each level**: a sliding automatic door of the *Elevator Landing Entrance* type in the front wall, the car door's clear width and height. A side-opening door is to one side of the car; where the front wall leaves too little room for the leaves to slide, the entrance moves along until they fit, and that position is kept. A hoistway too narrow for the leaves is refused (`vt.entrance`).
+  - Each member carries its car's GlobalId (`rxd:elevator_of`).
+- **Frame.** `point` is the middle of the hoistway's inside front face (the entrance line); local x runs across the hoistway, local y into it; at rotation 0 the landing is toward −y.
+- `elevator.list` lists the elevators with the levels they serve and their sizes. `elevator.delete`, given the car or any member, deletes the entrances, walls, shaft and car.
+
+**Data (IFC mapping).** The car is an `IfcTransportElement` (PredefinedType ELEVATOR) with `Pset_TransportElementCommon` (CapacityPeople, CapacityWeight), `Pset_TransportElementElevator` (ClearWidth, ClearDepth, ClearHeight, FireFightingLift) and `Reviera_Elevator` (RatedSpeed, DriveType, DoorOperation, DoorClearWidth, DoorClearHeight, HoistwayWidth, HoistwayDepth, PitDepth, Overhead, StopsServed, SizingPack), published in `schemas/psets/reviera-psets-1.json`. The shaft is an `IfcBuildingElementProxy` PROVISIONFORVOID with an `IfcOpeningElement` per floor it cuts (ARC-OPEN-004); walls and doors are ordinary.
+
+**Acceptance criteria.**
+- [x] Under the US packs, an elevator serving two storeys gets the 2000 lb car (1727 × 1295 mm, 914 mm side door), the first that meets the ADA; serving four storeys, the 3500 lb car (2032 × 1651 mm), the first that takes the IBC stretcher, with 21 persons.
+- [x] Under the EN packs at 1.6 m/s, the 630 kg car (1100 × 1400 mm) gets a 1400 mm pit and 3800 mm headroom (2200 mm car + 1600 mm).
+- [x] A four-storey elevator makes a car, a shaft, four walls and four entrances; nothing overlaps; the file has an `IFCTRANSPORTELEMENT` of type ELEVATOR with its property sets; deleting it from a wall removes all ten elements.
+
+*Built (2026-11-03):* `elevator.size`, `elevator.create`, `elevator.list`, `elevator.delete`, and Architecture › Circulation › Elevator. Defaults are recorded as E-83 in `EXPERT_REVIEW.md`. Not yet: editing an elevator in place (delete and make it again), rear and side entrances, freight, hospital and vehicle cars, small lifts, banks, machine and control rooms, pit ladders and sumps, hall fixtures, rails and counterweight, and structural and electrical interfaces (plan §4.4).
+
+### 3.7a.3 Elevator clear zones
+**ID:** ARC-VT-003 · **Priority:** P1 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §4.3; research/16 L3 (Z4, Z13, Z14); ARC-MOD-031
+
+**Purpose.** Show and keep clear the space an elevator needs: its hoistway from pit to overhead, and the landing in front of each entrance.
+
+**Behaviour & rules.**
+- **Zones are virtual volumes** (ARC-MOD-031), regenerated from the elevator's data:
+  - **Hoistway** (kind *hoistway*): the hoistway's inside plan from the pit floor to the overhead above the top level. Only the elevator's own members, cars and shaft openings may be in it; anything else (a duct, a pipe, a partition, a beam) is an intrusion (research/16 R25; Approved Document B 17.9).
+  - **Elevator landing** (kind *elevator landing*): for each pack in use with a `landing` rule and each level served, a box of the rule's width centred on the entrance and the rule's depth out from the front wall's face, from the floor to the rule's height (2.03 m by default).
+- `clearance.check` and `clearance.list` include them as they do door clearances, and views show them with the other virtual volumes: hoistways violet, landings green.
+
+**Data (IFC mapping).** As ARC-MOD-031.
+
+**Acceptance criteria.**
+- [x] A partition run across a hoistway on an upper level is reported as an intrusion into it; the elevator's own walls, entrances and car are not.
+- [x] Under `england_adm`, each entrance has a 1500 × 1500 mm landing zone against the front wall's face.
+
+*Built (2026-11-03):* in `clearances::all`. Not yet: pit refuges, the overhead and counterweight zones, machine-room working space, call-button reach bands (research/16 L3 Z5–Z28).
+
+### 3.7a.4 The elevator check
+**ID:** ARC-VT-004 · **Priority:** P1 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §3.3, §10; research/16 A3, A6, D2, D7
+
+**Purpose.** Say which elevator breaks which rule, from which pack and edition, how sure the rule is, and by how much.
+
+**Behaviour & rules.**
+- **`elevator.check`** checks every elevator (or those given, by car or member) against the packs in use:
+  - **car area**: the car's inside area against the pack's maximum for its rated load; a load below the table's first row is reported as not checked;
+  - **accessible car**: the car and door against the pack's options and turning circle;
+  - **stretcher**: where the elevator serving the most storeys serves at least the rule's storeys, one elevator serving all of them must take the stretcher, laid flat, straight or turned (a rounded rectangle in the car's plan; the door is not tried yet).
+- Each finding gives the elevator, the pack, its edition and layer, the rule ID and description, its confidence and source, a message, and for areas the measured and allowed values. A finding from a `recommended` pack or an `advisory` rule is a **note**; any other is an **error**.
+- Intrusions into hoistways and landings are reported by `clearance.check` (ARC-VT-003).
+
+**Acceptance criteria.**
+- [x] A 1500 × 1200 mm car with an 800 mm door in a four-storey building is reported against ADA 407.4.1 and IBC 3002.4, as errors.
+- [x] Under `en81`, a 630 kg car of 1400 × 1600 mm is a note (advisory), giving 1.66 m² allowed.
+
+*Built (2026-11-03):* `elevator.check`, and Architecture › Circulation › Check Elevators. Not yet: the HTML and BCF report (as `bath.report`), the door in the stretcher test, door widths alone, call buttons.
+
+---
+
 ## 3.8 Openings
 
 ### 3.8.1 Opening by face
@@ -16193,6 +16307,15 @@ All commands below are registered once in the command registry and exposed autom
 | `unit.set_merge_rules` | type_id, faces: [{face, rule: merge\|keep\|share}] | — | Yes | ARC-GRP-004 |
 | `grab_bar.create` | level, points, wall_id?, side?, diameter?, gap? | element_id | Yes | ARC-BATH-003 |
 | `grab_bar.set` | element_ids, diameter?, gap?, top? | — | Yes | ARC-BATH-003 |
+| `vt.rule_packs` | — | [{id, title, layer, jurisdiction, edition, in_use, shipped, car_area, accessible_car, stretcher, landing, call_buttons, sizing}] | No (query) | ARC-VT-001 |
+| `vt.set_rule_packs` | packs? (none for automatic) | — | Yes | ARC-VT-001 |
+| `vt.add_rule_pack` | pack | id | Yes | ARC-VT-001 |
+| `vt.remove_rule_pack` | id | — | Yes | ARC-VT-001 |
+| `elevator.size` | load?, speed?, drive?, door?, car_width?, car_depth?, car_height?, door_width?, door_height?, storeys?, space_below? | {load, persons, speed, drive, door, car, door_size, hoistway, pit, overhead, sizing_pack, notes} | No (query) | ARC-VT-002 |
+| `elevator.create` | point, rotation?, base_level, top_level, (as `elevator.size`), walls?, wall_thickness? | {elevator, shaft, walls, entrances, sizes} | Yes | ARC-VT-002 |
+| `elevator.list` | — | [{elevator, name, levels, sizes, members}] | No (query) | ARC-VT-002 |
+| `elevator.delete` | elevator | count | Yes | ARC-VT-002 |
+| `elevator.check` | elevators? | finding[] | No (query) | ARC-VT-004 |
 | `enclosure.create` | form, footprint \| host_wall_ids, level_id, params | element_id | Yes | ARC-GLZ-001 |
 | `enclosure.set` | enclosure_id, params | — | Yes | ARC-GLZ-001 |
 | `enclosure.get` | enclosure_id | {form, params, parts} | No (query) | ARC-GLZ-001 |
@@ -29360,14 +29483,14 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 39 | 8 | 0 | 123 |
 | DM | 91 | 65 | 34 | 3 | 193 |
-| ARC | 77 | 89 | 20 | 1 | 187 |
+| ARC | 77 | 93 | 20 | 1 | 191 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 28 | 0 | 29 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
 | COL | 8 | 50 | 12 | 1 | 71 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **329** | **208** | **7** | **864** |
+| **Total** | **320** | **333** | **208** | **7** | **868** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -29566,7 +29689,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2306 unique commands** in 430 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2315 unique commands** in 432 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -29690,6 +29813,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `electrical_settings` | 2 |
 | `element` | 39 |
 | `elevationmarker` | 1 |
+| `elevator` | 5 |
 | `embodied_carbon` | 5 |
 | `enclosure` | 16 |
 | `energy_location` | 1 |
@@ -29982,6 +30106,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `viewset` | 3 |
 | `viewtype` | 1 |
 | `voltage` | 1 |
+| `vt` | 4 |
 | `walkthrough` | 9 |
 | `wall` | 28 |
 | `wall_foundation` | 1 |
@@ -30587,6 +30712,11 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `element.unpin` | 3 | element_ids | — | Yes | ARC-MOD-013 |
 | `element.update_to_face` | 3 | element_ids | — | Yes | ARC-MASS-003 |
 | `elevationmarker.set_directions` | 5 | marker_id, directions[] | view_ids[] | Yes | DOC-VIEW-003 |
+| `elevator.check` | 3 | elevators? | finding[] | No (query) | ARC-VT-004 |
+| `elevator.create` | 3 | point, rotation?, base_level, top_level, (as `elevator.size`), walls?, wall_thickness? | {elevator, shaft, walls, entrances, sizes} | Yes | ARC-VT-002 |
+| `elevator.delete` | 3 | elevator | count | Yes | ARC-VT-002 |
+| `elevator.list` | 3 | — | [{elevator, name, levels, sizes, members}] | No (query) | ARC-VT-002 |
+| `elevator.size` | 3 | load?, speed?, drive?, door?, car_width?, car_depth?, car_height?, door_width?, door_height?, storeys?, space_below? | {load, persons, speed, drive, door, car, door_size, hoistway, pit, overhead, sizing_pack, notes} | No (query) | ARC-VT-002 |
 | `embodied_carbon.compare` | 4 | job_id_a, job_id_b | report | No | ANA-CARB-001 |
 | `embodied_carbon.export` | 4 | job_id, path, format: "csv"\ | "json"\ | "html" | — |
 | `embodied_carbon.import_factors` | 4 | path, format: "ilcd"\ | "csv" | library_id | Yes |
@@ -32216,6 +32346,10 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `viewset.save` | 5 | name, view_and_sheet_ids[]?, rule? | set_id | Yes | DOC-OUT-001 |
 | `viewtype.create` | 5 | kind, name, default_template_id?, bind_new_views?, marker_type_id? | view_family_type_id | Yes | DOC-VIEW-001 |
 | `voltage.create` | 4 | name, value, min, max | id | Yes | MEP-SET-002 |
+| `vt.add_rule_pack` | 3 | pack | id | Yes | ARC-VT-001 |
+| `vt.remove_rule_pack` | 3 | id | — | Yes | ARC-VT-001 |
+| `vt.rule_packs` | 3 | — | [{id, title, layer, jurisdiction, edition, in_use, shipped, car_area, accessible_car, stretcher, landing, call_buttons, sizing}] | No (query) | ARC-VT-001 |
+| `vt.set_rule_packs` | 3 | packs? (none for automatic) | — | Yes | ARC-VT-001 |
 | `walkthrough.capture` | 7 | session_id, comment?, as?: view\ | bcf | id | Yes |
 | `walkthrough.record` | 7 | session_id, on | () | No | ADV-WALK-001 |
 | `walkthrough.save_path` | 7 | session_id, name | view_id | Yes | ADV-WALK-001 |

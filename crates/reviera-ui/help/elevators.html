@@ -1,0 +1,89 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Reviera contributors -->
+<h1>Elevators</h1>
+<p class="lead">An elevator is laid out from what it must carry. Reviera sizes the car from the
+<b>vertical-transport rule packs</b> in use, then builds the hoistway round it: a shaft that cuts
+every floor from the pit to the overhead, hoistway walls, and a sliding entrance at each level it
+serves. <b>Check Elevators</b> then says which rule a car breaks. The sample
+<a href="reviera:sample/elevators">Elevators in an office core</a> shows the tools.</p>
+<nav class="toc">
+  <a href="#place">Placing an elevator</a>
+  <a href="#sizes">How it is sized</a>
+  <a href="#parts">What it is made of</a>
+  <a href="#zones">Hoistway and landing zones</a>
+  <a href="#check">Check Elevators</a>
+  <a href="#packs">Rule packs</a>
+  <a href="#limits">Limits and what to check</a>
+  <a href="#scripts">Scripts and agents</a>
+</nav>
+
+<h2 id="place">Placing an elevator</h2>
+<p>Open a plan of the lowest level the elevator serves and choose <b>Architecture › Circulation ›
+Elevator</b>. Choose the highest level it serves, and leave the rated load empty for the smallest
+car the rule packs accept, or type one in kilograms. Choose the drive and speed, the doors, and
+the rotation: at 0° the landing faces the bottom of the plan. Then click the middle of its
+entrance, or type the point in the dialog. The status bar gives the sizes it chose.</p>
+
+<h2 id="sizes">How it is sized</h2>
+<ul>
+  <li><b>The car</b> is the smallest car in the sizing pack's catalogue that meets every
+  accessibility pack in use. Where the elevator serves enough storeys for a stretcher rule (four
+  under the IBC), it must also take the stretcher, flat, straight or turned. A load you give picks
+  the smallest car of at least that load.</li>
+  <li><b>The hoistway</b> is the car plus the pack's allowances for the door kind and depth.</li>
+  <li><b>The pit and overhead</b> come from the pack's table for the drive and speed. A taller
+  car adds its extra height to the overhead.</li>
+  <li><b>Persons</b> are the load divided by 75 kg.</li>
+</ul>
+<p>These are generic, maker-style sizes. A real product's sizes will differ a little; use the
+maker's planning guide before the core is fixed.</p>
+
+<h2 id="parts">What it is made of</h2>
+<p>The <b>car</b> is a transport element (IFC <code>IfcTransportElement</code>, type ELEVATOR) on
+the lowest level, carrying the elevator's capacity, clear size, speed, drive, hoistway, pit and
+overhead as property sets. The <b>shaft</b> is an ordinary shaft opening, so it also cuts floors
+added later. With walls, the shaft follows their outer faces, so the floors stop at the
+hoistway walls. The <b>walls</b> and <b>entrances</b> are ordinary walls and sliding automatic
+doors. Delete an elevator with <code>elevator.delete</code>, given the car or any of its walls or
+entrances; it removes them all.</p>
+
+<h2 id="zones">Hoistway and landing zones</h2>
+<p>Each elevator has virtual volumes: its <b>hoistway</b> (violet), from the pit floor to the
+overhead, which nothing but the elevator's own parts may enter, and a <b>landing</b> (green) in
+front of each entrance where a pack gives one: 760 × 1220 mm at the call buttons under the ADA,
+1500 × 1500 mm under Approved Document M. <b>View › Coordination › Check Clearances</b> lists what
+stands in them. Show them by setting a view's virtual volumes to <i>Translucent</i>.</p>
+
+<h2 id="check">Check Elevators</h2>
+<p><b>Architecture › Circulation › Check Elevators</b> checks each car's area against the
+maximum for its rated load, its size and door against the accessibility packs, and that an
+elevator serving every floor takes the stretcher where one is needed. Each finding names the
+rule, pack, edition and source. A finding from guidance or from a rule marked advisory is a
+<b>note</b>; others are <b>errors</b>. Pick one to select and frame the elevator.</p>
+
+<h2 id="packs">Rule packs</h2>
+<p>The packs are chosen from the building code (Manage › Model Properties):</p>
+<ul>
+  <li>IBC or IRC: <code>us_ibc_ada</code> (ADA car sizes, the IBC stretcher, landings),
+  <code>us_a17</code> (ASME A17.1 car area, advisory) and <code>practice_us</code> (sizes);</li>
+  <li>England: <code>en81</code> (EN 81-20 car area, advisory), <code>en81_70</code> (type 2
+  car), <code>england_adm</code> (car, landing, call buttons) and <code>practice_en</code>;</li>
+  <li>otherwise <code>en81</code>, <code>en81_70</code> and <code>practice_en</code>.</li>
+</ul>
+<p>Name others with <code>vt.set_rule_packs</code>, and add your own following
+<code>schemas/vt/reviera.vt-rules-1.schema.json</code> with <code>vt.add_rule_pack</code>; one
+with a shipped pack's id replaces it in this project.</p>
+
+<h2 id="limits">Limits and what to check</h2>
+<p>ASME A17.1 and EN 81-20 were read only through state adoptions, inspection checklists and
+makers' guides, so their rules are advisory. Not yet built: editing an elevator in place, rear
+entrances, freight and hospital cars, machine rooms, pit ladders, hall fixtures, banks of
+elevators and escalators.</p>
+
+<h2 id="scripts">Scripts and agents</h2>
+<p>Everything above is a command: <code>vt.rule_packs</code>, <code>vt.set_rule_packs</code>,
+<code>vt.add_rule_pack</code>, <code>vt.remove_rule_pack</code>, <code>elevator.size</code>,
+<code>elevator.create</code>, <code>elevator.list</code>, <code>elevator.delete</code> and
+<code>elevator.check</code>; <code>clearance.list</code> and <code>clearance.check</code> include
+hoistways and landings. Lua scripts and AI agents (MCP, the <i>modeling</i> toolset) can use
+them.</p>

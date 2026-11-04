@@ -113,6 +113,19 @@
     ]
   },
   {
+    "name": "elevators",
+    "title": "Elevators in an office core",
+    "group": "Architecture",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "elevators.lua"
+        }
+      }
+    ]
+  },
+  {
     "name": "washrooms",
     "title": "Washrooms and a locker room",
     "group": "Architecture",
