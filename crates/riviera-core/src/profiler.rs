@@ -584,18 +584,21 @@ mod tests {
         // The outer scope's self time leaves out its three inner ones.
         assert!(outer.total_ms >= 14.0 && outer.self_ms < outer.total_ms - 5.0, "{outer:?}");
         assert!(inner.p95_ms >= 2.0 && inner.max_ms >= inner.median_ms);
-        // Only the outer scope reached the 5 ms threshold.
-        assert_eq!(r.slow.len(), 1);
-        assert_eq!((r.slow[0].name.as_str(), r.slow[0].detail.as_deref()), ("outer", Some("detail")));
-        assert_eq!(r.counters[0].total, 7);
+        // Only the outer scope reached the 5 ms threshold. (Other tests in this process may record
+        // scopes of their own while the profiler is on: only this test's are counted.)
+        let ours = |n: &str| n == "outer" || n == "inner";
+        let slow: Vec<_> = r.slow.iter().filter(|e| ours(&e.name)).collect();
+        assert_eq!(slow.len(), 1);
+        assert_eq!((slow[0].name.as_str(), slow[0].detail.as_deref()), ("outer", Some("detail")));
+        assert_eq!(r.counters.iter().find(|c| c.name == "things").map(|c| c.total), Some(7));
         let path = r.paths.iter().find(|p| p.path == "outer › inner").expect("the nested path");
         assert_eq!((path.calls, path.depth), (3, 1));
         let l = live();
-        assert_eq!(l.recent.len(), 1, "one top-level operation");
+        assert_eq!(l.recent.iter().filter(|e| ours(&e.name)).count(), 1, "one top-level operation");
         let md = markdown(&r, &Context::here());
         assert!(md.contains("`outer › inner`") && md.contains("## Slow operations") && md.contains("| `outer` |"), "{md}");
         let t = chrome_trace();
-        let ev = t["traceEvents"].as_array().unwrap();
+        let ev: Vec<&serde_json::Value> = t["traceEvents"].as_array().unwrap().iter().filter(|e| e["name"].as_str().is_some_and(ours)).collect();
         assert_eq!(ev.len(), 4);
         assert!(ev.iter().all(|e| e["ph"] == "X" && e["dur"].as_u64().is_some()));
         reset();
