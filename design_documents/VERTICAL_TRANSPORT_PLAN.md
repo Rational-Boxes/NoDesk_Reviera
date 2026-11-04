@@ -22,8 +22,8 @@ sample *Panoramic lifts in a hotel atrium*, as `car_glass` and `hoistway` option
 `elevator.create` rather than a separate `elevator.panoramic` (banks wait for ARC-GRP-004); then
 step 8: elevator up-peak traffic (ARC-VT-018) and escalator capacity against demand with one unit
 out (ARC-VT-019), with the sample *Elevator traffic in an office tower*. This completes the first
-build's steps 1–8, except the egress modes and the airport and transit context, which are listed
-as *Not yet*; the owner's next priority is FileEngine support (2026-11-04). What is left is
+build's steps 1–8; the transit context and escalator egress counting followed (ARC-VT-020/021,
+2026-11-04), egress through multi-level routes is next; the owner's next priority is FileEngine support (2026-11-04). What is left is
 listed under each requirement's *Not yet*.
 **Owner's requests:**
 - 2026-11-01: "Elevators, both passenger and freight." and "For elevators include ornamental

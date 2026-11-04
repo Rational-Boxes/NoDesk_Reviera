@@ -188,9 +188,10 @@ impl Gui {
         let top = f.choice("Up to", &names, usize::from(!above.is_empty()));
         let width = f.choice("Step or pallet width", &["600 mm".to_owned(), "800 mm".to_owned(), "1000 mm".to_owned(), "1200 mm (walks)".to_owned(), "1400 mm (walks)".to_owned()], 2);
         let incline = f.text("Inclination (°)", "", "Empty: 30° for escalators, 12° for inclined walks");
-        let speed = f.text("Speed (m/s)", "0.5", "");
+        let speed = f.text("Speed (m/s)", "", "Empty: 0.5, or 0.65 in a station");
         let flat = f.text("Flat steps", "", "Empty: the least the rule packs ask for the rise and speed");
         let duty = f.choice("Duty", &["Commercial".to_owned(), "Transit (heavy duty)".to_owned()], 0);
+        let context = f.choice("Setting", &["A building".to_owned(), "An airport".to_owned(), "A station (transit: 0.65 m/s, 6 m run-off)".to_owned()], 0);
         let length = f.text("Walk length (m)", "", "A horizontal walk's length between its working points");
         let pit = f.choice("Horizontal walk", &["On the floor".to_owned(), "In a pit, flush".to_owned()], 0);
         let rotation = f.text("Rotation (°)", "0", "0: it rises toward the right of the plan; counter-clockwise");
@@ -198,6 +199,7 @@ impl Gui {
         let ok = f.show("Sized under the vertical-transport rule packs in use, with floor openings for its pits and headroom. Then click the middle of its lower end.", "Place");
         let num = |t: &TextCtrl| t.get_value().trim().parse::<f64>().ok();
         let step = [0.6, 0.8, 1.0, 1.2, 1.4][width.get_selection().unwrap_or(2) as usize];
+        let setting = ["building", "airport", "transit"][context.get_selection().unwrap_or(0) as usize];
         let mut args = json!({
             "command": "escalator.create",
             "kind": if kind.get_selection() == Some(1) { "moving_walk" } else { "escalator" },
@@ -205,6 +207,7 @@ impl Gui {
             "rotation": num(&rotation).unwrap_or(0.0).to_radians(),
             "duty": if duty.get_selection() == Some(1) { "transit" } else { "commercial" },
             "pit": pit.get_selection() == Some(1),
+            "context": setting,
         });
         if let Some(t) = top.get_selection().and_then(|k| (k as usize).checked_sub(1)).and_then(|k| above.get(k)) {
             args["top_level"] = t["id"].clone();

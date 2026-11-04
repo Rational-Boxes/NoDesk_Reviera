@@ -1084,6 +1084,18 @@ fn the_traffic_sample_has_a_slow_bank_and_a_fast_one() {
 }
 
 #[test]
+fn the_station_sample_keeps_its_transit_pair_and_run_off() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "station");
+    let list = ok(&mut app, "escalator.list", json!({}));
+    let units: Vec<(String, f64)> = list.as_array().unwrap().iter().map(|e| (e["context"].as_str().unwrap().to_owned(), f(&e["speed"]))).collect();
+    assert_eq!(units, [("transit".to_owned(), 0.65), ("transit".to_owned(), 0.65)]);
+    let zones = ok(&mut app, "clearance.list", json!({}));
+    assert_eq!(zones.as_array().unwrap().iter().filter(|z| z["kind"] == "escalator_run_off").count(), 4);
+    assert_eq!(ok(&mut app, "clearance.check", json!({})), json!([]));
+}
+
+#[test]
 fn the_escalators_sample_keeps_its_units_and_openings() {
     let work = tempfile::tempdir().unwrap();
     let mut app = open(work.path(), "escalators");

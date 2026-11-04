@@ -165,6 +165,19 @@
     ]
   },
   {
+    "name": "station",
+    "title": "Escalators in a transit station",
+    "group": "Architecture",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "station.lua"
+        }
+      }
+    ]
+  },
+  {
     "name": "escalators",
     "title": "Escalators and moving walks in a department store",
     "group": "Architecture",

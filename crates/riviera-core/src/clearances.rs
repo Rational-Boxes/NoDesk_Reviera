@@ -82,6 +82,8 @@ pub enum ClearanceKind {
     EscalatorHeadroom,
     /// The landing zone beyond each end of an escalator or walk (ARC-VT-011).
     EscalatorLanding,
+    /// A transit escalator's or walk's station run-off zone beyond each end (ARC-VT-020).
+    EscalatorRunOff,
     /// A stairlift's running envelope over its stair (ARC-VT-014).
     StairliftRun,
     /// The run-out and landing space at each end of a stairlift (ARC-VT-014).
@@ -104,6 +106,7 @@ impl ClearanceKind {
             Self::MachineSpace => "Clearance:machine_space/3d",
             Self::EscalatorHeadroom => "Clearance:escalator_headroom/3d",
             Self::EscalatorLanding => "Clearance:escalator_landing/3d",
+            Self::EscalatorRunOff => "Clearance:escalator_run_off/3d",
             Self::StairliftRun => "Clearance:stairlift_run/3d",
             Self::StairliftLanding => "Clearance:stairlift_landing/3d",
         }
@@ -123,6 +126,7 @@ impl ClearanceKind {
             Self::MachineSpace => "elevator machine space",
             Self::EscalatorHeadroom => "escalator headroom",
             Self::EscalatorLanding => "escalator landing",
+            Self::EscalatorRunOff => "station run-off",
             Self::StairliftRun => "stairlift running envelope",
             Self::StairliftLanding => "stairlift landing",
         }
@@ -320,7 +324,7 @@ pub fn all(store: &Store) -> Vec<Clearance> {
 /// Whether an element may stand in a virtual volume of this kind: grab bars, rails and
 /// accessories in a fixture's clear space (ADA 2010 604.3.2, UPC 402.5).
 pub fn may_share(store: &Store, kind: ClearanceKind, other: ElementId) -> bool {
-    if matches!(kind, ClearanceKind::EscalatorHeadroom | ClearanceKind::EscalatorLanding) {
+    if matches!(kind, ClearanceKind::EscalatorHeadroom | ClearanceKind::EscalatorLanding | ClearanceKind::EscalatorRunOff) {
         return crate::escalators::may_share(store, other);
     }
     if matches!(kind, ClearanceKind::StairliftRun | ClearanceKind::StairliftLanding) {

@@ -129,6 +129,12 @@ pub struct Sizing {
     pub truss_add: f64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transit_truss_add: Option<f64>,
+    /// A transit unit's speed when none is given (m/s).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transit_speed: Option<f64>,
+    /// The station run-off zone beyond each end of a transit unit (m).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transit_run_off: Option<f64>,
     pub pit_add: f64,
     pub truss_depth: f64,
     pub pit_depth: f64,
@@ -181,6 +187,17 @@ pub enum Kind {
 }
 
 /// Duty: transit units are wider and deeper (heavy-duty public transport trusses).
+/// Where an escalator or walk stands (ARC-VT-020): a station sets transit defaults and its
+/// run-off zone.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Context {
+    #[default]
+    Building,
+    Airport,
+    Transit,
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Duty {
@@ -214,6 +231,10 @@ pub struct SizeParams {
     /// A walk set in a pit, its pallets flush with the floor (default: on the floor).
     #[serde(default)]
     pub pit: bool,
+    /// Building (default), airport or transit: a transit unit is heavy duty, runs at the
+    /// sizing pack's transit speed unless given, and keeps a station run-off zone.
+    #[serde(default)]
+    pub context: Context,
 }
 
 /// An escalator's or walk's sizes.
@@ -221,6 +242,8 @@ pub struct SizeParams {
 pub struct Sized {
     pub kind: Kind,
     pub duty: Duty,
+    #[serde(default)]
+    pub context: Context,
     pub rise: f64,
     /// Degrees.
     pub inclination: f64,
@@ -272,7 +295,8 @@ pub fn size(packs: &[Pack], p: &SizeParams) -> Result<Sized> {
     let r = rules(packs).map(|(_, r)| r);
     let mut notes = Vec::new();
     let rise = p.rise.unwrap_or(0.0).max(0.0);
-    let speed = p.speed.unwrap_or(0.5);
+    let transit_context = p.context == Context::Transit;
+    let speed = p.speed.unwrap_or(if transit_context { sz.transit_speed.unwrap_or(0.65) } else { 0.5 });
     let step = p.step_width.unwrap_or(1.0);
     if speed <= 0.0 || step <= 0.0 {
         return Err(bad("vt.params", "the speed and step width must be positive"));
@@ -311,7 +335,8 @@ pub fn size(packs: &[Pack], p: &SizeParams) -> Result<Sized> {
         }
         Kind::MovingWalk => (sz.walk_ends.lower, sz.walk_ends.upper),
     };
-    let transit = p.duty == Duty::Transit;
+    let duty = if transit_context { Duty::Transit } else { p.duty };
+    let transit = duty == Duty::Transit;
     let truss_width = step + if transit { sz.transit_truss_add.unwrap_or(sz.truss_add) } else { sz.truss_add };
     let (truss_depth, pit_depth, deck) = match (p.kind, horizontal, p.pit) {
         (Kind::MovingWalk, true, false) => {
@@ -344,7 +369,8 @@ pub fn size(packs: &[Pack], p: &SizeParams) -> Result<Sized> {
     }
     Ok(Sized {
         kind: p.kind,
-        duty: p.duty,
+        duty,
+        context: p.context,
         rise,
         inclination,
         step_width: step,
@@ -687,6 +713,22 @@ pub fn zones(store: &Store) -> Vec<Clearance> {
                 mesh: crate::bodies::extrude(&ring, &[], z, z + r.headroom),
                 door_swing_forbidden: false,
             });
+        }
+        // A station's run-off beyond each end (ARC-VT-020), deeper than the code's landing.
+        if s.context == Context::Transit
+            && let Ok((sp, sz)) = sizing(&packs)
+            && let Some(run_off) = sz.transit_run_off
+        {
+            for (x, z) in [([-run_off, 0.0], z0 + s.deck), ([length, length + run_off], z0 + s.deck + s.rise)] {
+                let ring = [el.at(x[0], -width / 2.0), el.at(x[1], -width / 2.0), el.at(x[1], width / 2.0), el.at(x[0], width / 2.0)];
+                out.push(Clearance {
+                    element: id,
+                    kind: ClearanceKind::EscalatorRunOff,
+                    rule: format!("{} station run-off", sp.id),
+                    mesh: crate::bodies::extrude(&ring, &[], z, z + r.headroom),
+                    door_swing_forbidden: false,
+                });
+            }
         }
     }
     out

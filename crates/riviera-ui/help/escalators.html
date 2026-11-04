@@ -54,10 +54,19 @@ Clearances lists anything in them: a beam, a wall, or a neighbouring escalator t
 each pack in use. A17.1's rules come only through state checklists, so its findings are
 <b>notes</b>.</p>
 
+<h2 id="stations">In stations</h2>
+<p>Set the Escalator dialog's <b>Setting</b> to <i>a station</i> for a transit escalator: it is
+heavy duty, runs at 0.65 m/s unless you give a speed, and keeps a 6 m <b>station run-off</b>
+zone beyond each end, as transit authorities ask, besides the code's landing zone.
+<code>escalator.traffic</code> gives the units each way a station needs for its peak, with one
+assumed out, and with <code>egress</code> what escalators running the way out add to a level's
+egress capacity: nothing under the IBC, at most half the required capacity under NFPA 130 or
+SCDF, the worst unit out.</p>
+
 <h2 id="limits">Limits and what to check</h2>
 <p>Not yet built: crisscross and scissor arrangements as one command, draft curtains, sprinklers
-and shutters around the openings, intersection guards, deck barricades, the airport and transit
-rules (station run-off, unit counts, NFPA 130), and outdoor units.</p>
+and shutters around the openings, intersection guards, deck barricades, airport rules (trolley walks,
+queues), run-off to gatelines, and outdoor units.</p>
 
 <h2 id="scripts">Scripts and agents</h2>
 <p>Everything above is a command: <code>escalator.size</code>, <code>escalator.create</code>,

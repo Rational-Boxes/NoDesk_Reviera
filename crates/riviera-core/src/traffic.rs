@@ -281,7 +281,64 @@ pub struct EscalatorTrafficParams {
     /// Check with the largest unit each way out of service (default true).
     #[serde(default)]
     pub one_out: Option<bool>,
+    /// What the escalators may count toward the egress capacity (ARC-VT-021).
+    #[serde(default)]
+    pub egress: Option<EgressParams>,
 }
+
+/// Whose rule decides what escalators count in egress.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum EgressMode {
+    /// IBC 1003.7: escalators are never part of the means of egress.
+    #[default]
+    Ibc,
+    /// NFPA 130 5.3.5.4: at most half the required capacity at any level.
+    Nfpa130,
+    /// SCDF (rapid transit): at most half, the worst unit out, the tread width counted.
+    Scdf,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Way {
+    #[default]
+    Up,
+    Down,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct EgressParams {
+    #[serde(default)]
+    pub mode: EgressMode,
+    /// The way out: the units running that way count (default up, out of a station).
+    #[serde(default)]
+    pub exit: Way,
+    /// The egress capacity the level needs, and its stairs' (persons a minute).
+    pub required: f64,
+    pub stairs: f64,
+}
+
+/// What the escalators add to a level's egress capacity.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct Egress {
+    pub mode: EgressMode,
+    /// Persons a minute: the units running the way out at 120 a minute per metre of tread, the
+    /// worst unit out; what of it counts; the stairs; and the whole.
+    pub escalators: f64,
+    pub counted: f64,
+    pub stairs: f64,
+    pub total: f64,
+    pub required: f64,
+    pub meets: bool,
+    pub rule: String,
+}
+
+/// Persons a minute per metre of a working escalator's tread in an evacuation (TfL).
+pub const EVACUATION_RATE: f64 = 120.0;
+/// A transit unit's planning flow, persons a minute.
+pub const UNIT_FLOW: f64 = 100.0;
 
 /// One direction's capacity against its demand.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
@@ -294,6 +351,9 @@ pub struct Direction {
     /// Demand over the capacity counted (one out where asked).
     pub utilisation: f64,
     pub meets: bool,
+    /// The units a station needs this way at 100 persons a minute each, one more for the unit
+    /// out where asked.
+    pub units_needed: u32,
 }
 
 #[derive(Debug, Clone, Serialize, JsonSchema)]
@@ -301,6 +361,8 @@ pub struct EscalatorTraffic {
     pub up: Direction,
     pub down: Direction,
     pub one_out: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub egress: Option<Egress>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub notes: Vec<String>,
 }
@@ -328,11 +390,37 @@ pub(crate) fn escalator_traffic(store: &Store, p: EscalatorTrafficParams) -> Res
         }
         let counted = if one_out { capacity_one_out } else { capacity };
         let utilisation = if counted > 0.0 { demand / counted } else if demand > 0.0 { f64::INFINITY } else { 0.0 };
-        Ok(Direction { units: c.len(), capacity, capacity_one_out, demand, utilisation, meets: demand <= counted + 1e-9 })
+        let units_needed = (demand / 60.0 / UNIT_FLOW).ceil() as u32 + u32::from(one_out && demand > 0.0);
+        Ok(Direction { units: c.len(), capacity, capacity_one_out, demand, utilisation, meets: demand <= counted + 1e-9, units_needed })
     };
     let up = direction("up", &p.up, p.demand_up)?;
     let down = direction("down", &p.down, p.demand_down)?;
-    Ok(EscalatorTraffic { up, down, one_out, notes })
+    let egress = match &p.egress {
+        None => None,
+        Some(e) => {
+            let refs = match e.exit {
+                Way::Up => &p.up,
+                Way::Down => &p.down,
+            };
+            let widths: Vec<f64> = refs
+                .iter()
+                .map(|r| {
+                    let id = store.resolve(r).ok_or_else(|| bad("element.not_found", "no such escalator"))?;
+                    all.iter().find(|(x, _)| *x == id).map(|(_, x)| x.sized.step_width).ok_or_else(|| bad("vt.not_escalator", format!("element {id} is not an escalator or walk")))
+                })
+                .collect::<Result<_>>()?;
+            let rates: Vec<f64> = widths.iter().map(|w| w * EVACUATION_RATE).collect();
+            let working: f64 = rates.iter().sum::<f64>() - rates.iter().copied().fold(0.0, f64::max);
+            let (counted, rule) = match e.mode {
+                EgressMode::Ibc => (0.0, "IBC 1003.7: escalators are not a means of egress".to_owned()),
+                EgressMode::Nfpa130 => (working.min(e.required / 2.0), "NFPA 130 5.3.5.4: at most half the required capacity".to_owned()),
+                EgressMode::Scdf => (working.min(e.required / 2.0), "SCDF rapid transit 2.2.3: at most half, one unit out, tread width".to_owned()),
+            };
+            let total = e.stairs + counted;
+            Some(Egress { mode: e.mode, escalators: working, counted, stairs: e.stairs, total, required: e.required, meets: total + 1e-9 >= e.required, rule })
+        }
+    };
+    Ok(EscalatorTraffic { up, down, one_out, egress, notes })
 }
 
 #[cfg(test)]

@@ -758,7 +758,7 @@ tools and the datums.
   hospital, clinic), with the population given or estimated from the floors; `escalator.traffic`
   compares escalators' and walks' capacity each way with the peak demand, one unit out. Planning
   check only (coefficients flagged for review). Not built yet: lunchtime and two-way simulation,
-  zoned banks, lifts and escalators in egress, the transit context.
+  zoned banks, lifts in egress, multi-level egress routes. **Stations** (ARC-VT-020/021): an escalator's *Setting* may be a station (heavy duty, 0.65 m/s, a 6 m run-off zone beyond each end); `escalator.traffic` gives the units a station needs for its peak with one out, and what escalators add to a level's egress capacity under the IBC (nothing), NFPA 130 or SCDF (at most half, the worst unit out).
 - **Stairlifts and platform stairlifts** (ARC-VT-013…015): Architecture › Circulation › Stairlift
   puts a seated stairlift or a wheelchair platform lift (`IfcTransportElement` USERDEFINED
   STAIRLIFT or INCLINEDPLATFORMLIFT) on one side of the selected stair, its rail following the
@@ -1808,6 +1808,7 @@ sample:
   panoramic car glazed at the rear and sides in a glass hoistway, a rear-glazed car in a walled
   hoistway, and a glass hydraulic lift to the mezzanine; Check Elevators gives one note (the
   glass hoistway's fire-rated glazing).
+- **Escalators in a transit station** (`station.ifc`): a platform and a concourse joined by a pair of transit escalators with their 6 m run-off zones; the units a peak needs with one out, and the escalators' share of the platform's egress under NFPA 130 against the IBC.
 - **Elevator traffic in an office tower** (`traffic.ifc`): eleven storeys with a bank of four
   cars at 1.0 m/s that misses the office up-peak targets, a bank of six at 2.5 m/s that meets
   them for its population, and an escalator pair checked against its peak.

@@ -4034,7 +4034,42 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 **Acceptance criteria.**
 - [x] One escalator each way at about 6000 persons an hour carries 3000 up at 50 %; with one out each way nothing is left, and both directions are noted.
 
-*Built (2026-11-04):* `escalator.traffic`. Not yet: a window dialog, the transit packs (unit counts from flows, NFPA 130 egress credit; plan §6), reversing a unit to cover the one out, and the airport and transit context.
+*Built (2026-11-04):* `escalator.traffic`. Not yet: a window dialog, reversing a unit to cover the one out. Unit counts and egress counting: ARC-VT-021.
+
+### 3.7a.20 Escalators in stations and airports
+**ID:** ARC-VT-020 · **Priority:** P2 · **Ref:** owner requirement (2026-11-03: "Include moving walks in airports and transit stations too"); `VERTICAL_TRANSPORT_PLAN.md` §6; research/16 P2, P4 (airport and transit additions)
+
+**Purpose.** Lay out escalators and walks in a station or an airport as transit authorities ask, not only as the code minimum asks.
+
+**Behaviour & rules.**
+- `escalator.size` and `escalator.create` take a `context`: `building` (default), `airport` or `transit`.
+- A **transit** unit is heavy duty (the transit truss and pit, ARC-VT-010) and runs at the sizing pack's transit speed (0.65 m/s) unless one is given.
+- A transit unit keeps a **station run-off zone** (kind *station run-off*) beyond each end, as deep as the sizing pack's `transit_run_off` (6 m: SCDF, LTA, Network Rail to a passageway), as wide as its landing zone and as high as its headroom, separate from the code's landing zone. Check Clearances reports what stands in it.
+- **In the window:** the Escalator dialog's *Setting* (a building, an airport, a station).
+
+**Acceptance criteria.**
+- [x] A transit escalator between levels 6 m apart is heavy duty at 0.65 m/s with two run-off zones; a building escalator beside it has none.
+
+*Built (2026-11-04):* in `reviera_core::escalators`. Not yet: airport-specific rules (trolley walks, queue depths before walks in series), run-off to gatelines (8–12 m, the NR flow formula), transition radii, a stair beside every bank of two or more units.
+
+### 3.7a.21 Station unit counts and escalators in egress
+**ID:** ARC-VT-021 · **Priority:** P2 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §9; research/16 P2, P4 (*unit-count checks*, *egress mode*), Conflict on egress counting
+
+**Purpose.** Say how many units a station needs, and what escalators may add to a level's egress capacity under each code.
+
+**Behaviour & rules.**
+- `escalator.traffic` reports, each way, the **units needed**: the peak demand as a flow a minute over 100 persons a minute a unit, rounded up, plus one for the unit assumed out (LTA, SCDF, TfL) when `one_out`.
+- With `egress` (`mode`, `exit` way, the level's `required` capacity and its `stairs`' capacity, persons a minute), it reports what the escalators running the way out add: their capacity at 120 persons a minute per metre of tread with the worst unit out (TfL), and what of it **counts**:
+  - `ibc`: nothing (IBC 1003.7: escalators are not a means of egress);
+  - `nfpa130`: at most half the required capacity at any level (NFPA 130 5.3.5.4);
+  - `scdf`: at most half, the worst unit out, the tread width counted (SCDF rapid transit cl. 2.2.3).
+- It reports the stairs, the escalators counted, the total, and whether the total meets the required capacity, naming the rule.
+- The rates and the transit unit flow are planning values (E-90): NFPA 130's own escalator rates are not public.
+
+**Acceptance criteria.**
+- [x] 9,000 persons an hour up needs three units with one out. Two 1 m units up give 120 persons a minute with the worst out: under the IBC nothing counts (400 needed, 300 from the stairs: short); under NFPA 130 all 120 count (enough); under SCDF with 200 needed only 100 count.
+
+*Built (2026-11-04):* in `escalator.traffic`. Not yet: NFPA 130 5.3.5.5's larger share where escalators stop remotely, Bellevue's 25 % cap, platform clearing times (4 and 6 minutes), egress through the path of travel across levels.
 
 ---
 
@@ -6374,7 +6409,7 @@ All commands below are registered once in the command registry and exposed autom
 | `elevator.list` | — | [{elevator, name, levels, sizes, members}] | No (query) | ARC-VT-002 |
 | `elevator.delete` | elevator | count | Yes | ARC-VT-002 |
 | `elevator.check` | elevators? | finding[] | No (query) | ARC-VT-004 |
-| `escalator.size` | kind?, rise?, length?, step_width?, inclination?, speed?, flat_steps?, duty?, pit? | {kind, rise, inclination, step_width, speed, flat_steps, handrail_centres, handrail_outer, truss_width, truss_depth, pit_depth, lower_end, run, upper_end, capacity, motor_kw, reactions, intermediate_support, sizing_pack, notes} | No (query) | ARC-VT-010 |
+| `escalator.size` | kind?, rise?, length?, step_width?, inclination?, speed?, flat_steps?, duty?, pit?, context? | {kind, rise, inclination, step_width, speed, flat_steps, handrail_centres, handrail_outer, truss_width, truss_depth, pit_depth, lower_end, run, upper_end, capacity, motor_kw, reactions, intermediate_support, sizing_pack, notes} | No (query) | ARC-VT-010 |
 | `escalator.create` | point, rotation?, base_level, top_level?, (as `escalator.size`) | {escalator, openings, sizes} | Yes | ARC-VT-010 |
 | `escalator.list` | — | [{escalator, name, sizes, levels, openings}] | No (query) | ARC-VT-010 |
 | `escalator.delete` | escalator | count | Yes | ARC-VT-010 |
@@ -6384,7 +6419,7 @@ All commands below are registered once in the command registry and exposed autom
 | `stairlift.delete` | stairlift | count | Yes | ARC-VT-013 |
 | `stairlift.check` | stairlifts? | finding[] | No (query) | ARC-VT-015 |
 | `elevator.traffic` | building_use?, elevators?, population?, area_per_person?, loading?, stop_time?, transfer_time? | [{elevators, cars, floors, population, passengers, probable_stops, highest_reversal, rtt, interval, hc5, handling, waiting, targets, meets, notes}] | No (query) | ARC-VT-018 |
-| `escalator.traffic` | up, down, demand_up, demand_down?, one_out? | {up, down, one_out, notes} | No (query) | ARC-VT-019 |
+| `escalator.traffic` | up, down, demand_up, demand_down?, one_out?, egress?: {mode, exit, required, stairs} | {up, down, one_out, egress, notes} | No (query) | ARC-VT-019, ARC-VT-021 |
 | `enclosure.create` | form, footprint \| host_wall_ids, level_id, params | element_id | Yes | ARC-GLZ-001 |
 | `enclosure.set` | enclosure_id, params | — | Yes | ARC-GLZ-001 |
 | `enclosure.get` | enclosure_id | {form, params, parts} | No (query) | ARC-GLZ-001 |

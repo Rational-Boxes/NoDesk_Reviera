@@ -84,3 +84,44 @@ fn elevator_groups_and_escalators_against_their_targets() {
     let t = ok(&mut app, "escalator.traffic", json!({ "up": [up["escalator"]], "down": [down["escalator"]], "demand_up": 3000, "demand_down": 2000 }));
     assert_eq!((t["up"]["meets"].as_bool(), t["notes"].as_array().map(Vec::len)), (Some(false), Some(2)));
 }
+
+/// Escalators in a station (ARC-VT-020, ARC-VT-021): transit defaults and the station run-off
+/// zone; units needed for a peak with one out; what escalators may count toward egress.
+#[test]
+fn station_escalators_their_run_off_counts_and_egress() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = new_app(dir.path());
+    ok(&mut app, "file.new", json!({}));
+    let l1 = ok(&mut app, "level.list", json!({}))[0]["id"].clone();
+    let l2 = ok(&mut app, "level.create", json!({ "elevation": 6.0 }));
+    let c = [[0.0, 0.0], [60.0, 0.0], [60.0, 30.0], [0.0, 30.0]];
+    let curves: Vec<Value> = (0..4).map(|i| json!({ "line": { "start": c[i], "end": c[(i + 1) % 4] } })).collect();
+    for l in [&l1, &l2] {
+        ok(&mut app, "floor.create", json!({ "loops": [curves], "level_id": l }));
+    }
+    // A transit unit: heavy duty, 0.65 m/s, and a 6 m run-off zone beyond each end.
+    let a = ok(&mut app, "escalator.create", json!({ "point": [15.0, 10.0], "base_level": l1, "top_level": l2, "context": "transit" }));
+    assert_eq!((a["context"].as_str(), a["duty"].as_str(), a["speed"].as_f64()), (Some("transit"), Some("transit"), Some(0.65)), "{a:#}");
+    let zones = ok(&mut app, "clearance.list", json!({}));
+    let run_offs = zones.as_array().unwrap().iter().filter(|z| z["kind"] == "escalator_run_off").count();
+    assert_eq!(run_offs, 2, "{zones:#}");
+    // A building unit has none.
+    let b = ok(&mut app, "escalator.create", json!({ "point": [15.0, 20.0], "base_level": l1, "top_level": l2 }));
+    assert_eq!(b["speed"], 0.5);
+    let zones = ok(&mut app, "clearance.list", json!({}));
+    assert_eq!(zones.as_array().unwrap().iter().filter(|z| z["kind"] == "escalator_run_off").count(), 2);
+
+    // 9,000 people an hour up is 150 a minute: 2 units at 100 each, and one more for the unit out.
+    let t = ok(&mut app, "escalator.traffic", json!({ "up": [a["escalator"], b["escalator"]], "demand_up": 9000 }));
+    assert_eq!(t["up"]["units_needed"], 3);
+
+    // Egress: two 1 m units up at 120 a minute per metre, the worst out: 120 a minute.
+    let mut eg = |mode: &str| ok(&mut app, "escalator.traffic", json!({ "up": [a["escalator"], b["escalator"]], "demand_up": 0, "egress": { "mode": mode, "required": 400, "stairs": 300 } }))["egress"].clone();
+    let ibc = eg("ibc");
+    assert_eq!((ibc["counted"].as_f64(), ibc["meets"].as_bool()), (Some(0.0), Some(false)), "{ibc:#}");
+    let nfpa = eg("nfpa130");
+    assert_eq!((nfpa["escalators"].as_f64(), nfpa["counted"].as_f64(), nfpa["meets"].as_bool()), (Some(120.0), Some(120.0), Some(true)), "{nfpa:#}");
+    // At most half the required capacity: of 200 needed, the escalators' 120 counts as 100.
+    let scdf = ok(&mut app, "escalator.traffic", json!({ "up": [a["escalator"], b["escalator"]], "demand_up": 0, "egress": { "mode": "scdf", "required": 200, "stairs": 50 } }))["egress"].clone();
+    assert_eq!((scdf["counted"].as_f64(), scdf["meets"].as_bool()), (Some(100.0), Some(false)), "{scdf:#}");
+}
