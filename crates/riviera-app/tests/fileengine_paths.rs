@@ -111,3 +111,56 @@ fn every_command_that_takes_a_path_marks_it() {
     let names: Vec<&str> = marked.keys().map(String::as_str).collect();
     assert_eq!(names, expected, "{marked:#?}");
 }
+
+/// Publish sets (COL-FE-015): kept with the model, published in one step, again as new versions;
+/// a failing output reported while the others publish.
+#[test]
+fn publish_sets_publish_together() {
+    let dir = tempfile::tempdir().unwrap();
+    let fake = Fake::start("fesk_test", "fesks_secret", "ann@acme.test");
+    let mut app = new_app(dir.path());
+    let conn = connected(&mut app, &fake);
+    let eng = fake.uid_of("Engineering").unwrap();
+    let issued = ok(&mut app, "fileengine.make_folder", json!({ "connection_id": conn, "parent_uid": eng, "name": "Issued" })).as_str().unwrap().to_owned();
+    ok(&mut app, "file.new", json!({}));
+    let level = ok(&mut app, "level.list", json!({}))[0]["id"].clone();
+    ok(&mut app, "wall.create", json!({ "curve": { "line": { "start": [0, 0], "end": [6, 0] } }, "base_level": level, "top_constraint": { "unconnected": 3.0 } }));
+    ok(&mut app, "bcf.create_topic", json!({ "title": "Check the sill" }));
+    let schedule = ok(&mut app, "schedule.create", json!({ "category": "cat.walls", "name": "Walls" }));
+
+    let set = ok(&mut app, "publish.save_set", json!({
+        "name": "Weekly issue", "connection_id": conn, "folder_uid": issued, "folder_name": "Issued",
+        "outputs": [
+            { "command": "bcf.export", "name": "issues.bcf" },
+            { "command": "export.cobie", "args": { "overwrite": true }, "name": "COBie.xlsx" },
+            { "command": "schedule.export", "args": { "schedule_id": schedule }, "name": "Walls.csv" }
+        ]
+    }));
+    let id = set["id"].as_str().unwrap().to_owned();
+    // Kept with the model through saving and reopening.
+    let path = dir.path().join("model.ifc");
+    ok(&mut app, "file.save_as", json!({ "path": path }));
+    let doc = app.active().unwrap();
+    ok(&mut app, "file.close", json!({ "document_id": doc, "save": "no" }));
+    ok(&mut app, "file.open", json!({ "path": path }));
+    assert_eq!(ok(&mut app, "publish.list_sets", json!({}))[0]["name"], "Weekly issue");
+
+    let first = ok(&mut app, "publish.run", json!({ "set_id": id }));
+    let names: Vec<(&str, bool)> = first.as_array().unwrap().iter().map(|p| (p["name"].as_str().unwrap(), p["error"].is_null() && p["uploads"].as_array().unwrap().len() == 1)).collect();
+    assert_eq!(names, [("issues.bcf", true), ("COBie.xlsx", true), ("Walls.csv", true)], "{first:#}");
+    for n in ["issues.bcf", "COBie.xlsx", "Walls.csv"] {
+        assert!(fake.uid_of(&format!("Engineering/Issued/{n}")).is_some(), "{n}");
+    }
+    // Again: a new version of each.
+    let again = ok(&mut app, "publish.run", json!({ "set_id": id }));
+    assert!(again.as_array().unwrap().iter().all(|p| p["uploads"][0]["replaced"] == true), "{again:#}");
+
+    // An output that fails is reported; the others still publish.
+    let mixed = ok(&mut app, "publish.run", json!({ "connection_id": conn, "folder_uid": issued, "outputs": [
+        { "command": "schedule.export", "args": { "schedule_id": 999_999 }, "name": "Missing.csv" },
+        { "command": "bcf.export", "name": "issues2.bcf" }
+    ] }));
+    assert!(mixed[0]["error"].is_string() && mixed[1]["error"].is_null(), "{mixed:#}");
+    assert!(fake.uid_of("Engineering/Issued/issues2.bcf").is_some());
+    assert_eq!(ok(&mut app, "publish.remove_set", json!({ "set_id": id })), 1);
+}

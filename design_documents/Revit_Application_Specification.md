@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Riviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Riviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 886 numbered requirements (320 P0 · 343 P1 · 216 P2 · 7 P3), 2,326 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 887 numbered requirements (320 P0 · 343 P1 · 217 P2 · 7 P3), 2,330 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Riviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Riviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,326 commands; 886 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,330 commands; 887 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -27760,6 +27760,22 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 
 *Built (2026-11-04):* `riviera_app::fe_files` and the three marks; 60 commands marked in all. Not yet: merging parameter-library edits by definition GUID instead of refusing, `keynotes.reload` fetching the newest from FileEngine, `docs.link` and `docs.publish_local` (they take FileEngine folders through their own fields).
 
+### Publish sets
+**ID:** COL-FE-015 · **Priority:** P2 · **Ref:** FILEENGINE_INTEGRATION §7a (*Publish sets*)
+
+**Purpose.** Publish the outputs a project issues together (the issue sheets, the schedules, COBie, the latest issues) to their FileEngine folder in one step, and again with one click.
+
+**Behaviour & rules.**
+- A **publish set** is kept with the model (`rxd:project/publish_sets`): its name, its FileEngine connection and folder, and its outputs. Each output is a command that writes a file (one with a `write`, `write_any` or `write_folder` mark, COL-FE-012), its arguments apart from the destination, and the file's name.
+- `publish.save_set` stores a set (replacing the one with its `set_id`), `publish.list_sets` lists them, `publish.remove_set` removes one; each is one undo step.
+- `publish.run` publishes a stored set (`set_id`) or the `outputs` given, into the set's folder or the `connection_id` and `folder_uid` given: each output's command runs with its destination set to `fileengine://<connection>/<folder>/<name>` (the folder itself for a folder of outputs), so each file becomes a new version of the one of its name there, with COL-FE-012's metadata. An output that fails is reported and the others still run. It returns, per output, the command, the name, the files uploaded (uid, name, version) or the error.
+- **In the window:** *File › Publish to FileEngine…* lists the model's publish sets with *Publish*, *New…* and *Remove*. *New…* picks the outputs (the BCF issues, COBie, each schedule as CSV), a name for the set and its FileEngine folder.
+
+**Acceptance criteria.**
+- [x] Against the fake server: a set of the BCF issues, COBie and a schedule is saved with the model and survives saving and reopening; publishing it uploads three files (COBie as one workbook); publishing it again adds a version of each; an output whose command fails is reported while the others publish.
+
+*Built (2026-11-04):* `riviera_core::publish_sets` (`publish.save_set`, `publish.list_sets`, `publish.remove_set`), `publish.run` in `riviera_app::publish`, and File › Publish to FileEngine…. *Not yet:* sheets as PDF in the window's choice (scripts can name `export.pdf`), share links in the publish step (FileEngine's share door is not deployed), a status-bar retry of failed uploads.
+
 *Not yet (later phases):* a thumbnail with each save; the Documents pane (a dockable pane with document previews, uploads and expiry warnings); publish sets and share links (exports themselves: COL-FE-012); BCF over BCF-API; Component Libraries; field sets beyond EPD and HPD (§7c); live updates through the discussion service.
 
 ## 6.3 Merging
@@ -29196,6 +29212,10 @@ Every command below is registered once and is available from the UI, Lua and MCP
 | `docs.replace_all` | data | () | Yes | COL-FE-010 |
 | `docs.report` | path, carbon_run_id? | {path, materials, documented, warnings} | No | COL-FE-008 |
 | `fileengine.publish` | connection_id, folder_uid, path, name?, replace?, metadata? | {uid, name, version, replaced} | No | COL-FE-008 |
+| `publish.save_set` | set_id?, name, connection_id, folder_uid, folder_name?, outputs | {id, name, connection_id, folder_uid, folder_name, outputs} | Yes | COL-FE-015 |
+| `publish.list_sets` | — | [publish set] | No (query) | COL-FE-015 |
+| `publish.remove_set` | set_id | count | Yes | COL-FE-015 |
+| `publish.run` | set_id? \| outputs?, connection_id?, folder_uid? | [{command, name, uploads, error}] | No (host) | COL-FE-015 |
 | `bimserver.add_server` | name, url, allow_http?, ownership? | server | No | COL-BIM-001 |
 | `bimserver.remove_server` | server_id | () | No | COL-BIM-001 |
 | `bimserver.login` | server_id, username?, password?, user_token?, remember? | session_info | No | COL-BIM-001 |
@@ -29851,9 +29871,9 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 28 | 0 | 29 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
-| COL | 8 | 52 | 13 | 1 | 74 |
+| COL | 8 | 52 | 14 | 1 | 75 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **343** | **216** | **7** | **886** |
+| **Total** | **320** | **343** | **217** | **7** | **887** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -29908,7 +29928,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.2a Riviera-originated features
 
-141 requirements are Riviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
+142 requirements are Riviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
 
 | Requirement | Ch | Feature |
 |-------------|----|---------|
@@ -30046,6 +30066,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | COL-FE-012 | 6 | FileEngine wherever a file is read or written |
 | COL-FE-013 | 6 | Component Libraries hosted on FileEngine |
 | COL-FE-014 | 6 | Parameter libraries, scripts and keynotes on FileEngine |
+| COL-FE-015 | 6 | Publish sets |
 | COL-MRG-001 | 6 | Three-way merge by GlobalId and RXD id |
 | COL-OWN-002 | 6 | Live ownership document and sync lock |
 | COL-OWN-004 | 6 | Enforced ownership through a server plugin (optional) |
@@ -30056,7 +30077,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2326 unique commands** in 434 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2330 unique commands** in 434 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -30346,7 +30367,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `project` | 6 |
 | `propertyline` | 2 |
 | `pset` | 2 |
-| `publish` | 1 |
+| `publish` | 5 |
 | `purge` | 2 |
 | `qto` | 1 |
 | `railing` | 12 |
@@ -31876,7 +31897,11 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `propertyline.to_table` | 3 | element_id | — | Yes | ARC-SITE-001 |
 | `pset.remove` | 2 | element_id, pset_name, property_name? | — | Yes | DM-IFC-003 |
 | `pset.set` | 2 | element_id, pset_name, property_name, value | — | Yes | DM-IFC-003 |
+| `publish.list_sets` | 6 | — | [publish set] | No (query) | COL-FE-015 |
+| `publish.remove_set` | 6 | set_id | count | Yes | COL-FE-015 |
 | `publish.review_set` | 5 | set_id, include_3d_views[]?, target: folder\ | bimserver, path? | job_id | No |
+| `publish.run` | 6 | set_id? \ | outputs?, connection_id?, folder_uid? | [{command, name, uploads, error}] | No (host) |
+| `publish.save_set` | 6 | set_id?, name, connection_id, folder_uid, folder_name?, outputs | {id, name, connection_id, folder_uid, folder_name, outputs} | Yes | COL-FE-015 |
 | `purge.list` | 2 | include_unplaced_views=false | {kind, items[]}[] | No | DM-PURGE-001 |
 | `purge.run` | 2 | item_ids[], compact_undo=false | report | Yes | DM-PURGE-001 |
 | `qto.recompute` | 2 | element_ids?[] | — | Yes | DM-IFC-003 |

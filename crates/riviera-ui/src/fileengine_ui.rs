@@ -383,6 +383,111 @@ impl Gui {
         dialog.get_path()
     }
 
+    /// File › Publish to FileEngine… (COL-FE-015): the model's publish sets, each published in
+    /// one step; or a new one made from the outputs ticked.
+    pub(crate) fn publish_to_fileengine(&mut self) {
+        let frame = self.frame;
+        if self.doc.is_none() {
+            return error(&frame, "Open a model first.");
+        }
+        loop {
+            let sets = self.run("publish.list_sets", Value::Null).ok().and_then(|v| v.as_array().cloned()).unwrap_or_default();
+            let mut rows: Vec<String> = sets
+                .iter()
+                .map(|s| format!("{} → {} ({} outputs)", s["name"].as_str().unwrap_or(""), s["folder_name"].as_str().unwrap_or("FileEngine folder"), s["outputs"].as_array().map_or(0, Vec::len)))
+                .collect();
+            rows.push("New publish set…".into());
+            let refs: Vec<&str> = rows.iter().map(String::as_str).collect();
+            let d = SingleChoiceDialog::builder(&frame, "Publish a set of outputs to its FileEngine folder (each file a new version of the one there):", "Publish to FileEngine", &refs).build();
+            if d.show_modal() != ID_OK {
+                return;
+            }
+            let k = usize::try_from(d.get_selection()).unwrap_or(usize::MAX);
+            d.destroy();
+            let Some(set) = sets.get(k).cloned() else {
+                if !self.new_publish_set() {
+                    return;
+                }
+                continue;
+            };
+            let actions = ["Publish now", "Remove this set"];
+            let a = SingleChoiceDialog::builder(&frame, set["name"].as_str().unwrap_or(""), "Publish to FileEngine", &actions).build();
+            if a.show_modal() != ID_OK {
+                continue;
+            }
+            let pick = a.get_selection();
+            a.destroy();
+            if pick == 1 {
+                if let Err(e) = self.run("publish.remove_set", json!({ "set_id": set["id"] })) {
+                    error(&frame, &e);
+                }
+                continue;
+            }
+            frame.set_status_text(&format!("Publishing {} to FileEngine…", set["name"].as_str().unwrap_or("")), 0);
+            match self.run("publish.run", json!({ "set_id": set["id"] })) {
+                Ok(r) => {
+                    let lines: Vec<String> = r
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .map(|p| match p["error"].as_str() {
+                            Some(e) => format!("✗ {}: {e}", p["name"].as_str().unwrap_or("")),
+                            None => format!("✓ {} ({} file(s))", p["name"].as_str().unwrap_or(""), p["uploads"].as_array().map_or(0, Vec::len)),
+                        })
+                        .collect();
+                    frame.set_status_text("", 0);
+                    MessageDialog::builder(&frame, &lines.join("\n"), "Published to FileEngine").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build().show_modal();
+                }
+                Err(e) => error(&frame, &format!("Nothing was published:\n{e}")),
+            }
+            return;
+        }
+    }
+
+    /// A new publish set: the outputs ticked, a name and a FileEngine folder. `false` when cancelled.
+    fn new_publish_set(&mut self) -> bool {
+        let frame = self.frame;
+        let model = self.current_path().and_then(|p| p.file_stem().map(|s| s.to_string_lossy().into_owned())).unwrap_or_else(|| "Model".into());
+        // (label, command, args, file name)
+        let mut choices: Vec<(String, &str, Value, String)> = vec![
+            ("BCF issues".into(), "bcf.export", json!({}), format!("{model} issues.bcf")),
+            ("COBie workbook".into(), "export.cobie", json!({ "overwrite": true }), format!("{model} COBie.xlsx")),
+        ];
+        if let Some(store) = self.store_now() {
+            let mut schedules: Vec<(String, u64)> = store.iter().filter(|e| riviera_core::schedules::is_schedule(e)).map(|e| (e.name.clone().unwrap_or_else(|| "Schedule".into()), e.id().0)).collect();
+            schedules.sort();
+            for (n, id) in schedules {
+                choices.push((format!("Schedule: {n}"), "schedule.export", json!({ "schedule_id": id }), format!("{n}.csv")));
+            }
+        }
+        let labels: Vec<String> = choices.iter().map(|c| format!("{} ({})", c.0, c.3)).collect();
+        let refs: Vec<&str> = labels.iter().map(String::as_str).collect();
+        let d = MultiChoiceDialog::builder(&frame, "Outputs to publish together:", "New Publish Set", &refs).build();
+        if d.show_modal() != ID_OK {
+            return false;
+        }
+        let picked = d.get_selections();
+        d.destroy();
+        if picked.is_empty() {
+            return false;
+        }
+        let name = TextEntryDialog::builder(&frame, "Publish set name:", "New Publish Set").with_default_value(&format!("{model} issue")).build();
+        if name.show_modal() != ID_OK {
+            return false;
+        }
+        let set_name = name.get_value().unwrap_or_default();
+        name.destroy();
+        let Some(folder) = self.fileengine_pick_folder("Publish Into") else { return false };
+        let outputs: Vec<Value> = picked.iter().filter_map(|k| choices.get(*k as usize)).map(|c| json!({ "command": c.1, "args": c.2, "name": c.3 })).collect();
+        match self.run("publish.save_set", json!({ "name": set_name, "connection_id": folder.connection_id, "folder_uid": folder.folder_uid, "folder_name": folder.folder_name, "outputs": outputs })) {
+            Ok(_) => true,
+            Err(e) => {
+                error(&frame, &format!("The publish set was not saved:\n{e}"));
+                false
+            }
+        }
+    }
+
     /// A folder to read (a plugin folder): chosen in the system's dialog, or, where a FileEngine
     /// connection exists and FileEngine is chosen, a FileEngine folder as a `fileengine://`
     /// address.

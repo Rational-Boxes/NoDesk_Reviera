@@ -626,6 +626,22 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 
 *Built (2026-11-04):* `riviera_app::fe_files` and the three marks; 60 commands marked in all. Not yet: merging parameter-library edits by definition GUID instead of refusing, `keynotes.reload` fetching the newest from FileEngine, `docs.link` and `docs.publish_local` (they take FileEngine folders through their own fields).
 
+### Publish sets
+**ID:** COL-FE-015 · **Priority:** P2 · **Ref:** FILEENGINE_INTEGRATION §7a (*Publish sets*)
+
+**Purpose.** Publish the outputs a project issues together (the issue sheets, the schedules, COBie, the latest issues) to their FileEngine folder in one step, and again with one click.
+
+**Behaviour & rules.**
+- A **publish set** is kept with the model (`rxd:project/publish_sets`): its name, its FileEngine connection and folder, and its outputs. Each output is a command that writes a file (one with a `write`, `write_any` or `write_folder` mark, COL-FE-012), its arguments apart from the destination, and the file's name.
+- `publish.save_set` stores a set (replacing the one with its `set_id`), `publish.list_sets` lists them, `publish.remove_set` removes one; each is one undo step.
+- `publish.run` publishes a stored set (`set_id`) or the `outputs` given, into the set's folder or the `connection_id` and `folder_uid` given: each output's command runs with its destination set to `fileengine://<connection>/<folder>/<name>` (the folder itself for a folder of outputs), so each file becomes a new version of the one of its name there, with COL-FE-012's metadata. An output that fails is reported and the others still run. It returns, per output, the command, the name, the files uploaded (uid, name, version) or the error.
+- **In the window:** *File › Publish to FileEngine…* lists the model's publish sets with *Publish*, *New…* and *Remove*. *New…* picks the outputs (the BCF issues, COBie, each schedule as CSV), a name for the set and its FileEngine folder.
+
+**Acceptance criteria.**
+- [x] Against the fake server: a set of the BCF issues, COBie and a schedule is saved with the model and survives saving and reopening; publishing it uploads three files (COBie as one workbook); publishing it again adds a version of each; an output whose command fails is reported while the others publish.
+
+*Built (2026-11-04):* `riviera_core::publish_sets` (`publish.save_set`, `publish.list_sets`, `publish.remove_set`), `publish.run` in `riviera_app::publish`, and File › Publish to FileEngine…. *Not yet:* sheets as PDF in the window's choice (scripts can name `export.pdf`), share links in the publish step (FileEngine's share door is not deployed), a status-bar retry of failed uploads.
+
 *Not yet (later phases):* a thumbnail with each save; the Documents pane (a dockable pane with document previews, uploads and expiry warnings); publish sets and share links (exports themselves: COL-FE-012); BCF over BCF-API; Component Libraries; field sets beyond EPD and HPD (§7c); live updates through the discussion service.
 
 ## 6.3 Merging
@@ -2062,6 +2078,10 @@ Every command below is registered once and is available from the UI, Lua and MCP
 | `docs.replace_all` | data | () | Yes | COL-FE-010 |
 | `docs.report` | path, carbon_run_id? | {path, materials, documented, warnings} | No | COL-FE-008 |
 | `fileengine.publish` | connection_id, folder_uid, path, name?, replace?, metadata? | {uid, name, version, replaced} | No | COL-FE-008 |
+| `publish.save_set` | set_id?, name, connection_id, folder_uid, folder_name?, outputs | {id, name, connection_id, folder_uid, folder_name, outputs} | Yes | COL-FE-015 |
+| `publish.list_sets` | — | [publish set] | No (query) | COL-FE-015 |
+| `publish.remove_set` | set_id | count | Yes | COL-FE-015 |
+| `publish.run` | set_id? \| outputs?, connection_id?, folder_uid? | [{command, name, uploads, error}] | No (host) | COL-FE-015 |
 | `bimserver.add_server` | name, url, allow_http?, ownership? | server | No | COL-BIM-001 |
 | `bimserver.remove_server` | server_id | () | No | COL-BIM-001 |
 | `bimserver.login` | server_id, username?, password?, user_token?, remember? | session_info | No | COL-BIM-001 |

@@ -39,6 +39,7 @@ pub const UI_ACTIONS: &[&str] = &[
     "ui.fileengine_open",
     "ui.fileengine_save",
     "ui.fileengine_versions",
+    "ui.publish_fileengine",
     "ui.material_documents",
     "ui.publish_local_documents",
     "ui.place_bathroom_component",

@@ -91,6 +91,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add_host(crate::fileengine::FeMakeFolder),
         registry.add_host(crate::fileengine::FeOpen),
         registry.add_host(crate::fileengine::FePublish),
+        registry.add_host(crate::publish::PublishRun),
         registry.add_host(crate::model_issues::FeIssues),
         registry.add_host(crate::model_issues::FeIssueSnapshot),
         registry.add_host(crate::model_issues::FeShowIssue),

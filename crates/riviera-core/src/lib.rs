@@ -141,6 +141,7 @@ pub mod overlap;
 pub mod overlap_accept;
 pub mod panoramic;
 pub mod paramlib;
+pub mod publish_sets;
 pub mod parameters;
 pub mod parts;
 pub mod path_arrays;

@@ -13,6 +13,7 @@ pub mod fileengine;
 pub mod fe_paths;
 pub mod fe_library;
 pub mod fe_files;
+pub mod publish;
 mod keychain;
 pub mod docs;
 pub mod model_issues;

@@ -4832,6 +4832,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "ui.fileengine_open" => with(gui, Gui::fileengine_open),
         "ui.fileengine_save" => with(gui, Gui::fileengine_save),
         "ui.fileengine_versions" => with(gui, Gui::fileengine_versions),
+        "ui.publish_fileengine" => with(gui, Gui::publish_to_fileengine),
         "ui.material_documents" => with(gui, Gui::material_documents),
         "ui.publish_local_documents" => with(gui, |g| {
             g.publish_local_documents();

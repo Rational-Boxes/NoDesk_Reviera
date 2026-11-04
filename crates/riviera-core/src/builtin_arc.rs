@@ -576,6 +576,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(StairliftCheck),
         registry.add(ElevatorTraffic),
         registry.add(EscalatorTraffic),
+        registry.add(PublishSaveSet),
+        registry.add(PublishListSets),
+        registry.add(PublishRemoveSet),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -7381,4 +7384,39 @@ read_command!(
     crate::traffic::EscalatorTrafficParams,
     crate::traffic::EscalatorTraffic,
     crate::traffic::escalator_traffic
+);
+
+edit_command!(
+    PublishSaveSet,
+    "publish.save_set",
+    "Save a publish set",
+    "Keeps a publish set with the model (COL-FE-015): its name, FileEngine connection and folder, and its \
+     outputs, each a command that writes a file (`schedule.export`, `export.cobie`, `bcf.export`, …) with its \
+     arguments apart from the destination and the file's name. With `set_id` it replaces that set. \
+     `publish.run` publishes it.",
+    "Save Publish Set",
+    crate::publish_sets::SaveParams,
+    crate::publish_sets::PublishSet,
+    crate::publish_sets::save
+);
+
+read_command!(
+    PublishListSets,
+    "publish.list_sets",
+    "List the publish sets",
+    "Lists the publish sets kept with the model (COL-FE-015).",
+    Option<crate::publish_sets::NoParams>,
+    Vec<crate::publish_sets::PublishSet>,
+    crate::publish_sets::list
+);
+
+edit_command!(
+    PublishRemoveSet,
+    "publish.remove_set",
+    "Remove a publish set",
+    "Removes a publish set from the model (COL-FE-015); what it published stays on FileEngine.",
+    "Remove Publish Set",
+    crate::publish_sets::RemoveParams,
+    usize,
+    crate::publish_sets::remove
 );

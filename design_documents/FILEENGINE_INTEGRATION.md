@@ -641,8 +641,8 @@ Commands:
      made in the window (once FileEngine's share door is live). **Destinations and sources built
      2026-11-04** (COL-FE-012): every command that reads or writes a file takes a `fileengine://`
      address through its marked path parameters, resolved in one place (`riviera_app::fe_paths`),
-     and the export and import dialogs offer FileEngine. Publish sets and share links are still to
-     come;
+     and the export and import dialogs offer FileEngine. Publish sets built the same day
+     (COL-FE-015, File › Publish to FileEngine…). Share links wait for FileEngine's share door;
   3. BCF issues over BCF-API, once FileEngine's persistent BCF store lands;
   4. Component Libraries on FileEngine (read, place, cache, updates; then writing, with the
      manifest merge). **Built 2026-11-04** (COL-FE-013) as a mirror of the whole library in the
