@@ -1,0 +1,49 @@
+{
+  "format": "reviera.vt-rules-1",
+  "id": "us_a17",
+  "title": "ASME A17.1 maximum car area (through makers and the VA)",
+  "jurisdiction": "US",
+  "edition": "ASME A17.1 Rule 2.16.1, Table 2.16.1.1, as restated by Hollister-Whitney and VA PG 18-10",
+  "layer": "minimum",
+  "notes": "A17.1 itself was not read; the table comes from makers and the VA, so findings are advisory. Rows stop at 6000 lb because the 8000 lb row differs between sources (research/16 M2). Loads are converted from pounds.",
+  "car_area": {
+    "id": "ASME A17.1 2.16.1.1",
+    "description": "Maximum inside net platform area for a passenger car's rated load",
+    "rows": [
+      [
+        907,
+        2.248
+      ],
+      [
+        1134,
+        2.703
+      ],
+      [
+        1361,
+        3.131
+      ],
+      [
+        1588,
+        3.53
+      ],
+      [
+        1814,
+        3.92
+      ],
+      [
+        2041,
+        4.292
+      ],
+      [
+        2268,
+        4.645
+      ],
+      [
+        2722,
+        5.36
+      ]
+    ],
+    "source": "S1513 S1521",
+    "confidence": "advisory"
+  }
+}

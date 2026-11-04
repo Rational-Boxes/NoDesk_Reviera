@@ -1,0 +1,129 @@
+{
+  "format": "reviera.vt-rules-1",
+  "id": "en81",
+  "title": "EN 81-20 maximum car area (through makers and the Hong Kong code)",
+  "jurisdiction": "EU",
+  "edition": "EN 81-20:2020 Table 6, as restated by makers, CIBSE and the Hong Kong lift code (Table 1)",
+  "layer": "minimum",
+  "notes": "EN 81-20 itself was not read, so findings are advisory. Rows below 450 kg rest on search snippets only. Above 2500 kg the area grows 0.16 m² per 100 kg (the Hong Kong code applies that from 1600 kg, a local rule not used here).",
+  "car_area": {
+    "id": "EN 81-20 5.4.2.1, Table 6",
+    "description": "Maximum available car area for a passenger lift's rated load",
+    "rows": [
+      [
+        100,
+        0.37
+      ],
+      [
+        180,
+        0.58
+      ],
+      [
+        225,
+        0.7
+      ],
+      [
+        300,
+        0.9
+      ],
+      [
+        375,
+        1.1
+      ],
+      [
+        400,
+        1.17
+      ],
+      [
+        450,
+        1.3
+      ],
+      [
+        525,
+        1.45
+      ],
+      [
+        600,
+        1.6
+      ],
+      [
+        630,
+        1.66
+      ],
+      [
+        680,
+        1.75
+      ],
+      [
+        750,
+        1.9
+      ],
+      [
+        800,
+        2.0
+      ],
+      [
+        900,
+        2.2
+      ],
+      [
+        1000,
+        2.4
+      ],
+      [
+        1050,
+        2.5
+      ],
+      [
+        1125,
+        2.65
+      ],
+      [
+        1200,
+        2.8
+      ],
+      [
+        1250,
+        2.9
+      ],
+      [
+        1275,
+        2.95
+      ],
+      [
+        1350,
+        3.1
+      ],
+      [
+        1425,
+        3.25
+      ],
+      [
+        1500,
+        3.4
+      ],
+      [
+        1600,
+        3.56
+      ],
+      [
+        1800,
+        3.88
+      ],
+      [
+        2000,
+        4.2
+      ],
+      [
+        2500,
+        5.0
+      ]
+    ],
+    "above_last": {
+      "per_kg": 100,
+      "add_m2": 0.16
+    },
+    "source": "S1660 S1673 S2391",
+    "confidence": "advisory"
+  }
+}

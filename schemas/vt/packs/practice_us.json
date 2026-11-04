@@ -1,0 +1,123 @@
+{
+  "format": "reviera.vt-rules-1",
+  "id": "practice_us",
+  "title": "US elevator sizing practice (maker planning guides)",
+  "jurisdiction": "US",
+  "edition": "Otis Gen3, KONE MonoSpace 500, Schindler 3300/330A, TKE endura/evolution and Hollister-Whitney planning guides, 2015–2024",
+  "layer": "recommended",
+  "notes": "Generic, maker-style defaults for sizing a new elevator: where makers differ, the larger value (research/16 M6). A chosen product's own sizes replace them. Overheads are for an 8 ft (2438 mm) cab; a taller cab adds its extra height.",
+  "sizing": {
+    "cars": [
+      {
+        "load": 907,
+        "door": "side",
+        "width": 1.727,
+        "depth": 1.295,
+        "door_width": 0.914,
+        "use": "2000–2100 lb"
+      },
+      {
+        "load": 1134,
+        "door": "side",
+        "width": 2.032,
+        "depth": 1.295,
+        "door_width": 1.067,
+        "use": "2500 lb"
+      },
+      {
+        "load": 1361,
+        "door": "side",
+        "width": 2.032,
+        "depth": 1.448,
+        "door_width": 1.067,
+        "use": "3000 lb"
+      },
+      {
+        "load": 1588,
+        "door": "side",
+        "width": 2.032,
+        "depth": 1.651,
+        "door_width": 1.067,
+        "use": "3500 lb; takes the IBC stretcher with a side door"
+      },
+      {
+        "load": 1814,
+        "door": "centre",
+        "width": 2.337,
+        "depth": 1.651,
+        "door_width": 1.219,
+        "use": "4000 lb"
+      }
+    ],
+    "hoistway": {
+      "side_door_width": 0.559,
+      "centre_door_width": 0.559,
+      "depth": 0.457,
+      "rear_entrance_depth": 0.298,
+      "space_below_depth": 0.203
+    },
+    "pit_overhead": [
+      {
+        "drives": [
+          "mrl_traction"
+        ],
+        "max_speed": 1.02,
+        "pit": 1.524,
+        "overhead": 4.115
+      },
+      {
+        "drives": [
+          "mrl_traction"
+        ],
+        "max_speed": 1.78,
+        "pit": 1.676,
+        "overhead": 4.14
+      },
+      {
+        "drives": [
+          "traction"
+        ],
+        "max_speed": 1.02,
+        "pit": 1.676,
+        "overhead": 4.928
+      },
+      {
+        "drives": [
+          "traction"
+        ],
+        "max_speed": 1.78,
+        "pit": 1.727,
+        "overhead": 5.105
+      },
+      {
+        "drives": [
+          "traction"
+        ],
+        "max_speed": 2.54,
+        "pit": 2.032,
+        "overhead": 5.639
+      },
+      {
+        "drives": [
+          "hydraulic"
+        ],
+        "max_speed": 0.76,
+        "pit": 1.219,
+        "overhead": 3.734
+      },
+      {
+        "drives": [
+          "holeless"
+        ],
+        "max_speed": 0.76,
+        "pit": 1.219,
+        "overhead": 3.937
+      }
+    ],
+    "car_height": 2.438,
+    "door_height": 2.134,
+    "persons_kg": 75,
+    "source": "S1505 S1506 S1508 S1512 S1513",
+    "confidence": "secondary"
+  }
+}

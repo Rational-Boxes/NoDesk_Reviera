@@ -1,0 +1,136 @@
+{
+  "format": "reviera.vt-rules-1",
+  "id": "practice_en",
+  "title": "EN lift sizing practice (maker planning guides)",
+  "jurisdiction": "EU",
+  "edition": "KONE MonoSpace and DX, Schindler 3000 and TKE EOX planning data, 2019–2024",
+  "layer": "recommended",
+  "notes": "Generic, maker-style defaults for sizing a new lift. Pit and headroom are the envelope of KONE, Schindler and TKE rows (agent L's judgement, research/16 D4 and L5).",
+  "sizing": {
+    "cars": [
+      {
+        "load": 450,
+        "door": "side",
+        "width": 1.0,
+        "depth": 1.25,
+        "door_width": 0.8,
+        "use": "small; EN 81-70 type 1 (2003)"
+      },
+      {
+        "load": 630,
+        "door": "side",
+        "width": 1.1,
+        "depth": 1.4,
+        "door_width": 0.9,
+        "use": "EN 81-70 type 2; England minimum"
+      },
+      {
+        "load": 800,
+        "door": "side",
+        "width": 1.35,
+        "depth": 1.4,
+        "door_width": 0.9,
+        "use": "office"
+      },
+      {
+        "load": 1000,
+        "door": "side",
+        "width": 1.1,
+        "depth": 2.1,
+        "door_width": 0.9,
+        "use": "stretcher; EN 81-70 type 3"
+      },
+      {
+        "load": 1275,
+        "door": "centre",
+        "width": 2.0,
+        "depth": 1.4,
+        "door_width": 1.1,
+        "use": "EN 81-70 type 5"
+      },
+      {
+        "load": 1600,
+        "door": "centre",
+        "width": 2.1,
+        "depth": 1.6,
+        "door_width": 1.1,
+        "use": "high-capacity office"
+      },
+      {
+        "load": 2000,
+        "door": "side",
+        "width": 1.5,
+        "depth": 2.7,
+        "door_width": 1.3,
+        "use": "bed lift"
+      },
+      {
+        "load": 2500,
+        "door": "side",
+        "width": 1.8,
+        "depth": 2.7,
+        "door_width": 1.4,
+        "use": "bed and equipment"
+      }
+    ],
+    "hoistway": {
+      "side_door_width": 0.6,
+      "centre_door_width": 0.68,
+      "depth": 0.4,
+      "rear_entrance_depth": 0.2,
+      "space_below_depth": 0.2
+    },
+    "pit_overhead": [
+      {
+        "drives": [
+          "mrl_traction",
+          "traction"
+        ],
+        "max_speed": 1.0,
+        "pit": 1.2,
+        "overhead_above_car": 1.4
+      },
+      {
+        "drives": [
+          "mrl_traction",
+          "traction"
+        ],
+        "max_speed": 1.6,
+        "pit": 1.4,
+        "overhead_above_car": 1.6
+      },
+      {
+        "drives": [
+          "mrl_traction",
+          "traction"
+        ],
+        "max_speed": 2.0,
+        "pit": 1.6,
+        "overhead_above_car": 1.8
+      },
+      {
+        "drives": [
+          "mrl_traction",
+          "traction"
+        ],
+        "max_speed": 2.5,
+        "pit": 2.0,
+        "overhead_above_car": 2.1
+      },
+      {
+        "drives": [
+          "hydraulic",
+          "holeless"
+        ],
+        "max_speed": 0.63,
+        "pit": 1.2,
+        "overhead_above_car": 1.4
+      }
+    ],
+    "car_height": 2.2,
+    "door_height": 2.1,
+    "persons_kg": 75,
+    "source": "S1507 S1559 S1637 S1662 S1675",
+    "confidence": "secondary"
+  }
+}

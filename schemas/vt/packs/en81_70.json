@@ -1,0 +1,24 @@
+{
+  "format": "reviera.vt-rules-1",
+  "id": "en81_70",
+  "title": "EN 81-70 accessible lifts",
+  "jurisdiction": "EU",
+  "edition": "EN 81-70:2021+A1:2022 (official preview and KONE's fact sheet)",
+  "layer": "accessible",
+  "notes": "Type 2 (1100 × 1400 mm, door 900 mm) is the minimum for new buildings; type 1 only where type 2 cannot fit in an existing building; type 4 where doors are on adjacent walls (not checked yet).",
+  "accessible_car": {
+    "id": "EN 81-70:2021 5.3, Table 1",
+    "description": "Type 2 car: one wheelchair user and a companion",
+    "options": [
+      {
+        "label": "type 2",
+        "door": "any",
+        "door_width": 0.9,
+        "width": 1.1,
+        "depth": 1.4
+      }
+    ],
+    "source": "S1643 S1641",
+    "confidence": "verified"
+  }
+}

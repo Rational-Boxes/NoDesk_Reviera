@@ -1,6 +1,8 @@
 # Vertical and people transport: elevators, lifts, escalators, moving walks, stairlifts, people movers, funiculars and ropeways
 
-**Status:** Draft 0.1 · 2026-11-03 · for the owner's review; nothing built.
+**Status:** Draft 0.2 · 2026-11-03 · building started. The owner (2026-11-03): "Go with your
+recommended defaults and start building elevators". The answers to §12 are therefore the
+recommended ones, recorded in §12a, until the owner says otherwise.
 **Owner's requests:**
 - 2026-11-01: "Elevators, both passenger and freight." and "For elevators include ornamental
   version like glass enclosed."
@@ -475,3 +477,21 @@ positions. The README gains the goals, marked as not yet built.
 8. **Glass shafts:** the structural guidance is thin (post sizes, fixings at ≤ 1500 mm, pit
    loads from one quotation; SCI P103 for rail brackets). Ship the panoramic generator with these
    as flagged defaults, or wait for more research?
+
+## 12a. Answers in use (owner, 2026-11-03: "Go with your recommended defaults")
+
+1. Shaft devices, escalators and stairlifts first (steps 1–8); guideways and ropeways after.
+2. US (`us_ibc_ada`, `us_a17_checklists`) and EU/England (`en81`, `england_adm_adb_adk`) ship
+   first; Hong Kong and the others follow as advisory packs.
+3. A17.1, A18.1 and EN 81 rules ship as advisory notes, never errors, until checked.
+4. The IFC classes proposed in Question 4 are used.
+5. One shared `IfcAlignment` foundation, built with roads, before the guideway devices.
+6. Built-in defaults stay generic ("maker-style"), with their sources; named maker data comes in
+   through products (§10).
+7. The up-peak calculation only; simulation stays a possible compute-job provider.
+8. The panoramic generator ships with its structural values as flagged defaults.
+
+The vertical-transport rules get their own schema (`reviera.vt-rules-1`) with the bath packs'
+header (format, id, title, jurisdiction, edition, layer), so that it can join a general
+`reviera.rules-1` if KITCHENS_PLAN Question 1 is answered that way.
+

@@ -1,0 +1,40 @@
+{
+  "format": "reviera.vt-rules-1",
+  "id": "england_adm",
+  "title": "Approved Document M volume 2 (passenger lifts)",
+  "jurisdiction": "England",
+  "edition": "Approved Document M volume 2, 2015 incorporating 2020 amendments",
+  "layer": "accessible",
+  "notes": "A 900 mm wide route may stand in for the 1500 × 1500 mm landing (not checked yet).",
+  "accessible_car": {
+    "id": "ADM vol. 2 3.34",
+    "description": "Car at least 1100 mm wide by 1400 mm deep, doors at least 800 mm clear",
+    "options": [
+      {
+        "label": "minimum car",
+        "door": "any",
+        "door_width": 0.8,
+        "width": 1.1,
+        "depth": 1.4
+      }
+    ],
+    "source": "S1034",
+    "confidence": "verified"
+  },
+  "landing": {
+    "id": "ADM vol. 2 3.34",
+    "description": "1500 × 1500 mm clear landing in front of each lift entrance",
+    "width": 1.5,
+    "depth": 1.5,
+    "source": "S1034",
+    "confidence": "verified"
+  },
+  "call_buttons": {
+    "id": "ADM vol. 2 3.34",
+    "description": "Landing call buttons 900–1100 mm above the floor",
+    "min": 0.9,
+    "max": 1.1,
+    "source": "S1034",
+    "confidence": "verified"
+  }
+}

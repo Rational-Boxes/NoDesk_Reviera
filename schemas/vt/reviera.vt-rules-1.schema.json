@@ -1,0 +1,151 @@
+{
+  "$id": "https://reviera.org/schemas/vt/reviera.vt-rules-1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Reviera vertical-transport rule pack",
+  "description": "Rules and sizing defaults for elevators and lifts from one code, standard or guide (ARC-VT-001). Lengths are metres, loads kilograms, speeds metres per second. The header matches the bathroom packs' so that both can join one rules schema. MIT licensed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "id", "title", "jurisdiction", "edition", "layer"],
+  "properties": {
+    "format": { "const": "reviera.vt-rules-1" },
+    "id": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+    "title": { "type": "string" },
+    "jurisdiction": { "type": "string" },
+    "edition": { "type": "string" },
+    "layer": { "enum": ["minimum", "accessible", "recommended"], "description": "A code minimum, an accessibility standard, or guidance (findings are notes)." },
+    "notes": { "type": "string" },
+    "car_area": {
+      "type": "object",
+      "description": "Maximum inside car floor area for a rated load (passenger cars), interpolated linearly between rows.",
+      "additionalProperties": false,
+      "required": ["id", "rows", "source", "confidence"],
+      "properties": {
+        "id": { "type": "string" },
+        "description": { "type": "string" },
+        "rows": { "type": "array", "minItems": 2, "items": { "type": "array", "prefixItems": [ { "type": "number", "exclusiveMinimum": 0, "description": "rated load, kg" }, { "type": "number", "exclusiveMinimum": 0, "description": "maximum area, m²" } ], "items": false, "minItems": 2 } },
+        "above_last": { "type": "object", "additionalProperties": false, "required": ["per_kg", "add_m2"], "properties": { "per_kg": { "type": "number", "exclusiveMinimum": 0 }, "add_m2": { "type": "number", "minimum": 0 } }, "description": "Beyond the last row, area grows by add_m2 for each per_kg of load." },
+        "source": { "$ref": "#/$defs/source" },
+        "confidence": { "$ref": "#/$defs/confidence" }
+      }
+    },
+    "accessible_car": {
+      "type": "object",
+      "description": "Minimum car and door sizes for an accessible car. A car passes if it meets any one option.",
+      "additionalProperties": false,
+      "required": ["id", "options", "source", "confidence"],
+      "properties": {
+        "id": { "type": "string" },
+        "description": { "type": "string" },
+        "options": { "type": "array", "minItems": 1, "items": { "type": "object", "additionalProperties": false, "required": ["door", "door_width", "width", "depth"], "properties": {
+          "label": { "type": "string" },
+          "door": { "enum": ["centred", "side", "any"], "description": "Where the door is on the front wall." },
+          "door_width": { "type": "number", "exclusiveMinimum": 0 },
+          "width": { "type": "number", "exclusiveMinimum": 0, "description": "Inside width, side to side." },
+          "depth": { "type": "number", "exclusiveMinimum": 0, "description": "Inside depth, back wall to the inside face of the door." }
+        } } },
+        "turning_circle": { "type": "number", "exclusiveMinimum": 0, "description": "Any car whose floor holds a circle of this diameter, with a door at least the smallest option's width, also passes." },
+        "source": { "$ref": "#/$defs/source" },
+        "confidence": { "$ref": "#/$defs/confidence" }
+      }
+    },
+    "stretcher": {
+      "type": "object",
+      "description": "A stretcher that one elevator serving every floor must take, in buildings of at least min_storeys.",
+      "additionalProperties": false,
+      "required": ["id", "length", "width", "corner_radius", "min_storeys", "source", "confidence"],
+      "properties": {
+        "id": { "type": "string" },
+        "description": { "type": "string" },
+        "length": { "type": "number", "exclusiveMinimum": 0 },
+        "width": { "type": "number", "exclusiveMinimum": 0 },
+        "corner_radius": { "type": "number", "minimum": 0 },
+        "min_storeys": { "type": "integer", "minimum": 1, "description": "Storeys served by the elevator at or above which the rule applies." },
+        "source": { "$ref": "#/$defs/source" },
+        "confidence": { "$ref": "#/$defs/confidence" }
+      }
+    },
+    "landing": {
+      "type": "object",
+      "description": "Clear floor space in front of each landing entrance, centred on the door.",
+      "additionalProperties": false,
+      "required": ["id", "width", "depth", "source", "confidence"],
+      "properties": {
+        "id": { "type": "string" },
+        "description": { "type": "string" },
+        "width": { "type": "number", "exclusiveMinimum": 0 },
+        "depth": { "type": "number", "exclusiveMinimum": 0 },
+        "height": { "type": "number", "exclusiveMinimum": 0, "description": "Defaults to 2.03 m." },
+        "source": { "$ref": "#/$defs/source" },
+        "confidence": { "$ref": "#/$defs/confidence" }
+      }
+    },
+    "call_buttons": {
+      "type": "object",
+      "description": "Height band for hall call buttons above the landing floor.",
+      "additionalProperties": false,
+      "required": ["id", "min", "max", "source", "confidence"],
+      "properties": {
+        "id": { "type": "string" },
+        "description": { "type": "string" },
+        "min": { "type": "number", "minimum": 0 },
+        "max": { "type": "number", "exclusiveMinimum": 0 },
+        "source": { "$ref": "#/$defs/source" },
+        "confidence": { "$ref": "#/$defs/confidence" }
+      }
+    },
+    "door_width": {
+      "type": "object",
+      "description": "Minimum clear width of car and landing doors.",
+      "additionalProperties": false,
+      "required": ["id", "min", "source", "confidence"],
+      "properties": {
+        "id": { "type": "string" },
+        "description": { "type": "string" },
+        "min": { "type": "number", "exclusiveMinimum": 0 },
+        "source": { "$ref": "#/$defs/source" },
+        "confidence": { "$ref": "#/$defs/confidence" }
+      }
+    },
+    "sizing": {
+      "type": "object",
+      "description": "Defaults for sizing a new elevator: generic, maker-style values, replaced by a product's own.",
+      "additionalProperties": false,
+      "required": ["cars", "hoistway", "pit_overhead", "source", "confidence"],
+      "properties": {
+        "cars": { "type": "array", "minItems": 1, "items": { "type": "object", "additionalProperties": false, "required": ["load", "door", "width", "depth", "door_width"], "properties": {
+          "load": { "type": "number", "exclusiveMinimum": 0 },
+          "door": { "enum": ["side", "centre"] },
+          "width": { "type": "number", "exclusiveMinimum": 0 },
+          "depth": { "type": "number", "exclusiveMinimum": 0 },
+          "door_width": { "type": "number", "exclusiveMinimum": 0 },
+          "persons": { "type": "integer", "minimum": 1 },
+          "use": { "type": "string" }
+        } } },
+        "hoistway": { "type": "object", "additionalProperties": false, "required": ["side_door_width", "centre_door_width", "depth"], "properties": {
+          "side_door_width": { "type": "number", "minimum": 0, "description": "Added to the car width for a side-opening door." },
+          "centre_door_width": { "type": "number", "minimum": 0, "description": "Added to the car width for a centre-opening door." },
+          "depth": { "type": "number", "minimum": 0, "description": "Added to the car depth, front entrance only." },
+          "rear_entrance_depth": { "type": "number", "minimum": 0, "description": "Further depth for a rear entrance." },
+          "space_below_depth": { "type": "number", "minimum": 0, "description": "Further depth for counterweight safeties where there is occupied space below the pit." }
+        } },
+        "pit_overhead": { "type": "array", "minItems": 1, "items": { "type": "object", "additionalProperties": false, "required": ["drives", "max_speed", "pit"], "properties": {
+          "drives": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/drive" } },
+          "max_speed": { "type": "number", "exclusiveMinimum": 0 },
+          "pit": { "type": "number", "exclusiveMinimum": 0 },
+          "overhead": { "type": "number", "exclusiveMinimum": 0, "description": "Top landing floor to the underside of the structure above, for a standard car height." },
+          "overhead_above_car": { "type": "number", "exclusiveMinimum": 0, "description": "Or: the car's clear height plus this." }
+        } } },
+        "car_height": { "type": "number", "exclusiveMinimum": 0 },
+        "door_height": { "type": "number", "exclusiveMinimum": 0 },
+        "persons_kg": { "type": "number", "exclusiveMinimum": 0, "description": "Mass per person for the capacity in persons." },
+        "source": { "$ref": "#/$defs/source" },
+        "confidence": { "$ref": "#/$defs/confidence" }
+      }
+    }
+  },
+  "$defs": {
+    "source": { "type": "string", "pattern": "^S[0-9]{4}( S[0-9]{4})*$", "description": "Source IDs in SOURCE_REGISTER.md." },
+    "confidence": { "enum": ["verified", "secondary", "advisory"] },
+    "drive": { "enum": ["mrl_traction", "traction", "hydraulic", "holeless"] }
+  }
+}
