@@ -1,0 +1,187 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Riviera contributors
+
+//! B-rep geometry, booleans, sweeps, sections, tessellation and hidden-line output through OCCT
+//! (TECH_STACK §3.2).
+//!
+//! Built so far: **solid booleans on closed meshes** ([`boolean`]). Each closed part becomes an
+//! OCCT solid (its triangles as planar faces sewn into a shell, turned to face out). The
+//! subtraction, intersection or union runs on the two compounds, and the result is triangulated
+//! back into closed parts. Each input's coplanar neighbours are merged into one face first (not
+//! the result's, with `ShapeUpgrade_UnifySameDomain`, which can loop without bound), so a body
+//! cut again and again keeps few faces. Inputs over [`MAX_TRIANGLES`] are refused, and so is a
+//! result that is not closed or is far larger than its inputs: the target is then left as it
+//! was rather than shown broken.
+
+pub mod csg;
+mod ffi;
+
+pub use riviera_core::bodies::Mesh;
+
+/// A boolean operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Op {
+    /// A − B.
+    Subtract,
+    /// A ∩ B.
+    Intersect,
+    /// A ∪ B.
+    Union,
+}
+
+fn pack(parts: &[Mesh]) -> ffi::bridge::Meshes {
+    let mut out = ffi::bridge::Meshes {
+        verts: Vec::new(),
+        faces: Vec::new(),
+        parts: Vec::new(),
+    };
+    for (points, indices) in parts {
+        let base = (out.verts.len() / 3) as u32;
+        out.verts.extend(points.iter().flatten());
+        out.faces.extend(indices.iter().map(|i| i + base));
+        out.parts.push((indices.len() / 3) as u32);
+    }
+    out
+}
+
+/// The most triangles, both inputs together, a boolean takes. Each triangle becomes an OCCT
+/// face, and a B-rep boolean's memory grows quickly with the face count.
+pub const MAX_TRIANGLES: usize = 20_000;
+
+/// A boolean of two sets of closed parts: the result's closed parts. An empty result (nothing in
+/// common, or everything subtracted) is an empty list.
+pub fn boolean(op: Op, a: &[Mesh], b: &[Mesh], tolerance: f64) -> Result<Vec<Mesh>, String> {
+    let triangles: usize = a.iter().chain(b).map(|m| m.1.len() / 3).sum();
+    if triangles > MAX_TRIANGLES {
+        return Err(format!(
+            "too complex for a boolean: {triangles} triangles (at most {MAX_TRIANGLES})"
+        ));
+    }
+    let code = match op {
+        Op::Subtract => 0,
+        Op::Intersect => 1,
+        Op::Union => 2,
+    };
+    let out = ffi::bridge::mesh_boolean(code, &pack(a), &pack(b), tolerance)
+        .map_err(|e| e.what().to_owned())?;
+    // Split back into parts, each with its own vertices: welded (OCCT gives each face its own
+    // nodes) and without degenerate triangles.
+    let mut parts = Vec::new();
+    let mut first = 0usize;
+    let mut total = 0usize;
+    for n in out.parts {
+        let tris = &out.faces[3 * first..3 * (first + n as usize)];
+        first += n as usize;
+        let mut map = std::collections::HashMap::new();
+        let mut points: Vec<[f64; 3]> = Vec::new();
+        let mut id = |i: u32| {
+            let k = 3 * i as usize;
+            let p = [out.verts[k], out.verts[k + 1], out.verts[k + 2]];
+            *map.entry(p.map(|c| (c * 1e7).round() as i64))
+                .or_insert_with(|| {
+                    points.push(p);
+                    (points.len() - 1) as u32
+                })
+        };
+        let mut indices = Vec::with_capacity(tris.len());
+        for t in tris.chunks(3) {
+            let v = [id(t[0]), id(t[1]), id(t[2])];
+            if v[0] != v[1] && v[1] != v[2] && v[2] != v[0] {
+                indices.extend(v);
+            }
+        }
+        if indices.is_empty() {
+            continue;
+        }
+        // Closed: every edge is met the other way by a neighbour.
+        let mut edges = std::collections::HashMap::<(u32, u32), i32>::new();
+        for t in indices.chunks(3) {
+            for k in 0..3 {
+                let (a, b) = (t[k], t[(k + 1) % 3]);
+                *edges.entry((a.min(b), a.max(b))).or_default() += if a < b { 1 } else { -1 };
+            }
+        }
+        if edges.values().any(|&c| c != 0) {
+            return Err("the boolean's result is not closed".into());
+        }
+        total += indices.len() / 3;
+        parts.push((points, indices));
+    }
+    // A result far larger than its inputs has gone wrong (slivers split again and again).
+    let limit = MAX_TRIANGLES.min(4 * triangles + 2_000);
+    if total > limit {
+        return Err(format!(
+            "the boolean's result is too complex: {total} triangles from {triangles}"
+        ));
+    }
+    Ok(parts)
+}
+
+/// The linked OpenCASCADE version.
+pub fn occt_version() -> String {
+    ffi::bridge::occt_version()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use riviera_core::bodies::extrude;
+
+    fn cube(lo: [f64; 3], hi: [f64; 3]) -> Mesh {
+        let ring = [
+            [lo[0], lo[1]],
+            [hi[0], lo[1]],
+            [hi[0], hi[1]],
+            [lo[0], hi[1]],
+        ];
+        extrude(&ring, &[], lo[2], hi[2])
+    }
+
+    fn volume(parts: &[Mesh]) -> f64 {
+        parts
+            .iter()
+            .map(|(p, idx)| {
+                idx.chunks(3)
+                    .map(|t| {
+                        let (a, b, c) = (p[t[0] as usize], p[t[1] as usize], p[t[2] as usize]);
+                        (a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0])
+                            + a[2] * (b[0] * c[1] - b[1] * c[0]))
+                            / 6.0
+                    })
+                    .sum::<f64>()
+            })
+            .sum()
+    }
+
+    #[test]
+    fn subtract_intersect_union() {
+        let a = [cube([0.0, 0.0, 0.0], [2.0, 2.0, 2.0])];
+        let b = [cube([1.0, 1.0, 1.0], [3.0, 3.0, 3.0])];
+        let cut = boolean(Op::Subtract, &a, &b, 1e-6).unwrap();
+        assert!((volume(&cut) - 7.0).abs() < 1e-6, "{}", volume(&cut));
+        let common = boolean(Op::Intersect, &a, &b, 1e-6).unwrap();
+        assert!((volume(&common) - 1.0).abs() < 1e-6);
+        let union = boolean(Op::Union, &a, &b, 1e-6).unwrap();
+        assert!((volume(&union) - 15.0).abs() < 1e-6);
+        // A hole right through: the slab keeps its volume less the hole's.
+        let slab = [cube([0.0, 0.0, 0.0], [4.0, 4.0, 0.3])];
+        let pipe = [cube([1.0, 1.0, -1.0], [2.0, 2.0, 1.0])];
+        let holed = boolean(Op::Subtract, &slab, &pipe, 1e-6).unwrap();
+        assert!((volume(&holed) - (16.0 - 1.0) * 0.3).abs() < 1e-6);
+        // Nothing in common.
+        let far = [cube([10.0, 10.0, 10.0], [11.0, 11.0, 11.0])];
+        assert!(boolean(Op::Intersect, &a, &far, 1e-6).unwrap().is_empty());
+        assert!(!occt_version().is_empty());
+    }
+
+    #[test]
+    fn oversized_inputs_are_refused() {
+        // Many small boxes (12 triangles each), past the limit together.
+        let many: Vec<Mesh> = (0..MAX_TRIANGLES / 12 + 1)
+            .map(|i| cube([i as f64, 0.0, 0.0], [i as f64 + 0.5, 1.0, 1.0]))
+            .collect();
+        let b = [cube([0.0, 0.0, 0.0], [1.0, 1.0, 1.0])];
+        let err = boolean(Op::Subtract, &many, &b, 1e-6).unwrap_err();
+        assert!(err.contains("too complex"), "{err}");
+    }
+}

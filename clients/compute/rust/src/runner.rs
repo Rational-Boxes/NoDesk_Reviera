@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2026 Reviera contributors
+// Copyright (C) 2026 Riviera contributors
 
 //! A toolkit for writing runners: implement [`Kind`] for each job kind and call
 //! [`main_with`]; the toolkit serves `reviera.compute.v1` (negotiation, blobs, jobs, numbered
@@ -7,7 +7,7 @@
 //! memory only; the compute host that starts it holds the durable registry.
 //!
 //! A runner is started by a host as `<runner> --serve <address>` with the token in the
-//! `REVIERA_COMPUTE_TOKEN` environment variable, and prints its kinds as JSON for
+//! `RIVIERA_COMPUTE_TOKEN` environment variable, and prints its kinds as JSON for
 //! `<runner> --describe`.
 
 use std::collections::HashMap;
@@ -628,7 +628,7 @@ fn describe_json(r: &Runner) -> String {
 }
 
 /// A runner's `main`: `--describe` prints its kinds; `--serve <address>` serves them until
-/// asked to shut down, or until no call has arrived for `REVIERA_RUNNER_IDLE_S` seconds
+/// asked to shut down, or until no call has arrived for `RIVIERA_RUNNER_IDLE_S` seconds
 /// (default 600), so a runner whose host has gone does not stay resident.
 pub fn main_with(runner: Runner) -> std::process::ExitCode {
     let args: Vec<String> = std::env::args().collect();
@@ -648,8 +648,8 @@ pub fn main_with(runner: Runner) -> std::process::ExitCode {
         );
         return std::process::ExitCode::from(2);
     };
-    let token = std::env::var("REVIERA_COMPUTE_TOKEN").unwrap_or_default();
-    let idle = std::env::var("REVIERA_RUNNER_IDLE_S")
+    let token = std::env::var("RIVIERA_COMPUTE_TOKEN").or_else(|_| std::env::var("REVIERA_COMPUTE_TOKEN")).unwrap_or_default();
+    let idle = std::env::var("RIVIERA_RUNNER_IDLE_S").or_else(|_| std::env::var("REVIERA_RUNNER_IDLE_S"))
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(600u64);

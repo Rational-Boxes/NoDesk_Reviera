@@ -47,10 +47,10 @@ sold.** In practice:
 
 Missing everywhere: an open, IFC-native foodservice library with ports; a vendor-neutral
 equipment-to-rough-in workflow; and display-case line-ups that sum refrigeration load per
-circuit or rack (research/14 E5). Reviera can do all three, on the bathroom pattern: **rules as
+circuit or rack (research/14 E5). Riviera can do all three, on the bathroom pattern: **rules as
 data, placeholders with ports, layouts checked as you draw, products swapped in later.**
 
-## 2. What Reviera already has
+## 2. What Riviera already has
 
 | Need | Existing tool | Status |
 |---|---|---|
@@ -67,7 +67,7 @@ data, placeholders with ports, layouts checked as you draw, products swapped in 
 | Sprinklers | MEP-PIPE-007 | Built |
 | Spaces and the energy model | MEP-SPACE-001, ANA-EM-003 | Built |
 | Path of travel | ANA-ROUTE-001/002 | Built |
-| Reviera property sets, published MIT | `schemas/psets/reviera-psets-1.json` | Built |
+| Riviera property sets, published MIT | `schemas/psets/riviera-psets-1.json` | Built |
 | Interior elevations, schedules, COBie | 5.4, schedules, DOC-OUT-015 | Built |
 | Repeated units with connection points and shared spines | Modular units (ARC-GRP-004) | Specified, not built |
 
@@ -78,7 +78,7 @@ spaces that every other tool already understands.
 
 ### 3.1 One rules schema, not two (proposal)
 
-The bath schema (`reviera.bath-rules-1`) has zones, distances, bars and counts, keyed to six
+The bath schema (`riviera.bath-rules-1`) has zones, distances, bars and counts, keyed to six
 sanitary fixture kinds. Kitchens need those four kinds of rule and several new ones
 (research/14 E7.1):
 
@@ -93,7 +93,7 @@ sanitary fixture kinds. Kitchens need those four kinds of rule and several new o
 | **Dated rules** | GWP limit by equipment type and install date (C8, F224–F231) |
 | **Product values** | Hood height, OTR microwave clearances, oven cut-outs, rear air gaps, A2L room area: read from the product, else the pack default (E7.5) |
 
-**Proposal: generalise to `schemas/rules/reviera.rules-1.schema.json` (MIT).** Each pack names
+**Proposal: generalise to `schemas/rules/riviera.rules-1.schema.json` (MIT).** Each pack names
 its domain (`bath`, `kitchen`, `foodservice`, `refrigeration`). Element kinds become an open
 list mapped from IFC class and predefined type, not a fixed enum. Existing bath packs stay valid
 and are read unchanged; the `bath.*` commands keep working. Reasons:
@@ -103,7 +103,7 @@ and are read unchanged; the `bath.*` commands keep working. Reasons:
 - the new kinds (path distance, dated rules, product values) will be wanted by bathrooms too
   (a hand-dryer reach range, a sauna heater's distances from its product).
 
-The alternative, a separate `reviera.kitchen-rules-1`, is quicker to start but doubles the code
+The alternative, a separate `riviera.kitchen-rules-1`, is quicker to start but doubles the code
 that reads, merges and reports packs. Question 1 (§11).
 
 ### 3.2 Packs to ship first (proposed)
@@ -209,18 +209,18 @@ catalogue in research/14 D5. Each placeholder carries what D6 lists:
 
 **IFC gaps and proposed workarounds** (D1, E7.4; each to `EXPERT_REVIEW.md`):
 - **Gas cookers have no class in IFC4 or IFC4.3.** Proposal: `IfcElectricAppliance`
-  USERDEFINED "GasRange" (or "GasCooktop") with a Gas port and `Reviera_Utilities` fuel GAS.
+  USERDEFINED "GasRange" (or "GasCooktop") with a Gas port and `Riviera_Utilities` fuel GAS.
   The alternative is ELECTRICCOOKER with a gas port, which misleads any tool reading the enum.
 - **Hoods have no class.** Proposal: `IfcAirTerminal` USERDEFINED "KitchenHood", as BDNS maps
   them.
 - **Sinks have only a drainage port in IFC** (water comes through a nested `IfcValve` FAUCET).
-  Reviera's sinks keep their cold and hot connectors (MEP-PIPE-006) and export a nested faucet
+  Riviera's sinks keep their cold and hot connectors (MEP-PIPE-006) and export a nested faucet
   carrying those ports.
 
-### 5.2 A utility property set (`Reviera_Utilities`)
+### 5.2 A utility property set (`Riviera_Utilities`)
 `Pset_ElectricApplianceTypeCommon` holds only Reference and Status: no voltage, power, gas,
 water, drain or exhaust (research/14 D2). Without that data there is no rough-in schedule. The
-proposal adds one type pset to `schemas/psets/reviera-psets-1.json` (MIT), from agent D's field
+proposal adds one type pset to `schemas/psets/riviera-psets-1.json` (MIT), from agent D's field
 set (D6, E2, E3):
 
 | Group | Properties |
@@ -234,7 +234,7 @@ set (D6, E2, E3):
 | Listing and handling | Listings (NSF, UL, ETL), Weight, TransportOpening |
 
 Each value lives on the type; ports carry the same data where the MEP tools need it, so a
-dishwasher's hot-water connector and its pset agree. Display cases add `Reviera_DisplayCase`
+dishwasher's hot-water connector and its pset agree. Display cases add `Riviera_DisplayCase`
 (§8).
 
 ### 5.3 Products and documents
@@ -247,7 +247,7 @@ As ARC-BATH-006, generalised so kitchens do not need their own copies of the com
 - documents on the type (COL-FE-006): spec sheet, installation guide, cut-out guide, O&M,
   warranty, NSF/UL listings, EPD and HPD. Cabinet and quartz countertop EPDs exist (E4).
 
-Reviera ships placeholders only. Manufacturers publish Revit and DWG (Hillphoenix) or data
+Riviera ships placeholders only. Manufacturers publish Revit and DWG (Hillphoenix) or data
 sheets (Hussmann), not IFC (E3); import stays through meshes and IFC types.
 
 ## 6. Layout tools
@@ -332,7 +332,7 @@ sheets (Hussmann), not IFC (E3); import stays through meshes and IFC types.
   glass-door reach-in (VCT), chest (HCT), solid door, service counter (SOC), ice cream and
   self-contained (research/14 C1). Each has lengths (8 and 12 ft; doors about 30.7 in), ends,
   rear air gap, door swing (26½ in), temperatures, load, defrost, refrigerant and charge (C2).
-- **`Reviera_DisplayCase` pset** (MIT): DOE class (e.g. VOP.RC.M), TDA, volume, temperature class
+- **`Riviera_DisplayCase` pset** (MIT): DOE class (e.g. VOP.RC.M), TDA, volume, temperature class
   (DOE M/L/I; ISO 23953 M0–H2, L1–L3), load, defrost, CDEC against MDEC, A2L minimum room area.
 - IFC: `IfcElectricAppliance` REFRIGERATOR (MT) or FREEZER (LT, ice cream), as agent C proposed
   (D3).
@@ -386,7 +386,7 @@ sheets (Hussmann), not IFC (E3); import stays through meshes and IFC types.
 
 - **Equipment schedule** in the foodservice layout (NY OGS 11 40 00, E2): item number, quantity,
   manufacturer, model, then electrical, plumbing, gas and exhaust columns with rough-in heights,
-  all from `Reviera_Utilities` and ports. A **rough-in plan** tags each connection for plan
+  all from `Riviera_Utilities` and ports. A **rough-in plan** tags each connection for plan
   review (B1).
 - **Kitchen elevations:** one action makes an elevation of each wall, cabinets tagged and
   dimensioned.
@@ -396,13 +396,13 @@ sheets (Hussmann), not IFC (E3); import stays through meshes and IFC types.
 - **Compliance report** (`kitchen.check`, `refrig.check`): HTML and BCF, as `bath.check`.
 - **COBie:** foodservice equipment and cases are managed assets (Components and Types); residential
   cabinets are left out by default (E1). The Connection sheet is filled from the ports, which
-  Reviera's COBie export (DOC-OUT-015) does not yet do.
+  Riviera's COBie export (DOC-OUT-015) does not yet do.
 
 ## 10. Build order (proposed)
 
 1. Generalised rules schema (or the bath schema extended, per Question 1) with the new rule
    kinds; first packs `us_nkba_kitchen`, `ada_2010_kitchen`, `england_kitchen`; `kitchen.check`.
-2. `Reviera_Utilities` and the residential placeholder library with ports and IFC mapping.
+2. `Riviera_Utilities` and the residential placeholder library with ports and IFC mapping.
 3. Cabinet runs, countertops with automatic cut-outs, appliances in cabinets (§4).
 4. Residential layout templates with triangle, landing and aisle checks; kitchen elevations (§6.1).
 5. Generalised product swap and documents, with cut-out fit checks (§5.3).
@@ -423,7 +423,7 @@ points (standing rules).
 
 ## 11. Questions for the owner
 
-1. **Rules schema:** generalise the bath schema into one `reviera.rules-1` for all domains
+1. **Rules schema:** generalise the bath schema into one `riviera.rules-1` for all domains
    (proposed, §3.1), or keep a separate kitchen schema?
 2. **Packs and jurisdiction:** which packs ship by default? For commercial kitchens, ship the
    Food Code plus a few local overlays (Maricopa, CUPHD, SNHD) as worked examples, or the Food
@@ -438,6 +438,6 @@ points (standing rules).
 6. **The NEC:** its kitchen receptacle rules are known only from city handouts and NKBA
    citations. Ship them as advisory, or leave them out until a reviewer checks the text?
 7. **Refrigerant and energy rules:** they change often (the US GWP limits changed twice since
-   2023). Ship them as dated, advisory data that Reviera updates, or leave them to user packs?
+   2023). Ship them as dated, advisory data that Riviera updates, or leave them to user packs?
 8. **Cabinet depth:** stop at design (runs, tops, elevations, schedules), or plan for shop cut
    lists and CNC export later, as KCD does?

@@ -1,0 +1,88 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Riviera contributors -->
+<h1>Rooms</h1>
+<p class="lead">A room fills a region enclosed by walls. It measures its area and volume to the
+walls' finish faces, follows the walls when they move, and is labelled in plans.</p>
+
+<h2 id="place">To place rooms</h2>
+<ol>
+  <li>Open the plan of the level. <b>Architecture › Room &amp; Area › Room</b> (<kbd>RM</kbd>).
+    <a class="run" href="riviera:action/room.place">Room</a></li>
+  <li>Hover inside a region: the region the room would take is shown.</li>
+  <li>Click to place the room. Click more regions; <kbd>Esc</kbd> ends.</li>
+</ol>
+<p><b>Place Rooms Automatically</b> puts a room in every enclosed region of the plan's level that
+has none, numbered in reading order.
+<a class="run" href="riviera:action/room.place_automatically">Place Rooms Automatically</a>
+<code>room.place</code>, <code>room.place_automatically</code></p>
+
+<h2 id="boundaries">Boundaries</h2>
+<ul>
+  <li>Rooms measure to the walls' finish faces, curved walls included.</li>
+  <li>Islands, such as a free-standing wall inside the room, are left out of the area.</li>
+  <li>When the walls move, the room follows them. If the walls open up so the region is no
+    longer enclosed, the room's status becomes <i>Not Enclosed</i>.</li>
+</ul>
+
+<h2 id="properties">Names, numbers and properties</h2>
+<p>Select a room by clicking its label or its inside in a plan. In Properties:</p>
+<table>
+  <tr><td><b>Name</b></td><td>The room's name (<i>Living</i>, <i>Kitchen</i>).</td></tr>
+  <tr><td>Number</td><td>Shown as the element's Name in the identity rows at the top.</td></tr>
+  <tr><td><b>Level</b>, <b>Upper Limit</b>, <b>Limit Offset</b>, <b>Base Offset</b></td><td>The
+    room's height range.</td></tr>
+  <tr><td><b>Area</b>, <b>Perimeter</b>, <b>Volume</b>, <b>Status</b></td><td>Computed, read
+    only. Status is <i>Placed</i>, <i>Not Enclosed</i> or <i>Redundant</i>.</td></tr>
+</table>
+<p><code>room.set</code> sets a room's name and number from a script.</p>
+
+<h2 id="tags">Labels and tags</h2>
+<p>Plans label each room with its name, number and area. <b>Annotate › Room Tag</b>
+(<kbd>RT</kbd>) adds a room tag, and Rooms can be scheduled with <b>View › Schedules</b>. See
+<a href="riviera:help/documentation#tags">Tags</a> and
+<a href="riviera:help/documentation#schedules">Schedules</a>.</p>
+<p>Rooms are saved as <code>IfcSpace</code> under their storey, with the number as the IFC Name
+and the name as its LongName.</p>
+<h2 id="separators">Room separators</h2>
+<p><b>Architecture › Room &amp; Area › Room Separator</b> draws lines (or arcs, from the
+<b>Shape</b> row in Properties) that split space like walls without being built: an open-plan
+kitchen and living room become two rooms. Rooms on the level update at once.
+<code>roomseparator.create</code></p>
+
+<h2 id="color-schemes">Colour schemes</h2>
+<p><b>Architecture › Room &amp; Area › Color Schemes</b> colours a plan's rooms (or an area plan's
+areas) by a parameter: Name, Number, Area, Perimeter, or any parameter of rooms, including your
+own (such as Department).</p>
+<ul>
+  <li><b>By value</b>: each value gets a row. Values with no row of their own are coloured from a
+    pastel palette, so a new department shows at once.</li>
+  <li><b>By range</b>: rows by their <i>At least</i> value (m² for Area, m for Perimeter); a room
+    falls in the row with the largest one not above its value.</li>
+</ul>
+<p>Edit a row's colour (<code>#rrggbb</code>) or untick <b>Visible</b> to leave its rooms
+uncoloured. <b>Show in this plan</b> fills the active plan. <code>colorscheme.create</code>,
+<code>colorscheme.set_rows</code>, <code>colorscheme.legend</code>,
+<code>view.set_color_scheme</code></p>
+
+<h2 id="areas">Areas and area plans</h2>
+<p>Areas are measured by <b>area schemes</b>: <i>Gross Building</i> and <i>Rentable</i> to begin
+with, each with area types and rules for where boundaries sit on walls.</p>
+<ol>
+  <li>Open a plan of the level. <b>Architecture › Area › Area Plan</b>: choose the scheme; with
+    <b>Boundaries on the walls round the outside</b>, the outside walls are picked as
+    boundaries. The area plan opens (Project Browser › Area Plans).</li>
+  <li><b>Area Boundary</b> picks the selected walls as more boundaries; they follow their walls,
+    placed by the scheme's rules.</li>
+  <li><b>Area</b>: choose the area type, then click inside boundaries to place areas; Esc
+    ends.</li>
+</ol>
+<p>The rules place a picked wall's boundary by the areas either side: in Gross Building on the
+outside faces of the outside walls, so the area is the building's footprint; in Rentable on the
+centreline between two offices, and on the office's face next to an exterior area or the
+outside. Changing an area's type (<code>area.set_type</code>) moves its boundaries. Areas are
+<code>IfcSpace</code> (GFA for Gross Building) and boundaries <code>IfcVirtualElement</code>.
+<code>areascheme.create</code>, <code>areascheme.set_rules</code>, <code>areaplan.create</code>,
+<code>areaboundary.create</code>, <code>area.place</code>, <code>area.list</code></p>
+
+<p class="note">Not yet available: other area rules, and volumes clipped by
+floors and roofs.</p>

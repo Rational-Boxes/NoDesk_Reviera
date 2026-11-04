@@ -67,7 +67,7 @@ Start with **File › New**, and open a Level 1 plan (View › **Floor Plan**).
     Elevation*. Select the first wall and set Host Length 1500 in Properties. **Text** above them:
     *WALL, DOOR AND WINDOW TYPES*. (Placed on sheet A101 in the next step, with Place View.)
 14. **Sheet.** View › **Sheet**, *A2*: it is numbered A101. In Properties name it *Ground
-    Floor*, Drawn By *Reviera*, Issue Date *2026-10-26*. Its Sheet tab › **Place View**: the
+    Floor*, Drawn By *Riviera*, Issue Date *2026-10-26*. Its Sheet tab › **Place View**: the
     Level 1 plan, then *Section A*, then *South*; **Place Schedule**: the door and room
     schedules. Drag them into place: the plan at the left, the section and elevation to its
     right, the schedules below.

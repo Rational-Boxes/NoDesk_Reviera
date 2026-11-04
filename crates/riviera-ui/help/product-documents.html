@@ -1,0 +1,138 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Riviera contributors -->
+<h1>Material Documents</h1>
+<p class="lead">A material's product documents, such as its EPD (Environmental Product
+Declaration), HPD (Health Product Declaration), datasheets and certificates, can live in one
+folder that the model points to: a folder on this computer, or one on FileEngine. Everything works
+with a local folder. FileEngine adds sharing, reading values out of the documents for you (each
+with the words it was read from) and publishing reports. You decide which values go into the
+model.</p>
+<nav class="toc">
+  <a href="#link">Linking a material to its folder</a>
+  <a href="#types">Document types</a>
+  <a href="#enter">Entering values by hand</a>
+  <a href="#extract">Reading values from the documents</a>
+  <a href="#accept">Accepting values</a>
+  <a href="#carbon">An EPD's carbon</a>
+  <a href="#ifc">In the model and in IFC</a>
+  <a href="#publish">Publishing local documents to FileEngine</a>
+  <a href="#limits">Limits and what to check</a>
+  <a href="#scripts">Scripts and agents</a>
+</nav>
+
+<h2 id="link">Linking a material to its folder</h2>
+<p>Open <a href="riviera:action/ui.material_documents">File › Material Documents…</a>. The list
+shows the project's materials (the ones that walls, floors, ceilings and roofs use) and any that
+are already documented. Choose a material, then <b>Link Folder…</b>. When a FileEngine connection
+is set up, Riviera asks whether the folder is <b>on this computer</b> or <b>on FileEngine</b>;
+otherwise it goes straight to choosing a folder on this computer. For FileEngine, browse to the
+product's folder (see <a href="riviera:help/fileengine">Models on FileEngine</a> to connect and
+sign in).</p>
+<p>A local folder's files are its documents (hidden files are left out). Each one's version is
+the time it was last changed, in UTC, written as FileEngine writes versions
+(<code>20261031_142233.000</code>). <b>Open</b> opens the chosen document in its usual
+application. A FileEngine folder is kept by its identifier, so the link still works when the
+folder is renamed or moved. <b>Unlink</b> removes the link; the values read from the documents
+stay unless you also forget them.</p>
+
+<h2 id="types">Document types</h2>
+<p>Each document in the folder has a <i>type</i>: EPD, HPD, specification, certification,
+installation, O&amp;M, warranty, SDS, drawing or other. Riviera reads an EPD's values only from
+documents marked <b>EPD</b>, and an HPD's values only from documents marked <b>HPD</b>, so that a
+figure is never taken from the wrong kind of document. Choose a document and <b>Set Type…</b> to
+mark it. On FileEngine the type is kept with the file, where other people and tools see it too;
+for a local folder it is kept in the model.</p>
+
+<h2 id="enter">Entering values by hand</h2>
+<p><b>Enter Values…</b> asks for the field set (EPD or HPD), then shows its fields. Type in the
+values the document gives and leave the rest blank, choose the document they came from, and
+choose <b>Enter</b>. Numbers and dates are checked before anything is written. The values go
+onto the material in one step, with that document as their source, just as values read by
+FileEngine do. This is the way for a local folder, and works for a FileEngine folder too.</p>
+
+<h2 id="extract">Reading values from the documents</h2>
+<p>This needs the documents on FileEngine; for a local folder, the buttons are greyed out. Choose <b>Read EPD</b> or <b>Read HPD</b>. FileEngine's conversion service reads each document
+of that type whole, and gives back these values:</p>
+<ul>
+  <li><b>EPD:</b> manufacturer, product, EPD number, programme operator, declared unit, GWP for
+  modules A1–A3 including biogenic carbon and, where the EPD gives it, excluding it (kg CO₂e per
+  declared unit), and the date it is valid until.</li>
+  <li><b>HPD:</b> the HPD identifier, the HPD standard version, the MasterFormat classification,
+  the content threshold (ppm), the highest-concern hazard scores, the VOC emissions certificate,
+  and the dates it was published and is valid until.</li>
+</ul>
+<p>Each value is shown with the words it was read from (the <i>quote</i>) and the document's
+version. A value the service could not back with a quote is listed as <i>not found</i>: nothing
+is guessed. Reading takes about half a minute a document. Reading the same version again is
+answered at once from the service's cache.</p>
+<p>The first time you read with a field set on a server, Riviera publishes it there as an
+extraction <i>prompt set</i> named <code>riviera.epd</code> or <code>riviera.hpd</code>. Your
+administrator doesn't need to set anything up. The server's own extraction tools and folder
+automation can then use the same definition. If someone who manages extraction on the server has
+taken the set over, Riviera reads with their version, and the review says so. A PDF read this way
+also gets a marked-up copy beside it on FileEngine, with each value's words highlighted. Choose
+<b>Open Marked-up PDF</b> in the review to see it: it opens the copy for the selected value's
+document in your PDF viewer, and the review stays as you left it. A server
+without prompt sets is asked the old way, with the same results.</p>
+
+<h2 id="accept">Accepting values</h2>
+<p>Nothing is written until you accept. Tick the values you want and choose <b>Apply</b>. They go
+onto the material in one step, which <b>Undo</b> takes back. Each value remembers the document,
+version and reading it came from.</p>
+<ul>
+  <li><b>Also write to the folder</b> puts the values in the folder's FileEngine metadata too
+  (<code>epd.number</code>, <code>epd.gwp_a1a3</code>, <code>hpd.valid_until</code>, …), so that
+  FileEngine can list and search products by them.</li>
+  <li>When two documents disagree on a value, Riviera asks which one to take.</li>
+</ul>
+
+<h2 id="carbon">An EPD's carbon</h2>
+<p>With <b>Use the GWP for embodied carbon</b> ticked, the EPD's GWP A1–A3 becomes the
+material's emission factor for <a href="riviera:help/sustainability#carbon">embodied carbon</a>, in a library
+named <i>Product EPDs</i>. Riviera converts the declared unit: an EPD declared per 1,000 ft² of
+board at 126 kg CO₂e gives 1.356 kg CO₂e per m². It reads m², ft², m³, ft³, yd³, kg, tonnes, lb
+and pieces; any other unit is refused with the reason.</p>
+
+<h2 id="ifc">In the model and in IFC</h2>
+<p>An IFC4 file carries, for each documented material:</p>
+<ul>
+  <li>the folder as an <code>IfcDocumentReference</code> (its address and identifier, or a
+  <code>file:///</code> address and its path for a local folder), tied to the
+  <code>IfcMaterial</code>;</li>
+  <li>the values as material properties, <code>Riviera_EPD</code> and <code>Riviera_HPD</code>,
+  each with the printed unit and the documents they came from.</li>
+</ul>
+<p>When the model itself is saved to FileEngine, its metadata lists the documented materials and
+their values (<code>riviera.products</code>).</p>
+
+<h2 id="publish">Publishing local documents to FileEngine</h2>
+<p>A project documented in local folders can move to FileEngine once a connection is set up.
+<a href="riviera:action/ui.publish_local_documents">File › Publish Local Documents to
+FileEngine…</a> is offered while the project has a local documents folder and a connection
+exists; <b>Publish to FileEngine…</b> in the Material Documents dialog does the same for the
+chosen material's folder. Choose the FileEngine folder to publish into. Riviera makes a folder of
+the same name in it (or uses the one there), uploads each document (a new version of a file
+already there) and sets the types you gave.</p>
+<p>Riviera then asks whether to <b>update the model's references</b>. With yes, the materials
+point to the folder on FileEngine and their values to the uploaded files, in one step that
+<b>Undo</b> takes back; save the model to keep it. With no, the model keeps pointing at the local
+folder, and the documents are on FileEngine for others to read.</p>
+
+<h2 id="limits">Limits and what to check</h2>
+<ul>
+  <li>The service reads the documents' text. A scanned page with no text layer is listed as
+  skipped (<i>no text</i>); check it by hand.</li>
+  <li>An EPD often gives several GWP figures (with or without biogenic carbon, by different
+  methods). Riviera asks for GWP-total including biogenic carbon (IPCC AR6, or EN 15804+A2); check
+  the quote to see which one was read.</li>
+  <li>Your FileEngine key has a usage allowance (requests a minute, tokens a day). The dialog
+  shows it, and warns before it runs out.</li>
+</ul>
+
+<h2 id="scripts">Scripts and agents</h2>
+<p>Everything above is a command in the <code>docs</code> domain: <code>docs.link</code>,
+<code>docs.list</code>, <code>docs.set_doc_type</code>, <code>docs.document_path</code>,
+<code>docs.enter_values</code>, <code>docs.extract</code>, <code>docs.apply_extracted</code>,
+<code>docs.materials</code>, <code>docs.field_sets</code>, <code>docs.publish_field_sets</code>, <code>docs.usage</code>,
+<code>docs.local_collections</code> and <code>docs.publish_local</code>. Lua scripts and AI agents (MCP) can use them, acting as you. The field
+sets are JSON Schemas in <code>schemas/extract/</code>.</p>

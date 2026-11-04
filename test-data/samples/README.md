@@ -1,25 +1,25 @@
-# Reviera sample models
+# Riviera sample models
 
-Models built with Reviera, to show and test its modelling features. Unlike `test-data/ifc`
+Models built with Riviera, to show and test its modelling features. Unlike `test-data/ifc`
 (third-party validation models), these are the project's own, under the project licence.
 
 Each sample is rebuilt from `samples.json`, a list of command steps: Lua scripts in this
 folder (`script.run`), plugin runs (`plugin.run`) and settings. The test
-`crates/reviera-app/tests/samples.rs` rebuilds every sample. Each must have no overlapping
+`crates/riviera-app/tests/samples.rs` rebuilds every sample. Each must have no overlapping
 elements beyond those it leaves on purpose, and no intrusions into its clearances, and must save and reopen intact. To rewrite
 the `.ifc` files after a change:
 
 ```sh
-REVIERA_REGEN_SAMPLES=1 cargo test -p reviera-app --test samples
+RIVIERA_REGEN_SAMPLES=1 cargo test -p riviera-app --test samples
 ```
 
-or only some of them, by name: `REVIERA_REGEN_SAMPLES=temple,csg`.
+or only some of them, by name: `RIVIERA_REGEN_SAMPLES=temple,csg`.
 
 A sample with a `weather` entry has that EPW imported after it is saved, so the file is kept in
 `<name>.resources/weather` beside it; Help copies the folder with the sample. The weather year
-`reviera_synthetic.epw` is synthetic, made by `make_weather.py` (sun positions, a clear-sky model
+`riviera_synthetic.epw` is synthetic, made by `make_weather.py` (sun positions, a clear-sky model
 dimmed by a repeatable cloud cover, seasonal and daily temperatures): the project's own, not
-measured weather. `crates/reviera-app/tests/sample_analyses.rs` checks that the MEP and
+measured weather. `crates/riviera-app/tests/sample_analyses.rs` checks that the MEP and
 sustainability samples show their features from their saved files, running their analyses.
 
 Each entry's `group` names the part of the application it shows, as the ribbon's tabs are
@@ -62,7 +62,7 @@ Each sample also has a walkthrough (`house.md`, `observatory.md`, `manor.md`, `s
 build it in the window. It names the UI path for every operation the script uses, and marks
 the steps the window cannot do yet. Those gaps are missing UI for core features, or scripts
 that need an input form. The corpus test fails a sample without its walkthrough (a titled
-`<name>.md` naming its script). `crates/reviera-app/tests/sample_features.rs` checks that the
+`<name>.md` naming its script). `crates/riviera-app/tests/sample_features.rs` checks that the
 ribbon tabs' showcase samples (Steel, Concrete, Massing & Site, Annotate, View, Manage, Modify,
 fire protection) keep what they show in their saved files; `sample_analyses.rs` runs the
 analyses of the MEP, sustainability and analysis samples.
@@ -71,4 +71,4 @@ A script may write files beside its sample (the editing tools sample writes its 
 `modify_tools.resources/library`); a check run removes what it wrote, and a regeneration keeps
 only the sample's weather file in `<name>.resources`.
 
-Open one with `reviera gui test-data/samples/manor.ifc`.
+Open one with `riviera gui test-data/samples/manor.ifc`.

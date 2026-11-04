@@ -1,19 +1,19 @@
-# Reviera Application Specification
+# Riviera Application Specification
 
-**Document:** Functional and technical specification of Reviera, an open-source BIM authoring application
+**Document:** Functional and technical specification of Riviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
-**Licence of Reviera:** GPL-3.0-or-later
+**Licence of Riviera:** GPL-3.0-or-later
 **Version:** 0.1 (draft) · 2026-10-16 · **Size:** 883 numbered requirements (320 P0 · 341 P1 · 215 P2 · 7 P3), 2,326 commands
 
-> **Clean-room statement.** This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.
+> **Clean-room statement.** This specification describes features, workflows and behaviour in Riviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Riviera is not affiliated with or endorsed by Autodesk.
 
-> **Independence statement.** BIM Reviera is an independent, original application. It is in no way a copy or clone of any existing product, and it does not set out to read or write any existing product's closed, proprietary formats (such as RVT and RFA); IFC is its native format. An existing application was researched, from public sources only, to establish the workflows and user-interface conventions that the industry's users already know, so they can work in Reviera without relearning their trade. Beyond that research, Reviera implements its own features and enhancements: its architecture, native IFC storage, scripting and AI integration, remote computation and analysis, and many of its modelling tools are its own design. Interchange formats used across the industry, such as DWG and DXF, are supported only through open-source libraries, for interoperability.
+> **Independence statement.** BIM Riviera is an independent, original application. It is in no way a copy or clone of any existing product, and it does not set out to read or write any existing product's closed, proprietary formats (such as RVT and RFA); IFC is its native format. An existing application was researched, from public sources only, to establish the workflows and user-interface conventions that the industry's users already know, so they can work in Riviera without relearning their trade. Beyond that research, Riviera implements its own features and enhancements: its architecture, native IFC storage, scripting and AI integration, remote computation and analysis, and many of its modelling tools are its own design. Interchange formats used across the industry, such as DWG and DXF, are supported only through open-source libraries, for interoperability.
 
 ---
 
 ## 0.1 Purpose and Scope
 
-Reviera is a parametric Building Information Modeling (BIM) authoring application for architecture, structural and MEP design, documentation and coordination. Its goal is functional parity with the main workflows of the reference product. It is built on open standards and open-source components:
+Riviera is a parametric Building Information Modeling (BIM) authoring application for architecture, structural and MEP design, documentation and coordination. Its goal is functional parity with the main workflows of the reference product. It is built on open standards and open-source components:
 
 - **Open data:** IFC is the native file format, with no proprietary container.
 - **Open collaboration:** it can run as a client of the Open Source BIMserver.
@@ -27,7 +27,7 @@ This document covers:
 | 0 | Overview, architecture, glossary, requirement conventions, roadmap (this chapter) |
 | 1 | User interface shell |
 | 2 | Data model, families, parameters, project setup, file I/O, extensibility (Lua, add-ins, MCP) |
-| 2a | Reviera Extension Data (RXD): bespoke format and IFC embedding |
+| 2a | Riviera Extension Data (RXD): bespoke format and IFC embedding |
 | 2b | Live model store (SQLite) and crash recovery |
 | 3 | Architectural modeling and editing tools |
 | 4 | Structure, steel, concrete/precast, MEP systems, analysis |
@@ -58,10 +58,10 @@ Out of scope:
 ### 0.2.2 Product principles
 1. **Single source of truth.** All drawings, schedules and 3D views are live views of one model. Changing an element anywhere updates it everywhere.
 2. **Parametric relationships.** Hosting, joins, constraints, formulas and datums propagate changes automatically.
-3. **Open by construction, compatibility first.** A Reviera project is a single, schema-valid IFC file. Information IFC can't express (parametric intent, drawings, standards) is stored as Reviera Extension Data (RXD), a published JSON format embedded as standard `Reviera_*` property sets. Other IFC tools keep it or safely ignore it. A clean-IFC export and an external sidecar carrier are also available (Chapter 2a).
+3. **Open by construction, compatibility first.** A Riviera project is a single, schema-valid IFC file. Information IFC can't express (parametric intent, drawings, standards) is stored as Riviera Extension Data (RXD), a published JSON format embedded as standard `Riviera_*` property sets. Other IFC tools keep it or safely ignore it. A clean-IFC export and an external sidecar carrier are also available (Chapter 2a).
 4. **Everything is a command.** Each operation is a typed, undoable command, available in the same way to the UI, Lua and MCP.
 5. **Multi-core first.** Regeneration, tessellation, hidden-line processing, schedules and export use all available cores.
-6. **Familiar workflows, own expression.** Experienced BIM users should find the workflow concepts familiar. Reviera's naming, visual design, icons and defaults are its own.
+6. **Familiar workflows, own expression.** Experienced BIM users should find the workflow concepts familiar. Riviera's naming, visual design, icons and defaults are its own.
 
 ## 0.3 System Architecture Summary
 
@@ -89,38 +89,38 @@ The full rationale is in `TECH_STACK.md`.
 ### 0.3.1 Command model (applies to every chapter)
 - A command has a stable dotted name (`wall.create`, `view.duplicate`, `bimserver.checkin`). It also has a parameter schema (JSON Schema), a result schema, an **undoable** flag, a **permission class** (`read`, `edit`, `script`, `admin`), and UI metadata (label, icon id, ribbon location, shortcut).
 - Every model-changing command runs inside a transaction. Interactive tools, such as drawing a wall chain, gather input and then issue one or more commands. A whole tool session can be grouped into one undo step.
-- Lua sees commands as `reviera.<domain>.<verb>{...}`. MCP sees each command as a tool named `<domain>_<verb>`. Read-only model access is provided as Lua query APIs and MCP resources (`reviera://element/{guid}`, `reviera://view/{id}`, `reviera://schedule/{id}`).
+- Lua sees commands as `riviera.<domain>.<verb>{...}`. MCP sees each command as a tool named `<domain>_<verb>`. Read-only model access is provided as Lua query APIs and MCP resources (`riviera://element/{guid}`, `riviera://view/{id}`, `riviera://schedule/{id}`).
 - Each chapter ends with a **command catalog**. Appendix A merges them into one index.
 
 ### 0.3.2 Operating modes
 - **Local:** the project is an `.ifc` or `.ifczip` file on disk, and one user edits it.
-- **BIMserver client:** the project is an Open Source BIMserver project. Reviera keeps an offline working copy, checks in revisions, gets the latest revision, merges changes by GlobalId and shows notifications. Chapter 6 maps the reference product's worksharing concepts (central/local, worksets, element borrowing, synchronise) onto this mode.
+- **BIMserver client:** the project is an Open Source BIMserver project. Riviera keeps an offline working copy, checks in revisions, gets the latest revision, merges changes by GlobalId and shows notifications. Chapter 6 maps the reference product's worksharing concepts (central/local, worksets, element borrowing, synchronise) onto this mode.
 
 ### 0.3.3 Persistence summary
 
-| Reference concept | Reviera persistence |
+| Reference concept | Riviera persistence |
 |-------------------|---------------------|
 | Project file | IFC4 (ADD2 TC1) `.ifc` / `.ifczip`; IFC4X3 optional |
 | Unsaved working state | Live SQLite store `*.rvlive` in the per-user data directory, updated per transaction (Chapter 2b); local only, never exchanged |
 | Family file | IFC library file (`IfcProjectLibrary` + type objects) with RXD `families/<id>` embedded |
-| Project template | IFC file marked as a template (`Reviera_ProjectTemplate`) |
-| Categories | IFC entity class + PredefinedType (+ `Reviera_Category` where finer granularity is needed) |
+| Project template | IFC file marked as a template (`Riviera_ProjectTemplate`) |
+| Categories | IFC entity class + PredefinedType (+ `Riviera_Category` where finer granularity is needed) |
 | Types / instances | `IfcTypeObject` subtypes / occurrence entities |
 | Parameter values | Readable Psets/Qtos (standard `Pset_*` where defined, otherwise project-named Psets) |
 | Parameter definitions (formulas, groups, shared ids) | RXD document `standards/parameters` |
-| Element recipes, sketches, owned constraints | RXD element data in the `Reviera_Element` Pset on the element |
+| Element recipes, sketches, owned constraints | RXD element data in the `Riviera_Element` Pset on the element |
 | Cross-element constraints | RXD document `model/constraints` |
-| Views, sheets, schedules, view templates, annotation | RXD documents (`Reviera_Doc:*` Psets on IfcProject); optional `IfcAnnotation` export |
+| Views, sheets, schedules, view templates, annotation | RXD documents (`Riviera_Doc:*` Psets on IfcProject); optional `IfcAnnotation` export |
 | Worksets / phases / design options | RXD documents and element membership (optional `IfcGroup` export) |
 | Live ownership / locks (BIMserver) | BIMserver Extended Data, not in the model file |
 
 ## 0.4 Glossary
 
-| Term | Meaning in Reviera |
+| Term | Meaning in Riviera |
 |------|--------------------|
 | **Element** | Any persistent object: a model element, datum, view, annotation, type or setting |
 | **Category** | A classification of elements (Walls, Doors, …) that controls visibility, graphics and scheduling |
-| **Family** | A named definition of a parametric object, with one or more types. **System families** (walls, floors and similar) are built into Reviera. **Loadable families** come from IFC library files. **In-place families** are one-off, project-specific definitions. |
+| **Family** | A named definition of a parametric object, with one or more types. **System families** (walls, floors and similar) are built into Riviera. **Loadable families** come from IFC library files. **In-place families** are one-off, project-specific definitions. |
 | **Type** | A named set of parameter values shared by many instances (`IfcTypeObject`) |
 | **Instance** | One placed occurrence of a type |
 | **Host** | An element that another depends on and is cut by, such as a wall hosting a door |
@@ -135,7 +135,7 @@ The full rationale is in `TECH_STACK.md`.
 | **Working copy** | The local copy of a BIMserver project being edited |
 | **Check in / Get latest / Sync** | Upload a revision / download the newest revision / do both, with a merge |
 | **Lua add-in** | A packaged Lua extension with a manifest that declares a GPL-compatible SPDX licence |
-| **MCP** | Model Context Protocol: the interface through which AI agents call Reviera commands |
+| **MCP** | Model Context Protocol: the interface through which AI agents call Riviera commands |
 
 ## 0.5 Requirement Conventions
 

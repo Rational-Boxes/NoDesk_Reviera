@@ -1,11 +1,11 @@
 {
-  "format": "reviera.bath-rules-1",
+  "format": "riviera.bath-rules-1",
   "id": "us_nec",
   "title": "NEC bathroom receptacles (NFPA 70, 2023)",
   "jurisdiction": "US",
   "edition": "NEC 2023 406.9(C) and 210.52(D), from secondary summaries",
   "layer": "minimum",
-  "notes": "NFPA 70 is behind a login; the values are from trade summaries (S0893, S0894). The 406.9(C) zone stops at walls, doors and fixed barriers, which Reviera does not yet cut it by; its exceptions (680.73, the far-wall receptacle in small bathrooms, ceiling receptacles for luminaires, an electronic toilet seat's receptacle) are not modelled. GFCI protection (210.8) and the 20 A circuit (210.11(C)(3)) are circuit data Reviera does not check here. The luminaire and switch rules (410.10(D), 404.4(C)) were not verified and are left out.",
+  "notes": "NFPA 70 is behind a login; the values are from trade summaries (S0893, S0894). The 406.9(C) zone stops at walls, doors and fixed barriers, which Riviera does not yet cut it by; its exceptions (680.73, the far-wall receptacle in small bathrooms, ceiling receptacles for luminaires, an electronic toilet seat's receptacle) are not modelled. GFCI protection (210.8) and the 20 A circuit (210.11(C)(3)) are circuit data Riviera does not check here. The luminaire and switch rules (410.10(D), 404.4(C)) were not verified and are left out.",
   "receptacles": {
     "id": "NEC 2023 406.9(C) and 210.52(D)",
     "description": "No receptacle inside a tub or shower or within 3 ft (900 mm) of its outside edge, up to 8 ft (2.5 m) above its rim or threshold; in a dwelling, at least one receptacle within 3 ft (900 mm) of each basin's outside edge",

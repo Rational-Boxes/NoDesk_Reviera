@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2026 Reviera contributors
+// Copyright (C) 2026 Riviera contributors
 
 //! An in-memory BCF API 3.0 server on localhost, for tests (feature `fake`). It answers as
 //! OpenConstructionERP's does: the API under `/api/v1/bcf/3.0/`, signing in by e-mail and

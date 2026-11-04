@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 Reviera contributors
+# Copyright (C) 2026 Riviera contributors
 <#
 .SYNOPSIS
-    Builds BIM Reviera for Windows (x64): a portable ZIP and an Inno Setup installer.
+    Builds BIM Riviera for Windows (x64): a portable ZIP and an Inno Setup installer.
 
 .DESCRIPTION
     Run it on Windows 10/11 from the repository (any PowerShell; the Visual Studio build
@@ -154,13 +154,13 @@ if (-not ($SkipIfcOpenShell -and (Test-Path (Join-Path $IfcosPrefix 'include\ifc
 }
 $IfcosLib = Join-Path $IfcosPrefix 'lib'
 
-# reviera-ifc's build script was written for GCC/Clang. Until it learns MSVC:
+# riviera-ifc's build script was written for GCC/Clang. Until it learns MSVC:
 # - it picks the library folder holding libIfcParse.a: a marker file stands in for it (rustc then
 #   links IfcParse.lib from the same folder);
 # - it links boost_<name> by plain name: copies of vcpkg's versioned Boost libraries are put
 #   there under those names (an empty boost_system.lib when Boost no longer builds one);
 # - it passes `-isystem <dir>`, which cl.exe ignores: the same folders go on INCLUDE instead.
-Step 'Preparing the link folder for reviera-ifc'
+Step 'Preparing the link folder for riviera-ifc'
 New-Item -ItemType File -Force (Join-Path $IfcosLib 'libIfcParse.a') | Out-Null
 foreach ($name in $BoostLibs) {
     $target = Join-Path $IfcosLib "boost_$name.lib"
@@ -171,7 +171,7 @@ foreach ($name in $BoostLibs) {
     } elseif ($name -eq 'system') {
         $empty = Join-Path $Work 'empty.c'
         New-Item -ItemType Directory -Force $Work | Out-Null
-        Set-Content -Path $empty -Value 'static int reviera_boost_system_stub;'
+        Set-Content -Path $empty -Value 'static int riviera_boost_system_stub;'
         Push-Location $Work
         try {
             Invoke-Native cl.exe @('/nologo', '/c', $empty, '/Foempty.obj')
@@ -186,7 +186,7 @@ foreach ($name in $BoostLibs) {
 Step 'cargo build --release'
 $env:OCC_INCLUDE_DIR = $OccInclude
 $env:OCC_LIBRARY_DIR = $OccLib
-$env:REVIERA_IFCOS_PREFIX = $IfcosPrefix
+$env:RIVIERA_IFCOS_PREFIX = $IfcosPrefix
 $env:LIBCLANG_PATH = $llvmBin
 $env:LUA_LIB = Join-Path $Dyn 'lib'
 $env:LUA_LIB_NAME = 'lua51'
@@ -201,9 +201,9 @@ $env:INCLUDE = @(
 ) -join ';'
 Push-Location $Root
 try {
-    Invoke-Native cargo @('build', '--release', '--locked', '-p', 'reviera', '-p', 'reviera-compute', '--bins')
+    Invoke-Native cargo @('build', '--release', '--locked', '-p', 'riviera', '-p', 'riviera-compute', '--bins')
 } finally { Pop-Location }
-$Exe = Join-Path $Root 'target\release\reviera.exe'
+$Exe = Join-Path $Root 'target\release\riviera.exe'
 
 # ------------------------------------------------------------------ 4. Stage
 Step "Staging $Stage"
@@ -211,12 +211,12 @@ if (Test-Path $Stage) { Remove-Item -Recurse -Force $Stage }
 New-Item -ItemType Directory -Force $Stage | Out-Null
 Copy-Item $Exe $Stage
 # The window without a console window: what the shortcuts and the file association start.
-Copy-Item (Join-Path $Root 'target\release\reviera-gui.exe') $Stage
-# The local compute host and the built-in runner, beside reviera.exe (DM-RPC-004).
-Copy-Item (Join-Path $Root 'target\release\reviera-compute-host.exe') $Stage
-Copy-Item (Join-Path $Root 'target\release\reviera-analysis-builtin.exe') $Stage
+Copy-Item (Join-Path $Root 'target\release\riviera-gui.exe') $Stage
+# The local compute host and the built-in runner, beside riviera.exe (DM-RPC-004).
+Copy-Item (Join-Path $Root 'target\release\riviera-compute-host.exe') $Stage
+Copy-Item (Join-Path $Root 'target\release\riviera-analysis-builtin.exe') $Stage
 
-# The DLLs reviera.exe needs from vcpkg, followed recursively (dumpbin /dependents).
+# The DLLs riviera.exe needs from vcpkg, followed recursively (dumpbin /dependents).
 $searchDirs = @((Join-Path $Dyn 'bin'), (Join-Path $BoostDir 'bin'))
 $seen = @{}
 $queue = New-Object System.Collections.Generic.Queue[string]
@@ -247,7 +247,7 @@ $crt = Get-ChildItem (Join-Path $env:VCToolsRedistDir 'x64') -Directory -Filter 
     Select-Object -First 1
 if ($crt) { Copy-Item (Join-Path $crt.FullName '*.dll') $Stage }
 
-# Samples beside the exe (crates/reviera-ui/src/help.rs: <exe dir>\samples).
+# Samples beside the exe (crates/riviera-ui/src/help.rs: <exe dir>\samples).
 $samples = Join-Path $Stage 'samples'
 New-Item -ItemType Directory -Force $samples | Out-Null
 $sampleSrc = Join-Path $Root 'test-data\samples'
@@ -255,18 +255,18 @@ Copy-Item (Join-Path $sampleSrc 'samples.json') $samples
 foreach ($pattern in @('*.ifc', '*.lua', '*.md')) { Copy-Item (Join-Path $sampleSrc $pattern) $samples }
 # Samples' resources (their weather files), beside them.
 Get-ChildItem -Directory (Join-Path $sampleSrc '*.resources') | ForEach-Object { Copy-Item -Recurse -Force $_.FullName $samples }
-# The sample Component Library beside the samples (crates/reviera-ui/src/components.rs).
+# The sample Component Library beside the samples (crates/riviera-ui/src/components.rs).
 Copy-Item -Recurse -Force (Join-Path $Root 'test-data\library') (Join-Path $Stage 'library')
 Copy-Item (Join-Path $Root 'LICENSE') (Join-Path $Stage 'COPYING.txt')
 Copy-Item (Join-Path $Root 'packaging\THIRD-PARTY-NOTICES.txt') $Stage
-Copy-Item (Join-Path $Root 'packaging\icons\reviera.ico') $Stage
+Copy-Item (Join-Path $Root 'packaging\icons\riviera.ico') $Stage
 
 # ------------------------------------------------------------------ 5. Portable ZIP
 New-Item -ItemType Directory -Force $Dist | Out-Null
-$zip = Join-Path $Dist "BIM-Reviera-$Version-windows-x64-portable.zip"
+$zip = Join-Path $Dist "BIM-Riviera-$Version-windows-x64-portable.zip"
 Step "Portable ZIP $zip"
 if (Test-Path $zip) { Remove-Item $zip }
-$zipRoot = Join-Path $Work "BIM-Reviera-$Version"
+$zipRoot = Join-Path $Work "BIM-Riviera-$Version"
 if (Test-Path $zipRoot) { Remove-Item -Recurse -Force $zipRoot }
 Copy-Item $Stage $zipRoot -Recurse
 Compress-Archive -Path $zipRoot -DestinationPath $zip
@@ -292,9 +292,9 @@ if (-not $NoInstaller) {
         "/DAppVersionNumeric=$numeric",
         "/DStageDir=$Stage",
         "/DOutputDir=$Dist",
-        (Join-Path $Here 'reviera.iss')
+        (Join-Path $Here 'riviera.iss')
     )
 }
 
 Step 'Done'
-Get-ChildItem $Dist -Filter "BIM-Reviera-$Version-windows-*" | Format-Table Name, Length
+Get-ChildItem $Dist -Filter "BIM-Riviera-$Version-windows-*" | Format-Table Name, Length

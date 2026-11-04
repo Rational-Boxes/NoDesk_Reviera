@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2026 Reviera contributors
+// Copyright (C) 2026 Riviera contributors
 
 //! Connecting and serving: a Unix domain socket on one machine where the platform has them
 //! (owner-only permissions, no network port), loopback TCP otherwise; a bearer token on every

@@ -1,6 +1,6 @@
 # IFC validation models
 
-Third-party sample models used by `crates/reviera-ifc/tests` for lossless round-trip and
+Third-party sample models used by `crates/riviera-ifc/tests` for lossless round-trip and
 tessellation checks. They are not covered by the project licence.
 
 | File | Model | Schema | SHA-256 |
@@ -11,7 +11,7 @@ tessellation checks. They are not covered by the project licence.
 **Provenance.** Freely distributed sample models from the Karlsruhe Institute of Technology (KIT,
 Institute for Automation and Applied Informatics) FZK model collection, exported from ARCHICAD 20
 (file headers dated 2016-12-21 and 2017-01-11). Added at the project owner's direction, 2026-10-12.
-They are test inputs only: no Reviera code or specification text is derived from them.
+They are test inputs only: no Riviera code or specification text is derived from them.
 
 To validate against other local files without adding them to the repository, set
-`REVIERA_IFC_SAMPLES` to a directory of `.ifc` files.
+`RIVIERA_IFC_SAMPLES` to a directory of `.ifc` files.

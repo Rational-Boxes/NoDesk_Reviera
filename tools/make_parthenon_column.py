@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 Reviera contributors
+# Copyright (C) 2026 Riviera contributors
 """Builds the sample library's Parthenon-style Doric column (an OBJ with its MTL).
 
 The shaft is a public-domain (CC0) Doric shaft from Wikimedia Commons, "Antike griechische Säule
@@ -84,7 +84,7 @@ def main():
     abacus = [[c[q[0]], c[q[1]], c[q[2]]] for q in quads] + [[c[q[0]], c[q[2]], c[q[3]]] for q in quads]
 
     with open(f"{out}/parthenon_column.obj", "w") as f:
-        f.write("# Parthenon-style Doric column for Reviera's sample library.\n")
+        f.write("# Parthenon-style Doric column for Riviera's sample library.\n")
         f.write("# Shaft: CC0, Wikimedia Commons, 'Antike griechische Säule 20220605.stl' by PantheraLeo1359531,\n")
         f.write("# reduced and scaled. Capital modelled by tools/make_parthenon_column.py. Metres, Z up.\n")
         f.write("mtllib parthenon_column.mtl\n")

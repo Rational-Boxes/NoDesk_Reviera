@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 Reviera contributors
+# Copyright (C) 2026 Riviera contributors
 #
-# Builds the IfcOpenShell C++ libraries (IfcParse, IfcGeom with OpenCASCADE) that reviera-ifc
+# Builds the IfcOpenShell C++ libraries (IfcParse, IfcGeom with OpenCASCADE) that riviera-ifc
 # links against. Sources, build tree and install prefix live under third_party/ (not committed).
 #
 #   tools/build-ifcopenshell.sh            # configure, build, install

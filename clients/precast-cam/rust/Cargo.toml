@@ -1,5 +1,5 @@
 [package]
-name = "reviera-precast-cam"
+name = "riviera-precast-cam"
 description = "A neutral precast piece model for CAM (JSON and CSV), and CAM filename rules"
 version.workspace = true
 edition.workspace = true

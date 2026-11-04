@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2026 Reviera contributors
+// Copyright (C) 2026 Riviera contributors
 
 //! The subscription client against a mock service (DM-RPC-011): Basic credentials only to the
 //! token endpoint, bearer tokens elsewhere, renewal, the error reasons, and certificate checks
@@ -10,7 +10,7 @@ use std::net::TcpListener;
 use std::sync::{Arc, Mutex};
 
 use base64::Engine;
-use reviera_compute_proto::subscription::{self as sub, Client, Credentials, Endpoint};
+use riviera_compute_proto::subscription::{self as sub, Client, Credentials, Endpoint};
 use serde_json::json;
 
 #[derive(Default)]
@@ -201,7 +201,7 @@ fn certificates() -> (String, Vec<u8>, Arc<rustls::ServerConfig>) {
     let ca_key = rcgen::KeyPair::generate().unwrap();
     let mut ca = rcgen::CertificateParams::new(Vec::<String>::new()).unwrap();
     ca.is_ca = rcgen::IsCa::Ca(rcgen::BasicConstraints::Unconstrained);
-    ca.distinguished_name.push(rcgen::DnType::CommonName, "Reviera Test CA");
+    ca.distinguished_name.push(rcgen::DnType::CommonName, "Riviera Test CA");
     let ca_cert = ca.self_signed(&ca_key).unwrap();
     let issuer = rcgen::Issuer::new(ca, ca_key);
     let leaf_key = rcgen::KeyPair::generate().unwrap();

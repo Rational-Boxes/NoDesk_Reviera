@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2026 Reviera contributors
+// Copyright (C) 2026 Riviera contributors
 
 //! A client for FileEngine's REST door (Proxima File Vault's `http_bridge`), spec Ch 6 and
 //! `design_documents/FILEENGINE_INTEGRATION.md`.
@@ -19,7 +19,7 @@
 //!   writing).
 //! - **Metadata** (string key/values on any node) and **permission** checks.
 //!
-//! This crate is MIT licensed (Reviera's interface components are), and talks to FileEngine
+//! This crate is MIT licensed (Riviera's interface components are), and talks to FileEngine
 //! (AGPL-3.0) over the network only.
 
 use std::collections::BTreeMap;
@@ -225,7 +225,7 @@ fn http_client(timeout: Duration) -> Result<reqwest::blocking::Client> {
     reqwest::blocking::Client::builder()
         .tls_backend_preconfigured(tls)
         .timeout(timeout)
-        .user_agent(concat!("BIM-Reviera/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("BIM-Riviera/", env!("CARGO_PKG_VERSION")))
         .build()
         .map_err(|e| Error::new(ErrorKind::Transport, format!("the connection could not be set up: {e}")))
 }
@@ -426,7 +426,7 @@ impl Client {
         Ok(self.list(dir, false)?.into_iter().find(|n| n.name == name && !n.deleted))
     }
 
-    /// The node at `path` (`Engineering/Reviera test/model.ifc`), from the top folder.
+    /// The node at `path` (`Engineering/Riviera test/model.ifc`), from the top folder.
     pub fn resolve(&self, path: &str) -> Result<Node> {
         let mut node = Node { uid: ROOT.to_owned(), kind: Kind::Directory, ..Node::default() };
         for part in path.split('/').filter(|p| !p.is_empty()) {

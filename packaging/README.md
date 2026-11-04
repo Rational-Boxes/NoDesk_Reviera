@@ -1,43 +1,43 @@
-# Packaging BIM Reviera
+# Packaging BIM Riviera
 
 Builders for the three desktop packages of TECH_STACK §5.4. Each one is a script that runs on its
 own platform; there is no hosted CI. The version in file names defaults to the first
 pre-release, `0.1.0-pre.9` (the workspace `Cargo.toml` says `0.1.0`), and every script takes
-another one (`REVIERA_VERSION=…` or `-Version …`).
+another one (`RIVIERA_VERSION=…` or `-Version …`).
 
 | Package | Builder | Output in `dist/` | Status |
 |---|---|---|---|
-| Linux Flatpak | `packaging/flatpak/build.sh` | `BIM-Reviera-<ver>-x86_64.flatpak` | Built and tested on Fedora 43 |
-| macOS disk image | `packaging/macos/build-dmg.sh` | `BIM-Reviera-<ver>-macos-<arch>.dmg` | Written, **not yet run on a Mac** |
-| Windows installer and ZIP | `packaging/windows/cross/build-cross.sh` (on Linux), `packaging/windows/build-installer.ps1` (on Windows) | `BIM-Reviera-<ver>-windows-x64-setup.exe`, `…-portable.zip` | Cross-built on Fedora 43; tested on Windows 11 and under Wine. The MSVC script is **not yet run** |
+| Linux Flatpak | `packaging/flatpak/build.sh` | `BIM-Riviera-<ver>-x86_64.flatpak` | Built and tested on Fedora 43 |
+| macOS disk image | `packaging/macos/build-dmg.sh` | `BIM-Riviera-<ver>-macos-<arch>.dmg` | Written, **not yet run on a Mac** |
+| Windows installer and ZIP | `packaging/windows/cross/build-cross.sh` (on Linux), `packaging/windows/build-installer.ps1` (on Windows) | `BIM-Riviera-<ver>-windows-x64-setup.exe`, `…-portable.zip` | Cross-built on Fedora 43; tested on Windows 11 and under Wine. The MSVC script is **not yet run** |
 
 Every package carries the sample models of the Help page (`test-data/samples`), the GPL
 (`COPYING`) and [`THIRD-PARTY-NOTICES.txt`](THIRD-PARTY-NOTICES.txt). The application icon is
-[`icons/reviera.svg`](icons/reviera.svg), a copy of the project logo
-(`design_documents/logo/reviera-logo.svg`); `reviera-1024.png` (macOS) and `reviera.ico`
+[`icons/riviera.svg`](icons/riviera.svg), a copy of the project logo
+(`design_documents/logo/riviera-logo.svg`); `riviera-1024.png` (macOS) and `riviera.ico`
 (Windows) are rendered from it with ImageMagick and librsvg (`magick -background none -density
-192 reviera.svg -resize 1024x1024 -depth 8 reviera-1024.png`; `magick -background none -density
-96 reviera.svg -define icon:auto-resize=256,128,64,48,32,24,16 reviera.ico`), and the Flatpak
+192 riviera.svg -resize 1024x1024 -depth 8 riviera-1024.png`; `magick -background none -density
+96 riviera.svg -define icon:auto-resize=256,128,64,48,32,24,16 riviera.ico`), and the Flatpak
 renders its PNG sizes at build time.
 
-`reviera` without arguments is the command-line tool, so every launcher (desktop entry, Start
-menu, the macOS bundle) runs `reviera gui`.
+`riviera` without arguments is the command-line tool, so every launcher (desktop entry, Start
+menu, the macOS bundle) runs `riviera gui`.
 
-Beside `reviera`, every package installs the local compute host `reviera-compute-host` and the
-built-in runner `reviera-analysis-builtin` (spec Ch 2 §2.17). Reviera starts the host when a job
+Beside `riviera`, every package installs the local compute host `riviera-compute-host` and the
+built-in runner `riviera-analysis-builtin` (spec Ch 2 §2.17). Riviera starts the host when a job
 needs it (for example the project-wide clash test, `compute.submit`), and the host starts the
 runner; both exit again when idle, so neither is resident otherwise. The host keeps its job
-registry in the per-user state directory (Flatpak: `~/.var/app/<id>/.local/state/reviera/compute`;
-Windows: `%LOCALAPPDATA%\Reviera\compute`).
+registry in the per-user state directory (Flatpak: `~/.var/app/<id>/.local/state/riviera/compute`;
+Windows: `%LOCALAPPDATA%\Riviera\compute`).
 
 ## Linux: Flatpak
 
 ```sh
-packaging/flatpak/build.sh              # build, then dist/BIM-Reviera-0.1.0-pre.4-x86_64.flatpak
+packaging/flatpak/build.sh              # build, then dist/BIM-Riviera-0.1.0-pre.4-x86_64.flatpak
 packaging/flatpak/build.sh --install    # ... and install the bundle for this user
-flatpak run io.github.rational_boxes.Reviera gui            # the window
-flatpak run io.github.rational_boxes.Reviera shell m.ifc    # the command shell
-flatpak run io.github.rational_boxes.Reviera --mcp-stdio    # the MCP server
+flatpak run io.github.rational_boxes.Riviera gui            # the window
+flatpak run io.github.rational_boxes.Riviera shell m.ifc    # the command shell
+flatpak run io.github.rational_boxes.Riviera --mcp-stdio    # the MCP server
 ```
 
 Prerequisites: `flatpak`, `flatpak-builder`, `python3` and `curl`. The script installs the GNOME
@@ -47,9 +47,9 @@ release build of the workspace); `--ccache` and flatpak-builder's module cache, 
 `packaging/flatpak/.flatpak-builder`, make later builds much quicker. The state directory,
 `build-dir/`, `repo/` and `dist/` are git-ignored.
 
-The manifest, `io.github.rational_boxes.Reviera.yml`:
+The manifest, `io.github.rational_boxes.Riviera.yml`:
 
-- **App id** `io.github.rational_boxes.Reviera` (GitHub org `Rational-Boxes`, with the hyphen as
+- **App id** `io.github.rational_boxes.Riviera` (GitHub org `Rational-Boxes`, with the hyphen as
   an underscore, as Flathub asks). The same id is the macOS bundle identifier.
 - **Runtime** `org.gnome.Platform//51` (freedesktop-sdk 26.08): it has GTK 3 and WebKitGTK 4.1,
   which wxWidgets' GTK port and its WebView use.
@@ -76,10 +76,10 @@ The manifest, `io.github.rational_boxes.Reviera.yml`:
   home folder (models live anywhere; wxWidgets' GTK file dialogs are not portal-based, so a
   portal-only sandbox would show no files), `org.freedesktop.secrets` for the live-store
   keys and the BIMserver and remote-analysis secrets in the keyring, and the network, for the
-  BIMserver servers and remote analysis services the user adds (Reviera connects to none until
+  BIMserver servers and remote analysis services the user adds (Riviera connects to none until
   one is added). Links in Help
   open the browser through the OpenURI portal.
-- **Desktop integration**: `io.github.rational_boxes.Reviera.desktop` (`reviera gui %f`),
+- **Desktop integration**: `io.github.rational_boxes.Riviera.desktop` (`riviera gui %f`),
   hicolor PNG icons from 16 to 512 px (no scalable SVG: `appstreamcli compose` runs on the
   build host, and Fedora 43's gdk-pixbuf has no SVG loader, so it rejects one),
   AppStream `…metainfo.xml` (validates with `appstreamcli validate --no-net`; the screenshot
@@ -89,30 +89,30 @@ The manifest, `io.github.rational_boxes.Reviera.yml`:
 **Verified on Fedora 43 (2026-10-14)**: the bundle (39 MB) installed with `flatpak install --user
 --bundle`; `flatpak run … shell` loaded a sample and ran `:commands` (217 commands) and
 `level.list`; on an Xvfb display (X11, llvmpipe Vulkan) the window opened, F1 showed Help
-(WebKitGTK) listing the five samples from `/app/share/reviera/samples`, and opening the House
+(WebKitGTK) listing the five samples from `/app/share/riviera/samples`, and opening the House
 sample drew its plan (53 elements). Not tested inside the sandbox: Wayland, a real GPU, the
 keyring, and opening files from the file dialog.
 
-Samples are installed in `/app/share/reviera/samples`, which `samples_dir()` finds as
-`<exe>/../share/reviera/samples`.
+Samples are installed in `/app/share/riviera/samples`, which `samples_dir()` finds as
+`<exe>/../share/riviera/samples`.
 
 ## macOS: .app and .dmg
 
 ```sh
 packaging/macos/build-dmg.sh
 SKIP_BREW=1 SKIP_IFCOS=1 packaging/macos/build-dmg.sh       # later runs
-CODESIGN_IDENTITY="Developer ID Application: … (TEAMID)" NOTARY_PROFILE=reviera packaging/macos/build-dmg.sh
+CODESIGN_IDENTITY="Developer ID Application: … (TEAMID)" NOTARY_PROFILE=riviera packaging/macos/build-dmg.sh
 ```
 
 Prerequisites: Xcode command-line tools, Homebrew and rustup. The script installs `opencascade
 luajit boost eigen nlohmann-json cmake ninja pkgconf dylibbundler` with Homebrew, builds
 IfcOpenShell with `tools/build-ifcopenshell.sh` (portable once it is given OCCT's Homebrew
 paths, the job count and `CMAKE_PREFIX_PATH`), runs `cargo build --release`, and assembles
-`packaging/macos/build/BIM Reviera.app`:
+`packaging/macos/build/BIM Riviera.app`:
 
-- `Contents/MacOS/reviera` and a small launcher, `BIM Reviera`, that runs `reviera gui`;
+- `Contents/MacOS/riviera` and a small launcher, `BIM Riviera`, that runs `riviera gui`;
 - `Contents/Resources/samples` (found by `samples_dir()` as `<exe>/../Resources/samples`),
-  `Reviera.icns` (made with `sips` and `iconutil` from `icons/reviera-1024.png`), `COPYING` and
+  `Riviera.icns` (made with `sips` and `iconutil` from `icons/riviera-1024.png`), `COPYING` and
   the notices;
 - `Info.plist` with the bundle id, version, and `.ifc` as a document type (an imported UTI,
   `org.buildingsmart.ifc`);
@@ -129,11 +129,11 @@ To check on the first run on a Mac:
 - The build is for the host architecture only; the universal binary of TECH_STACK §5.4 needs
   both Homebrew prefixes and `lipo`. The minimum macOS is that of the Homebrew bottles (the
   running macOS), not 10.12.
-- Boost 1.89 and later no longer build `libboost_system`, which `crates/reviera-ifc/build.rs`
+- Boost 1.89 and later no longer build `libboost_system`, which `crates/riviera-ifc/build.rs`
   links; the script then links an empty stand-in. If IfcOpenShell's CMake rejects that Boost,
   install `boost@1.85` and put it first on `CMAKE_PREFIX_PATH`.
 - Finder opens documents through an Apple Event, not the command line: double-clicking an
-  `.ifc` file starts Reviera but does not open the file until the app handles
+  `.ifc` file starts Riviera but does not open the file until the app handles
   `wxApp::MacOpenFiles`.
 
 ## Windows: installer and portable ZIP
@@ -155,21 +155,21 @@ Inno Setup under Wine in its own prefix. What it needed:
   (inside `std::async` in IfcOpenShell's geometry iterator) called a null pointer.
 - `patches/ifcopenshell-mingw-strtod.patch`: IfcOpenShell's MinGW real-number parser rejected a
   number that ends its token (a storey's elevation), so files did not open.
-- `apps/reviera/build.rs` embeds the application manifest (Common Controls 6, per-monitor DPI,
+- `apps/riviera/build.rs` embeds the application manifest (Common Controls 6, per-monitor DPI,
   long paths) and the icon. Without it Windows 11 loads comctl32 5.x, which lacks
   `GetWindowSubclass`, and the program does not start; Wine hides this.
-- `reviera.exe` is a console program (it is also the command-line tool and the MCP server), so
+- `riviera.exe` is a console program (it is also the command-line tool and the MCP server), so
   started as the window it would bring a console window whose closing ends the program. The
-  shortcuts and the `.ifc` association start `reviera-gui.exe` instead, a small Windows-subsystem
-  launcher (`apps/reviera/src/bin/reviera-gui.rs`) that runs `reviera.exe gui` with no console
-  window. `reviera.exe gui` (or a double click on it) also lets go of a console that is its
+  shortcuts and the `.ifc` association start `riviera-gui.exe` instead, a small Windows-subsystem
+  launcher (`apps/riviera/src/bin/riviera-gui.rs`) that runs `riviera.exe gui` with no console
+  window. `riviera.exe gui` (or a double click on it) also lets go of a console that is its
   alone; a terminal it was started from is left alone.
 - Under Wine there is no WebView2: Help falls back to wxWidgets' HTML window, and wgpu draws with
   OpenGL.
 
 To test under Wine: `WINEPREFIX=$PWD/packaging/windows/cross/build/wine wine
-dist/BIM-Reviera-0.1.0-pre.4-windows-x64-setup.exe`. Wine maps the prefix's Documents folder
-to your real home folder, so keep test files elsewhere (`C:\reviera-test`).
+dist/BIM-Riviera-0.1.0-pre.4-windows-x64-setup.exe`. Wine maps the prefix's Documents folder
+to your real home folder, so keep test files elsewhere (`C:\riviera-test`).
 
 ### Built on Windows (MSVC)
 
@@ -186,7 +186,7 @@ vcpkg (`-VcpkgRoot` or `VCPKG_ROOT`) and Inno Setup 7 (or 6.3+).
 Steps: `vcpkg install` OpenCASCADE, LuaJIT, Eigen and nlohmann-json (`x64-windows`, DLLs) and
 Boost (`x64-windows-static-md`, the static libraries IfcOpenShell's CMake asks for on Windows);
 IfcOpenShell 0.8.5 with the options of `tools/build-ifcopenshell.sh`; `cargo build --release`;
-then a stage folder with `reviera.exe` and `reviera-gui.exe`, the DLLs it needs (followed recursively with `dumpbin
+then a stage folder with `riviera.exe` and `riviera-gui.exe`, the DLLs it needs (followed recursively with `dumpbin
 /dependents`), the MSVC runtime DLLs, `samples\` (found as `<exe dir>\samples`), `COPYING.txt`,
 the notices and the icon. From it come the portable ZIP and the installer.
 
@@ -194,7 +194,7 @@ the notices and the icon. From it come the portable ZIP and the installer.
 same installer (`PrivilegesRequiredOverridesAllowed=dialog`), a licence page, Start-menu and
 optional desktop shortcuts, an optional `.ifc` association and an uninstaller, with no MSI
 authoring or .NET tool chain. An MSI (WiX) can follow if managed deployment asks for it.
-`reviera.iss` was compiled with Inno Setup 7.1 under Wine on Linux, and the resulting installer
+`riviera.iss` was compiled with Inno Setup 7.1 under Wine on Linux, and the resulting installer
 (with a dummy stage) installed, registered the association and uninstalled cleanly there.
 
 **WebView2**: Help uses wxWidgets' Edge backend. MSVC builds link the WebView2 *static* loader
@@ -204,9 +204,9 @@ authoring or .NET tool chain. An MSI (WiX) can follow if managed deployment asks
 
 To check on the first run on Windows (the build scripts of the crates were written on Linux):
 
-- `crates/reviera-ifc/build.rs` and `crates/reviera-geom/build.rs` pass GCC-style
+- `crates/riviera-ifc/build.rs` and `crates/riviera-geom/build.rs` pass GCC-style
   `-isystem <dir>`, which `cl.exe` ignores; the script puts the same folders on `INCLUDE`.
-  reviera-ifc looks for `libIfcParse.a` and links Boost as `boost_<name>`; the script adds a
+  riviera-ifc looks for `libIfcParse.a` and links Boost as `boost_<name>`; the script adds a
   marker file and copies of vcpkg's Boost libraries under those names. A cleaner fix is in the
   build scripts: `.include()` and the MSVC library names when the target is `msvc`.
 
@@ -237,5 +237,5 @@ The current one is `0.1.0-pre.9` (2026-11-03; `0.1.0-pre.8` was 2026-11-02, `0.1
 `0.1.0-pre.N`; the AppStream release is `0.1.0~pre.N` (so that it sorts before `0.1.0`), with a
 new `<release>` entry at the top of the metainfo, and the macOS and Windows version fields, which
 take numbers only, say `0.1.0`. The version is the default `VERSION` in the Flatpak, Windows and
-macOS build scripts and in `reviera.iss`. The GitHub release carries the Flatpak, the Windows
+macOS build scripts and in `riviera.iss`. The GitHub release carries the Flatpak, the Windows
 installer and portable ZIP, and `SHA256SUMS` of the three.

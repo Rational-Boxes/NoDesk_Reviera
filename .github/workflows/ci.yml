@@ -88,7 +88,7 @@ jobs:
           cache-all-crates: true
           cache-on-failure: true
 
-      - name: Build "BIM Reviera.app" and the DMG
+      - name: Build "BIM Riviera.app" and the DMG
         env:
           # Reuse the cached IfcOpenShell when present; the script rebuilds it otherwise.
           SKIP_IFCOS: ${{ steps.ifcos.outputs.cache-hit == 'true' && '1' || '' }}
@@ -97,7 +97,7 @@ jobs:
       - name: Upload the DMG
         uses: actions/upload-artifact@v4
         with:
-          name: reviera-macos-dmg
+          name: riviera-macos-dmg
           path: dist/*.dmg
           if-no-files-found: error
 

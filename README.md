@@ -1,22 +1,22 @@
-# BIM Reviera
+# BIM Riviera
 
 **Open-source BIM authoring on native IFC: build anywhere, even from the beach.**
 
 ![A laptop showing a building model on a beach table, next to a "Beach Life" mug](design_documents/beach_life.jpg)
 
-Reviera is a parametric Building Information Modeling (BIM) application for architecture,
+Riviera is a parametric Building Information Modeling (BIM) application for architecture,
 structure and MEP. IFC is its native file format, so there is no proprietary container. Every
 operation can be driven by Lua scripts and by AI agents through the Model Context Protocol (MCP).
 
-**Website: [bimreviera.com](https://bimreviera.com/)**: downloads, features and getting started.
-Pre-release packages are also on the [GitHub releases page](https://github.com/Rational-Boxes/NoDesk_Reviera/releases).
+**Website: [bimriviera.com](https://bimriviera.com/)**: downloads, features and getting started.
+Pre-release packages are also on the [GitHub releases page](https://github.com/Rational-Boxes/BIM_Riviera/releases).
 
-> **Independence.** BIM Reviera is an independent, original application. It is in no way a copy or clone of
+> **Independence.** BIM Riviera is an independent, original application. It is in no way a copy or clone of
 > any existing product, and it does not set out to read or write any existing product's
 > closed, proprietary formats (such as RVT and RFA); IFC is its native format. An existing
 > application was researched, from public sources only, to establish the workflows and
 > user-interface conventions that the industry's users already know, so they can work in
-> Reviera without relearning their trade. Beyond that research, Reviera implements its own
+> Riviera without relearning their trade. Beyond that research, Riviera implements its own
 > features and enhancements: its architecture, native IFC storage, scripting and AI
 > integration, remote computation and analysis, and many of its modelling tools are its
 > own design. Interchange formats used across the industry, such as DWG and DXF, are
@@ -51,7 +51,7 @@ Pre-release packages are also on the [GitHub releases page](https://github.com/R
 
 ## Screenshots
 
-The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Reviera, October 2026.
+The KIT FZK *AC20-Institute-Var-2* sample model (`test-data/ifc/`) open in Riviera, October 2026.
 
 ![A door selected in the 3D view, with the contextual Modify | Doors tab](design_documents/application_screenshots/3D-view.png)
 
@@ -90,14 +90,14 @@ ribbon's tools, the command shell, Lua and MCP alike.
 
 - **Native IFC** through IfcOpenShell and OpenCASCADE: open, edit, save and tessellate IFC2X3,
   IFC4 and IFC4X3_ADD2 models, with lossless round trips of files from other tools. Elements
-  Reviera does not model itself (furniture, imported stairs, equipment) are kept, drawn and
+  Riviera does not model itself (furniture, imported stairs, equipment) are kept, drawn and
   selectable.
-- **Reviera elements are standard IFC.** Walls, slabs, roofs, stairs, railings, doors, windows,
+- **Riviera elements are standard IFC.** Walls, slabs, roofs, stairs, railings, doors, windows,
   spaces, storeys and grids are written as ordinary typed IFC entities with their relationships
   (containment, voids and fills, path connections, interferences), so other tools see them.
-  Reviera's own data (recipes, sketches, views, settings) is embedded as standard `Reviera_*`
-  property sets (RXD), and Reviera reopens its elements as editable.
-- **Colours other viewers show.** Saving gives geometry that has no style the colour Reviera
+  Riviera's own data (recipes, sketches, views, settings) is embedded as standard `Riviera_*`
+  property sets (RXD), and Riviera reopens its elements as editable.
+- **Colours other viewers show.** Saving gives geometry that has no style the colour Riviera
   draws its class in (walls off-white, floors grey, roofs terracotta, doors wood, glass
   translucent, pipes blue, …), as shared `IfcSurfaceStyle`s, so xeokit and other viewers no
   longer show a model white on white. Styles from other tools or materials are kept as they are.
@@ -112,7 +112,7 @@ ribbon's tools, the command shell, Lua and MCP alike.
 - **Units**: SI storage with project display units (metric and imperial, feet-and-inches);
   every length field accepts typed units (`4.5 m`, `12' 6"`) (`units.get`, `units.set_preset`,
   `units.set_format`, `units.set_number_format`, `units.format`, `units.parse`).
-- **Help** (Help › Reviera Help, F1): a help tab beside the views with getting started,
+- **Help** (Help › Riviera Help, F1): a help tab beside the views with getting started,
   navigation and selection basics, pages for the Architecture and Structure tools (framing,
   foundations, settings and standards, the analytical model and its checks, loads, analysis and
   results), MEP and energy, daylight and carbon, and the sample models grouped by the part of the
@@ -139,16 +139,16 @@ ribbon's tools, the command shell, Lua and MCP alike.
 - **One command registry**: 207 commands in 46 domains today, each with a JSON Schema, a
   summary and description, a permission level (`read_only`, `model_edit`, `full_scripting`)
   and attribution. `registry.list` and `registry.describe` list and explain them; the command
-  shell (`reviera shell`) runs them with JSON arguments.
+  shell (`riviera shell`) runs them with JSON arguments.
 - **Lua scripting** (LuaJIT): `script.run` runs a script or a `.lua` file against the open model.
-  `reviera.<domain>.<verb>{...}` (or `reviera.call`; longer names nest, as
-  `reviera.param.project.add{...}`) runs any command, `reviera.ui.form{...}` asks
+  `riviera.<domain>.<verb>{...}` (or `riviera.call`; longer names nest, as
+  `riviera.param.project.add{...}`) runs any command, `riviera.ui.form{...}` asks
   the user for input (length, number, integer, checkbox, choice and text fields, with defaults,
   ranges and help, validated and asked again until valid), and `print` reports. A run is one undo
   step and rolls back entirely if it fails.
 - **Plugins**: a folder whose `plugin.lua` returns `{title, description, run}`, or a single
   `.lua` file with a `-- title:` header. They are found in the built-in set, the user's library
-  (`~/.config/reviera/plugins`) and `REVIERA_PLUGINS` folders (`plugin.list`, `plugin.run`,
+  (`~/.config/riviera/plugins`) and `RIVIERA_PLUGINS` folders (`plugin.list`, `plugin.run`,
   `script.import`, `script.remove`). The built-in **Castle Turret** plugin builds a round tower
   (walls, a cone, pointed, onion or hemispherical dome or battlements, and arrow slits) from a
   form; it is the scripting capabilities test.
@@ -156,7 +156,7 @@ ribbon's tools, the command shell, Lua and MCP alike.
   script or a plugin folder), Manage Library… (each known script with its description, to run,
   remove or import) and every known script. A script's form shows as a dialog in the model's
   units. Headless runs (shell, MCP, tests) answer forms from `answers` and the defaults.
-- **MCP server** for AI agents (`reviera --mcp-stdio`): every command is a tool, grouped into
+- **MCP server** for AI agents (`riviera --mcp-stdio`): every command is a tool, grouped into
   toolsets (core, modeling, documentation, families, materials, project_setup, io,
   collaboration, analysis, scripting, admin) that agents enable as needed, with discovery
   tools, `query_elements` and `get_element`, undo/redo/history, undo groups, preview and
@@ -542,7 +542,7 @@ pieces of a building) placed into a model as many times as needed. They come fro
 Libraries**: plain folders of ordinary 3D files, readable by any other tool.
 
 - **Component Libraries**: a library is a folder of OBJ (with its MTL and textures), STL, PLY,
-  glTF/GLB and IFC files with one manifest, `reviera-library.json`, in its root. The manifest
+  glTF/GLB and IFC files with one manifest, `riviera-library.json`, in its root. The manifest
   holds what the files cannot: names, categories, units, up axes, tags, product data and settings
   per folder (inherited by sub-folders). The files are never rewritten, so a library can live in
   git or a shared folder (`library.create`, `library.open`, `library.list`,
@@ -550,7 +550,7 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
   `library.restore_items`; DM-LIB-004).
 - **The Component Library panel** (docked right; Window › Component Library, CL): the libraries
   you have open (remembered; the sample library at first), their folders with item counts, and
-  each folder's components as thumbnails rendered by Reviera. Open… turns any folder into a library
+  each folder's components as thumbnails rendered by Riviera. Open… turns any folder into a library
   by adding only the manifest; New… makes one; Import… copies 3D files in, with their units and
   up axis set once and the size previewed.
 - **Place Component** (Architecture › Component, CM): click a component in the panel to pick it
@@ -560,7 +560,7 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
   in the library's manifest (`component.place`; DM-LIB-002).
 - **Import Object** (Architecture › Component): one 3D file straight into the model as a
   component type, with units, up axis, insertion point, category and name, its size previewed
-  (`mesh_object.inspect`, `mesh_object.import`, `mesh_object.reload`; DM-IMP-015). Reviera reads
+  (`mesh_object.inspect`, `mesh_object.import`, `mesh_object.reload`; DM-IMP-015). Riviera reads
   OBJ, STL, PLY, glTF and GLB itself.
 - **Create Component** (middle-click quick menu, Modify tab): any selection becomes a component,
   an IFC file of that piece of the model saved into the library folder shown. It brings what the
@@ -712,7 +712,7 @@ tools and the datums.
   `us_a17`, `practice_us`; `en81`, `en81_70`, `england_adm`, `practice_en`; MIT schema in
   `schemas/vt/`): the smallest car that meets the accessibility packs and, from four storeys
   under the IBC, takes the stretcher; then its hoistway, pit and overhead. It makes the car (an
-  `IfcTransportElement` ELEVATOR with `Reviera_Elevator` and IFC's transport property sets), a
+  `IfcTransportElement` ELEVATOR with `Riviera_Elevator` and IFC's transport property sets), a
   shaft cutting every floor from the pit to the overhead, hoistway walls and a sliding entrance
   at each level. Hoistways and landings are virtual volumes checked by Check Clearances; Check
   Elevators reports car area against load (A17.1, EN 81-20, advisory), accessible car sizes and
@@ -782,7 +782,7 @@ tools and the datums.
   from 325 standard sections in 14 catalogues: AISC W, C, L, WT, HSS and pipe; Euronorm IPE, HEA
   and HEB; UK UB and UC; North American sawn lumber (PS 20) and EN 336 timber, in the region's
   timber grade. Catalogues carry nominal dimensions only, with sources
-  (`crates/reviera-core/data/sections`). A **materials library** of 35 steel grades, concrete
+  (`crates/riviera-core/data/sections`). A **materials library** of 35 steel grades, concrete
   classes and timber grades gives their strengths and moduli (`structural.materials`).
 - **Beams**: Beam (`BM`) draws beams in plans, a click at each end, chained; **On Grids** puts one
   in every bay between columns along the selected grid lines. Their tops are at the level (each
@@ -931,7 +931,7 @@ tools and the datums.
   (`precast.place_mounting_parts`, `mounting_part.place`; STR-PRE-005); shop-drawing sheets per
   piece or per group of identical pieces, drawn live from the model: dimensioned front view and
   section, centre of gravity and bill of materials (`precast.shop_drawings`; STR-PRE-006); CAM
-  export of pieces as the neutral JSON or CSV piece model of the MIT `reviera-precast-cam` crate
+  export of pieces as the neutral JSON or CSV piece model of the MIT `riviera-precast-cam` crate
   (`clients/precast-cam`), or through external writers named by manifests, with checked filename
   rules (`precast.cam_export`, `cam_writer.list`; STR-PRE-007). Not yet: lattice girders, other
   mounting parts, shop-drawing templates with model viewports, Lua CAM writers, Unitechnik and
@@ -944,7 +944,7 @@ tools and the datums.
 - **Steel numbering and NC files**: part marks for identical members and plates (section,
   length, holes and cuts; however placed), assembly marks for identical shop assemblies (a member
   and everything shop-welded to it), written to IFC `Tag`s and STEEL_ASSEMBLY assemblies; DSTV
-  NC1 export, one file per part mark, through the MIT `reviera-dstv` crate (`clients/dstv`)
+  NC1 export, one file per part mark, through the MIT `riviera-dstv` crate (`clients/dstv`)
   (`steel_numbering.run`, `steel_numbering.preview`, `steel_nc.export`; STR-STL-010). Not yet: copes
   and cuts as NC contours, marks kept stable across changes.
 - **Connection automation**: Automate Connections finds the joins in the framing (column feet,
@@ -996,14 +996,14 @@ tools and the datums.
   combinations and loads to a neutral structural model and solves it out of process on the
   compute host with the built-in linear static 3D frame solver; the results (displacements,
   reactions, member forces along each member, per case and combination) are kept with the model
-  and marked stale when it changes. The model also exports as `reviera-structural-model.json`
+  and marked stale when it changes. The model also exports as `riviera-structural-model.json`
   (`structural_analysis.run`, `.collect`, `.results`, `.export_model`; ANA-FEA-001).
 - **Results Explorer**: Analyze › Structural Analysis › Results Explorer shows a load case's or
   combination's member force diagrams (N, Vy, Vz, T, My, Mz) on the tension side, the deformed
   shape (in-span deflections from the moment diagrams) or reaction arrows in the 3D view, with
   values, for all members, columns, beams, braces or transfer beams; 17 presets plus your own;
   Insights lists the largest values and frames their members; the result set exports and imports
-  as a `.reviera-results` package and shows when it is stale (`results.*`; STR-RES-001, member
+  as a `.riviera-results` package and shows when it is stale (`results.*`; STR-RES-001, member
   results only).
 - **Regional standards**: the model's building code sets the region, which catalogues are listed
   first, the default steel grade and concrete class (ASTM A992 and f'c 4000 psi in the US; S355
@@ -1019,9 +1019,9 @@ View › User Interface › **Terminal** (Ctrl+Shift+T) opens a Terminal pane un
 terminal (colours, full-screen programs, scrollback, copy and paste) with tabs for your shell and
 for command-line AI agents: **Claude Code**, **Antigravity CLI** (which replaced Gemini CLI), **Qwen Code** and **Codex CLI**, plus
 your own presets. An agent tab starts the agent already connected to the open model through
-Reviera's MCP server, via `reviera mcp-bridge` over a private local socket with a per-session
+Riviera's MCP server, via `riviera mcp-bridge` over a private local socket with a per-session
 secret; the agent's edits are ordinary undoable commands, destructive ones wait for your approval
-in Reviera, and your own agent settings are never changed (UI-AGENT-004). Agents are found on
+in Riviera, and your own agent settings are never changed (UI-AGENT-004). Agents are found on
 PATH and in the folders their installers use that a desktop session's PATH often lacks
 (`~/.local/bin`, npm, Bun, Volta, nvm; on Windows `.local\bin` and npm's `.cmd` scripts).
 
@@ -1086,7 +1086,7 @@ schedules, circuit paths, cable sizing and voltage drop.
   custom nodes, orthogonal with a path offset, drawn dashed when selected), and its cable: the
   smallest conductor of its cable type (Cu/PVC, Cu/XLPE, Al/XLPE in mm², Cu THHN in AWG) within
   the voltage drop limit (3 %) that carries the rating where your ampacity table has rows, or a
-  size you give, kept with a warning when it fails; voltage drop in V and %. Reviera ships
+  size you give, kept with a warning when it fails; voltage drop in V and %. Riviera ships
   physical conductor data (resistivity, areas) but no ampacities, which you enter under Manage ›
   MEP Settings › Wiring (`circuit.properties`, `circuit.size_cable`, `circuit.set_path`,
   `cable_type.create`, `conductor_size.create`, `conductor_ampacity.set`, `wiring.set`).
@@ -1110,7 +1110,7 @@ schedules, circuit paths, cable sizing and voltage drop.
   `fixture_unit_method.set`).
 - **Pressure drop and analytical segments** (Analyze › Pressure Drop): each duct and pipe system
   calculated from its equipment: every segment's and fitting's flow, velocity, friction and loss
-  (friction over the length; Reviera's provisional fitting coefficients by elbow angle, straight
+  (friction over the length; Riviera's provisional fitting coefficients by elbow angle, straight
   or branch flow and area ratio; terminals' connector coefficient or specific loss), static
   pressures, the critical path to the terminal with the highest loss and each terminal's excess
   pressure. Results are kept on the model and marked stale when anything they depend on changes;
@@ -1422,7 +1422,7 @@ schedules, circuit paths, cable sizing and voltage drop.
 ### Analysis and remote computation (in development)
 
 The foundation for analysis is being built (spec Chapter 2 §2.17, Chapter 4 §4.0.2a, overview in
-Chapter 8). Heavy calculations run outside Reviera's process, start only when needed, and send a
+Chapter 8). Heavy calculations run outside Riviera's process, start only when needed, and send a
 *distillation* of the model (only what the calculation needs) rather than the model. The first
 milestone works end to end, with project-wide clash detection as its first job kind:
 
@@ -1441,8 +1441,8 @@ milestone works end to end, with project-wide clash detection as its first job k
   `compute.results`).
 - **Local compute host**: started on demand, keeps a durable job registry, starts runners only
   for jobs and stops them when idle, enforces a memory limit and lower priority on them, reports
-  crashes, runaways and hangs as failed jobs without affecting Reviera, and exits when idle. Jobs
-  outlive Reviera and are collected later, or from another session (`compute.jobs`,
+  crashes, runaways and hangs as failed jobs without affecting Riviera, and exits when idle. Jobs
+  outlive Riviera and are collected later, or from another session (`compute.jobs`,
   `compute.reattach`, `compute.cancel`, `compute.forget_job`, `compute.kinds`,
   `compute.distill`).
 - **An open contract**: `reviera.compute.v1` over gRPC, with negotiated compression, numbered and
@@ -1505,7 +1505,7 @@ simulation sessions, and the first engine runners (see [Not built yet](#not-buil
   a sample of the type, so it changes when the type does. Legends hold text, print, and go on
   many sheets (`view.create_legend`, `legend.place_component`, `legend.set_component`,
   `legend.list`).
-- **Sheets**: View › Sheet makes an ISO A0–A4 sheet, numbered A101, A102, …, with Reviera's
+- **Sheets**: View › Sheet makes an ISO A0–A4 sheet, numbered A101, A102, …, with Riviera's
   title block (project, sheet, date, people and scale, *As indicated* when scales differ).
   Place View puts a plan, section or elevation on it at its scale with a numbered title; Place
   Schedule adds a schedule's live table; viewports are dragged and deleted (`sheet.create`,
@@ -1519,7 +1519,7 @@ simulation sessions, and the first engine runners (see [Not built yet](#not-buil
   elevations.
 - **Dimensions**: Annotate › Aligned Dimension (DI) dimensions parallel wall faces, centrelines,
   grids and cut edges, and in sections and elevations levels and walls' bases, tops and ends;
-  dimensions to Reviera walls, levels and grids follow them (`dim.create_aligned`, `anno.list`).
+  dimensions to Riviera walls, levels and grids follow them (`dim.create_aligned`, `anno.list`).
 - **Crop regions**: plans, sections and elevations have Crop View, Crop Region Visible,
   Annotation Crop and Reset Crop in Properties: the model (lines, fills and the shaded model) is
   drawn only inside the rectangle (whose edges and corners are dragged in the view, or sized in *Size Crop…*), tags of elements outside it are hidden, and with the
@@ -1697,7 +1697,7 @@ simulation sessions, and the first engine runners (see [Not built yet](#not-buil
 
 ## Sample models
 
-`test-data/samples` holds Reviera's own sample models. Each is rebuilt by a Lua script and
+`test-data/samples` holds Riviera's own sample models. Each is rebuilt by a Lua script and
 checked by a test (no overlaps beyond those it keeps on purpose, no clearance intrusions, saves
 and reopens), and each has a walkthrough (`<name>.md`, shown in Help as its Walkthrough page;
 the test fails a sample without one) giving the manual steps to build or use it in the window,
@@ -1819,8 +1819,8 @@ sample:
 files and runs their analyses (the canopy's structural analysis among them) to check each shows
 what it says; `tests/sample_features.rs` does the same for the other tabs' samples.
 
-Open one with `reviera gui test-data/samples/manor.ifc`, or rebuild them with
-`REVIERA_REGEN_SAMPLES=1 cargo test -p reviera-app --test samples`.
+Open one with `riviera gui test-data/samples/manor.ifc`, or rebuild them with
+`RIVIERA_REGEN_SAMPLES=1 cargo test -p riviera-app --test samples`.
 
 ## Not built yet
 
@@ -1889,7 +1889,7 @@ area by area (reviewed against the spec on 2026-10-15).
   as linked groups, pinned and recent stamps and Alt+click to pick one from the model, rows and
   scatter, smart folders, moving and drag-and-drop in the panel, organisation libraries, 3MF and
   OFF files, textures, reducing large meshes, plan cut outlines of components, and IFC
-  components from other tools whose geometry Reviera does not regenerate (DM-IMP-015,
+  components from other tools whose geometry Riviera does not regenerate (DM-IMP-015,
   DM-LIB-002 … 005).
 - **Path arrays**: grips and an on-canvas count label, railing paths, heights following the path
   or a host face, alternate mirroring, arrays of IFC components (ARC-MOD-033).
@@ -1901,8 +1901,8 @@ area by area (reviewed against the spec on 2026-10-15).
   existing roofs, sloped glazing, curtain walls, gutters and members by one Glazed Enclosure
   tool: commercial forms first (gable, gutter-connected multispan, Venlo, hoop, gothic, sawtooth),
   a glazing and frame library, vents, growing layouts (benches, rolling benches, NFT and
-  high-wire gutters), glazed vaults, domes and geodesic domes, and Reviera-defined types and
-  `Reviera_*` property sets for what IFC lacks. Later phases: hothouse screens, heating,
+  high-wire gutters), glazed vaults, domes and geodesic domes, and Riviera-defined types and
+  `Riviera_*` property sets for what IFC lacks. Later phases: hothouse screens, heating,
   cooling and CO₂, louvres, baffles and other shading devices with sun-tracking control, atriums with smoke and
   stack-ventilation checks, HVAC, energy and structural load modelling, residential forms, and
   building-code rule sets for the US, UK, Canada, EU, Australia and New Zealand. Specified (phase
@@ -1912,19 +1912,19 @@ area by area (reviewed against the spec on 2026-10-15).
   ebb-and-flow or NFT tables or high-wire gutters clear of the posts, in an enclosure or a room,
   with their growing area (`growing.*`); a glazing
   library (glass, polycarbonate, acrylic, film) whose types carry light, U, g and safety values in the
-  published `Reviera_GlazingUnit` property set (`glazing.*`, `schemas/psets`); frame systems
-  (aluminium, steel, timber, uPVC bars) with their deflection limit in `Reviera_FrameSystem`
+  published `Riviera_GlazingUnit` property set (`glazing.*`, `schemas/psets`); frame systems
+  (aluminium, steel, timber, uPVC bars) with their deflection limit in `Riviera_FrameSystem`
   (`frame.*`), and a warning when a roof is flatter than its glazing allows; glazed geodesic
   domes of any frequency and truncation, with their struts by length class for fabrication
   (`roof.create_geodesic`, `roof.geodesic`); glazed barrel vaults and smooth domes divided into
   flat panels on their surface (`roof.set_glazing`); side vents and each vent's free and effective area
-  in `Reviera_Vent` (`enclosure.set_vents`), and the enclosure's design values in
-  `Reviera_EnclosureDesign`; roll-up sides and gable vents; a headhouse across one end
-  (`enclosure.*`); a growing climate from crop presets (`Reviera_GrowingClimate`,
+  in `Riviera_Vent` (`enclosure.set_vents`), and the enclosure's design values in
+  `Riviera_EnclosureDesign`; roll-up sides and gable vents; a headhouse across one end
+  (`enclosure.*`); a growing climate from crop presets (`Riviera_GrowingClimate`,
   `enclosure.set_climate`), the crop's daily light integral month by month through the glazing
   from the weather file or the latitude (`enclosure.crop_light`), and grow lights laid out to make
-  up the darkest month (`growing.lights`, `Reviera_GrowLight`); energy, shade and blackout
-  screens under the gutters (`enclosure.set_screens`, `Reviera_Screen`) and the quick heat loss by
+  up the darkest month (`growing.lights`, `Riviera_GrowLight`); energy, shade and blackout
+  screens under the gutters (`enclosure.set_screens`, `Riviera_Screen`) and the quick heat loss by
   the greenhouse table method, with an energy screen closed too (`enclosure.heat_loss`); heating
   sizing for unit heaters, perimeter and under-bench fin pipe and root-zone heat
   (`enclosure.heating`); fan, inlet, pad and HAF sizing with the natural vents checked (`enclosure.ventilation`) and CO₂
@@ -1947,23 +1947,23 @@ area by area (reviewed against the spec on 2026-10-15).
 - **FileEngine integration** (`design_documents/FILEENGINE_INTEGRATION.md`): open, save and
   version models on the owner's FileEngine server through its REST API; BCF issues through its
   BCF and discussion services; publishing reports and exports to it, with share links made in
-  Reviera; Component Libraries hosted on it; product documentation folders linked to types and
+  Riviera; Component Libraries hosted on it; product documentation folders linked to types and
   materials. **Phase 1 built** (spec Ch 6 §6.2a, COL-FE-001 … 005):
   - connections signed in with a FileEngine service credential, kept in the OS keychain, with tokens that renew themselves;
-  - File › Open From FileEngine..., to browse folders and open a model as a working copy (`<data>/reviera/fileengine/<connection>/<uid>/`);
+  - File › Open From FileEngine..., to browse folders and open a model as a working copy (`<data>/riviera/fileengine/<connection>/<uid>/`);
   - Ctrl+S uploads a new version, but never over someone else's newer save without asking (save a copy beside it, overwrite, or open theirs read-only);
   - Save to FileEngine... into a folder, with a comment;
   - FileEngine Version History... to open a past version read-only or restore one;
   - the model's schema, project GlobalId and levels written as file metadata;
   - `file.open` and `file.save_as` take `fileengine://` addresses (`fileengine.*`; the client is `clients/fileengine`, MIT).
 
-  **Material documents built** (COL-FE-006 … 008): File › Material Documents... links each material to a FileEngine folder of its product documents (EPD, HPD, …, typed by `doc.type`); *Read EPD...* and *Read HPD...* ask FileEngine's headless AI extraction for the field sets in `schemas/extract/` (MIT), each value with the quote it was read from; the user ticks what to keep, written onto the material in one undo step with its source, exported as `IfcMaterialProperties` (`Reviera_EPD`, `Reviera_HPD`) and an `IfcDocumentReference`, optionally into the folder's metadata; an EPD's GWP A1–A3 becomes the material's embodied-carbon factor, its declared unit converted (`docs.*`). Each field set is published to the server as an extraction prompt set (`reviera.epd`, `reviera.hpd`; COL-FE-011, `docs.publish_field_sets`) the first time a session reads with it, with no administrator setup. Reading then uses that set at the revision Reviera published, so the server's cache, its marked-up PDFs and its folder automation use the same definition. A set an editor has taken over is used as they left it; an older server is sent the schema. *Open Marked-up PDF* in the review opens the server's copy of the document with each value's evidence highlighted. Verified live on Proxima File Vault (2026-11-02). *Report to FileEngine...* writes the material documentation and embodied carbon report (expired and expiring documents, undocumented materials) and publishes it to a folder (`docs.report`, `fileengine.publish`).
+  **Material documents built** (COL-FE-006 … 008): File › Material Documents... links each material to a FileEngine folder of its product documents (EPD, HPD, …, typed by `doc.type`); *Read EPD...* and *Read HPD...* ask FileEngine's headless AI extraction for the field sets in `schemas/extract/` (MIT), each value with the quote it was read from; the user ticks what to keep, written onto the material in one undo step with its source, exported as `IfcMaterialProperties` (`Riviera_EPD`, `Riviera_HPD`) and an `IfcDocumentReference`, optionally into the folder's metadata; an EPD's GWP A1–A3 becomes the material's embodied-carbon factor, its declared unit converted (`docs.*`). Each field set is published to the server as an extraction prompt set (`riviera.epd`, `riviera.hpd`; COL-FE-011, `docs.publish_field_sets`) the first time a session reads with it, with no administrator setup. Reading then uses that set at the revision Riviera published, so the server's cache, its marked-up PDFs and its folder automation use the same definition. A set an editor has taken over is used as they left it; an older server is sent the schema. *Open Marked-up PDF* in the review opens the server's copy of the document with each value's evidence highlighted. Verified live on Proxima File Vault (2026-11-02). *Report to FileEngine...* writes the material documentation and embodied carbon report (expired and expiring documents, undocumented materials) and publishes it to a folder (`docs.report`, `fileengine.publish`).
 
   **Local documents built** (COL-FE-006, -007, -010): FileEngine is optional. A material can link to a folder on this computer instead; its files are listed with their types and modified-time versions, opened in their usual application, and exported as a `file:///` `IfcDocumentReference`. *Enter Values...* types in a field set's values, checked and written with the document as their source, carbon factor included (`docs.enter_values`). The report can be saved to a file. When a FileEngine connection exists, File › Publish Local Documents to FileEngine... (offered only while the project has local document folders) uploads them with their types and optionally relinks the model's materials and value sources to the uploaded files in one undo step (`docs.local_collections`, `docs.publish_local`).
 
-  **Issues on FileEngine models built** (COL-FE-009): opening a model reads the issues people raised on it in FileEngine's 3D viewer (discussion threads with a viewpoint, snapshot, elements and measurements) and opens the docked Issues pane (Window › Issues, COL-BCF-004): Show applies the viewpoint in the 3D view, Reply…, Resolve and New Issue… (from the 3D view, with a snapshot) write back to the server; the issues stay on the server, kept beside the working copy for reading offline, so the model is never changed by them (`fileengine.issues`, `show_issue`, `comment_issue`, `resolve_issue`, `new_issue`). FileEngine's viewer anchors put a clipping plane's direction on the kept side (BCF's is the cut side): Reviera turns them round both ways. Since 2026-11-03 the pane opens when a FileEngine model with any issues (open or resolved) opens, whether from the FileEngine browser or from its working copy (File › Open, Recent); the model's own BCF topics (clash checks, BCF imports) are listed beside the server's and go to FileEngine as threads with Publish to Server (`issues.publish`), once each.
+  **Issues on FileEngine models built** (COL-FE-009): opening a model reads the issues people raised on it in FileEngine's 3D viewer (discussion threads with a viewpoint, snapshot, elements and measurements) and opens the docked Issues pane (Window › Issues, COL-BCF-004): Show applies the viewpoint in the 3D view, Reply…, Resolve and New Issue… (from the 3D view, with a snapshot) write back to the server; the issues stay on the server, kept beside the working copy for reading offline, so the model is never changed by them (`fileengine.issues`, `show_issue`, `comment_issue`, `resolve_issue`, `new_issue`). FileEngine's viewer anchors put a clipping plane's direction on the kept side (BCF's is the cut side): Riviera turns them round both ways. Since 2026-11-03 the pane opens when a FileEngine model with any issues (open or resolved) opens, whether from the FileEngine browser or from its working copy (File › Open, Recent); the model's own BCF topics (clash checks, BCF imports) are listed beside the server's and go to FileEngine as threads with Publish to Server (`issues.publish`), once each.
 
-  Checked against the live Proxima File Vault server, with a public EPD and HPD of a real product and the AC20-FZK-Haus model's issues. **Not yet:** publish sets and share links, FileEngine's own BCF-API door (its projection store is not deployed; Reviera uses the discussion service), live issue updates over WebSocket, Component Libraries (the later phases), field sets beyond EPD and HPD, the docked Documents pane, thumbnails, single sign-on, and transfers off the UI thread.
+  Checked against the live Proxima File Vault server, with a public EPD and HPD of a real product and the AC20-FZK-Haus model's issues. **Not yet:** publish sets and share links, FileEngine's own BCF-API door (its projection store is not deployed; Riviera uses the discussion service), live issue updates over WebSocket, Component Libraries (the later phases), field sets beyond EPD and HPD, the docked Documents pane, thumbnails, single sign-on, and transfers off the UI thread.
 
 - **Coordination**: clash tests (COL-CLASH), automatic pipe and duct penetrations (MEP-PEN-001),
   bathroom fixture clear floor spaces and turning spaces, ISO 21542. For BCF issues: the docked
@@ -2005,7 +2005,7 @@ area by area (reviewed against the spec on 2026-10-15).
   **Built:** server profiles and login by password or user token, kept in the OS keychain, with a
   silent re-login when the server drops the session; project and revision lists, new projects and
   sub-projects; *Publish to BIMserver*, which checks a Local model in and makes it the project's
-  working copy; opening a project as a working copy (`<data>/reviera/bimserver/<server>/<poid>/`,
+  working copy; opening a project as a working copy (`<data>/riviera/bimserver/<server>/<poid>/`,
   never overwriting local work); checking in, refused while the server has a newer revision;
   downloading a revision as IFC; Get Latest and Synchronise, merging other users' changes three-way
   element by element and parameter by parameter, conflicts decided element by element in a Conflicts dialog, the losing side kept in a stash;
@@ -2016,7 +2016,7 @@ area by area (reviewed against the spec on 2026-10-15).
   synchronise. Checked against BIMserver 1.6.1. **Not yet:** notifications, worksets, streamed
   upload of large models, and calls off the UI thread. File › BIMserver... lists servers, projects and revisions, logs in, opens, publishes and checks in.
 - **Performance profiler** (spec Ch 2 §2.18, DM-PERF-001; development support): **built.** Off
-  until started (Manage › Settings › Performance Profiler, `profiler.start`, or `REVIERA_PROFILE=1`),
+  until started (Manage › Settings › Performance Profiler, `profiler.start`, or `RIVIERA_PROFILE=1`),
   it times every command, commit, regeneration, scene build, IFC open and save, recovery-store
   write, merge, BIMserver call and viewport frame, with self time and call paths; a live window
   (frame time, fps, memory, latest and slow operations, hottest scopes and paths) refreshed every
@@ -2028,7 +2028,7 @@ area by area (reviewed against the spec on 2026-10-15).
   delta compression; end-to-end encryption and signed results, negotiated so new techniques can be
   added; the HTTPS binding; paired compute hosts on the LAN; vendor-neutral cloud clusters that
   scale to zero, with estimates, budgets and a catalogue of hosted calculation services; job sets
-  for parameter studies; real-time simulation sessions shown live in Reviera, a game engine or VR;
+  for parameter studies; real-time simulation sessions shown live in Riviera, a game engine or VR;
   and memory limits on Windows and macOS. (The installers already carry the compute host and
   the built-in runner.)
 - **Analysis plugin layer** (ANA-PLUG-004 … 009): specified, not built. Calculations that update
@@ -2038,10 +2038,10 @@ area by area (reviewed against the spec on 2026-10-15).
 
 ### Working with CADCraft
 
-Reviera is meant to work alongside [CADCraft](https://github.com/storytold/cadcraft), an
+Riviera is meant to work alongside [CADCraft](https://github.com/storytold/cadcraft), an
 open-source 2D drafting application in Rust. The goal is a two-way exchange through DWG and
 DXF files: drawings made in CADCraft (site plans, surveys, details, consultant drawings) come
-into Reviera as imported or linked CAD, and Reviera's plans and views go back to CADCraft as
+into Riviera as imported or linked CAD, and Riviera's plans and views go back to CADCraft as
 DXF or DWG. Both applications read these files with the same library (`acadrust`), so a
 drawing is read the same way in each. A corpus of CADCraft-made drawings will check
 compatibility continuously, in both directions. The requirements are DM-IMP-013 and DM-IMP-014
@@ -2083,7 +2083,7 @@ cargo run                              # list unsaved work left by a crash
 To connect an AI agent over MCP, for example Claude Code:
 
 ```sh
-claude mcp add reviera -- /path/to/reviera --mcp-stdio --permission model_edit /path/to/model.ifc
+claude mcp add riviera -- /path/to/riviera --mcp-stdio --permission model_edit /path/to/model.ifc
 ```
 
 Permission levels are `read_only` (the default), `model_edit` and `full_scripting`.
@@ -2092,25 +2092,25 @@ Permission levels are `read_only` (the default), `model_edit` and `full_scriptin
 
 | Path | Contents |
 |---|---|
-| `apps/reviera` | The `reviera` program |
-| `crates/reviera-core` | Element store, transactions, undo, command registry, and the modelling: walls, inserts, sketches, floors, roofs, stairs, railings, decks, rooms, components and libraries, path arrays, overlaps, clearances |
-| `crates/reviera-ifc` | IfcOpenShell bridge (C++ shim through `cxx`) |
-| `crates/reviera-rxd` | Reviera Extension Data encoding |
-| `crates/reviera-store` | Local `.ifc` projects with embedded RXD; IFC components (model fragments) |
-| `crates/reviera-livestore` | Encrypted live store and crash recovery |
-| `crates/reviera-app` | Application session: documents, file, view-state, inspection, output and recovery commands |
-| `crates/reviera-mcp` | MCP server |
-| `crates/reviera-render` | Render Scene, plan and section graphics, annotation, stroke font |
-| `crates/reviera-render-wgpu` | The built-in `wgpu` viewport |
-| `crates/reviera-ui` | The main window (wxWidgets through wxDragon): ribbon, views, tools, panes |
-| `crates/reviera-lua` | The LuaJIT scripting host: the `reviera` API, forms, plugin discovery, the built-in plugins |
-| `crates/reviera-geom` | OpenCASCADE solid kernel (`cxx`): booleans and their cache |
-| `crates/reviera-compute` | Remote computation: the client, distillations, the local compute host (`reviera-compute-host`) and the built-in runner (`reviera-analysis-builtin`) |
-| `crates/reviera-godot`, `reviera-net`, `reviera-opencde` | Placeholders for the Godot viewer, networking and OpenCDE |
+| `apps/riviera` | The `riviera` program |
+| `crates/riviera-core` | Element store, transactions, undo, command registry, and the modelling: walls, inserts, sketches, floors, roofs, stairs, railings, decks, rooms, components and libraries, path arrays, overlaps, clearances |
+| `crates/riviera-ifc` | IfcOpenShell bridge (C++ shim through `cxx`) |
+| `crates/riviera-rxd` | Riviera Extension Data encoding |
+| `crates/riviera-store` | Local `.ifc` projects with embedded RXD; IFC components (model fragments) |
+| `crates/riviera-livestore` | Encrypted live store and crash recovery |
+| `crates/riviera-app` | Application session: documents, file, view-state, inspection, output and recovery commands |
+| `crates/riviera-mcp` | MCP server |
+| `crates/riviera-render` | Render Scene, plan and section graphics, annotation, stroke font |
+| `crates/riviera-render-wgpu` | The built-in `wgpu` viewport |
+| `crates/riviera-ui` | The main window (wxWidgets through wxDragon): ribbon, views, tools, panes |
+| `crates/riviera-lua` | The LuaJIT scripting host: the `riviera` API, forms, plugin discovery, the built-in plugins |
+| `crates/riviera-geom` | OpenCASCADE solid kernel (`cxx`): booleans and their cache |
+| `crates/riviera-compute` | Remote computation: the client, distillations, the local compute host (`riviera-compute-host`) and the built-in runner (`riviera-analysis-builtin`) |
+| `crates/riviera-godot`, `riviera-net`, `riviera-opencde` | Placeholders for the Godot viewer, networking and OpenCDE |
 | `design_documents/` | The specification (`spec/`), technology stack, research log and source register |
-| `schemas/`, `clients/` | Open data formats, protocols and their clients (MIT): RXD, the Reviera Scene Protocol, the remote computation contract (`schemas/compute`, `clients/compute`), the DSTV NC1 writer (`clients/dstv`), the BIMserver JSON API client (`clients/bimserver`) and the FileEngine REST client (`clients/fileengine`) |
+| `schemas/`, `clients/` | Open data formats, protocols and their clients (MIT): RXD, the Riviera Scene Protocol, the remote computation contract (`schemas/compute`, `clients/compute`), the DSTV NC1 writer (`clients/dstv`), the BIMserver JSON API client (`clients/bimserver`) and the FileEngine REST client (`clients/fileengine`) |
 | `test-data/ifc/` | Third-party IFC models for tests (see their README for provenance) |
-| `test-data/samples/` | Reviera's own sample models, their Lua scripts and walkthroughs |
+| `test-data/samples/` | Riviera's own sample models, their Lua scripts and walkthroughs |
 | `test-data/library/` | The sample Component Library (a public-domain Doric column; see its README) |
 | `tools/` | Building IfcOpenShell, and preparing sample components (`decimate_stl.py`, `make_parthenon_column.py`) |
 
@@ -2119,14 +2119,14 @@ The specification is in `design_documents/spec/`, collected into
 
 ## Licence
 
-Reviera is licensed under the **GNU General Public License v3.0 or later** (see `LICENSE`). The
-RXD schemas (`schemas/rxd/`), the Reviera Scene Protocol (`schemas/rsp/`) and its clients
+Riviera is licensed under the **GNU General Public License v3.0 or later** (see `LICENSE`). The
+RXD schemas (`schemas/rxd/`), the Riviera Scene Protocol (`schemas/rsp/`) and its clients
 (`clients/rsp/`) are MIT-licensed, so any tool can adopt them.
 
 ## Clean-room statement
 
-Reviera's functional reference is a commercial BIM product, described only from publicly
+Riviera's functional reference is a commercial BIM product, described only from publicly
 available sources (online help, public blogs, tutorials, forums and open-source repositories),
 all listed in `design_documents/SOURCE_REGISTER.md`. No proprietary, confidential or leaked
 material, vendor code, binaries or file formats were used. Autodesk and Revit are trademarks of
-Autodesk, Inc. Reviera is not affiliated with or endorsed by Autodesk.
+Autodesk, Inc. Riviera is not affiliated with or endorsed by Autodesk.

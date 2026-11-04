@@ -1,16 +1,16 @@
 # Specification Conventions (for chapter authors)
 
-These rules apply to every chapter of the Reviera Application Specification.
+These rules apply to every chapter of the Riviera Application Specification.
 
 ## 1. Clean-room writing rules (mandatory)
 1. **Use your own words.** Describe behaviour, workflows and requirements. Do **not** copy sentences, tables or help text from the research files' quotations of Autodesk material. A short quoted term or UI label (for example a dialog name like "View Range") is fine. Paragraphs are not.
-2. **Treat Autodesk features as the functional reference, not as wording or design to copy.** Write requirements as "Reviera shall…".
+2. **Treat Autodesk features as the functional reference, not as wording or design to copy.** Write requirements as "Riviera shall…".
 3. **Do not reproduce any of these:** icons, artwork, Autodesk file contents (for example `KeyboardShortcuts.xml`, shared-parameter file headers, template content), or code from the Autodesk API.
-4. **Name things neutrally.** Generic industry terms (wall, level, grid, section, schedule, sheet, family/type) are fine. Do not use Autodesk product or brand names as Reviera names: say "Reviera" instead of "Revit", "Reviera Home" instead of "Revit Home". Name the reference product only in the "Reference" lines.
-5. **Every feature cites the research section it came from** (for example `Ref: research/02 §4.3`), so it can be traced through `RESEARCH_LOG.md`. A UI feature also cites the relevant screenshot path (for example `screenshots/ui/properties_palette_annotated.png`). Screenshots are **internal reference only**; never embed them as Reviera assets.
+4. **Name things neutrally.** Generic industry terms (wall, level, grid, section, schedule, sheet, family/type) are fine. Do not use Autodesk product or brand names as Riviera names: say "Riviera" instead of "Revit", "Riviera Home" instead of "Revit Home". Name the reference product only in the "Reference" lines.
+5. **Every feature cites the research section it came from** (for example `Ref: research/02 §4.3`), so it can be traced through `RESEARCH_LOG.md`. A UI feature also cites the relevant screenshot path (for example `screenshots/ui/properties_palette_annotated.png`). Screenshots are **internal reference only**; never embed them as Riviera assets.
 
 ## 2. Target technology (see `TECH_STACK.md`)
-- **Data and storage.** Native IFC through IfcOpenShell. The default project schema is IFC4 (ADD2 TC1); IFC4X3 is optional. Anything IFC can't express is **Reviera Extension Data (RXD)**: refer to it as "RXD document `<name>`" or "RXD element data (`<kind>`)". The storage carrier (embedded `Reviera_*` Psets by default, or an external sidecar) is defined only in `spec/02a_extension_data_format.md`.
+- **Data and storage.** Native IFC through IfcOpenShell. The default project schema is IFC4 (ADD2 TC1); IFC4X3 is optional. Anything IFC can't express is **Riviera Extension Data (RXD)**: refer to it as "RXD document `<name>`" or "RXD element data (`<kind>`)". The storage carrier (embedded `Riviera_*` Psets by default, or an external sidecar) is defined only in `spec/02a_extension_data_format.md`.
 - **Application and modes.** The core is written in Rust and uses multiple cores. Geometry uses OpenCASCADE, the UI uses wxWidgets, and scripting uses LuaJIT.
 - **Shared commands.** Every operation is a command in a single registry. That registry automatically exposes it to the UI, to Lua and to an MCP server for AI agents.
   - **High-level tools too.** Automation tools (stairs, roof shapes, gable infill, dormers, tag-all, footprint edits and the like) must be equally available to Lua and MCP. Their logic is a registered command, and the window only gathers input and calls it. A behaviour that exists only in the window is a defect.
@@ -78,5 +78,5 @@ Smaller features can be grouped into a table: `ID | Feature | Priority | Descrip
 ## 6. Chapter ending
 Every chapter ends with these three sections:
 1. **Command catalog**: a table of every command defined in the chapter: `Command | Parameters | Returns | Undoable | Req ID`.
-2. **Open questions / deviations from reference**: places where Reviera intentionally differs from the reference product, and why. Example: no Options Bar, matching the reference's 2027 direction; contextual ribbon plus Properties palette instead.
+2. **Open questions / deviations from reference**: places where Riviera intentionally differs from the reference product, and why. Example: no Options Bar, matching the reference's 2027 direction; contextual ribbon plus Properties palette instead.
 3. **Traceability**: a list of the research sections used.

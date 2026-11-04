@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 Reviera contributors
+# Copyright (C) 2026 Riviera contributors
 #
-# Cross-builds BIM Reviera for Windows x86-64 on Fedora, with the MinGW-w64 toolchain (GNU
+# Cross-builds BIM Riviera for Windows x86-64 on Fedora, with the MinGW-w64 toolchain (GNU
 # target, x86_64-pc-windows-gnu), and stages a portable folder and a ZIP:
 #
 #   packaging/windows/cross/build-cross.sh            # dependencies (cached), app, stage, zip
-#   REVIERA_VERSION=0.1.0-pre.9 packaging/windows/cross/build-cross.sh
+#   RIVIERA_VERSION=0.1.0-pre.9 packaging/windows/cross/build-cross.sh
 #
 # Needs (Fedora): mingw64-gcc-c++ mingw64-boost mingw64-eigen3 mingw64-zlib
 # mingw64-winpthreads-static, cmake, ninja-build, curl, and the Rust target
@@ -27,7 +27,7 @@ ROOT="$(cd "$HERE/../../.." && pwd)"
 BUILD="$HERE/build"
 PREFIX="$BUILD/prefix"
 DIST="$ROOT/dist"
-VERSION="${REVIERA_VERSION:-0.1.0-pre.9}"
+VERSION="${RIVIERA_VERSION:-0.1.0-pre.9}"
 TRIPLE=x86_64-w64-mingw32
 TARGET=x86_64-pc-windows-gnu
 SYSROOT=/usr/$TRIPLE/sys-root/mingw
@@ -44,7 +44,7 @@ rustup target list --installed | grep -qx $TARGET \
     || { echo "missing: rustup target add $TARGET" >&2; exit 1; }
 
 mkdir -p "$BUILD/src" "$PREFIX"
-export REVIERA_CROSS_PREFIX="$PREFIX"
+export RIVIERA_CROSS_PREFIX="$PREFIX"
 
 # fetch <name> <url> <sha256>: downloads and unpacks a pinned source tarball once.
 fetch() {
@@ -114,12 +114,12 @@ if [ ! -f "$PREFIX/lib/libIfcParse.a" ]; then
     cmake --install "$BUILD/ifcopenshell"
 fi
 
-# ---- Reviera ----
+# ---- Riviera ----
 export OCC_INCLUDE_DIR="$PREFIX/include/opencascade"
 export OCC_LIBRARY_DIR="$PREFIX/lib"
-export REVIERA_IFCOS_PREFIX="$PREFIX"
-export REVIERA_EIGEN_INCLUDE="$SYSROOT/include/eigen3"
-export REVIERA_BOOST_LIB_DIR="$SYSROOT/lib" REVIERA_BOOST_SUFFIX=-mt-x64
+export RIVIERA_IFCOS_PREFIX="$PREFIX"
+export RIVIERA_EIGEN_INCLUDE="$SYSROOT/include/eigen3"
+export RIVIERA_BOOST_LIB_DIR="$SYSROOT/lib" RIVIERA_BOOST_SUFFIX=-mt-x64
 export LUA_LIB="$PREFIX/lib" LUA_LIB_NAME=luajit LUA_LINK=static
 export CMAKE_TOOLCHAIN_FILE_x86_64_pc_windows_gnu="$TOOLCHAIN"
 export CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER=$TRIPLE-gcc
@@ -139,21 +139,21 @@ echo "INPUT($SYSROOT/lib/libstdc++.a)" > "$BUILD/link-shims/libstdc++.dll.a"
 echo "INPUT($SYSROOT/lib/libstdc++.a)" > "$BUILD/link-shims/libc++.a"
 # (Encoded, with 0x1f between arguments: the path may contain spaces.)
 export CARGO_ENCODED_RUSTFLAGS="-L"$'\x1f'"native=$BUILD/link-shims"
-(cd "$ROOT" && cargo build --release --target $TARGET -p reviera -p reviera-compute --bins)
+(cd "$ROOT" && cargo build --release --target $TARGET -p riviera -p riviera-compute --bins)
 
 # ---- Stage: the program, the DLLs it needs, samples and notices ----
-STAGE="$DIST/windows/BIM-Reviera"
+STAGE="$DIST/windows/BIM-Riviera"
 rm -rf "$STAGE"
 mkdir -p "$STAGE/samples"
-install -m755 "$ROOT/target/$TARGET/release/reviera.exe" "$STAGE/"
+install -m755 "$ROOT/target/$TARGET/release/riviera.exe" "$STAGE/"
 # The window without a console window: what the shortcuts and the file association start.
-install -m755 "$ROOT/target/$TARGET/release/reviera-gui.exe" "$STAGE/"
-# The local compute host and the built-in runner, beside reviera.exe (DM-RPC-004).
-install -m755 "$ROOT/target/$TARGET/release/reviera-compute-host.exe" \
-    "$ROOT/target/$TARGET/release/reviera-analysis-builtin.exe" "$STAGE/"
+install -m755 "$ROOT/target/$TARGET/release/riviera-gui.exe" "$STAGE/"
+# The local compute host and the built-in runner, beside riviera.exe (DM-RPC-004).
+install -m755 "$ROOT/target/$TARGET/release/riviera-compute-host.exe" \
+    "$ROOT/target/$TARGET/release/riviera-analysis-builtin.exe" "$STAGE/"
 # The DLLs it imports, transitively, from our prefix and the MinGW sysroot (not Windows').
 search=("$PREFIX/bin" "$SYSROOT/bin")
-queue=("$STAGE/reviera.exe")
+queue=("$STAGE/riviera.exe")
 while [ ${#queue[@]} -gt 0 ]; do
     f="${queue[0]}"; queue=("${queue[@]:1}")
     for dll in $($TRIPLE-objdump -p "$f" | sed -n 's/^\s*DLL Name: //p'); do
@@ -176,7 +176,7 @@ else
     echo "warning: WebView2Loader.dll not found; the help tab will not open" >&2
 fi
 install -m644 "$ROOT"/test-data/samples/samples.json "$STAGE/samples/"
-# The sample Component Library beside the samples (crates/reviera-ui/src/components.rs).
+# The sample Component Library beside the samples (crates/riviera-ui/src/components.rs).
 rm -rf "$STAGE/library" && cp -r "$ROOT/test-data/library" "$STAGE/library"
 for n in $(python3 -c "import json;print(' '.join(s['name'] for s in json.load(open('$ROOT/test-data/samples/samples.json'))))"); do
     for ext in ifc lua md; do
@@ -185,22 +185,22 @@ for n in $(python3 -c "import json;print(' '.join(s['name'] for s in json.load(o
 done
 install -m644 "$ROOT/LICENSE" "$STAGE/COPYING.txt"
 install -m644 "$ROOT/packaging/THIRD-PARTY-NOTICES.txt" "$STAGE/"
-install -m644 "$ROOT/packaging/icons/reviera.ico" "$STAGE/"
+install -m644 "$ROOT/packaging/icons/riviera.ico" "$STAGE/"
 
-ZIP="$DIST/BIM-Reviera-$VERSION-windows-x64-portable.zip"
+ZIP="$DIST/BIM-Riviera-$VERSION-windows-x64-portable.zip"
 rm -f "$ZIP"
-(cd "$DIST/windows" && python3 -m zipfile -c "$ZIP" BIM-Reviera)
+(cd "$DIST/windows" && python3 -m zipfile -c "$ZIP" BIM-Riviera)
 echo "==> $ZIP ($(du -h "$ZIP" | cut -f1))"
 
 # ---- The installer: Inno Setup under Wine, in a Wine prefix of the build's own ----
 # (packaging/windows/cross/build/wine; install it once with
 #  WINEPREFIX=… wine innosetup-7.1.0-x64.exe /VERYSILENT /CURRENTUSER "/DIR=C:\InnoSetup").
 export WINEPREFIX="${WINEPREFIX:-$BUILD/wine}" WINEDEBUG="${WINEDEBUG:--all}"
-ISCC="${REVIERA_ISCC:-$WINEPREFIX/drive_c/InnoSetup/ISCC.exe}"
+ISCC="${RIVIERA_ISCC:-$WINEPREFIX/drive_c/InnoSetup/ISCC.exe}"
 if [ -f "$ISCC" ] && command -v wine >/dev/null; then
     wine "$ISCC" /Qp "/DAppVersion=$VERSION" "/DAppVersionNumeric=${VERSION%%-*}" \
         "/DStageDir=$(winepath -w "$STAGE")" "/DOutputDir=$(winepath -w "$DIST")" \
-        "$(winepath -w "$ROOT/packaging/windows/reviera.iss")"
+        "$(winepath -w "$ROOT/packaging/windows/riviera.iss")"
     ls -la "$DIST"/*.exe
 else
     echo "==> No Inno Setup under Wine: the installer is not made (see packaging/README.md)"

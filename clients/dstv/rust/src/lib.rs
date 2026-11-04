@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2026 Reviera contributors
+// Copyright (C) 2026 Riviera contributors
 
 //! DSTV NC1 files: the Deutscher Stahlbau-Verband's *Standard Description for Steel Structure
 //! Pieces for the Numerical Controls* (7th edition, 1998), an open, machine-neutral interchange
@@ -169,7 +169,7 @@ fn clean(s: &str) -> String {
 pub fn write(p: &Piece) -> String {
     let mut s = String::new();
     s.push_str("ST\n");
-    s.push_str("** BIM Reviera\n");
+    s.push_str("** BIM Riviera\n");
     for t in [&p.order, &p.drawing, &p.phase, &p.piece, &p.steel] {
         let _ = writeln!(s, "  {}", clean(t));
     }

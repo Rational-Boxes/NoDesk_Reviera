@@ -2,7 +2,7 @@
 
 **Status:** Draft 0.3 · 2026-10-28 · the owner answered §10 (commercial first, codes for common
 jurisdictions, full load modelling with the analysis tools, commercial growing, both dome kinds).
-Nothing here is built yet; the spec sections follow from this plan. Reviera-defined types and
+Nothing here is built yet; the spec sections follow from this plan. Riviera-defined types and
 property sets in its own namespace for what IFC lacks (owner, 2026-10-28) are in §8a.
 **Owner's requests (2026-10-28):** "a bespoke greenhouse and solarium set of tools"; "integrating
 the existing tools for the greenhouse specialization"; "also suitable for large integrated
@@ -27,14 +27,14 @@ serve:
 - **Solariums, sunrooms and conservatories** on houses, and **orangeries** with roof lanterns.
 - **Atriums:** glazed courtyards and streets inside offices, hotels, malls and hospitals.
 
-Each tool is built from Reviera's existing elements, not a parallel set of them. A greenhouse made
+Each tool is built from Riviera's existing elements, not a parallel set of them. A greenhouse made
 with the new tool is made of ordinary walls, sloped-glazing roofs, curtain walls, gutters, doors
 and railings, which every other tool, schedule, analysis and IFC export already understands. The
 new part is the **enclosure**: one element that knows the form and its parameters, lays out its
 parts, keeps them consistent when a parameter changes, and runs the checks and analyses that
 apply to glazed rooms.
 
-## 2. What Reviera already has
+## 2. What Riviera already has
 
 | Need | Existing tool | Status |
 |---|---|---|
@@ -106,7 +106,7 @@ coefficient (g-value), safety class and weight: horticultural float, toughened, 
 double and triple units, twin- and multiwall polycarbonate, acrylic, and single or inflated double
 polyethylene film [§3 of research 09]. Optical values go in `Pset_MaterialOptical` on the material;
 the safety class and polycarbonate wall structure, which IFC has no property for on plates, go in
-a Reviera property set [G056 et al.].
+a Riviera property set [G056 et al.].
 
 **Frame types:** aluminium glazing-bar systems, galvanised steel tube, timber and uPVC, each with
 member sections and the deflection limits that apply (for example L/60, or L/175 per lite where a
@@ -200,7 +200,7 @@ path at the site and the cut-off angle the blades give. Its effect is carried in
 
 ## 7. Analyses: HVAC, energy and the rest
 
-The enclosure feeds Reviera's existing engines rather than adding new solvers wherever it can.
+The enclosure feeds Riviera's existing engines rather than adding new solvers wherever it can.
 Heavy runs go out of process as compute jobs, as the other analyses do.
 
 | Analysis | How | Builds on |
@@ -225,7 +225,7 @@ Analysis pane and in reports, and go stale when the model or weather change.
 
 | Part | IFC | Notes |
 |---|---|---|
-| Enclosure | `IfcElementAssembly` (or `IfcBuildingElementProxy` until an assembly type fits) aggregating its parts | Reviera recipe for the form and parameters |
+| Enclosure | `IfcElementAssembly` (or `IfcBuildingElementProxy` until an assembly type fits) aggregating its parts | Riviera recipe for the form and parameters |
 | Glazed roof | `IfcRoof` (type by form) aggregating `IfcPlate` (CURTAIN_PANEL or SHEET) and `IfcMember` (RAFTER, PURLIN, MULLION) | As sloped glazing is now |
 | Glazed walls | `IfcCurtainWall` with `IfcPlate`, `IfcMember` | As now |
 | Frame members | `IfcMember`, `IfcColumn`, `IfcBeam`; IFC4.3 adds ARCH_SEGMENT and TIEBAR | [G056] |
@@ -236,43 +236,43 @@ Analysis pane and in reports, and go stale when the model or weather change.
 | Atrium | `IfcSpace` spanning storeys, in `IfcSpatialZone`s (FIRESAFETY, THERMAL, VENTILATION) | [A001] |
 | Glazing optics | `Pset_MaterialOptical` on the material; §8a for what IFC lacks | [G056] |
 
-## 8a. Reviera's own types and properties
+## 8a. Riviera's own types and properties
 
 IFC has no entity for a glazed enclosure, a growing gutter or a light shelf, and no property for a
 shading device's g_tot or a glazing unit's safety class. A valid IFC file cannot add entity
-classes, so, as the owner suggests, the toolset defines **its own types in Reviera's namespace**,
-each carried by the nearest IFC entity, following the rules Reviera already uses (spec Ch 2:
-categories from the IFC class, `PredefinedType` and `ObjectType`; Reviera data in `Reviera_*`
+classes, so, as the owner suggests, the toolset defines **its own types in Riviera's namespace**,
+each carried by the nearest IFC entity, following the rules Riviera already uses (spec Ch 2:
+categories from the IFC class, `PredefinedType` and `ObjectType`; Riviera data in `Riviera_*`
 property sets; the building still readable by a tool that ignores them):
 
 - **Types.** New categories in the category registry, each with its IFC carrier:
 
-  | Reviera type | IFC carrier |
+  | Riviera type | IFC carrier |
   |---|---|
   | Glazed enclosure | `IfcElementAssembly` USERDEFINED, ObjectType `GlazedEnclosure` |
   | Louvre, fin, brise-soleil, baffle, light shelf, screen | `IfcShadingDevice` (as §8) |
   | Growing gutter (NFT, high-wire), bench, rolling bench | `IfcFurniture` or `IfcBuildingElementProxy` USERDEFINED, ObjectType `GrowingGutter`, `Bench`, `RollingBench` |
   | Pad wall, energy curtain, shade screen | `IfcBuildingElementProxy` / `IfcShadingDevice` USERDEFINED |
-  | Vent | `IfcWindow` with `Reviera_Vent` |
+  | Vent | `IfcWindow` with `Riviera_Vent` |
   | Atrium | `IfcSpace` with ObjectType `Atrium` |
 
-- **Property sets** in Reviera's namespace for the engineering data IFC has no home for, shown in
+- **Property sets** in Riviera's namespace for the engineering data IFC has no home for, shown in
   Properties and schedules like any other, for example:
-  - `Reviera_GlazingUnit`: safety class, polycarbonate wall structure, light transmission,
+  - `Riviera_GlazingUnit`: safety class, polycarbonate wall structure, light transmission,
     horticultural diffusion (haze);
-  - `Reviera_ShadingPerformance`: g_tot, F_c, cut-off angle, blade depth, spacing, tilt and tilt
+  - `Riviera_ShadingPerformance`: g_tot, F_c, cut-off angle, blade depth, spacing, tilt and tilt
     range, wind class, control mode;
-  - `Reviera_EnclosureDesign`: form, design life class, importance factor, vent ratio;
-  - `Reviera_GrowingClimate`: crop, temperature and humidity setpoints, target daily light
+  - `Riviera_EnclosureDesign`: form, design life class, importance factor, vent ratio;
+  - `Riviera_GrowingClimate`: crop, temperature and humidity setpoints, target daily light
     integral, CO₂ setpoint;
-  - `Reviera_Vent`: free area, discharge coefficient, actuator, smoke-vent rating.
+  - `Riviera_Vent`: free area, discharge coefficient, actuator, smoke-vent rating.
 - **Published definitions.** Each property set is defined once, machine-readably, with names,
-  types, units and descriptions, published under the MIT licence with Reviera's other schemas (as
+  types, units and descriptions, published under the MIT licence with Riviera's other schemas (as
   the interfaces policy asks), so other tools can read them. Publishing them in the buildingSMART
-  Data Dictionary (bSDD) under a Reviera domain is a later option.
+  Data Dictionary (bSDD) under a Riviera domain is a later option.
 - **Standard first.** Where a standard property exists it is used instead (`Pset_ShadingDeviceCommon`
   transmittance and reflectance, `Pset_MaterialOptical`, `Pset_PipeSegmentTypeGutter`,
-  `Pset_SpaceThermalDesign`), and a Reviera property never repeats one.
+  `Pset_SpaceThermalDesign`), and a Riviera property never repeats one.
 
 ## 9. Building it, in phases
 

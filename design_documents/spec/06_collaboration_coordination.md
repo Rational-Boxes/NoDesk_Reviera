@@ -1,12 +1,12 @@
 # Chapter 6 — Collaboration, Linking and Coordination
 
 **Area code:** COL · **Status:** Draft 1 (2026-10-12) · **Primary source:** `research/04_documentation_collaboration.md` (cited as `research/04 §n`)
-**Related chapters:** Chapter 1 (UI shell, status bar, notifications), Chapter 2 (data model, file I/O), Chapter 2a (Reviera Extension Data, RXD: `02a_extension_data_format.md`), Chapter 5 (views, graphics resolver, output), TECH_STACK §3.7 (Local and BIMserver modes).
+**Related chapters:** Chapter 1 (UI shell, status bar, notifications), Chapter 2 (data model, file I/O), Chapter 2a (Riviera Extension Data, RXD: `02a_extension_data_format.md`), Chapter 5 (views, graphics resolver, output), TECH_STACK §3.7 (Local and BIMserver modes).
 **Reference:** Autodesk Revit 2026/2027 worksharing, linking, positioning and coordination features, used as the functional reference only.
 
-This chapter specifies how several people and several models work together in Reviera. It covers the two operating modes (Local and Open Source BIMserver client), the mapping of the reference product's worksharing concepts onto BIMserver, the merge algorithm, advisory ownership, worksets, offline working copies, linked models and underlays, project positioning and coordinate systems, coordination tools (copy/monitor, coordination review, clash detection, BCF issues) and model maintenance.
+This chapter specifies how several people and several models work together in Riviera. It covers the two operating modes (Local and Open Source BIMserver client), the mapping of the reference product's worksharing concepts onto BIMserver, the merge algorithm, advisory ownership, worksets, offline working copies, linked models and underlays, project positioning and coordinate systems, coordination tools (copy/monitor, coordination review, clash detection, BCF issues) and model maintenance.
 
-**Storage rule for this chapter.** As set out in Chapter 2a, everything IFC entities can express stays in IFC entities. Collaboration data that IFC cannot express (worksets, link registry, positioning extras, monitor pairs, clash tests, issues) is Reviera Extension Data (RXD), embedded in the IFC file by default, and named here as "RXD document `<name>`". The single exception is **live ownership and lock state**, which must change without creating model revisions; in BIMserver mode it travels as BIMserver extended data on the latest revision (COL-OWN-002). This chapter does not define the RXD carrier; Chapter 2a does.
+**Storage rule for this chapter.** As set out in Chapter 2a, everything IFC entities can express stays in IFC entities. Collaboration data that IFC cannot express (worksets, link registry, positioning extras, monitor pairs, clash tests, issues) is Riviera Extension Data (RXD), embedded in the IFC file by default, and named here as "RXD document `<name>`". The single exception is **live ownership and lock state**, which must change without creating model revisions; in BIMserver mode it travels as BIMserver extended data on the latest revision (COL-OWN-002). This chapter does not define the RXD carrier; Chapter 2a does.
 
 ---
 
@@ -55,7 +55,7 @@ This chapter specifies how several people and several models work together in Re
 
 - The `ModelStore` trait has the operations `open`, `save_working`, `get_latest`, `check_in`, `history`, `download_revision`, `ownership` (a sub-interface, null in Local mode), and `subscribe` (change notifications, null in Local mode).
 - Commands that only make sense in BIMserver mode (for example `bimserver.sync`) fail in Local mode with `mode.not_available`, and their ribbon buttons are disabled.
-- **Shared-folder protection (Local mode):** when a Local project is opened, Reviera creates a lock file `<name>.ifc.lock` next to it, holding user, host, process id and time. If another user opens the same file, they are told who has it open and can open it read-only or as a copy. Stale locks (the process no longer exists on the same host, or older than 24 hours on another host) can be broken after confirmation. This is protection only; real multi-user editing is BIMserver mode.
+- **Shared-folder protection (Local mode):** when a Local project is opened, Riviera creates a lock file `<name>.ifc.lock` next to it, holding user, host, process id and time. If another user opens the same file, they are told who has it open and can open it read-only or as a copy. Stale locks (the process no longer exists on the same host, or older than 24 hours on another host) can be broken after confirmation. This is protection only; real multi-user editing is BIMserver mode.
 
 **Data (IFC/RXD).** In BIMserver mode, the server binding (server URL, project id `poid`, base revision id `roid`) is client state in the working-copy folder (COL-OFF-001), not project data; a project file moved to another machine does not carry a server binding.
 
@@ -73,12 +73,12 @@ This chapter specifies how several people and several models work together in Re
 **Purpose.** Start a project alone and share it later, or take a shared project out of the server.
 
 **Workflow.**
-1. **Publish to BIMserver** (Collaborate › Share › Publish to BIMserver): log in, choose or create a project (or sub-project), enter a comment; Reviera checks in the current model as the project's first revision and switches to BIMserver mode with that revision as base.
+1. **Publish to BIMserver** (Collaborate › Share › Publish to BIMserver): log in, choose or create a project (or sub-project), enter a comment; Riviera checks in the current model as the project's first revision and switches to BIMserver mode with that revision as base.
 2. **Export local copy** (Collaborate › Share › Export Local Copy): writes the current working copy as a standalone `.ifc`. Options: *Keep worksets* or *Discard worksets* (all elements move to no workset and the workset definitions are removed); ownership data is never included. This is the counterpart of "detach from central" and is used for archives and consultant issues.
 
 **Behaviour & rules.**
 - Publishing to a project that already has revisions is refused unless the user chooses *Replace* (which checks in a new revision and keeps the history) after a confirmation naming the project.
-- The schema of the server project must match the model schema (IFC4 by default; IFC4X3 only if the server offers a matching deserialiser, TECH_STACK §3.7.3). On mismatch Reviera offers to convert the model (Chapter 5, DOC-OUT-006 conversion) or to create a new project with the right schema.
+- The schema of the server project must match the model schema (IFC4 by default; IFC4X3 only if the server offers a matching deserialiser, TECH_STACK §3.7.3). On mismatch Riviera offers to convert the model (Chapter 5, DOC-OUT-006 conversion) or to create a new project with the right schema.
 
 **Commands.** `bimserver.publish_local(project: {poid}|{new_name, parent_poid?}, comment, replace?) -> {poid, roid}`; `model.export_local_copy(path, keep_worksets?) -> ()`
 
@@ -114,7 +114,7 @@ The JSON bodies below are illustrative. Tokens, ids and values are placeholders.
                "parameters": {"username": "anna@example.org", "password": "••••"}}}
   → {"response": {"result": "<token>"}}
   ```
-  The token is attached to every later call. `AuthInterface.getLoggedInUser` returns the user's server identity (user id and name), which Reviera uses as the **owner identity** for ownership (§6.4). Logout calls `AuthInterface.logout`.
+  The token is attached to every later call. `AuthInterface.getLoggedInUser` returns the user's server identity (user id and name), which Riviera uses as the **owner identity** for ownership (§6.4). Logout calls `AuthInterface.logout`.
 - When a call fails because the token expired, the client logs in again silently if credentials are stored, otherwise it prompts once and retries.
 - Plain `http://` URLs are allowed only for `localhost` unless the user explicitly accepts the risk per profile.
 - Each profile records the server version and the list of serialisers and deserialisers it offers (looked up at connect time; COL-BIM-003, COL-BIM-004).
@@ -126,11 +126,11 @@ The JSON bodies below are illustrative. Tokens, ids and values are placeholders.
 The MCP tool for `bimserver.login` never accepts a password from an agent; it can only use stored credentials or ask the user interactively (COL-CORE-005).
 
 **Acceptance criteria.**
-- [ ] After *Remember me*, restarting Reviera reconnects without a prompt, and the password is not present in any Reviera file.
+- [ ] After *Remember me*, restarting Riviera reconnects without a prompt, and the password is not present in any Riviera file.
 - [x] An expired token is renewed transparently during a long session.
 - [x] Calling the MCP login tool with a password parameter is rejected.
 
-*Built (2026-10-29):* `clients/bimserver` (MIT, `reqwest` with rustls on the platform's certificates, blocking with a 60 s timeout rather than on `tokio`); profiles in the per-user `bimserver.json` (name, URL, user name, login kind, server version); the password or a **user token** (`AuthInterface.loginUserToken`, an addition: BIMserver shows one per user) in the OS keychain under `org.bimreviera.bimserver` (session memory where there is none); `bimserver.add_server(name, url, allow_http?)` asks the server for its version first; `bimserver.login(server_id, username?, password?, user_token?, remember?)`, refused from MCP when it carries a secret; `bimserver.logout(server_id, forget?)`; `bimserver.remove_server` (not offered to agents); `bimserver.list_servers`. A refused session is renewed once from the stored secret. BIMserver answers a wrong password with a `UserException`, taken as an authentication failure. Checked live against BIMserver 1.6.1-SNAPSHOT. Not yet: client certificates and *Verify TLS* off, the status-bar connection state, the Servers dialog, and the method lookup through the server's service metadata.
+*Built (2026-10-29):* `clients/bimserver` (MIT, `reqwest` with rustls on the platform's certificates, blocking with a 60 s timeout rather than on `tokio`); profiles in the per-user `bimserver.json` (name, URL, user name, login kind, server version); the password or a **user token** (`AuthInterface.loginUserToken`, an addition: BIMserver shows one per user) in the OS keychain under `org.bimriviera.bimserver` (session memory where there is none); `bimserver.add_server(name, url, allow_http?)` asks the server for its version first; `bimserver.login(server_id, username?, password?, user_token?, remember?)`, refused from MCP when it carries a secret; `bimserver.logout(server_id, forget?)`; `bimserver.remove_server` (not offered to agents); `bimserver.list_servers`. A refused session is renewed once from the stored secret. BIMserver answers a wrong password with a `UserException`, taken as an authentication failure. Checked live against BIMserver 1.6.1-SNAPSHOT. Not yet: client certificates and *Verify TLS* off, the status-bar connection state, the Servers dialog, and the method lookup through the server's service metadata.
 
 ### Project and revision browser
 **ID:** COL-BIM-002 · **Priority:** P1 · **Ref:** TECH_STACK §3.7 (*Open*)
@@ -149,7 +149,7 @@ The MCP tool for `bimserver.login` never accepts a password from an agent; it ca
 - **Revision list:** `ServiceInterface.getAllRevisionsOfProject {"poid": …}` returns each revision's object id (`roid`), sequence number, date, comment, user and size. User names are resolved with `ServiceInterface.getUserByUoid` (verify) and cached.
 - **New project:** `ServiceInterface.addProject {"projectName": "...", "schema": "ifc4"}`; sub-project: `ServiceInterface.addProjectAsSubProject {"projectName": "...", "parentPoid": …, "schema": "ifc4"}`.
 - Sub-projects are offered as a way to split a large job by discipline or building; each sub-project is a separate model that the others can link (COL-LNK-001).
-- Revisions whose check-in comment starts with `[reviera:ownership]` or `[reviera:restore]` are labelled accordingly.
+- Revisions whose check-in comment starts with `[riviera:ownership]` or `[riviera:restore]` are labelled accordingly.
 
 **Commands.** `bimserver.list_projects(server_id) -> project_summary[]` (query); `bimserver.list_revisions(server_id, poid) -> revision_summary[]` (query); `bimserver.create_project(server_id, name, schema?, parent_poid?) -> poid`
 
@@ -157,7 +157,7 @@ The MCP tool for `bimserver.login` never accepts a password from an agent; it ca
 - [ ] The browser lists projects and sub-projects as a tree matching the server's structure.
 - [ ] Creating a sub-project under "Hospital" shows it nested under that project immediately.
 
-*Built (2026-10-29):* `bimserver.list_projects` (with `working_copy` marking projects that have one here), `bimserver.list_revisions` (user names resolved and cached per call), `bimserver.create_project`. *Since (2026-10-29):* File › BIMserver… (`ui.bimserver`): the server choice (with its connection state), the chosen server's projects (schema, revision count, working copy here) and the chosen project's revisions newest first (number, date, user, first line of the comment); Add Server… (then Log In…), Log In… (user name and password or user token, *Remember in the system keychain*), Log Out (optionally forgetting the secret), Remove Server, Open Latest, Open Revision, Publish Current Project…, Check In…; the title bar shows a working copy's project and base revision; help page *BIMserver projects*. Not yet: the project tree of sub-projects, New project and New sub-project buttons, and the `[reviera:…]` revision labels.
+*Built (2026-10-29):* `bimserver.list_projects` (with `working_copy` marking projects that have one here), `bimserver.list_revisions` (user names resolved and cached per call), `bimserver.create_project`. *Since (2026-10-29):* File › BIMserver… (`ui.bimserver`): the server choice (with its connection state), the chosen server's projects (schema, revision count, working copy here) and the chosen project's revisions newest first (number, date, user, first line of the comment); Add Server… (then Log In…), Log In… (user name and password or user token, *Remember in the system keychain*), Log Out (optionally forgetting the secret), Remove Server, Open Latest, Open Revision, Publish Current Project…, Check In…; the title bar shows a working copy's project and base revision; help page *BIMserver projects*. Not yet: the project tree of sub-projects, New project and New sub-project buttons, and the `[riviera:…]` revision labels.
 
 ### Open and download
 **ID:** COL-BIM-003 · **Priority:** P1 · **Ref:** TECH_STACK §3.7.1 (*Download*)
@@ -175,7 +175,7 @@ The MCP tool for `bimserver.login` never accepts a password from an agent; it ca
    → {"response": {"result": <topicId>}}
    ```
 3. **Wait for the result:** progress through `NotificationRegistryInterface.getProgress {"topicId": …}` (or WebSocket progress events, COL-BIM-007).
-4. **Fetch the data:** HTTP `GET /download?token=…&topicId=…` streams the IFC file. Reviera streams it to disk in the working-copy folder, then parses it with IfcOpenShell. The embedded RXD arrives as part of the IFC (Chapter 2a).
+4. **Fetch the data:** HTTP `GET /download?token=…&topicId=…` streams the IFC file. Riviera streams it to disk in the working-copy folder, then parses it with IfcOpenShell. The embedded RXD arrives as part of the IFC (Chapter 2a).
 5. **Clean up:** `ServiceInterface.cleanupLongAction {"topicId": …}`.
 6. Store the downloaded file as both `base.ifc` (immutable, for three-way merges) and `working.ifc` (COL-OFF-001), and record the base `roid`.
 7. Fetch the live ownership document (COL-OWN-002) and subscribe to notifications (COL-BIM-007).
@@ -188,7 +188,7 @@ The MCP tool for `bimserver.login` never accepts a password from an agent; it ca
 - [ ] Opening a 200 MB project shows download progress, can be cancelled, and leaves no partial working copy after cancel.
 - [ ] Re-opening a project with unsynchronised local changes opens the local working copy with those changes intact.
 
-*Built (2026-10-29):* `bimserver.open(server_id, poid, roid?)`: an existing working copy is opened as it is (with `newer_on_server`); otherwise the revision is downloaded (`download` with `sync`, `GET /download`, `cleanupLongAction`) with the IFC4 (or IFC2X3) serialiser into `base.ifc` and `working.ifc` and opened; `bimserver.download_revision(server_id, roid, path, schema?)`. The Reviera recipes come back through the server: a sample published and reopened on a second machine had the same walls and windows, rebuilt from their recipes. Not yet: progress and cancel, resumed downloads, read-only opening of an older revision, the ownership document and notifications.
+*Built (2026-10-29):* `bimserver.open(server_id, poid, roid?)`: an existing working copy is opened as it is (with `newer_on_server`); otherwise the revision is downloaded (`download` with `sync`, `GET /download`, `cleanupLongAction`) with the IFC4 (or IFC2X3) serialiser into `base.ifc` and `working.ifc` and opened; `bimserver.download_revision(server_id, roid, path, schema?)`. The Riviera recipes come back through the server: a sample published and reopened on a second machine had the same walls and windows, rebuilt from their recipes. Not yet: progress and cancel, resumed downloads, read-only opening of an older revision, the ownership document and notifications.
 
 ### Check in
 **ID:** COL-BIM-004 · **Priority:** P1 · **Ref:** TECH_STACK §3.7.1 (*Check-in*)
@@ -205,9 +205,9 @@ The MCP tool for `bimserver.login` never accepts a password from an agent; it ca
                    "fileSize": 1234567, "fileName": "model.ifc", "data": "<base64>", "merge": false}}}
    ```
    (`checkin` with `"sync": false` returns a topic id instead, and progress is followed as for downloads.) Large models use the server's streamed upload endpoint: start the check-in to obtain a topic id (`ServiceInterface.initiateCheckin`, verify), then `POST /upload` as multipart form data with the token, topic id, deserialiser id, project id and comment (verify the endpoint and its fields).
-4. `merge` is always `false`: Reviera uploads a complete, already merged model, and does not use the server's own merge.
+4. `merge` is always `false`: Riviera uploads a complete, already merged model, and does not use the server's own merge.
 5. On success, read the new revision id from the result (or from `getProject`'s last revision id), record it as the new base, and copy `working.ifc` to `base.ifc`.
-6. The comment is required (empty comments are refused) and is prefixed with nothing; Reviera appends a machine-readable trailer line with the Reviera version and the RXD format version.
+6. The comment is required (empty comments are refused) and is prefixed with nothing; Riviera appends a machine-readable trailer line with the Riviera version and the RXD format version.
 
 **Commands.** `bimserver.check_in(comment) -> roid` (used internally by sync and publish; exposed for scripts that manage their own merging)
 
@@ -215,7 +215,7 @@ The MCP tool for `bimserver.login` never accepts a password from an agent; it ca
 - [ ] A 300 MB model checks in through the streamed endpoint without loading the whole file into memory twice (peak memory below model size + 100 MB).
 - [ ] After a successful check-in, the status bar shows the new revision number as base.
 
-*Built (2026-10-29):* `bimserver.check_in(comment, document_id?) -> {poid, roid, revision, warnings, document_id}`: saves the working copy, uploads it with `checkinSync` (base64, `merge: false`) through the deserialiser the server suggests for `.ifc`, then makes it the base; refused while the server's latest revision is not the base (`bimserver.out_of_date`, until synchronise can merge). The comment gets a trailer line `[reviera] BIM Reviera <version>`. Not yet: the streamed upload for large models and the RXD format version in the trailer.
+*Built (2026-10-29):* `bimserver.check_in(comment, document_id?) -> {poid, roid, revision, warnings, document_id}`: saves the working copy, uploads it with `checkinSync` (base64, `merge: false`) through the deserialiser the server suggests for `.ifc`, then makes it the base; refused while the server's latest revision is not the base (`bimserver.out_of_date`, until synchronise can merge). The comment gets a trailer line `[riviera] BIM Riviera <version>`. Not yet: the streamed upload for large models and the RXD format version in the trailer.
 
 ### Get latest
 **ID:** COL-BIM-005 · **Priority:** P1 · **Ref:** research/04 §7.1 (*Reload Latest*); TECH_STACK §3.7.2
@@ -244,7 +244,7 @@ The MCP tool for `bimserver.login` never accepts a password from an agent; it ca
 **Purpose.** Publish local changes and receive others' changes in one step (the counterpart of "synchronise with central").
 
 **Workflow.**
-1. Collaborate › Synchronise › *Synchronise and modify settings*: dialog with server project (read-only), comment, relinquish options (worksets I own, elements I borrowed; standards, views and families are not special in Reviera, see deviations), *Save working copy before and after*; or *Synchronise now*, which uses the last settings and relinquishes borrowed elements.
+1. Collaborate › Synchronise › *Synchronise and modify settings*: dialog with server project (read-only), comment, relinquish options (worksets I own, elements I borrowed; standards, views and families are not special in Riviera, see deviations), *Save working copy before and after*; or *Synchronise now*, which uses the last settings and relinquishes borrowed elements.
 2. Progress is shown in the status bar; the user can keep reading the model but edits are blocked during steps 3–7 (they would be lost from the upload).
 
 **Behaviour & rules.**
@@ -254,7 +254,7 @@ The MCP tool for `bimserver.login` never accepts a password from an agent; it ca
 4. If conflicts need user decisions, stop and show the conflict dialog (COL-MRG-002). Cancelling releases the lock and leaves the working copy merged but not uploaded.
 5. Regenerate and validate (COL-MRG-003).
 6. Check in (COL-BIM-004) with the comment.
-7. **Race check:** list revisions again. If a revision other than Reviera's own appeared between the merged remote revision and the new one (someone checked in without respecting the lock, for example another client application), merge again with base = the merged remote revision, local = Reviera's revision, remote = the intruding revision, and check in a corrective revision with comment `[reviera:merge] …`. Report this in the sync report.
+7. **Race check:** list revisions again. If a revision other than Riviera's own appeared between the merged remote revision and the new one (someone checked in without respecting the lock, for example another client application), merge again with base = the merged remote revision, local = Riviera's revision, remote = the intruding revision, and check in a corrective revision with comment `[riviera:merge] …`. Report this in the sync report.
 8. Relinquish ownership as chosen and release the sync lock (COL-OWN-002).
 9. Save the working copy (base = new revision).
 - The **sync history** (Collaborate › Show History) lists revisions with time, user and comment (COL-BIM-008).
@@ -266,9 +266,9 @@ The MCP tool for `bimserver.login` never accepts a password from an agent; it ca
 **Acceptance criteria.**
 - [x] Two users each move different walls and synchronise in turn; afterwards both working copies contain both moves.
 - [x] While user A is synchronising, user B's synchronise waits and completes after A's, with B's revision based on A's. *(Refused with the holder named; the user retries.)*
-- [x] If a foreign client checks in during Reviera's synchronise, the sync report shows a corrective merge and the final latest revision contains all three users' changes.
+- [x] If a foreign client checks in during Riviera's synchronise, the sync report shows a corrective merge and the final latest revision contains all three users' changes.
 
-*Built (2026-10-29), in part:* `bimserver.sync(comment, document_id?, conflicts?) -> sync_report` (with `checked_in`): save, get latest and merge when the server moved on (stopping at conflicts unless a side is chosen), check in; File › BIMserver… › Synchronise…. *Since (2026-10-29):* the **sync lock** (COL-OWN-002) and the **race check**: `bimserver.sync` takes the lock in the ownership document on the latest revision (10 minutes) and is refused with `bimserver.sync_locked`, naming the holder, while another session holds an unexpired one; after its check-in, revisions that appeared between the merged one and its own are merged in (the local side winning, or the remote under `conflicts: remote`) and checked in as `[reviera:merge] Corrective merge of revision n …`; the new revision starts a fresh, unlocked ownership chain. `bimserver.lock_status`. Where the server will not register the ownership schema the sync runs unlocked and says so (`lock: unavailable`). Not yet: waiting and retrying automatically while locked, renewing the lock during a long sync, relinquishing, *save before/after* options, reminders, and the close-project choices.
+*Built (2026-10-29), in part:* `bimserver.sync(comment, document_id?, conflicts?) -> sync_report` (with `checked_in`): save, get latest and merge when the server moved on (stopping at conflicts unless a side is chosen), check in; File › BIMserver… › Synchronise…. *Since (2026-10-29):* the **sync lock** (COL-OWN-002) and the **race check**: `bimserver.sync` takes the lock in the ownership document on the latest revision (10 minutes) and is refused with `bimserver.sync_locked`, naming the holder, while another session holds an unexpired one; after its check-in, revisions that appeared between the merged one and its own are merged in (the local side winning, or the remote under `conflicts: remote`) and checked in as `[riviera:merge] Corrective merge of revision n …`; the new revision starts a fresh, unlocked ownership chain. `bimserver.lock_status`. Where the server will not register the ownership schema the sync runs unlocked and says so (`lock: unavailable`). Not yet: waiting and retrying automatically while locked, renewing the lock during a long sync, relinquishing, *save before/after* options, reminders, and the close-project choices.
 
 ### Notifications
 **ID:** COL-BIM-007 · **Priority:** P1 · **Ref:** TECH_STACK §3.7.1 (*Notification interfaces*); research/04 §7.5 (update frequency)
@@ -276,7 +276,7 @@ The MCP tool for `bimserver.login` never accepts a password from an agent; it ca
 **Purpose.** Tell users promptly when the model or ownership changes on the server.
 
 **Behaviour & rules.**
-- Reviera opens a WebSocket to the server's notification endpoint (`/stream`, verify), receives an endpoint id, and registers for events on the open project:
+- Riviera opens a WebSocket to the server's notification endpoint (`/stream`, verify), receives an endpoint id, and registers for events on the open project:
   ```json
   {"token": "<token>", "request": {"interface": "NotificationRegistryInterface",
    "method": "registerNewRevisionOnSpecificProjectHandler",
@@ -285,7 +285,7 @@ The MCP tool for `bimserver.login` never accepts a password from an agent; it ca
   and, for ownership changes, the handler for new extended data on the latest revision (`registerNewExtendedDataOnRevisionHandler`, verify).
 - Incoming new-revision events (`NotificationInterface.newRevision` with `poid` and `roid`) produce a status-bar balloon "Model updated by <user>: <comment>" with *Get latest* and *Show changes*, and update the *Model updates* display mode (COL-WS-004).
 - Incoming ownership events refresh the live ownership document (COL-OWN-002).
-- **Fallback:** if the WebSocket cannot be opened or drops, Reviera polls the project's last revision id and the ownership document every 30 seconds (user setting: manual, 5 s, 15 s, 30 s, 60 s), and reconnects with exponential back-off.
+- **Fallback:** if the WebSocket cannot be opened or drops, Riviera polls the project's last revision id and the ownership document every 30 seconds (user setting: manual, 5 s, 15 s, 30 s, 60 s), and reconnects with exponential back-off.
 
 **Commands.** `bimserver.subscribe(events[]?) -> ()`; `bimserver.unsubscribe() -> ()`; `bimserver.set_update_frequency(seconds_or_manual) -> ()`
 
@@ -303,8 +303,8 @@ The MCP tool for `bimserver.login` never accepts a password from an agent; it ca
 **Workflow.** Collaborate › Show History lists revisions. Per revision: *Download as file*, *Open read-only*, *Compare with base / with another revision*, *Restore as latest*.
 
 **Behaviour & rules.**
-- **Compare** computes the change set between two revisions with the same fingerprinting used by the merge (§6.3): added, deleted, modified elements (with changed attributes and properties), and changed RXD objects (views, sheets, annotation). Results are shown in a changes palette and can be highlighted in views (colour by change kind) and exported as CSV or BCF topics. The server-side `ServiceInterface.compare` (verify) may be used as an accelerator when available, but Reviera's own comparison is authoritative.
-- **Restore as latest** downloads the chosen revision and checks it in as a new revision with comment `[reviera:restore] Restored revision n: <reason>`; history is never rewritten. Users with unsynchronised changes are told on their next sync that the model was restored, and their changes are merged onto the restored revision as usual.
+- **Compare** computes the change set between two revisions with the same fingerprinting used by the merge (§6.3): added, deleted, modified elements (with changed attributes and properties), and changed RXD objects (views, sheets, annotation). Results are shown in a changes palette and can be highlighted in views (colour by change kind) and exported as CSV or BCF topics. The server-side `ServiceInterface.compare` (verify) may be used as an accelerator when available, but Riviera's own comparison is authoritative.
+- **Restore as latest** downloads the chosen revision and checks it in as a new revision with comment `[riviera:restore] Restored revision n: <reason>`; history is never rewritten. Users with unsynchronised changes are told on their next sync that the model was restored, and their changes are merged onto the restored revision as usual.
 
 **Commands.** `bimserver.history() -> revision_summary[]` (query); `bimserver.compare(roid_a, roid_b) -> change_set` (query); `bimserver.restore(roid, reason) -> roid`
 
@@ -312,13 +312,13 @@ The MCP tool for `bimserver.login` never accepts a password from an agent; it ca
 - [ ] Comparing two revisions lists exactly the elements changed between them, including a dimension text change in a view.
 - [x] Restoring revision 12 creates revision 20 identical in content to revision 12, and revisions 13–19 remain in the history.
 
-*Built (2026-10-29):* `bimserver.history(document_id?)` (newest first, with Reviera's `restore` label and the working copy's base marked); `bimserver.compare(roid_a?, roid_b?, document_id?) -> {added, deleted, modified}` by the merge's element-store diff (`reviera_core::merge::diff`): modified elements list the facets that changed (class, name, parameters); `roid_a` defaults to the base and `roid_b` to the working copy, so with neither it lists the local changes; `bimserver.restore(roid, reason, document_id?)`: refused unless the working copy is up to date with no local changes; the working copy becomes the revision (one undoable step) and is checked in with `[reviera:restore] Restored revision n: <reason>`. File › BIMserver… › Compare with Working Copy and Restore…. Not yet: the changes palette, highlighting in views, CSV and BCF export, *Open read-only*.
+*Built (2026-10-29):* `bimserver.history(document_id?)` (newest first, with Riviera's `restore` label and the working copy's base marked); `bimserver.compare(roid_a?, roid_b?, document_id?) -> {added, deleted, modified}` by the merge's element-store diff (`riviera_core::merge::diff`): modified elements list the facets that changed (class, name, parameters); `roid_a` defaults to the base and `roid_b` to the working copy, so with neither it lists the local changes; `bimserver.restore(roid, reason, document_id?)`: refused unless the working copy is up to date with no local changes; the working copy becomes the revision (one undoable step) and is checked in with `[riviera:restore] Restored revision n: <reason>`. File › BIMserver… › Compare with Working Copy and Restore…. Not yet: the changes palette, highlighting in views, CSV and BCF export, *Open read-only*.
 
 ---
 
 ## 6.2a FileEngine models
 
-FileEngine (Proxima File Vault) is a versioned document store with a REST door. Reviera keeps models there as files: every save is a new version, and FileEngine decides who may read and write. COL-FE-001…005 are phase 1 of `FILEENGINE_INTEGRATION.md` (§4–5): connections, browsing, open, save and versions. COL-FE-006…010 add material documentation folders (on this computer or in FileEngine, and publishing local ones), product data read from their documents by FileEngine's headless extraction (§7, §7c), publishing reports (§7a, in part), and the model's issues from FileEngine's discussion service (§6, its second door). Publish sets, share links, BCF-API and Component Libraries come in later phases. Reviera talks to FileEngine (AGPL-3.0) over HTTP only; its client `clients/fileengine` is MIT.
+FileEngine (Proxima File Vault) is a versioned document store with a REST door. Riviera keeps models there as files: every save is a new version, and FileEngine decides who may read and write. COL-FE-001…005 are phase 1 of `FILEENGINE_INTEGRATION.md` (§4–5): connections, browsing, open, save and versions. COL-FE-006…010 add material documentation folders (on this computer or in FileEngine, and publishing local ones), product data read from their documents by FileEngine's headless extraction (§7, §7c), publishing reports (§7a, in part), and the model's issues from FileEngine's discussion service (§6, its second door). Publish sets, share links, BCF-API and Component Libraries come in later phases. Riviera talks to FileEngine (AGPL-3.0) over HTTP only; its client `clients/fileengine` is MIT.
 
 ### Connections and sign-in
 **ID:** COL-FE-001 · **Priority:** P1 · **Ref:** FILEENGINE_INTEGRATION §4, §8
@@ -330,7 +330,7 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 - **Sign-in with a service credential.** FileEngine generates a key id and secret (`fesk_…`, `fesks_…`) with the `api` scope for this app. `POST /api/v1/auth/token` with HTTP Basic exchanges it for a bearer token that lasts 900 s.
   - The client renews the token at `/v1/auth/refresh` a minute before it runs out.
   - It asks for a new token with the credential when the renewal is refused, or when a call is refused once (a server restart).
-- The credential is kept in the OS keychain under `org.bimreviera.fileengine` when *remember* is on, otherwise only for the session. No command returns it, and no settings file, model or log holds it.
+- The credential is kept in the OS keychain under `org.bimriviera.fileengine` when *remember* is on, otherwise only for the session. No command returns it, and no settings file, model or log holds it.
 - Plain `http://` is allowed for localhost only, unless the connection is marked as a trusted local network.
 - MCP agents may use every `fileengine.*` command, acting as the signed-in user, except two things:
   - giving a credential to `fileengine.sign_in`;
@@ -357,7 +357,7 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 
 **Behaviour & rules.**
 - *File › Open From FileEngine…* lists a connection's folders and models (`GET /v1/dirs/{uid}`), folders first. Each entry shows its size, version count, who changed it last, and whether this computer has a working copy. Double-click enters a folder; *Up* goes back.
-- **Open** streams the model into a working copy, `<data>/reviera/fileengine/<connection>/<uid>/<name>`, beside `fileengine.json`. That file records the connection, the uid, the folder, the version opened, who opened it, and the read-only, past-version and unsent states. The working copy is then opened like any local file, with the live store, recovery and undo.
+- **Open** streams the model into a working copy, `<data>/riviera/fileengine/<connection>/<uid>/<name>`, beside `fileengine.json`. That file records the connection, the uid, the folder, the version opened, who opened it, and the read-only, past-version and unsent states. The working copy is then opened like any local file, with the live store, recovery and undo.
 - A model the user may not write (`GET /v1/nodes/{uid}/permissions?permission=w`) opens read-only.
 - A working copy holding work not uploaded yet is opened as it is and never overwritten. The open reports whether the server has a newer version.
 - A past version opens read-only from `<uid>@<version>/`.
@@ -379,7 +379,7 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 
 **Behaviour & rules.**
 - `file.save` of a FileEngine model first writes the working copy on this computer (atomic), then uploads it (`PUT /v1/files/{uid}/content`) as a new version.
-- **The version check.** Just before uploading, Reviera reads the file's newest version (`GET /v1/nodes/{uid}`). If it is not the one opened or last uploaded, someone else has saved.
+- **The version check.** Just before uploading, Riviera reads the file's newest version (`GET /v1/nodes/{uid}`). If it is not the one opened or last uploaded, someone else has saved.
   - The save stays on this computer, marked *unsent*.
   - The error `fileengine.conflict` names who saved and when.
   - The window offers *Save as a Copy Beside It*, *Overwrite* (their version stays in the history) or *Open Theirs Read-Only*. It never merges silently.
@@ -423,9 +423,9 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 - Each upload sets string metadata on the model's file (`PUT /v1/nodes/{uid}/metadata/{key}`):
   - `ifc.schema`;
   - `ifc.project_guid` (the IfcProject's GlobalId);
-  - `reviera.version`;
-  - `reviera.levels` (a JSON array of the level names);
-  - with a comment, `reviera.comment` and `reviera.comment.<version>`, which the version history reads.
+  - `riviera.version`;
+  - `riviera.levels` (a JSON array of the level names);
+  - with a comment, `riviera.comment` and `riviera.comment.<version>`, which the version history reads.
 - The metadata is best effort: a refused metadata write does not undo the upload.
 
 **Acceptance criteria.**
@@ -447,10 +447,10 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 - `docs.list` lists the folder's documents with their `doc.type` metadata (EPD, HPD, specification, certification, …), their version, size and dates.
 - On save, an IFC4 file gets, for each linked material:
   - an `IfcDocumentReference` (`Location` = the folder's address, or `file:///` and its path for a local folder; `Identification` = its uid or path; `Name` = its name), tied to the `IfcMaterial` by an `IfcExternalReferenceRelationship`;
-  - the values taken from its documents as `IfcMaterialProperties`, one set per field set (`Reviera_EPD`, `Reviera_HPD`).
+  - the values taken from its documents as `IfcMaterialProperties`, one set per field set (`Riviera_EPD`, `Riviera_HPD`).
   
   All of these are marked `rxd:product_docs` and rewritten on every save. IFC2X3 files get none of it.
-- Uploading a model to FileEngine (COL-FE-005) adds `reviera.products`: a JSON array of the documented materials, with each one's folder and values.
+- Uploading a model to FileEngine (COL-FE-005) adds `riviera.products`: a JSON array of the documented materials, with each one's folder and values.
 
 **Acceptance criteria.**
 - [x] A material linked to a folder exports an `IfcDocumentReference` to that folder, related to its `IfcMaterial`, and its values as `IfcMaterialProperties`; the file opens again with the link and the values intact.
@@ -463,11 +463,11 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 **Purpose.** Read the values a material needs (EPD number, GWP, HPD identifier, expiry dates, …) from its documents, rather than typing them in. Each value keeps the quote it came from.
 
 **Behaviour & rules.**
-- **Field sets** ship as JSON Schemas in `schemas/extract/` (MIT): `epd` and `hpd` to start with. Each field's `x-reviera` names its label, the IFC property it fills and the FileEngine folder metadata key it may fill. `docs.field_sets` lists them.
-- `docs.extract` sends the linked folder's documents of the matching `doc.type`, or the files named, to the conversion service's headless extraction (`POST /csai/v1/extract`). It names the field set's prompt set on the server (COL-FE-011), or sends the field set's schema without the `x-reviera` annotations where it cannot. The run is kept for the session and returned: for each document and field, the value, its unit, the evidence quote and offset, the version it was read from, and whether it came from the cache. Fields with no supporting quote are listed as not found; nothing is guessed. `cache: "refresh"` asks again.
+- **Field sets** ship as JSON Schemas in `schemas/extract/` (MIT): `epd` and `hpd` to start with. Each field's `x-riviera` names its label, the IFC property it fills and the FileEngine folder metadata key it may fill. `docs.field_sets` lists them.
+- `docs.extract` sends the linked folder's documents of the matching `doc.type`, or the files named, to the conversion service's headless extraction (`POST /csai/v1/extract`). It names the field set's prompt set on the server (COL-FE-011), or sends the field set's schema without the `x-riviera` annotations where it cannot. The run is kept for the session and returned: for each document and field, the value, its unit, the evidence quote and offset, the version it was read from, and whether it came from the cache. Fields with no supporting quote are listed as not found; nothing is guessed. `cache: "refresh"` asks again.
 - A **local folder** cannot be read by extraction (`docs.local_folder`); its values are typed in. `docs.enter_values` takes a field set's values as text, checks them against the field set (numbers, dates), and writes them as `docs.apply_extracted` does, with the document they were read from as their source. *Enter Values…* in the Material Documents dialog shows the set's fields.
 - Nothing is written until the user accepts. `docs.apply_extracted` writes the accepted fields onto the material in one undo step. Each value records its source: file uid and name, version, run id, field set and field. With `to_folder`, the values are also written to the folder's metadata under the field's key. The quote is not copied into the model.
-- An EPD's GWP A1–A3, applied with `carbon: true`, also becomes the material's embodied-carbon factor (ANA-CARB-001). It goes in a library named *Product EPDs* and is matched to the material, per m², m³, kg or piece. A declared unit in ft², ft³, lb or a multiple (`1,000 ft2`) is converted, and one Reviera cannot read is refused with the reason.
+- An EPD's GWP A1–A3, applied with `carbon: true`, also becomes the material's embodied-carbon factor (ANA-CARB-001). It goes in a library named *Product EPDs* and is matched to the material, per m², m³, kg or piece. A declared unit in ft², ft³, lb or a multiple (`1,000 ft2`) is converted, and one Riviera cannot read is refused with the reason.
 - `docs.usage` shows the service's usage state for the connection's key.
 - Agents may run `docs.extract` and `docs.apply_extracted`; both act as the signed-in user.
 
@@ -480,11 +480,11 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 ### Issues on a FileEngine model
 **ID:** COL-FE-009 · **Priority:** P1 · **Ref:** FILEENGINE_INTEGRATION §6
 
-**Purpose.** Opening a model from FileEngine brings its coordination with it: the issues people raised on it in FileEngine's 3D viewer, or in Reviera, shown at once and answered from Reviera.
+**Purpose.** Opening a model from FileEngine brings its coordination with it: the issues people raised on it in FileEngine's 3D viewer, or in Riviera, shown at once and answered from Riviera.
 
 **Behaviour & rules.**
 - **Reading.** `fileengine.open` reads the model's discussion threads (`GET /discuss/files/{uid}/threads`) and returns its open issue count; `fileengine.issues` lists them, open first. Each issue has its title (the thread's, else its first comment's first line without leading @mentions), status, who opened and resolved it, the version it was raised on, its comments, its viewpoint, the elements it is about (`object_refs` and the selection), its measurements and whether it has a snapshot (`fileengine.issue_snapshot`).
-- **Viewpoints.** A `model-viewpoint` anchor holds a BCF-API-shaped viewpoint (`bcf::from_json`, `to_json`). FileEngine's viewer writes `fileengine.anchor.v1` planes with the direction pointing to the side kept, the reverse of BCF. Reviera turns them round on reading and writing, so a cut looks the same in both.
+- **Viewpoints.** A `model-viewpoint` anchor holds a BCF-API-shaped viewpoint (`bcf::from_json`, `to_json`). FileEngine's viewer writes `fileengine.anchor.v1` planes with the direction pointing to the side kept, the reverse of BCF. Riviera turns them round on reading and writing, so a cut looks the same in both.
 - **Not in the model.** The issues stay on the server. The last answer is kept beside the working copy (`issues.json`) for reading offline (`offline: true`). Reading them never changes the model, and they are never uploaded inside it.
 - **Answering.**
   - `fileengine.show_issue` shows an issue's viewpoint in a 3D view, as `bcf.apply_viewpoint` does, with the elements it is about selected.
@@ -497,7 +497,7 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 
 **Acceptance criteria.**
 - [x] Against the fake server, an issue raised in the viewer is read on open (the model unchanged), shown with its element selected, replied to, resolved on the open version and reopened. One raised from a 3D view reaches the server with a camera, its turned planes and its element. The issues read offline from the copy.
-- [x] Live: a reply and a reopen made outside Reviera show in the pane within a minute, with the status bar saying so.
+- [x] Live: a reply and a reopen made outside Riviera show in the pane within a minute, with the status bar saying so.
 - [x] Live (read-only): AC20-FZK-Haus's two issues are read, and showing one applies its camera, slice and hidden elements with all its elements found.
 
 ### Publishing local documentation folders to FileEngine
@@ -518,12 +518,12 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 ### Field sets published as extraction prompt sets
 **ID:** COL-FE-011 · **Priority:** P2 · **Ref:** FILEENGINE_INTEGRATION §7c, §11.9
 
-**Purpose.** Reviera's field sets become the server's own extraction definitions, with nothing for an administrator to set up, so the server's cache, its marked-up PDFs and its folder automation all use the definition Reviera reads with. People who manage extraction on the server can still adopt, lock or retire a definition.
+**Purpose.** Riviera's field sets become the server's own extraction definitions, with nothing for an administrator to set up, so the server's cache, its marked-up PDFs and its folder automation all use the definition Riviera reads with. People who manage extraction on the server can still adopt, lock or retire a definition.
 
 **Behaviour & rules.**
-- Each field set is published as the conversion service's **prompt set** `reviera.<set>` (`PUT /csai/v1/prompt-sets/slug/{slug}`, `fileengine.prompt_set.v1`). Any signed-in member's key may do this; nothing is configured on the server first. Its fields are typed as the service types them (string, number, integer, boolean, date, enum, list), each with its label, description and unit. Reviera's own mapping (IFC property, folder key) stays in Reviera. No model is named, so the deployment's default model is used.
-- `docs.extract` publishes a field set the first time a session uses it on a connection, then names the set and the revision it published (`prompt_set`, `revision`). Publishing an unchanged definition changes nothing on the server; a changed one (a newer Reviera) becomes the set's next revision. `docs.publish_field_sets` publishes ahead or again and reports, per set, the prompt set, whether anything changed, and any note or warning. Signing in again or out forgets what was published that session.
-- **When an editor has the set** (taken over or locked in the web application), Reviera does not publish over it. It uses the set's current revision as the editor left it and says so in the run's `note`. A field the editor removed is reported as not found.
+- Each field set is published as the conversion service's **prompt set** `riviera.<set>` (`PUT /csai/v1/prompt-sets/slug/{slug}`, `fileengine.prompt_set.v1`). Any signed-in member's key may do this; nothing is configured on the server first. Its fields are typed as the service types them (string, number, integer, boolean, date, enum, list), each with its label, description and unit. Riviera's own mapping (IFC property, folder key) stays in Riviera. No model is named, so the deployment's default model is used.
+- `docs.extract` publishes a field set the first time a session uses it on a connection, then names the set and the revision it published (`prompt_set`, `revision`). Publishing an unchanged definition changes nothing on the server; a changed one (a newer Riviera) becomes the set's next revision. `docs.publish_field_sets` publishes ahead or again and reports, per set, the prompt set, whether anything changed, and any note or warning. Signing in again or out forgets what was published that session.
+- **When an editor has the set** (taken over or locked in the web application), Riviera does not publish over it. It uses the set's current revision as the editor left it and says so in the run's `note`. A field the editor removed is reported as not found.
 - **Fallbacks.** Extraction still works, sending the field set's schema as before (COL-FE-007), with the reason in the run's `note`, when:
   - the server has no prompt sets (an older conversion service);
   - the set was retired with nothing in its place (one that names a replacement is used instead);
@@ -533,10 +533,10 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 - The run records the prompt set and revision it ran (`prompt_set`), and the review dialog shows them. When the server has a newer revision than the one pinned, the run says so. A PDF read with a prompt set gets a marked-up copy with each value's evidence highlighted, a sidecar beside the document. Each document's `markup` gives its status, name and uid, and the page each value was located on. The review dialog lists it, and *Open Marked-up PDF* downloads the selected value's document's copy and opens it in the system's PDF viewer (`docs.document_path`), then returns to the review with the selection kept.
 
 **Acceptance criteria.**
-- [x] Against the fake server, the first extraction publishes `reviera.epd` (revision 1, typed fields, units) and names it. Publishing again, or from a second user's session, changes nothing.
-- [x] An editor's take-over is used as they left it (their revision, fields they removed not found), and Reviera does not publish over it.
+- [x] Against the fake server, the first extraction publishes `riviera.epd` (revision 1, typed fields, units) and names it. Publishing again, or from a second user's session, changes nothing.
+- [x] An editor's take-over is used as they left it (their revision, fields they removed not found), and Riviera does not publish over it.
 - [x] A retired set, and a server without prompt sets, fall back to the schema with the reason given, and the values are still read.
-- [x] Live: against a server with prompt sets deployed, `docs.publish_field_sets` publishes both sets, and an EPD in the test folder is read through `reviera.epd` with its marked-up PDF (Proxima File Vault, 2026-11-02: both sets created at revision 1, unchanged when published again; the CertainTeed EPD's eight values located in its marked-up copy).
+- [x] Live: against a server with prompt sets deployed, `docs.publish_field_sets` publishes both sets, and an EPD in the test folder is read through `riviera.epd` with its marked-up PDF (Proxima File Vault, 2026-11-02: both sets created at revision 1, unchanged when published again; the CertainTeed EPD's eight values located in its marked-up copy).
 
 ### Publishing files and the material documentation report
 **ID:** COL-FE-008 · **Priority:** P2 · **Ref:** FILEENGINE_INTEGRATION §7a
@@ -597,7 +597,7 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 
 *Step 4 — Relationship sets.* Relationships whose meaning is a set of members are merged as **sets**, not as values, so that two users adding different elements to the same storey, group or assignment never conflict: `IfcRelContainedInSpatialStructure.RelatedElements`, `IfcRelAggregates.RelatedObjects`, `IfcRelNests.RelatedObjects` (keeping order: local insertions first, then remote), `IfcRelAssignsToGroup.RelatedObjects`, `IfcRelDefinesByType.RelatedObjects`, `IfcRelDefinesByProperties.RelatedObjects`, `IfcRelAssociatesMaterial.RelatedObjects`, `IfcRelAssociatesClassification.RelatedObjects`. The merged set is `(B ∪ added_L ∪ added_R) − removed_L − removed_R`. A relationship whose set becomes empty is deleted.
 
-*Step 5 — Exclusivity rules.* After step 4, rules that IFC or Reviera require are checked: an element contained in exactly one spatial structure element; an occurrence typed by at most one type; an element in at most one workset (RXD). If the merged result breaks a rule (for example the element was moved to Level 2 locally and to Level 3 remotely), it becomes a conflict on that element.
+*Step 5 — Exclusivity rules.* After step 4, rules that IFC or Riviera require are checked: an element contained in exactly one spatial structure element; an occurrence typed by at most one type; an element in at most one workset (RXD). If the merged result breaks a rule (for example the element was moved to Level 2 locally and to Level 3 remotely), it becomes a conflict on that element.
 
 *Step 6 — RXD.* RXD objects are merged per Chapter 2a: by stable id, three-way against B, field by field; same-field changes on both sides are conflicts; delete/modify is a conflict. Keyed collections inside an object (for example per-category overrides in a view, or rows in a schedule's fields) are merged per key.
 
@@ -621,7 +621,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.
 - [ ] Merging 100 000 elements with 1 000 changes on each side completes in under 30 seconds on the reference machine.
 - [ ] Running the same merge twice gives byte-identical output.
 
-*Built (2026-10-29), by the element store:* `reviera_core::merge` merges Reviera's element store rather than the IFC entity closures: each element (by GlobalId) is its class, name and parameters (properties, IFC attributes, the Reviera recipe and RXD records), which is what both sides edit and what a server's re-serialisation reads back unchanged. Classification as the table above; facets are the class, the name and each parameter; a parameter changed on both sides merges key by key when it is a JSON object (recursively) and as a set when it is a list of strings (members, parts); numbers equal within 1e-9 relative; conflicts by `policy` (fail, local, remote). The plan is ordered by GlobalId (deterministic) and applied as one transaction. `merge.three_way(base_path, local_path, remote_path, out_path, policy?) -> {created, updated, deleted, remote_changes, merged, conflicts, written}`. Checked: two users moving different walls, each adding walls, and both moving the same wall (one conflict on the recipe's curve). Not yet: `merge.preview`, the exclusivity checks (step 5), ownership-aware resolution (step 7), host/hosted repair (step 8), conflicts decided one by one (COL-MRG-002), geometry of elements that exist only in IFC (imported, without a recipe) when added remotely, and regeneration of generated parts changed on both sides (an enclosure's parts).
+*Built (2026-10-29), by the element store:* `riviera_core::merge` merges Riviera's element store rather than the IFC entity closures: each element (by GlobalId) is its class, name and parameters (properties, IFC attributes, the Riviera recipe and RXD records), which is what both sides edit and what a server's re-serialisation reads back unchanged. Classification as the table above; facets are the class, the name and each parameter; a parameter changed on both sides merges key by key when it is a JSON object (recursively) and as a set when it is a list of strings (members, parts); numbers equal within 1e-9 relative; conflicts by `policy` (fail, local, remote). The plan is ordered by GlobalId (deterministic) and applied as one transaction. `merge.three_way(base_path, local_path, remote_path, out_path, policy?) -> {created, updated, deleted, remote_changes, merged, conflicts, written}`. Checked: two users moving different walls, each adding walls, and both moving the same wall (one conflict on the recipe's curve). Not yet: `merge.preview`, the exclusivity checks (step 5), ownership-aware resolution (step 7), host/hosted repair (step 8), conflicts decided one by one (COL-MRG-002), geometry of elements that exist only in IFC (imported, without a recipe) when added remotely, and regeneration of generated parts changed on both sides (an enclosure's parts).
 
 ### Conflict resolution
 **ID:** COL-MRG-002 · **Priority:** P1 · **Ref:** research/04 §7.1 (*Editing request*, as the reference's way of avoiding conflicts)
@@ -649,14 +649,14 @@ Ownership is advisory, so step 7 is what gives it force at merge time.
 **Purpose.** Make sure a merged model is consistent before it is used or uploaded, even though each side was consistent on its own.
 
 **Workflow.**
-1. After the merge's step 9 (COL-MRG-001), Reviera regenerates and validates the merged working copy automatically; the status bar shows "Regenerating merged model (n of m)".
+1. After the merge's step 9 (COL-MRG-001), Riviera regenerates and validates the merged working copy automatically; the status bar shows "Regenerating merged model (n of m)".
 2. During *Get latest* the result is shown in the sync report. During *Synchronise* it runs before the check-in (COL-BIM-006 step 5): if validation finds **blocking** problems, the sync stops before uploading and shows them with *Fix*, *Upload anyway* (blocked for schema errors) and *Cancel*.
 
 **Behaviour & rules.**
 - After a merge, the regeneration graph is re-run for every changed element and its dependents (joins, hosted elements, rooms, schedules), so that, for example, two walls edited by different users still join correctly.
 - **Seed set:** every element or RXD object whose fingerprint differs from L (the local copy before merging), plus everything that depends on it in the dependency graph (Chapter 2, regeneration). Unchanged parts of the model are not regenerated, so the cost is proportional to the change, not to the model.
 - Regeneration runs in parallel on independent sub-graphs, like an ordinary edit (Chapter 2b).
-- Model validation runs on the merged result: IFC schema rules for changed entities, RXD schema validation, Reviera model rules (overlapping walls, duplicate instances, room boundary problems). New warnings caused by the merge are listed in the sync report and in the warnings list (COL-MNT-004).
+- Model validation runs on the merged result: IFC schema rules for changed entities, RXD schema validation, Riviera model rules (overlapping walls, duplicate instances, room boundary problems). New warnings caused by the merge are listed in the sync report and in the warnings list (COL-MNT-004).
 - **Severity of findings:**
   - *Blocking* (stop before check-in): IFC schema errors on changed entities (wrong types, missing required attributes), duplicate GlobalIds, RXD documents that fail their schema.
   - *Warning* (reported, check-in allowed): model rules such as overlapping walls, rooms not enclosed, elements that failed to regenerate.
@@ -686,7 +686,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.
 
 **Behaviour & rules.**
 - A workset has a name, a kind (*user* or *view*), *visible by default in all views*, and *open by default*.
-- Every element belongs to exactly one workset. Model elements are in user worksets. View-owned elements (annotation, detail items) belong to the *view workset* of their view, which is created automatically for each view and sheet and cannot be edited by hand. (Reviera does not need the reference's separate worksets for families and project standards: those are types and RXD standards objects, which follow ordinary per-object ownership, see deviations.)
+- Every element belongs to exactly one workset. Model elements are in user worksets. View-owned elements (annotation, detail items) belong to the *view workset* of their view, which is created automatically for each view and sheet and cannot be edited by hand. (Riviera does not need the reference's separate worksets for families and project standards: those are types and RXD standards objects, which follow ordinary per-object ownership, see deviations.)
 - A new project has the user worksets *Shared Levels and Grids* (levels, grids, reference planes, scope boxes) and *Workset1* (everything else). Enabling worksets on a project without them (Collaborate › Worksets on first use) shows a dialog to rename these two.
 - Worksets work in Local mode as well (visibility, open/close); ownership applies only in BIMserver mode.
 
@@ -728,7 +728,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.
 **Validation.**
 - Names are 1–128 characters, unique among worksets (case-insensitive), and must not start with the reserved prefix `View: `. Duplicates are refused inline with "A workset with this name already exists".
 - *Delete* is refused for the last remaining user workset, for the active workset (choose another active one first), and in BIMserver mode for a workset owned or borrowed from by another user (the message names them).
-- *Rename* and *Delete* in BIMserver mode need ownership of the workset definition; Reviera borrows the definition object automatically, as for any RXD object.
+- *Rename* and *Delete* in BIMserver mode need ownership of the workset definition; Riviera borrows the definition object automatically, as for any RXD object.
 - *Close* is refused for the active workset (choose another active workset first). Closing a workset that contains elements the user has borrowed asks for confirmation, because those elements cannot be edited until it is reopened; the borrows are kept.
 - *Cancel* discards all changes made in the dialog; ownership changes already written to the ownership document (Editable/Non-editable) are not undone by *Cancel*, and the dialog says so before closing.
 
@@ -759,7 +759,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.
 **Behaviour & rules.**
 - A closed workset's elements are not displayed, not regenerated, not selectable and not included in schedules (a banner on the schedule says so).
 - At open time, *Specify…* lets the user choose which worksets to open; the choice is remembered per user and project (client state).
-- In P1, closed worksets are still downloaded and kept in the working copy; they are just not loaded into the editing session. In P2, Reviera downloads only open worksets, using a BIMserver query restricted to the GlobalIds of the open worksets' elements (verify query support), and fetches the rest when a workset is opened.
+- In P1, closed worksets are still downloaded and kept in the working copy; they are just not loaded into the editing session. In P2, Riviera downloads only open worksets, using a BIMserver query restricted to the GlobalIds of the open worksets' elements (verify query support), and fetches the rest when a workset is opened.
 - Elements of closed worksets still take part in merges (they are in the working copy file), so closing a workset never loses others' changes.
 
 **Commands.** `workset.open(workset_ids[]) -> ()`; `workset.close(workset_ids[]) -> ()`
@@ -775,11 +775,11 @@ Ownership is advisory, so step 7 is what gives it force at merge time.
 **Behaviour & rules.**
 - **Owner identity:** the BIMserver user (COL-BIM-001) plus a client session id (so the same user on two machines is two owners).
 - **Ownership units:** an element (borrowing), a workset (taking it editable), or an RXD object (a view, a sheet, a schedule, a standards object; borrowed when edited, like an element). View-owned annotation is covered by its view: borrowing a view borrows its annotation.
-- **Automatic borrowing:** when a user starts an edit on something nobody owns, Reviera borrows it in the same action (no prompt). The borrow is written to the live ownership document (COL-OWN-002) **before** the edit is committed. If the write fails because someone else claimed it first, the edit is cancelled and the user is offered an editing request (COL-OWN-003).
-- **Up-to-date rule:** an element can be borrowed only if the user's base contains its latest server version. Reviera knows this from the notifications and the ownership document (each ownership entry carries the revision in which its holder last changed the element; each relinquish records it). If the element changed in a newer revision, the user is asked to *Get latest* first.
+- **Automatic borrowing:** when a user starts an edit on something nobody owns, Riviera borrows it in the same action (no prompt). The borrow is written to the live ownership document (COL-OWN-002) **before** the edit is committed. If the write fails because someone else claimed it first, the edit is cancelled and the user is offered an editing request (COL-OWN-003).
+- **Up-to-date rule:** an element can be borrowed only if the user's base contains its latest server version. Riviera knows this from the notifications and the ownership document (each ownership entry carries the revision in which its holder last changed the element; each relinquish records it). If the element changed in a newer revision, the user is asked to *Get latest* first.
 - **Owned by others:** attempting to edit an element or object owned by someone else shows "<user> is editing this element" with *Place request* and *Cancel* (COL-OWN-003). Viewing and selecting are always allowed.
 - **Relinquishing:** happens at synchronise (by option), on *Relinquish All Mine* (Collaborate tab), on close (COL-BIM-006), or by an administrator's *Force relinquish* (server administrators only; logged and notified to the former owner).
-- **Advisory nature:** ownership is enforced by cooperating Reviera clients and by the merge (COL-MRG-001 step 7). A client that ignores it (for example another IFC tool checking in directly) cannot be stopped without a server plugin (COL-OWN-004); its changes are merged like any remote change.
+- **Advisory nature:** ownership is enforced by cooperating Riviera clients and by the merge (COL-MRG-001 step 7). A client that ignores it (for example another IFC tool checking in directly) cannot be stopped without a server plugin (COL-OWN-004); its changes are merged like any remote change.
 - **Offline:** while offline, edits to unowned things create *provisional borrows* that are queued and claimed on reconnection. If a provisional borrow is refused (someone else claimed the element meanwhile), the element is flagged and the merge will treat both edits as a conflict at the next sync.
 
 **Commands.** `ownership.borrow(element_or_object_ids[]) -> result` (normally implicit); `ownership.relinquish(scope: all|elements|worksets, ids[]?) -> ()`; `ownership.query(ids[]) -> ownership_info[]` (query); `ownership.force_relinquish(owner, ids[]?) -> ()` (administrators)
@@ -797,16 +797,16 @@ Ownership is advisory, so step 7 is what gives it force at merge time.
 **Purpose.** Share ownership and lock state among clients immediately, without creating model revisions.
 
 **Behaviour & rules.**
-- **Document:** a small JSON document, the *ownership document*, with schema name `org.reviera.ownership/1.0`. Contents: `version` (integer), `parentVersion`, `baseRoid` (the revision it applies to), `entries[]` (`{target: ifc:<GlobalId> | rv:<id> | workset:<id>, owner: {userId, userName, session}, since, lastChangedRoid}`), `requests[]` (COL-OWN-003), and `syncLock` (`{owner, acquired, expires}` or null). It is **not** embedded in the IFC model and is never part of a check-in.
+- **Document:** a small JSON document, the *ownership document*, with schema name `org.riviera.ownership/1.0`. Contents: `version` (integer), `parentVersion`, `baseRoid` (the revision it applies to), `entries[]` (`{target: ifc:<GlobalId> | rv:<id> | workset:<id>, owner: {userId, userName, session}, since, lastChangedRoid}`), `requests[]` (COL-OWN-003), and `syncLock` (`{owner, acquired, expires}` or null). It is **not** embedded in the IFC model and is never part of a check-in.
 - **Transport (BIMserver extended data, call names from the public BIMserver service interface):**
-  1. One-time per server: register the schema with `ServiceInterface.addExtendedDataSchema` (name `org.reviera.ownership/1.0`) if `getExtendedDataSchemaByName` does not find it.
+  1. One-time per server: register the schema with `ServiceInterface.addExtendedDataSchema` (name `org.riviera.ownership/1.0`) if `getExtendedDataSchemaByName` does not find it.
   2. **Read:** `ServiceInterface.getLastExtendedDataOfRevisionAndSchema {"roid": <latest>, "schemaId": …}` gives the newest ownership item on the latest revision; `ServiceInterface.getFile {"fileId": …}` returns its content. To resolve concurrent writers, the client reads all ownership items of the revision (`getAllExtendedDataOfRevision`, verify) and builds the chain described below.
   3. **Write:** `ServiceInterface.uploadFile` with the new JSON (base64) returns a file id; `ServiceInterface.addExtendedDataToRevision {"roid": <latest>, "extendedData": {"schemaId": …, "fileId": …, "title": "ownership v<N>"}}` attaches it.
 - **Optimistic concurrency with a deterministic chain:** each write declares `parentVersion` = the version it was based on, and `version = parentVersion + 1`. When two clients write children of the same parent, the one attached first (lowest extended-data object id) wins; the others are *rejected writes*. Every client computes the same current state by following, from the root, the earliest child of each version. A client that sees its own write rejected re-reads, re-applies its change to the winning state if still valid (for example the element is still unowned), and writes again; otherwise it reports the refusal to the user (COL-OWN-001).
 - **New revisions:** the client that checks in a revision immediately writes the carried-forward ownership state (after its relinquishes) as the root (`version` 1, `parentVersion` null) on the new revision. Until a root exists on the newest revision, clients keep using the chain on the previous revision.
 - **Refresh:** clients refresh on new-revision and new-extended-data notifications (COL-BIM-007), and otherwise poll at the update frequency (default 30 s). Before any borrow, the client re-reads the document (not the cache).
 - **Sync lock:** the `syncLock` field implements the "central model in use" lock of COL-BIM-006: a client acquires it by a successful write with itself as holder and an expiry time; it renews by further writes; it releases it by writing null. An expired lock may be taken over by any client.
-- **Growth:** each revision accumulates ownership items; Reviera never deletes them (history is useful for audit), and a new revision starts a fresh chain.
+- **Growth:** each revision accumulates ownership items; Riviera never deletes them (history is useful for audit), and a new revision starts a fresh chain.
 - **Local mode:** there is no ownership document; all ownership commands return `mode.not_available`.
 
 **Acceptance criteria.**
@@ -815,7 +815,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.
 - [x] Borrowing and relinquishing elements does not create any new model revision.
 - [ ] After user A checks in, user B (who still has base = previous revision) still sees A's remaining borrows.
 
-*Built (2026-10-29), the sync lock:* the ownership document `org.reviera.ownership/1.0` (version, parentVersion, baseRoid, entries, requests, syncLock with owner {userId, userName, session}, acquired, expires) in BIMserver extended data: the schema registered on first use (`getExtendedDataSchemaByName`, `addExtendedDataSchema`), written by `uploadFile` and `addExtendedDataToRevision`, read by `getAllExtendedDataOfRevision` and `getFile`, the current state the chain from the root through the earliest child of each version (oid order). All verified on BIMserver 1.6.1. Entries and requests are carried forward but not yet used (borrowing, COL-OWN-001/003).
+*Built (2026-10-29), the sync lock:* the ownership document `org.riviera.ownership/1.0` (version, parentVersion, baseRoid, entries, requests, syncLock with owner {userId, userName, session}, acquired, expires) in BIMserver extended data: the schema registered on first use (`getExtendedDataSchemaByName`, `addExtendedDataSchema`), written by `uploadFile` and `addExtendedDataToRevision`, read by `getAllExtendedDataOfRevision` and `getFile`, the current state the chain from the root through the earliest child of each version (oid order). All verified on BIMserver 1.6.1. Entries and requests are carried forward but not yet used (borrowing, COL-OWN-001/003).
 
 ### Editing requests
 **ID:** COL-OWN-003 · **Priority:** P1 · **Ref:** research/04 §7.1, §7.5; web: Grant a Request to Borrow an Element; web: Granted, Denied, and Retracted Requests · screenshots/documentation/editing_request_received.png
@@ -893,16 +893,16 @@ Ownership is advisory, so step 7 is what gives it force at merge time.
 
 **Purpose.** For teams that need ownership to be binding even for other clients.
 
-> **Deferred (owner, 2026-10-12).** Ownership follows what the target BIMserver release supports. Stock BIMserver has no locking, so Reviera's ownership is advisory (COL-OWN-001…003), and the Reviera project does **not** build or ship an enforcement plugin. The capability check below stays in P1 so that Reviera uses enforcement automatically if BIMserver itself, or a separately maintained plugin, ever provides it. The behaviour below describes what such a server-side facility must offer.
+> **Deferred (owner, 2026-10-12).** Ownership follows what the target BIMserver release supports. Stock BIMserver has no locking, so Riviera's ownership is advisory (COL-OWN-001…003), and the Riviera project does **not** build or ship an enforcement plugin. The capability check below stays in P1 so that Riviera uses enforcement automatically if BIMserver itself, or a separately maintained plugin, ever provides it. The behaviour below describes what such a server-side facility must offer.
 
 **Behaviour & rules.**
 - An optional BIMserver service plugin (Java, distributed separately under a licence compatible with BIMserver's AGPL-3.0) provides: an atomic compare-and-set endpoint for the ownership document (replacing the optimistic chain), and a check-in validator that rejects revisions changing elements owned by someone other than the uploader (comparing the uploaded model with the previous revision by GlobalId).
-- Reviera detects the plugin through the server's plugin list and uses it automatically; otherwise it falls back to COL-OWN-002.
+- Riviera detects the plugin through the server's plugin list and uses it automatically; otherwise it falls back to COL-OWN-002.
 
 **Commands.** No new commands; `bimserver.capabilities() -> capability_set` (query) reports whether enforcement is available.
 
 **Acceptance criteria.**
-- [ ] With the plugin installed, a check-in from a non-Reviera client that modifies an element owned by a Reviera user is rejected by the server.
+- [ ] With the plugin installed, a check-in from a non-Riviera client that modifies an element owned by a Riviera user is rejected by the server.
 
 ### Worksharing display modes
 **ID:** COL-WS-004 · **Priority:** P1 · **Ref:** research/04 §7.5 · screenshots/documentation/worksharing_display_worksets.png · screenshots/documentation/worksharing_display_owners.png
@@ -914,7 +914,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.
 **Behaviour & rules.**
 - **Checkout status:** owned by me / owned by others / not owned.
 - **Owners:** one colour per owner (stable, chosen from a distinct palette).
-- **Model updates:** up to date; changed in a newer server revision; deleted in a newer server revision. Reviera knows which elements changed from the notifications: after a new-revision event, the client downloads the revision in the background (or uses the server comparison where available) and compares fingerprints with its base (§6.3, steps 1–3), without merging.
+- **Model updates:** up to date; changed in a newer server revision; deleted in a newer server revision. Riviera knows which elements changed from the notifications: after a new-revision event, the client downloads the revision in the background (or uses the server comparison where available) and compares fingerprints with its base (§6.3, steps 1–3), without merging.
 - **Worksets:** one colour per workset.
 - The mode is applied as layer 6a of the graphics model (Chapter 5, DOC-GFX-001): a temporary colour override that is not printed and not saved.
 - Tooltips over an element show its workset, owner, borrowers and update status.
@@ -937,7 +937,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.
 **Purpose.** Keep working when the server is unreachable, and never lose local work.
 
 **Behaviour & rules.**
-- Each opened BIMserver project has a working-copy folder in the user's data directory: `<data>/reviera/bimserver/<server-id>/<poid>/` containing:
+- Each opened BIMserver project has a working-copy folder in the user's data directory: `<data>/riviera/bimserver/<server-id>/<poid>/` containing:
   - `working.ifc`: the working copy (IFC with embedded RXD), saved by Ctrl+S and by autosave;
   - `base.ifc`: the unmodified base revision, used for three-way merges;
   - `state.json`: client state (server profile id, `poid`, base `roid`, user, open/closed worksets, last sync time, queued ownership operations, queued editing requests);
@@ -954,7 +954,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.
 
 **Acceptance criteria.**
 - [ ] With the network disconnected, a user opens a BIMserver project from the working copy, edits it, saves and closes; on reconnection, synchronise uploads the edits.
-- [ ] Killing the Reviera process after 10 unsaved edits and reopening restores all 10 from the journal.
+- [ ] Killing the Riviera process after 10 unsaved edits and reopening restores all 10 from the journal.
 - [ ] A borrow made offline on an element that another user borrowed meanwhile is reported on reconnection, and the element is flagged for conflict review.
 
 ---
@@ -978,9 +978,9 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 3. Choose the workset for the link instance (BIMserver mode) and *Attachment* or *Overlay*.
 
 **Behaviour & rules.**
-- **Loading:** the linked file is parsed with IfcOpenShell into a read-only model in its own element space. If it carries Reviera Extension Data, its views and annotation are available for *By linked view* display (COL-LNK-007); other tools' `IfcAnnotation` content is shown as read-only drafting.
+- **Loading:** the linked file is parsed with IfcOpenShell into a read-only model in its own element space. If it carries Riviera Extension Data, its views and annotation are available for *By linked view* display (COL-LNK-007); other tools' `IfcAnnotation` content is shown as read-only drafting.
 - **BIMserver sources:** the link is downloaded like a revision (COL-BIM-003) into the working-copy `cache/`. For *latest* links, a new revision of the linked project triggers a notification "Link <name> has a new revision" with *Reload*. Source syntax: `bimserver://<server-id>/<poid>` (latest) or `bimserver://<server-id>/<poid>/<roid>` (pinned).
-- **Local file sources:** Reviera watches the file and offers *Reload* when it changes.
+- **Local file sources:** Riviera watches the file and offers *Reload* when it changes.
 - **Selection and use:** linked elements can be selected with Tab, or directly when the *Select links* toggle is on; they can be tagged, dimensioned, scheduled (*Include elements in links*), used as references for snapping and hosting of view annotation, copied into the host (as new elements with new GlobalIds), monitored (COL-CM-001) and clash-checked (COL-CLASH-001). References use `link:<linkId>/ifc:<GlobalId>` (Chapter 2a).
 - **Room bounding:** a link type option makes linked walls, floors and columns bound host rooms.
 - **Phase mapping:** each link type maps the linked model's phases (from its RXD, or from IFC status properties) to host phases; unmapped phases map to the nearest earlier host phase.
@@ -1023,10 +1023,10 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 
 **Purpose.** Use laser scans of existing buildings as references.
 
-**Workflow.** Insert › Link › Point Cloud: choose E57, LAS, LAZ, COPC (cloud-optimised LAZ) or PLY files; positioning (as COL-LNK-001); Reviera indexes the file on first use.
+**Workflow.** Insert › Link › Point Cloud: choose E57, LAS, LAZ, COPC (cloud-optimised LAZ) or PLY files; positioning (as COL-LNK-001); Riviera indexes the file on first use.
 
 **Behaviour & rules.**
-- **Readers:** libE57Format (Boost licence) for E57; `las`/`laz` Rust crates (MIT/Apache) for LAS/LAZ; Reviera's own PLY reader.
+- **Readers:** libE57Format (Boost licence) for E57; `las`/`laz` Rust crates (MIT/Apache) for LAS/LAZ; Riviera's own PLY reader.
 - **Indexing:** every cloud is converted once into an octree in the open COPC format (LAZ 1.4 with a hierarchical index), stored next to the source file or in the working-copy cache. Indexing runs in the background on all cores, with progress. Scans in a multi-scan E57 file become *scan regions*.
 - **Display:** the GPU viewport streams octree nodes by screen-space error within a point budget (default 5 million points), with point size and eye-dome lighting for depth perception. Colour modes: normal (RGB), single colour, by elevation, by intensity, by normal.
 - Point clouds are clipped by section boxes, crop regions and view ranges like model geometry; they appear in hidden-line views as points (not as linework).
@@ -1057,7 +1057,7 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 - **Rendering cache:** the page is rasterised once per dpi and cached in the working-copy or project cache folder; zooming in beyond the cached resolution re-renders the visible tiles at higher resolution in the background, up to the chosen dpi × 4.
 - **Vector extraction:** paths are flattened to lines and arcs in page coordinates; text is not extracted. Pages with more than 2 million path segments keep snapping off and show a note.
 - **Calibration** keeps the aspect ratio. The real distance must be greater than zero and the two points at least 1 mm apart on paper; otherwise the command fails with `underlay.bad_calibration`. Calibration is undoable and can be repeated.
-- **Linked PDFs:** a changed source file is detected on open and on *Reload* (COL-LNK-006); a missing file shows the last cached raster greyed with "not found", and the underlay keeps its position and calibration. If the reloaded page has different paper dimensions, Reviera keeps the calibration scale and warns.
+- **Linked PDFs:** a changed source file is detected on open and on *Reload* (COL-LNK-006); a missing file shows the last cached raster greyed with "not found", and the underlay keeps its position and calibration. If the reloaded page has different paper dimensions, Riviera keeps the calibration scale and warns.
 - **Imported PDFs** are stored as RXD assets and do not depend on the source file.
 - The underlay never prints when the view property *Show underlays in print* is off (default on); it is never exported to IFC.
 - **Interactive placement and calibration** follow the micro-operation rule (conventions §2.1): micro-ops `pdf.place_point{xy}` and `underlay.calib_point{index, xy}`, `underlay.calib_distance{value}`; replay re-applies the recorded points and reopens the calibration prompt at the last missing step.
@@ -1071,7 +1071,7 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 - [ ] The cursor snaps to end points of PDF vector lines.
 - [ ] Deleting the source of a linked PDF shows the underlay greyed as "not found" at the same position; restoring the file and reloading shows it normally with its calibration kept.
 - [ ] *Link PDF* is disabled in a 3D view.
-- [ ] Killing Reviera after the first calibration point and reopening resumes calibration at the second point.
+- [ ] Killing Riviera after the first calibration point and reopening resumes calibration at the second point.
 
 ### Image underlays
 **ID:** COL-LNK-005 · **Priority:** P1 · **Ref:** research/04 §8.1 (*PDF / Image*)
@@ -1131,7 +1131,7 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
   - BIMserver links also show *Newer revision available* (latest-following links) or *Pinned* in the revision column.
 - **Actions** (on one or many rows): Reload, Reload From… (a different file, or a different server project or revision), Unload, Remove, Add, Bind (IFC links: copy the linked elements into the host as new elements with new GlobalIds, after a warning), Save Positions (write a moved instance's position back as a named position, COL-POS-004), Show (select the instance or underlay in a view), Manage Worksets (open or close the linked model's worksets per instance).
   - *Reload* re-reads the source; elements are re-matched by GlobalId so that tags, dimensions, monitors, clash results and issues keep their references; references whose element disappeared are orphaned and listed (COL-CM-003 for hosted elements). After reload, monitored pairs are re-checked (COL-CM-002).
-  - *Reload From…* changes the source and reloads. Changing between a local file and a server source is allowed. If fewer than 50 % of referenced GlobalIds are found in the new source, Reviera warns before committing ("this looks like a different model").
+  - *Reload From…* changes the source and reloads. Changing between a local file and a server source is allowed. If fewer than 50 % of referenced GlobalIds are found in the new source, Riviera warns before committing ("this looks like a different model").
   - *Unload* keeps the link and its instances; annotation that refers to unloaded elements is hidden, not deleted.
   - *Remove* deletes the link type, all its instances, and asks what to do with annotation and monitor pairs that refer to it (*Delete them* or *Keep as orphans*); the confirmation states the counts.
   - *Add* opens the matching insert command (Link IFC, Link CAD, Point Cloud, PDF, Image) for the chosen type filter.
@@ -1186,10 +1186,10 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 **Purpose.** Locate the model in project terms and in the real world.
 
 **Behaviour & rules.**
-- **Internal origin:** the origin of the IFC model's world coordinate system (the `WorldCoordinateSystem` of the project's `IfcGeometricRepresentationContext`, normally at (0,0,0) with no rotation). All Reviera geometry is stored relative to it. It cannot be moved. It can be shown in views through the *Site › Internal Origin* sub-category.
+- **Internal origin:** the origin of the IFC model's world coordinate system (the `WorldCoordinateSystem` of the project's `IfcGeometricRepresentationContext`, normally at (0,0,0) with no rotation). All Riviera geometry is stored relative to it. It cannot be moved. It can be shown in views through the *Site › Internal Origin* sub-category.
 - **Project base point (PBP):** the origin of the *project coordinate system* that users dimension from and report spot coordinates against (Chapter 5, DOC-ANN-006/007). Its properties are its position relative to the internal origin and the *angle to true north*. Moving the PBP changes the project coordinate system only; the model does not move. Pinning prevents accidental moves.
 - **Survey point (SP):** a known point of the *shared coordinate system*, which is the real-world map grid (for example a national grid). Its properties are its shared coordinates (easting, northing, elevation). Moving the survey point graphically, or *Specify coordinates at a point* (COL-POS-004), redefines the shared coordinates of the whole model; the model does not move relative to the internal origin.
-- **Distance warning:** if model geometry lies more than a set distance from the internal origin (default 20 km, user setting), Reviera warns that geometric operations may lose precision, and offers to move the geometry and adjust the project base point and shared coordinates so that real-world positions are preserved.
+- **Distance warning:** if model geometry lies more than a set distance from the internal origin (default 20 km, user setting), Riviera warns that geometric operations may lose precision, and offers to move the geometry and adjust the project base point and shared coordinates so that real-world positions are preserved.
 - **Plan orientation:** each plan has *Orientation: Project North / True North* (Chapter 5, DOC-GFX-015).
 - **Rotate project north:** rotates the project coordinate system (and so the presentation of every plan set to project north), for example to square the building on sheets. It changes the PBP angle; the model does not rotate relative to the internal origin.
 - **Rotate true north:** rotates the shared coordinate system relative to the project (changes the map conversion angle, COL-POS-003).
@@ -1219,9 +1219,9 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 - **Privacy:** when the online service is off, the *Address* and *Map* options are disabled with a tooltip explaining how to enable them in Options; no request leaves the machine. The service URL is a user setting (any Nominatim-compatible geocoder and any XYZ tile server).
 - **Validation:** latitude −90…90°, longitude −180…180°, elevation −500…9 000 m; out-of-range values are refused inline. The time zone is an IANA name (for example `Europe/London`); daylight saving is derived from it.
 - Latitude, longitude and elevation are written to `IfcSite.RefLatitude`, `RefLongitude` and `RefElevation`.
-- **IFC form:** latitude and longitude are written as `IfcCompoundPlaneAngleMeasure` (degrees, minutes, seconds, millionths of a second, with a common sign). Reviera converts from decimal degrees with rounding to the nearest millionth of a second (about 0.03 mm) and reads both four- and three-part forms.
+- **IFC form:** latitude and longitude are written as `IfcCompoundPlaneAngleMeasure` (degrees, minutes, seconds, millionths of a second, with a common sign). Riviera converts from decimal degrees with rounding to the nearest millionth of a second (about 0.03 mm) and reads both four- and three-part forms.
 - If the project has several `IfcSite` objects (several buildings), the location is written to the site chosen as *project site* (default: the first); the others keep their own values.
-- The location does not move the model and does not change shared coordinates. If a CRS is set (COL-POS-003), Reviera compares the location with the position implied by the map conversion and warns when they differ by more than 1 km ("Location and shared coordinates disagree"), offering to update either one.
+- The location does not move the model and does not change shared coordinates. If a CRS is set (COL-POS-003), Riviera compares the location with the position implied by the map conversion and warns when they differ by more than 1 km ("Location and shared coordinates disagree"), offering to update either one.
 - The location drives sun position (Chapter 5, DOC-GFX-012, DOC-OUT-011) and, when a CRS is chosen, can be converted to and from map coordinates with PROJ (MIT licence).
 
 **Data (IFC/RXD).** `IfcSite.RefLatitude`, `RefLongitude`, `RefElevation`, and `IfcPostalAddress` (on `IfcSite.SiteAddress`) for the address. Time zone, weather station and climate file reference: RXD document `project/location`.
@@ -1240,14 +1240,14 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 **Purpose.** Store shared coordinates in standard IFC, so that every IFC tool places the model correctly.
 
 **Behaviour & rules.**
-- **Coordinate reference system:** Manage › Project Location › Coordinate System: choose a projected CRS by EPSG code or name search (from the PROJ database), plus a vertical datum. Reviera writes an `IfcProjectedCRS` with `Name` (for example `EPSG:27700`), `Description`, `GeodeticDatum`, `VerticalDatum`, `MapProjection`, `MapZone` and `MapUnit` (an `IfcNamedUnit`) where known.
+- **Coordinate reference system:** Manage › Project Location › Coordinate System: choose a projected CRS by EPSG code or name search (from the PROJ database), plus a vertical datum. Riviera writes an `IfcProjectedCRS` with `Name` (for example `EPSG:27700`), `Description`, `GeodeticDatum`, `VerticalDatum`, `MapProjection`, `MapZone` and `MapUnit` (an `IfcNamedUnit`) where known.
 - **Map conversion:** shared coordinates are the image of internal coordinates under one similarity transform, written as an `IfcMapConversion` with `SourceCRS` = the project's 3D model `IfcGeometricRepresentationContext`, `TargetCRS` = the `IfcProjectedCRS`, and:
   - `Eastings`, `Northings`, `OrthogonalHeight`: the shared coordinates of the internal origin;
   - `XAxisAbscissa`, `XAxisOrdinate`: cosine and sine of the angle from the internal x axis to the map's easting axis (grid north rotation);
   - `Scale`: the ratio of map units to model length units, combined with the CRS's scale factor at the site if the user enables *Apply grid scale factor* (default off; IFC4X3 projects may use the scaled map-conversion entity where the schema provides one).
-- **Deriving the conversion from the survey point:** with survey point internal position `s`, its shared coordinates `(E, N, H)`, and rotation `θ`, the translation is `(E, N, H) − R(θ)·s`, where `R(θ)` rotates about the vertical axis. Reviera recomputes and rewrites `IfcMapConversion` whenever the survey point, shared coordinates or true-north rotation change.
-- **True north:** `IfcGeometricRepresentationContext.TrueNorth` is set to the direction of geodetic true north in internal coordinates. Grid north (from the map conversion) and true north differ by the meridian convergence at the site, which Reviera computes with PROJ; the UI shows both and lets the user say which one *Angle to true north* means (default: grid north, which is what surveys normally give).
-- **Reading:** when a foreign IFC with `IfcMapConversion` is opened or linked, Reviera derives its shared coordinate system from it. IFC2X3 files with only the IFC2X3 property-set convention for georeferencing (`ePSet_MapConversion` / `ePSet_ProjectedCRS`) are read too.
+- **Deriving the conversion from the survey point:** with survey point internal position `s`, its shared coordinates `(E, N, H)`, and rotation `θ`, the translation is `(E, N, H) − R(θ)·s`, where `R(θ)` rotates about the vertical axis. Riviera recomputes and rewrites `IfcMapConversion` whenever the survey point, shared coordinates or true-north rotation change.
+- **True north:** `IfcGeometricRepresentationContext.TrueNorth` is set to the direction of geodetic true north in internal coordinates. Grid north (from the map conversion) and true north differ by the meridian convergence at the site, which Riviera computes with PROJ; the UI shows both and lets the user say which one *Angle to true north* means (default: grid north, which is what surveys normally give).
+- **Reading:** when a foreign IFC with `IfcMapConversion` is opened or linked, Riviera derives its shared coordinate system from it. IFC2X3 files with only the IFC2X3 property-set convention for georeferencing (`ePSet_MapConversion` / `ePSet_ProjectedCRS`) are read too.
 - **Export coordinate base** (Chapter 5, DOC-OUT-006): *internal origin* writes geometry unchanged with the map conversion; *project base point* or *shared coordinates* write the IFC with geometry shifted so that the chosen origin becomes (0,0,0), and adjust the map conversion so that real-world positions are unchanged.
 
 **Commands.** `coord.set_crs(epsg_or_wkt, vertical_datum?, apply_scale_factor?) -> ()`; `coord.get_georeference() -> {crs, map_conversion, true_north, grid_convergence}` (query)
@@ -1269,7 +1269,7 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 - **Report shared coordinates:** click a point to read its shared coordinates (and project coordinates); also available as `coord.report_point` for scripts.
 - **Reset shared coordinates:** makes the shared coordinate system equal to the internal one (identity map conversion), after confirmation.
 - **Named positions (sites):** a project can hold several named shared positions (for example, the same building placed at two sites). Each link instance records which named position of the linked model it uses, and *Auto – by shared coordinates* asks which named position to use when the link has more than one. Only the *current* named position is written to the project's `IfcMapConversion`; the others are RXD (`project/settings`, section `positioning.namedPositions`).
-- **Moving a link instance:** after moving or rotating an instance placed by shared coordinates, Reviera asks on save whether to *Record the new position* in the link (as publish), *Keep the old shared position* (the instance becomes manually positioned), or *Cancel*.
+- **Moving a link instance:** after moving or rotating an instance placed by shared coordinates, Riviera asks on save whether to *Record the new position* in the link (as publish), *Keep the old shared position* (the instance becomes manually positioned), or *Cancel*.
 
 **Commands.** `coord.acquire(instance_id) -> ()`; `coord.publish(instance_id, position_name?) -> ()`; `link.save_positions(link_ids[]) -> ()`; `coord.specify_at_point(point, easting, northing, elevation, angle?) -> ()`; `coord.report_point(point) -> {shared, project, internal}` (query); `coord.reset_shared() -> ()`; `coord.create_named_position(name) -> position_id`; `coord.set_current_position(position_id) -> ()`
 
@@ -1316,7 +1316,7 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 - [ ] Copying a wall with *Copy hosted openings* also copies its doors and windows, each monitored.
 - [ ] *Cancel* after copying five grids leaves the host without those grids and without monitor pairs; *Finish* followed by one Undo gives the same result.
 - [ ] Trying to monitor a host level against a linked grid is refused with a category-mismatch message.
-- [ ] Killing Reviera after three copies inside a session and reopening shows the session with the three pending copies.
+- [ ] Killing Riviera after three copies inside a session and reopening shows the session with the three pending copies.
 
 ### Coordination review
 **ID:** COL-CM-002 · **Priority:** P1 · **Ref:** research/04 §8.4 (*Coordination Review*); web: Actions for Coordination Review; web: Review Warnings for Monitored Elements
@@ -1324,9 +1324,9 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 **Purpose.** Show and settle changes found on monitored pairs.
 
 **Workflow.**
-1. After a link reload (or when a host element is edited), Reviera checks every affected pair; if anything changed, a warning says "Coordination review needed for <link>".
+1. After a link reload (or when a host element is edited), Riviera checks every affected pair; if anything changed, a warning says "Coordination review needed for <link>".
 2. Collaborate › Coordinate › Coordination Review ▾ › *Select Link* / *Use Current Project* opens the review dialog: a tree grouped by status and category, each item describing the change (moved by 120 mm; renamed from "Level 3" to "L03"; deleted; parameter X changed from a to b; type changed).
-3. Per item: *Postpone* (leave for later), *Reject* (the change in the source is wrong; keep the host and record the rejection, which the source's author can see if they also run Reviera with this host linked), *Accept difference* (update the snapshot; keep the host as it is), *Modify host* (move, rename or edit the host element to match), and a comment. *Show* zooms to the pair. *Create report* writes an HTML or CSV report.
+3. Per item: *Postpone* (leave for later), *Reject* (the change in the source is wrong; keep the host and record the rejection, which the source's author can see if they also run Riviera with this host linked), *Accept difference* (update the snapshot; keep the host as it is), *Modify host* (move, rename or edit the host element to match), and a comment. *Show* zooms to the pair. *Create report* writes an HTML or CSV report.
 
 **UI (Coordination Review dialog).** Opened with `coordreview.show(link_instance_id?)`: with a link instance it reviews pairs whose source is in that link; without it, pairs inside the current project. Modeless, so *Show* can be used while it is open.
 - **Header:** the scope (link instance name or "Current project"), a *Group by* choice (status → category → change kind, the default; or category → status → change kind), and a filter for status (default: pending and postponed).
@@ -1516,15 +1516,15 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 **Commands.** `bcf.create_topic(title, description?, fields?, view_id?, element_ids[]?) -> topic_id`; `bcf.update_topic(topic_id, fields) -> ()`; `bcf.add_comment(topic_id, text, viewpoint?: current|none) -> comment_id`; `bcf.add_viewpoint(topic_id, view_id?) -> viewpoint_id`; `bcf.delete_topic(topic_ids[]) -> ()`; `bcf.import(path) -> import_report`; `bcf.export(path, topic_ids[]?, version: 2.1|3.0) -> ()`; `bcf.list(filter?) -> topic_summary[]` (query)
 
 **Acceptance criteria.**
-- [ ] A `.bcfzip` exported from Reviera imports into at least two other BCF-capable tools with titles, comments, snapshots and camera positions intact.
-- [ ] A BCF 2.1 file from another tool imports into Reviera and its viewpoints restore the camera and selection.
+- [ ] A `.bcfzip` exported from Riviera imports into at least two other BCF-capable tools with titles, comments, snapshots and camera positions intact.
+- [ ] A BCF 2.1 file from another tool imports into Riviera and its viewpoints restore the camera and selection.
 - [ ] Two users commenting on the same topic in BIMserver mode both see both comments after synchronising.
 
-*Built (2026-10-26), topics and archives:* topics are kept with the model as RXD objects (`rxd:coordination/issues/<topic guid>`, one per topic; a topic's comments and viewpoints inside it), so they save, reopen and undo with the model. `bcf.create_topic` (from the active 3D view's viewpoint and the selection or `element_ids`; type Issue and status Open unless given), `bcf.update_topic` (recording the modification date and author), `bcf.add_comment` (optionally on one of its viewpoints), `bcf.add_viewpoint`, `bcf.apply_viewpoint` (COL-BCF-003), `bcf.delete_topic`, `bcf.list` (filters: status, type, priority, assignee, label, text) and `bcf.get`; beneath them `bcf.put_topic`, `bcf.put_viewpoint` and `bcf.merge_topics`. `bcf.export` writes a `.bcf` archive in BCF 3.0 (bcf.version, extensions.xml with the project's lists, per topic markup.bcf and `<guid>.bcfv`) or 2.1 (comments and viewpoints beside the topic, no aspect ratio); `bcf.import` reads either and merges by topic GUID: the fields of whichever changed last, comments and viewpoints joined by GUID (a comment changed later is taken). Exports validate against buildingSMART's BCF 3.0 and 2.1 XSDs. Authors are given or the system's user name (no user identity yet, UI-IDENT-001); the lists (`bcf.lists`) are Reviera's defaults and every value in use. View › Coordination › New Issue, Issues (a dialog: Show, Edit, Comment, Add View, Delete), Import BCF and Export BCF, also in the File menu. *(Owner, 2026-10-26: "commit and push work, continue feature development".)* *Built (2026-10-26), snapshots:* New Issue and Add View render the 3D view as it shows (camera, section box and slices, temporary hide and isolate; 1024 × 768 PNG, offscreen) and keep the picture with the model as its own RXD object per viewpoint (`rxd:coordination/snapshots/<viewpoint guid>`, at most 4 MB), in the same step as the topic or viewpoint; deleting a topic deletes its snapshots. Exports write each beside its viewpoint (`<guid>.png`, the markup's `Snapshot`); imports keep a file's PNG or JPEG snapshots for viewpoints that have none. `bcf.snapshot(viewpoint_id)` returns one (base64). Not yet: issues from clash results and review items, document references and project.bcfp, the lists as edited extensions, the docked Issues pane with filters (COL-BCF-004), BIMserver merge (third criterion), BCF API (COL-BCF-002).
+*Built (2026-10-26), topics and archives:* topics are kept with the model as RXD objects (`rxd:coordination/issues/<topic guid>`, one per topic; a topic's comments and viewpoints inside it), so they save, reopen and undo with the model. `bcf.create_topic` (from the active 3D view's viewpoint and the selection or `element_ids`; type Issue and status Open unless given), `bcf.update_topic` (recording the modification date and author), `bcf.add_comment` (optionally on one of its viewpoints), `bcf.add_viewpoint`, `bcf.apply_viewpoint` (COL-BCF-003), `bcf.delete_topic`, `bcf.list` (filters: status, type, priority, assignee, label, text) and `bcf.get`; beneath them `bcf.put_topic`, `bcf.put_viewpoint` and `bcf.merge_topics`. `bcf.export` writes a `.bcf` archive in BCF 3.0 (bcf.version, extensions.xml with the project's lists, per topic markup.bcf and `<guid>.bcfv`) or 2.1 (comments and viewpoints beside the topic, no aspect ratio); `bcf.import` reads either and merges by topic GUID: the fields of whichever changed last, comments and viewpoints joined by GUID (a comment changed later is taken). Exports validate against buildingSMART's BCF 3.0 and 2.1 XSDs. Authors are given or the system's user name (no user identity yet, UI-IDENT-001); the lists (`bcf.lists`) are Riviera's defaults and every value in use. View › Coordination › New Issue, Issues (a dialog: Show, Edit, Comment, Add View, Delete), Import BCF and Export BCF, also in the File menu. *(Owner, 2026-10-26: "commit and push work, continue feature development".)* *Built (2026-10-26), snapshots:* New Issue and Add View render the 3D view as it shows (camera, section box and slices, temporary hide and isolate; 1024 × 768 PNG, offscreen) and keep the picture with the model as its own RXD object per viewpoint (`rxd:coordination/snapshots/<viewpoint guid>`, at most 4 MB), in the same step as the topic or viewpoint; deleting a topic deletes its snapshots. Exports write each beside its viewpoint (`<guid>.png`, the markup's `Snapshot`); imports keep a file's PNG or JPEG snapshots for viewpoints that have none. `bcf.snapshot(viewpoint_id)` returns one (base64). Not yet: issues from clash results and review items, document references and project.bcfp, the lists as edited extensions, the docked Issues pane with filters (COL-BCF-004), BIMserver merge (third criterion), BCF API (COL-BCF-002).
 
 *Built (2026-10-31), the docked Issues pane (COL-BCF-004, in part):* Window › Issues and View › Coordination › Issues show a pane docked at the bottom: the issues with status, author, date and replies; the chosen one's snapshot and comments; Show, Reply…, Resolve/Reopen, New Issue… and Refresh, and an all/open/resolved filter. A FileEngine model's issues come from the server (COL-FE-009), and other models show their BCF topics. Not yet: the other filters (type, priority, assignee, label, text), editing fields in the pane, several viewpoints per issue.
 
-*Built (2026-10-26), topics and archives:* topics are kept with the model as RXD objects (`rxd:coordination/issues/<topic guid>`, one per topic; a topic's comments and viewpoints inside it), so they save, reopen and undo with the model. `bcf.create_topic` (from the active 3D view's viewpoint and the selection or `element_ids`; type Issue and status Open unless given), `bcf.update_topic` (recording the modification date and author), `bcf.add_comment` (optionally on one of its viewpoints), `bcf.add_viewpoint`, `bcf.apply_viewpoint` (COL-BCF-003), `bcf.delete_topic`, `bcf.list` (filters: status, type, priority, assignee, label, text) and `bcf.get`; beneath them `bcf.put_topic`, `bcf.put_viewpoint` and `bcf.merge_topics`. `bcf.export` writes a `.bcf` archive in BCF 3.0 (bcf.version, extensions.xml with the project's lists, per topic markup.bcf and `<guid>.bcfv`) or 2.1 (comments and viewpoints beside the topic, no aspect ratio); `bcf.import` reads either and merges by topic GUID: the fields of whichever changed last, comments and viewpoints joined by GUID (a comment changed later is taken). Exports validate against buildingSMART's BCF 3.0 and 2.1 XSDs. The authors are given or the system's user name (no user identity yet, UI-IDENT-001); the lists (`bcf.lists`) are Reviera's defaults and every value in use. View › Coordination › New Issue, Issues (a dialog: Show, Edit, Comment, Add View, Delete), Import BCF and Export BCF, also in the File menu. *(Owner, 2026-10-26: \"commit and push work, continue feature development\".)* Not yet: snapshots (named on import, not kept), issues from clash results and review items, document references and project.bcfp, the lists as edited extensions, the docked Issues pane with filters (COL-BCF-004), BIMserver merge (third criterion), BCF API (COL-BCF-002).
+*Built (2026-10-26), topics and archives:* topics are kept with the model as RXD objects (`rxd:coordination/issues/<topic guid>`, one per topic; a topic's comments and viewpoints inside it), so they save, reopen and undo with the model. `bcf.create_topic` (from the active 3D view's viewpoint and the selection or `element_ids`; type Issue and status Open unless given), `bcf.update_topic` (recording the modification date and author), `bcf.add_comment` (optionally on one of its viewpoints), `bcf.add_viewpoint`, `bcf.apply_viewpoint` (COL-BCF-003), `bcf.delete_topic`, `bcf.list` (filters: status, type, priority, assignee, label, text) and `bcf.get`; beneath them `bcf.put_topic`, `bcf.put_viewpoint` and `bcf.merge_topics`. `bcf.export` writes a `.bcf` archive in BCF 3.0 (bcf.version, extensions.xml with the project's lists, per topic markup.bcf and `<guid>.bcfv`) or 2.1 (comments and viewpoints beside the topic, no aspect ratio); `bcf.import` reads either and merges by topic GUID: the fields of whichever changed last, comments and viewpoints joined by GUID (a comment changed later is taken). Exports validate against buildingSMART's BCF 3.0 and 2.1 XSDs. The authors are given or the system's user name (no user identity yet, UI-IDENT-001); the lists (`bcf.lists`) are Riviera's defaults and every value in use. View › Coordination › New Issue, Issues (a dialog: Show, Edit, Comment, Add View, Delete), Import BCF and Export BCF, also in the File menu. *(Owner, 2026-10-26: \"commit and push work, continue feature development\".)* Not yet: snapshots (named on import, not kept), issues from clash results and review items, document references and project.bcfp, the lists as edited extensions, the docked Issues pane with filters (COL-BCF-004), BIMserver merge (third criterion), BCF API (COL-BCF-002).
 
 ### BCF issues pane
 **ID:** COL-BCF-004 · **Priority:** P1 · **Ref:** research/04 §6.7 (*Integrated Issues*), §8.5; COL-BCF-001
@@ -1541,7 +1541,7 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 - **Filter bar:** text search (title, description, comments), and drop-down filters for status, type, priority, assignee (including *Me*), labels, stage, due date (overdue, this week, none), *Has elements in this view*, and *Source* (manual, clash test, coordination review, imported). Filters combine with AND; the active filter is remembered per user and project.
 - **List:** sortable columns: index number, title, status, priority, type, assignee, due date, modified; the first viewpoint's snapshot as a thumbnail (togglable). Overdue topics show the due date in the alert colour.
 - **Detail area** (for the selected topic): editable fields (title, description, type, status, priority, labels, assignee, due date, stage), comment thread (newest last; each comment may carry a viewpoint thumbnail; *Add comment* with *Attach current view*), viewpoints strip (click to restore, COL-BCF-003; *Add viewpoint*; *Update viewpoint* replaces one with the current view after confirmation), related elements (*Select*, *Isolate*, with "not found" markers), related topics, and document references (links open in the system browser after confirmation).
-- **Context menu on a topic:** *Go to first viewpoint*, *Select related elements*, *Copy link* (`reviera://issue/<guid>`), *Export selected*, *Delete*.
+- **Context menu on a topic:** *Go to first viewpoint*, *Select related elements*, *Copy link* (`riviera://issue/<guid>`), *Export selected*, *Delete*.
 - **Canvas markers:** optional pins at each open topic's first viewpoint target in 3D views (toggle in the pane); clicking a pin selects the topic.
 
 **Behaviour & rules.**
@@ -1569,10 +1569,10 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 ### BCF API client (OpenCDE)
 **ID:** COL-BCF-002 · **Priority:** P1 · **Ref:** research/04 §7.6 (multi-company issue exchange, as context); web: buildingSMART BCF-API (v3.0), OpenCDE Foundation API (v1.1), OpenCDE Documents API (v1.0) repositories (public, accessed 2026-10-12)
 
-**Purpose.** Use any issue server that implements the buildingSMART **BCF API** as the shared issue tracker for a project, so issues move between Reviera and other BIM tools live, not only as files.
+**Purpose.** Use any issue server that implements the buildingSMART **BCF API** as the shared issue tracker for a project, so issues move between Riviera and other BIM tools live, not only as files.
 
 **Workflow.**
-1. Collaborate › Issues › **Connect issue server…** (`bcf.api_connect`): enter the server URL. Reviera reads the server's supported versions and authentication methods through the OpenCDE Foundation API, then signs the user in (COL-API-001).
+1. Collaborate › Issues › **Connect issue server…** (`bcf.api_connect`): enter the server URL. Riviera reads the server's supported versions and authentication methods through the OpenCDE Foundation API, then signs the user in (COL-API-001).
 2. Choose a project from the server's project list (`bcf.api_bind_project`). The Issues pane (COL-BCF-004) now shows the server's topics. Lists (types, statuses, priorities, labels, stages, users) come from the server's project extensions and are read-only locally.
 3. Work normally. Changes sync automatically (default every 2 minutes and on every local change, after 5 s of quiet) or with *Sync now*.
 
@@ -1586,7 +1586,7 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
   - related topics
   - document references, both internal documents and external URLs
   - documents (upload and download)
-  - files information, which links a topic to the IFC model file and revision it refers to: the Reviera model's file name, IFC project GUID and, in BIMserver mode, the revision
+  - files information, which links a topic to the IFC model file and revision it refers to: the Riviera model's file name, IFC project GUID and, in BIMserver mode, the revision
   - topic and comment events (audit history, shown in the topic's *History* tab)
 - **Server permissions:** the per-project, per-topic and per-comment action flags the server returns (for example `update`, `createComment`, `updateRelatedTopics`) drive the UI. Disallowed actions are disabled, with the server's restriction as the tooltip, and are never attempted.
 - **Paging and queries:** lists use the server's OData query options (`$filter`, `$orderby`, `$top`, `$skip`). Incremental sync filters on modification date. Paging continues until done, with a progress indicator for large projects.
@@ -1602,19 +1602,19 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 **Data (IFC/RXD).** Cached topics in `coordination/issues` (kinds `issue.topic`, `issue.extensions`), each with `server: {connection, guid, modified}`. Connection profiles and tokens are client state (COL-API-001), never stored in the model.
 
 *Built (2026-11-03), first build (preliminary: checked against an in-memory server answering as OpenConstructionERP's BCF API 3.0 does; no live BCF API server tested yet):*
-- **Client.** `clients/opencde` (MIT, `reviera-opencde`), blocking, over HTTPS (plain http only to this computer unless allowed). `Client::connect` finds the BCF API from a server's root or its base: the Foundation API's `foundation/versions` when offered, else `bcf/`, `api/v1/bcf/` (OpenConstructionERP) and `api/bcf/`, trying 3.0 then 2.1 with `current-user`; a refused sign-in is reported as such, not as "not found". Sign-in: a bearer token as given, HTTP Basic, or an e-mail and password posted as JSON to a login address that answers `access_token` (OpenConstructionERP's `api/v1/users/auth/login/` by default), renewed with its `refresh_token` and asked for again when refused. Lists are read bare (the standard) or wrapped (`{"items": …}`, as OpenConstructionERP answers); topics are paged with `$top`/`$skip` where the server pages. PUT, which replaces a topic, sends the server's copy with the changed fields.
+- **Client.** `clients/opencde` (MIT, `riviera-opencde`), blocking, over HTTPS (plain http only to this computer unless allowed). `Client::connect` finds the BCF API from a server's root or its base: the Foundation API's `foundation/versions` when offered, else `bcf/`, `api/v1/bcf/` (OpenConstructionERP) and `api/bcf/`, trying 3.0 then 2.1 with `current-user`; a refused sign-in is reported as such, not as "not found". Sign-in: a bearer token as given, HTTP Basic, or an e-mail and password posted as JSON to a login address that answers `access_token` (OpenConstructionERP's `api/v1/users/auth/login/` by default), renewed with its `refresh_token` and asked for again when refused. Lists are read bare (the standard) or wrapped (`{"items": …}`, as OpenConstructionERP answers); topics are paged with `$top`/`$skip` where the server pages. PUT, which replaces a topic, sends the server's copy with the changed fields.
 - **Servers and bindings** (`coordination.add_server`, `.servers`, `.sign_in`, `.remove_server`, `.projects`, `.bind`, `.unbind`, `.status`): per-user settings (`coordination.json`); the password or token in the OS keychain (or for the session), never returned and never written to the model. A model is bound to a project by its file, so binding does not change it; a bound model's issues are the project's even when the model was opened from FileEngine. `coordination.remove_server` is not offered to agents.
-- **Issues, wherever kept** (`issues.list`, `.show`, `.snapshot`, `.comment`, `.set_status`, `.update`, `.new`, `.add_view`, `.delete`, `.publish`, `.export_bcf`): one shape for a BCF server's topics, FileEngine's threads (COL-FE-009) and the model's own topics (COL-BCF-001). `issues.list` lists all, open and resolved (`resolved`: Resolved, Closed, Done, Fixed, Completed), open first, with `status` and `text` filters, counts, the lists for forms (the server's extensions, else Reviera's defaults and every value in use), and what the server allows. A server's topics are read with their comments (viewpoints again only when a topic's modification date changed) and kept beside the model (`<data>/reviera/coordination/<server>/<project>.json`) to read offline. Resolving picks the status the project's list has for it (Closed, Resolved, Done; reopening: Open, ReOpened …). New issues and added views carry the 3D view's viewpoint and snapshot (with no 3D view, none). `issues.publish` puts the model's own topics on the server with their GUIDs, fields, viewpoints, snapshots and comments (other authors' names and dates written into the text), skipping those already there, so publishing twice changes nothing; the model keeps its copies. `issues.export_bcf` writes every issue, wherever kept, as a BCF 3.0 or 2.1 archive (`bcf_topics::write_archive`, shared with `bcf.export`). `issues.delete` is not offered to agents.
+- **Issues, wherever kept** (`issues.list`, `.show`, `.snapshot`, `.comment`, `.set_status`, `.update`, `.new`, `.add_view`, `.delete`, `.publish`, `.export_bcf`): one shape for a BCF server's topics, FileEngine's threads (COL-FE-009) and the model's own topics (COL-BCF-001). `issues.list` lists all, open and resolved (`resolved`: Resolved, Closed, Done, Fixed, Completed), open first, with `status` and `text` filters, counts, the lists for forms (the server's extensions, else Riviera's defaults and every value in use), and what the server allows. A server's topics are read with their comments (viewpoints again only when a topic's modification date changed) and kept beside the model (`<data>/riviera/coordination/<server>/<project>.json`) to read offline. Resolving picks the status the project's list has for it (Closed, Resolved, Done; reopening: Open, ReOpened …). New issues and added views carry the 3D view's viewpoint and snapshot (with no 3D view, none). `issues.publish` puts the model's own topics on the server with their GUIDs, fields, viewpoints, snapshots and comments (other authors' names and dates written into the text), skipping those already there, so publishing twice changes nothing; the model keeps its copies. `issues.export_bcf` writes every issue, wherever kept, as a BCF 3.0 or 2.1 archive (`bcf_topics::write_archive`, shared with `bcf.export`). `issues.delete` is not offered to agents.
 - **Not yet:** OAuth 2 through the Foundation API's auth discovery, events and history, related topics, document references and documents, files information, the per-object permission flags beyond whole-source abilities, the offline write queue with conflicts, incremental sync by modification date, *Sync now* and automatic sync on local change (the pane reads every minute), copying topics between bindings.
 
 **Commands.** `bcf.api_connect(url, profile_name?) -> connection_id`; `bcf.api_list_projects(connection_id) -> project[]` (query); `bcf.api_bind_project(connection_id, project_id) -> ()`; `bcf.api_unbind(keep_local_copy=true) -> ()`; `bcf.api_sync(connection_id?) -> sync_report`; `bcf.api_status() -> {connection, last_sync, queued_changes, conflicts}` (query); `bcf.api_resolve_conflict(topic_id, field, use: server|local) -> ()`; `bcf.api_disconnect(connection_id) -> ()`.
 
 **Acceptance criteria.**
-- [ ] Against the open-source reference implementation of the OpenCDE APIs and at least one commercial BCF API server, a topic with two viewpoints, a snapshot and a comment created in Reviera appears on the server with its camera, components and image. A comment added on the server appears in Reviera after the next sync.
+- [ ] Against the open-source reference implementation of the OpenCDE APIs and at least one commercial BCF API server, a topic with two viewpoints, a snapshot and a comment created in Riviera appears on the server with its camera, components and image. A comment added on the server appears in Riviera after the next sync.
 - [ ] Losing the connection mid-sync leaves both sides consistent, and the next sync completes the transfer without duplicates.
 - [ ] Ten edits made offline are pushed in order when the connection returns.
 - [ ] An action the server forbids (for example editing a closed topic) is disabled in the pane and never sent.
-- [ ] A conflicting status change keeps both values visible: the server's in the topic, Reviera's in *Conflicts*.
+- [ ] A conflicting status change keeps both values visible: the server's in the topic, Riviera's in *Conflicts*.
 
 ### Issue tracking workflow
 **ID:** COL-BCF-005 · **Priority:** P1 · **Ref:** research/04 §6.7 (*Integrated Issues*, as context), §8.5; web: buildingSMART BCF-API (v3.0); COL-BCF-001, COL-BCF-004
@@ -1672,9 +1672,9 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 **Purpose.** Open models from, and publish models and drawings to, any common data environment (CDE) that implements the OpenCDE Documents API, without a vendor-specific connector.
 
 **Workflow.**
-1. **Open from CDE:** File › Open › *From CDE…* (`cde.select_documents`). Reviera starts a selection session. The CDE's own document picker opens in the system browser, and the user picks one or more files there. Reviera then downloads the chosen versions: IFC opens as a model, other files as links or attachments.
-2. **Publish to CDE:** File › Export › *Publish to CDE…* (`cde.upload_documents`). Reviera starts an upload session for the files to publish (the IFC model, a clean IFC export, PDF sheet sets, BCF). The user enters the CDE's metadata in its own web form, and Reviera uploads the binary data in the chunks the CDE specifies.
-3. **Stay current:** a document opened from a CDE remembers its document and version. Reviera polls the CDE's document-versions endpoint (with ETags) and shows "A newer version is available" with *Open newer version*.
+1. **Open from CDE:** File › Open › *From CDE…* (`cde.select_documents`). Riviera starts a selection session. The CDE's own document picker opens in the system browser, and the user picks one or more files there. Riviera then downloads the chosen versions: IFC opens as a model, other files as links or attachments.
+2. **Publish to CDE:** File › Export › *Publish to CDE…* (`cde.upload_documents`). Riviera starts an upload session for the files to publish (the IFC model, a clean IFC export, PDF sheet sets, BCF). The user enters the CDE's metadata in its own web form, and Riviera uploads the binary data in the chunks the CDE specifies.
+3. **Stay current:** a document opened from a CDE remembers its document and version. Riviera polls the CDE's document-versions endpoint (with ETags) and shows "A newer version is available" with *Open newer version*.
 
 **Behaviour & rules.**
 - Sign-in and server profiles use COL-API-001. A CDE that also offers the BCF API can be bound for issues with the same profile (COL-BCF-002).
@@ -1686,9 +1686,9 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 **Commands.** `cde.connect(url, profile_name?) -> connection_id`; `cde.select_documents(connection_id) -> selection_session_id`; `cde.download(selection_session_id, target_folder?) -> files[]`; `cde.upload_documents(connection_id, files[]) -> upload_session_id`; `cde.upload_status(upload_session_id) -> status` (query); `cde.check_versions(document_ids[]?) -> version_info[]` (query); `cde.disconnect(connection_id) -> ()`.
 
 **Acceptance criteria.**
-- [ ] Against the open-source reference implementation, a user can pick an IFC file in the CDE's browser UI and Reviera opens that exact version.
+- [ ] Against the open-source reference implementation, a user can pick an IFC file in the CDE's browser UI and Riviera opens that exact version.
 - [ ] Publishing an IFC and a PDF sheet set creates two documents in the CDE with the metadata entered in its form.
-- [ ] After someone uploads a newer version in the CDE, Reviera shows the newer-version notice within the polling interval (default 5 minutes).
+- [ ] After someone uploads a newer version in the CDE, Riviera shows the newer-version notice within the polling interval (default 5 minutes).
 
 ### Viewpoint mapping
 **ID:** COL-BCF-003 · **Priority:** P1 · **Ref:** research/04 §1.5 (3D views, section box), §3.5 (hide/isolate)
@@ -1704,7 +1704,7 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 - [ ] Restoring a viewpoint with a section box reproduces the box within 1 mm and the camera within 0.1°.
 - [ ] A viewpoint that isolates three elements shows only those three when restored.
 
-*Built (2026-10-26), viewpoint files:* `bcf.export_viewpoint(view_id?, path)` writes a 3D view as a BCF 3.0 visualization info file (`.bcfv`): a perspective camera with the vertical field of view in degrees (Reviera keeps the horizontal one at 16:10, written as the aspect ratio) or an orthogonal one with the view's height as `ViewToWorldScale`; the section box's six faces and the slice planes as clipping planes (`views::to_bcf`); the selection; and the view's temporary visibility as components (hidden elements as exceptions to a visible default, an isolated view as a hidden default with the isolated elements as exceptions), by IFC GlobalId. `bcf.import_viewpoint(path, view_id?)` reads BCF 2.1 or 3.0 and shows it in a 3D view (the active one when 3D, else the default 3D view): `view.apply_viewpoint` (also a command) sets the camera, a section box from planes that form one and slices from the rest (`views::from_bcf`), as one undoable step, the target put at the box's centre or 10 m ahead; then the visibility as temporary hide or isolate and the selection; GlobalIds not in the model are returned. View › Coordination › Export Viewpoint… and Show Viewpoint… (and the File menu). `view.get` reads a view's settings in full, section box, slices, scope box and virtual-volume mode among them. Both acceptance criteria above hold in `tests/bcf.rs` (on the views sample). *(Owner, 2026-10-26: "commit and push work, continue feature development"; the gap was found building the views sample.)* Not yet: topics and their `.bcf` archives (COL-BCF-001) with `bcf.apply_viewpoint` by viewpoint id, snapshots, component colouring and translucency, `ViewSetupHints`, a temporary view named after the topic, 2D views' viewpoints, linked models' components.
+*Built (2026-10-26), viewpoint files:* `bcf.export_viewpoint(view_id?, path)` writes a 3D view as a BCF 3.0 visualization info file (`.bcfv`): a perspective camera with the vertical field of view in degrees (Riviera keeps the horizontal one at 16:10, written as the aspect ratio) or an orthogonal one with the view's height as `ViewToWorldScale`; the section box's six faces and the slice planes as clipping planes (`views::to_bcf`); the selection; and the view's temporary visibility as components (hidden elements as exceptions to a visible default, an isolated view as a hidden default with the isolated elements as exceptions), by IFC GlobalId. `bcf.import_viewpoint(path, view_id?)` reads BCF 2.1 or 3.0 and shows it in a 3D view (the active one when 3D, else the default 3D view): `view.apply_viewpoint` (also a command) sets the camera, a section box from planes that form one and slices from the rest (`views::from_bcf`), as one undoable step, the target put at the box's centre or 10 m ahead; then the visibility as temporary hide or isolate and the selection; GlobalIds not in the model are returned. View › Coordination › Export Viewpoint… and Show Viewpoint… (and the File menu). `view.get` reads a view's settings in full, section box, slices, scope box and virtual-volume mode among them. Both acceptance criteria above hold in `tests/bcf.rs` (on the views sample). *(Owner, 2026-10-26: "commit and push work, continue feature development"; the gap was found building the views sample.)* Not yet: topics and their `.bcf` archives (COL-BCF-001) with `bcf.apply_viewpoint` by viewpoint id, snapshots, component colouring and translucency, `ViewSetupHints`, a temporary view named after the topic, 2D views' viewpoints, linked models' components.
 
 
 *Built (2026-10-26), issues from clash results:* `bcf.from_clash(clash_ids?, group_by?: clash|element, margin?, fields?)` makes a topic for each open clash result (new, active or reviewed), or for each element of set A with all its clashes: type Clash, status Open, label Clash, titled by the two elements (category and name), described by each clash's volume, depth, status and id, with a viewpoint looking at the clash from above the south-east, a section box round it with a margin (default 1 m) and both elements selected, and its snapshot rendered offscreen (`App::render_viewpoint`). A topic's GUID is a hash of its clashes' ids, so making issues again skips the clashes that have one (`already`). One undoable step. The Clash Detection pane's *Issues* button makes them for every open clash. *(Owner, 2026-10-26: \"commit and push work, continue feature development\".)* Not yet: workflow rules, a topic's recorded source and filtering by it, the other sources, element linking (Properties count, delete warnings), notifications, reports, the dashboard, bulk edit.
@@ -1715,7 +1715,7 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 ### Shared REST and authentication client
 **ID:** COL-API-001 · **Priority:** P1 · **Ref:** TECH_STACK §3.7.1 (async HTTP client); web: OpenCDE Foundation API (v1.1) authentication conventions; COL-CORE-005
 
-**Purpose.** One network client for every server Reviera talks to (BIMserver JSON API, BCF API, OpenCDE Documents API, library and analysis services, add-ins), so authentication, proxies, security and reliability work the same everywhere.
+**Purpose.** One network client for every server Riviera talks to (BIMserver JSON API, BCF API, OpenCDE Documents API, library and analysis services, add-ins), so authentication, proxies, security and reliability work the same everywhere.
 
 **Behaviour & rules.**
 - **Stack:** an asynchronous HTTP client (`reqwest` on `tokio`, TECH_STACK §3.7.1) running off the UI thread. The UI shows progress and allows cancelling any request that takes longer than 1 s.
@@ -1736,7 +1736,7 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 - **Paging helpers:** OData `$top`/`$skip`/`$filter`/`$orderby` and link-header paging, shared by all clients.
 - **Diagnostics:** a per-profile request log (method, URL path, status, timing; secrets and bodies redacted) under Help › Diagnostics, and `api.profile.test` checks reachability, TLS and authentication.
 - **Scripting:**
-  - Lua scripts get `reviera.http.request(...)` only at trust level `trusted` or `native` (DM-LUA-007), and only to hosts on the script's declared allow-list in its manifest.
+  - Lua scripts get `riviera.http.request(...)` only at trust level `trusted` or `native` (DM-LUA-007), and only to hosts on the script's declared allow-list in its manifest.
   - Requests made with a stored profile use that profile's authentication without exposing the token to the script.
   - MCP agents have no raw HTTP access. They use the commands of the services above.
 
@@ -1746,7 +1746,7 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 - [ ] Behind an authenticating corporate proxy configured by PAC, BIMserver, BCF API and CDE connections all work with no per-service setup.
 - [ ] A server answering 429 with `Retry-After: 5` is retried after 5 s, and the user sees "waiting for server" rather than an error.
 - [ ] No token or password appears in the request log, the model file, the live store, a profile export or any MCP resource (checked by scanning for a known token value).
-- [ ] A Lua script at `standard` trust calling `reviera.http.request` is refused. At `trusted` trust, a call to a host not on its allow-list is refused.
+- [ ] A Lua script at `standard` trust calling `riviera.http.request` is refused. At `trusted` trust, a call to a host not on its allow-list is refused.
 
 ---
 
@@ -1757,7 +1757,7 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 
 **Behaviour & rules.**
 - Manage › Settings › Purge Unused (default shortcut PU) shows a tree of unused items by kind: family types and families, materials, styles (line, fill, text, dimension), line and fill patterns, view templates, filters, colour schemes, schedules not placed and not referenced, groups without instances, property sets without objects, unused IFC resources (orphaned representations, placements and styles left by other tools), and unused RXD objects. Check All, Check None, Purge.
-- **Dependency-aware:** an item is unused if nothing reachable from the model uses it. Reviera computes this transitively, so one pass removes nested unused items (no need to purge several times).
+- **Dependency-aware:** an item is unused if nothing reachable from the model uses it. Riviera computes this transitively, so one pass removes nested unused items (no need to purge several times).
 - In BIMserver mode, purging items owned by others is not possible; they are shown greyed with the owner's name.
 - Purge is one undoable command.
 
@@ -1789,13 +1789,13 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 - **Local mode:** each save keeps the previous file as a numbered backup (`name.0001.ifc`, `name.0002.ifc`, …) up to *Maximum backups* (default 3; project setting). Backups keep their embedded RXD, so each is a complete project. *Restore backup* (File › Backups) lists them with date and size and opens one or replaces the current file with it (after confirmation, keeping the current file as a new backup).
 - **Autosave:** every N minutes (default 10) to a recovery file in the user's data directory, removed after a successful save; offered on the next start after a crash.
 - **BIMserver mode:** the server's revisions are the history; *Restore* is COL-BIM-008. The working copy has its own journal (COL-OFF-001).
-- **Compact:** Reviera always writes files in full, so there is no separate compaction; *Save As* with *Compressed (.ifczip)* reduces size.
+- **Compact:** Riviera always writes files in full, so there is no separate compaction; *Save As* with *Compressed (.ifczip)* reduces size.
 
 **Commands.** `model.set_backup_policy(max_backups, autosave_minutes?) -> ()`; `model.list_backups() -> backup_info[]` (query); `model.restore_backup(backup_id, replace?) -> ()`
 
 **Acceptance criteria.**
 - [ ] With maximum backups = 3, five saves leave exactly three backups, the oldest removed first.
-- [ ] After killing Reviera, the next start offers the autosave recovery file.
+- [ ] After killing Riviera, the next start offers the autosave recovery file.
 
 ### Warnings review
 **ID:** COL-MNT-004 · **Priority:** P0 · **Ref:** research/04 §9 (*Review Warnings*); spec/02 §2.7.4 (DM-FAIL-001)
@@ -1869,7 +1869,7 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 - **Size check:** the summary shows the total size; packages over 4 GB are written as ZIP64.
 - **BIMserver mode:** the package always contains a local copy (server binding and ownership data are never included); the transmittal report records the server project and base revision for reference.
 
-**Data.** No project data changes. The transmittal report (`transmittal.html` and `transmittal.csv`) lists every file with relative path, size, SHA-256 and origin path, plus the Reviera version and date.
+**Data.** No project data changes. The transmittal report (`transmittal.html` and `transmittal.csv`) lists every file with relative path, size, SHA-256 and origin path, plus the Riviera version and date.
 
 **Commands.** `model.package(path, zip?, options) -> transmittal_report` (`options`: `{include_bimserver_links?, pointclouds?: source|index|exclude, purge?, keep_view_set_id?, local_copy?, report?, exclude_paths?[]}`)
 
@@ -1890,7 +1890,7 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 - Statistics are computed in the background in under 5 seconds for a 100 000-element model; the dialog shows *Refresh* and the time computed.
 - **History (BIMserver mode):** the summary values are also computed for each sync and kept in the working copy, so the dialog can chart file size, element count and warning count over the last 50 syncs.
 - Numbers are read-only; clicking a category or warning kind selects the elements (with confirmation above 10 000).
-- The MCP resource is `reviera://model/statistics` (read-only, JSON with the same structure as `stats`).
+- The MCP resource is `riviera://model/statistics` (read-only, JSON with the same structure as `stats`).
 
 **Data.** Derived; nothing is stored in IFC or RXD. Sync history values are client state.
 
@@ -1909,7 +1909,7 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 **Behaviour & rules.** Manage › Inquiry › *Select by ID* accepts GlobalIds or internal ids (comma or line separated) and selects them, opening a view that shows them if needed; *IDs of Selection* shows and copies the GlobalIds of the selection.
 - **Input parsing:** separators are commas, semicolons, spaces and line breaks. A 22-character token in the IFC base-64 alphabet is a GlobalId; a 36-character UUID is converted to a GlobalId; a decimal number is an internal id; link references `link:<linkId>/ifc:<GlobalId>` select linked elements. Duplicates are ignored. Up to 100 000 ids per call.
 - **Not found:** ids that match nothing are listed in a result panel ("12 of 50 not found") with *Copy not found*; found ids are still selected.
-- **Hidden elements:** if an element is in a closed workset, an unloaded link, or hidden in every open view, Reviera offers to open the workset or a suitable view (a 3D view with *Reveal hidden* if no other view shows it).
+- **Hidden elements:** if an element is in a closed workset, an unloaded link, or hidden in every open view, Riviera offers to open the workset or a suitable view (a 3D view with *Reveal hidden* if no other view shows it).
 - **IDs of Selection** shows a dialog with GlobalIds and internal ids side by side, *Copy GlobalIds*, *Copy internal ids*, *Copy both (CSV)*. Internal ids are session-stable but GlobalIds are the ones to share (COL-CORE-002).
 
 **Data.** None; the commands only read the model and change the selection.
@@ -1937,7 +1937,7 @@ Common link fields: `id`, `name`, `source` (see each type), `pathType` (relative
 | BCF issues | RXD document `coordination/issues` (kinds `issue.topic`, `issue.extensions`; snapshots as assets) | COL-BCF-001, COL-BCF-004 |
 | Stored and acknowledged warnings | RXD document `project/warnings` (Chapter 2, DM-FAIL-001) | COL-MNT-004, COL-MRG-003 |
 | Orphaned hosting flag | element RXD `hosting` section | COL-CM-003 |
-| Live ownership, editing requests, sync lock | BIMserver extended data, schema `org.reviera.ownership/1.0`, on the latest revision (never in the IFC) | COL-OWN-002, COL-OWN-003 |
+| Live ownership, editing requests, sync lock | BIMserver extended data, schema `org.riviera.ownership/1.0`, on the latest revision (never in the IFC) | COL-OWN-002, COL-OWN-003 |
 | Server profiles, credentials, working copy state, conflict stash, closed-workset choice, BCF API bindings | Client state (user data directory, OS credential store) — never project data | COL-BIM-001, COL-OFF-001 |
 | Export-only forms: worksets as `IfcGroup`, documentation as `IfcAnnotation` | Written on IFC export only | COL-WS-001; Chapter 5 DOC-IFC-002 |
 
@@ -2203,11 +2203,11 @@ Every command below is registered once and is available from the UI, Lua and MCP
 
 **Deviations (intentional).**
 
-| # | Topic | Reviera behaviour | Reason |
+| # | Topic | Riviera behaviour | Reason |
 |---|---|---|---|
 | D7-1 | Central model | An Open Source BIMserver project replaces the file-based or vendor-cloud central model; *Synchronise* = get latest + merge + check in. | Open, self-hostable server; no vendor cloud (TECH_STACK §3.7). |
 | D7-2 | Element ownership | Advisory ownership through a live extended-data document, given force by the merge's ownership rule. No enforcement plugin is shipped; ownership follows what BIMserver supports (COL-OWN-004 deferred). The reference enforces ownership in its central model. | BIMserver has no native locking (TECH_STACK §5, decision 8). |
-| D7-3 | Conflicts | Reviera merges by GlobalId at facet level and asks the user about true conflicts, with a recoverable conflict stash. The reference avoids conflicts by strict ownership and has no merge UI. | Optimistic merging fits a revision server and offline work. |
+| D7-3 | Conflicts | Riviera merges by GlobalId at facet level and asks the user about true conflicts, with a recoverable conflict stash. The reference avoids conflicts by strict ownership and has no merge UI. | Optimistic merging fits a revision server and offline work. |
 | D7-4 | System worksets | No separate worksets for families, project standards and views as ownership units; types, standards objects and views are borrowed individually as objects, and each view's annotation belongs to an automatic view workset. | Finer-grained, fewer conflicts; matches the RXD object model. |
 | D7-5 | Worksets in IFC | Worksets are RXD; they are written as `IfcGroup` only on export. | Project-owner storage decision (Chapter 2a); `IfcGroup` remains available to other tools on export. |
 | D7-6 | Offline working | Full offline editing with queued ownership claims. | The reference requires a connection to the central model to borrow. |
@@ -2262,4 +2262,4 @@ Every command below is registered once and is available from the UI, Lua and MCP
 | web: Grant a Request to Borrow an Element (Autodesk public help, 2025) | COL-OWN-003, COL-OWN-005 |
 | web: Granted, Denied, and Retracted Requests (Autodesk public help, 2014) | COL-OWN-003 |
 
-Screenshots consulted (internal reference only, never used as Reviera assets): `screenshots/documentation/worksharing_central_local_diagram.png`, `worksets_dialog.png`, `synchronize_with_central_dialog.png`, `worksharing_display_worksets.png`, `worksharing_display_owners.png`, `editing_request_received.png`, `manage_links_new_dialog_type_filter.png`.
+Screenshots consulted (internal reference only, never used as Riviera assets): `screenshots/documentation/worksharing_central_local_diagram.png`, `worksets_dialog.png`, `synchronize_with_central_dialog.png`, `worksharing_display_worksets.png`, `worksharing_display_owners.png`, `editing_request_received.png`, `manage_links_new_dialog_type_filter.png`.

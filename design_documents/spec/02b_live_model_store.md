@@ -1,7 +1,7 @@
 # Chapter 2b — Live Model Store and Crash Recovery
 
 **ID prefix:** `DM-LIVE` · **Status:** Draft 0.2 · 2026-10-12 (open questions OD1–OD5 accepted by the owner: sketch-session recovery, encryption at rest, time travel, unified BIMserver timeline, shared snapshots)
-**Origin:** Project-owner feature directive (2026-10-12): *"Maintain the model live on disk as a SQLite database; on application crash, work can be restored from a near real-time on-disk representation."* This is a Reviera-originated feature. It has no counterpart in the functional reference, which offers only interval-based autosave reminders and backups.
+**Origin:** Project-owner feature directive (2026-10-12): *"Maintain the model live on disk as a SQLite database; on application crash, work can be restored from a near real-time on-disk representation."* This is a Riviera-originated feature. It has no counterpart in the functional reference, which offers only interval-based autosave reminders and backups.
 
 **Related:** Chapter 2 §2.6–2.7 (regeneration, transactions, undo), Chapter 2a (RXD), Chapter 6 (BIMserver working copies), `TECH_STACK.md` §3.3.
 
@@ -15,7 +15,7 @@
 | **Live store**: `*.rvlive`, a SQLite database in WAL mode | A near real-time mirror of the model, updated after **every committed transaction** | Survives crashes, power loss bounded by `synchronous` mode (§5) |
 | **Project file**: `.ifc` with embedded RXD (Chapter 2a) | Canonical, interoperable deliverable, written on **Save** | Durable and portable |
 
-The live store **does not replace** IFC as the file format. Compatibility remains the first priority. The live store is a local, private working representation, comparable to a database's write-ahead log combined with a materialised state. When work is saved normally the live store is simply in step. When Reviera exits abnormally, it is the source of recovery.
+The live store **does not replace** IFC as the file format. Compatibility remains the first priority. The live store is a local, private working representation, comparable to a database's write-ahead log combined with a materialised state. When work is saved normally the live store is simply in step. When Riviera exits abnormally, it is the source of recovery.
 
 ```
  command ──► Transaction Manager ──commit──► in-memory model (regeneration done)
@@ -33,11 +33,11 @@ The live store **does not replace** IFC as the file format. Compatibility remain
 
 | Item | Rule |
 |------|------|
-| **Default location** | The per-user data directory: `<data_dir>/Reviera/live/<project-key>.rvlive`. On Linux `<data_dir>` is `~/.local/share`; on Windows it is `%LOCALAPPDATA%`; on macOS it is `~/Library/Application Support`. `<project-key>` is a hash of the project's canonical path plus the `Reviera_Manifest.DataId`. |
+| **Default location** | The per-user data directory: `<data_dir>/Riviera/live/<project-key>.rvlive`. On Linux `<data_dir>` is `~/.local/share`; on Windows it is `%LOCALAPPDATA%`; on macOS it is `~/Library/Application Support`. `<project-key>` is a hash of the project's canonical path plus the `Riviera_Manifest.DataId`. |
 | **Why not beside the project file?** | SQLite locking is unreliable on network file systems (SMB/NFS), and projects often live on shared drives. Keeping the live store on local disk avoids corruption and keeps an unsaved working state out of shared folders. |
-| **Optional location** | A preference may place the store beside the project as `.<name>.rvlive`. Reviera warns if that path is on a network file system. |
+| **Optional location** | A preference may place the store beside the project as `.<name>.rvlive`. Riviera warns if that path is on a network file system. |
 | **Companion files** | SQLite's `-wal` and `-shm` files, plus `<key>.lock`, which holds the PID, hostname, start time and a heartbeat timestamp. |
-| **Single writer** | A live store is opened by exactly one Reviera process. A second instance opening the same project is offered **read-only** mode or **Open a copy**. A lock is stale when its PID no longer exists, or its heartbeat is older than 30 s and the host matches. |
+| **Single writer** | A live store is opened by exactly one Riviera process. A second instance opening the same project is offered **read-only** mode or **Open a copy**. A lock is stale when its PID no longer exists, or its heartbeat is older than 30 s and the host matches. |
 | **New/untitled projects** | Get a live store immediately, keyed by a session UUID. Crash recovery therefore also covers work that was never saved. |
 
 **Commands.** `live.status() -> {path, head_seq, saved_seq, pending, last_commit_at, size}` reports where the active project's store is, how far it has been written and how many change sets are still queued; the status-bar recovery indicator reads the same values (DM-LIVE-001).
@@ -56,7 +56,7 @@ CREATE TABLE meta (
 --       base_ifc_sha256 (IFC the session was opened from), saved_seq (last txn persisted to IFC),
 --       head_seq (last txn applied here), clean_shutdown ('0'/'1'), session_id, opened_at, mode ('local'|'bimserver')
 
--- materialised IFC instance graph (everything except Reviera_* carrier Psets, see §3.1)
+-- materialised IFC instance graph (everything except Riviera_* carrier Psets, see §3.1)
 CREATE TABLE ifc_entity (
   sid        INTEGER PRIMARY KEY,         -- stable store id (= IfcOpenShell instance id at load; new ids allocated monotonically)
   ifc_type   TEXT    NOT NULL,            -- e.g. IFCWALL
@@ -142,7 +142,7 @@ CREATE TABLE base_rxd (
 
 | Stored | Not stored |
 |--------|------------|
-| **IFC entities**, as canonical STEP attribute text per instance. This is lossless: it is exactly what IfcOpenShell would write. | **RXD carrier Psets** (`Reviera_*`). RXD lives decoded in `rxd_*` and is re-encoded only when writing IFC. |
+| **IFC entities**, as canonical STEP attribute text per instance. This is lossless: it is exactly what IfcOpenShell would write. | **RXD carrier Psets** (`Riviera_*`). RXD lives decoded in `rxd_*` and is re-encoded only when writing IFC. |
 | **RXD objects**, as canonical JSON | Regenerated **B-rep geometry**. It can be derived from IFC plus RXD; at most an optional tessellation cache is kept. |
 | The committed transaction journal, with forward and inverse change sets | — |
 | **Interactive sessions in progress** (sketches, multi-click tools, family-editor and group-edit sessions), as journaled micro-operations (§6.5) | — |
@@ -188,7 +188,7 @@ CREATE TABLE base_rxd (
 ## 6. Recovery
 
 ### 6.1 Detecting an unclean shutdown
-At startup, and whenever a project is opened, Reviera scans the live-store directory. A store needs recovery when all of these are true:
+At startup, and whenever a project is opened, Riviera scans the live-store directory. A store needs recovery when all of these are true:
 - `meta.clean_shutdown = '0'`
 - its lock is stale (§2)
 - `head_seq > saved_seq`, or the store belongs to an untitled project that was never saved
@@ -236,7 +236,7 @@ Actions per project:
    - Micro-operations are in the tool's own vocabulary. They are **not** model change sets, because nothing has been committed to the model yet.
 2. **Recovering a session.**
    - The recovery dialog shows open sessions under their project, for example "Sketch for 'Floor 3' — 14 edits, last at 14:31:52".
-   - After the model is restored, Reviera offers **Resume sketch** or **Discard sketch**.
+   - After the model is restored, Riviera offers **Resume sketch** or **Discard sketch**.
    - **Resume** reopens the same view and re-enters the same tool. It replays the micro-operations to rebuild the sketch exactly, including the undo stack inside the sketch, and leaves the user in sketch mode, ready to finish or cancel.
 3. **Sessions that can be resumed.** These are sketch mode (floors, roofs, ceilings, openings, railings, stairs by sketch, filled and masking regions, crop boundaries), multi-click placement tools (wall chains, beam chains, duct and pipe runs), group-edit mode, in-place family editing, and Family Editor documents opened from a project.
    - A Family Editor document has its **own live store** and is recovered in the same way.
@@ -257,7 +257,7 @@ Actions per project:
 - **Saving elsewhere.** Save As or Save a copy re-keys the store to the new path; the old key is removed.
 
 ## 8. Additional Uses
-1. **Fast reopen.** If a clean store exists and its `base_ifc_sha256` and `saved_seq` match the project file, Reviera can open from the store without parsing STEP. The aim is at least 3× faster for large models. The file hash is always checked, so the IFC file stays authoritative.
+1. **Fast reopen.** If a clean store exists and its `base_ifc_sha256` and `saved_seq` match the project file, Riviera can open from the store without parsing STEP. The aim is at least 3× faster for large models. The file hash is always checked, so the IFC file stays authoritative.
 2. **BIMserver working copies** (Chapter 6). The live store is the offline working copy: `base_entity` and `base_rxd` hold the downloaded base revision for the three-way merge, and the live tables hold local edits. Offline work, crash recovery and sync therefore share one mechanism, and an offline session that crashes recovers with its merge base intact.
 3. **Audit and diagnostics.** `txn.origin` records who made each change (user, Lua script, add-in, MCP agent). This supports the "undo agent turn" feature (Chapter 1) and reports such as "what did the agent change?". Support bundles may include a redacted copy of the journal, with the user's consent.
 4. **Read-only queries for tools.** The store is opened read-only alongside the WAL, so external analysis tools and Lua scripts can query model data with SQL without blocking editing (§10).
@@ -326,14 +326,14 @@ Actions per project:
 #### 8.6.2 Shared snapshots on BIMserver
 - **Purpose.** Lets a user publish a named snapshot, for example "Option B before client review", so that teammates can see it, compare against it and restore from it. Unlike a check-in, publishing a snapshot **doesn't change the project's latest revision**.
 - **Default transport: Extended Data.** The snapshot is attached to the server revision it was based on. The calls are confirmed in BIMserver's public `ServiceInterface`:
-  1. Register the extended-data schema `org.reviera.snapshot/1.0` once (`addExtendedDataSchema`, looked up by `getExtendedDataSchemaByName`).
+  1. Register the extended-data schema `org.riviera.snapshot/1.0` once (`addExtendedDataSchema`, looked up by `getExtendedDataSchemaByName`).
   2. Upload the snapshot, a `.ifczip` with embedded RXD, written from the historical model at that seq (`uploadFile`).
   3. Attach it with `addExtendedDataToRevision(base_roid, {schemaId, fileId, title})`. The `title` is the snapshot label.
   4. Teammates list snapshots with `getAllExtendedDataOfRevisionAndSchema(roid, schemaId)` for each revision in the timeline, and download one with `getFile` when they open it.
-- **Snapshot metadata.** A small JSON manifest, stored in the IFC's `Reviera_Manifest` and repeated in the extended-data title and description: label, description, author, created time, local seq, base `roid`, and the Reviera version that wrote it.
-- **Optional: publish as a browsable project.** For snapshots that should open in BIMserver's own viewers and query tools, Reviera can check the snapshot in as a revision of a **companion project**, by default named `<Project> [Snapshots]` (created on demand with project-creation rights). It deliberately does **not** use a sub-project, because BIMserver merges sub-projects into the parent's latest model. The companion project is recorded in the main project's RXD document `project/links` with the role `snapshots`.
+- **Snapshot metadata.** A small JSON manifest, stored in the IFC's `Riviera_Manifest` and repeated in the extended-data title and description: label, description, author, created time, local seq, base `roid`, and the Riviera version that wrote it.
+- **Optional: publish as a browsable project.** For snapshots that should open in BIMserver's own viewers and query tools, Riviera can check the snapshot in as a revision of a **companion project**, by default named `<Project> [Snapshots]` (created on demand with project-creation rights). It deliberately does **not** use a sub-project, because BIMserver merges sub-projects into the parent's latest model. The companion project is recorded in the main project's RXD document `project/links` with the role `snapshots`.
 - **Snapshots from other users** appear in the Snapshot lane, showing their author. The actions are View, Compare, Restore selected elements, and Save as copy. A snapshot shared by someone else can't be edited in place; it is opened as a copy.
-- **Deleting.** Authors (and project administrators) can withdraw a shared snapshot. The public `ServiceInterface` has no method for deleting extended data. In the extended-data transport, withdrawing therefore attaches a **tombstone** extended-data item (schema `org.reviera.snapshot-withdrawn/1.0`, holding the withdrawn snapshot's file id) to the same revision. Clients hide snapshots that have a tombstone. Administrators can purge withdrawn files on the server, outside Reviera. In the companion project, the revision is kept, because BIMserver revisions can't be deleted, but it is tagged withdrawn in its comment.
+- **Deleting.** Authors (and project administrators) can withdraw a shared snapshot. The public `ServiceInterface` has no method for deleting extended data. In the extended-data transport, withdrawing therefore attaches a **tombstone** extended-data item (schema `org.riviera.snapshot-withdrawn/1.0`, holding the withdrawn snapshot's file id) to the same revision. Clients hide snapshots that have a tombstone. Administrators can purge withdrawn files on the server, outside Riviera. In the companion project, the revision is kept, because BIMserver revisions can't be deleted, but it is tagged withdrawn in its comment.
 - **Size guard.** Snapshots larger than a configurable limit (default 500 MB) ask the user for confirmation, and suggest the companion project, where BIMserver stores objects instead of whole files.
 
 **Commands.** `snapshot.publish(seq | snapshot_label, label, description?, target: extended_data|companion_project) -> {roid?, extended_data_oid?}` publishes a point of the timeline. `snapshot.list_shared(roid?) -> [SharedSnapshot]` lists the Snapshot lane, hiding tombstoned items. `snapshot.open_shared(snapshot_ref, mode: view|copy) -> historical_view_id | model_id` opens one read-only, or as an editable copy. `snapshot.withdraw(snapshot_ref) -> status` attaches the tombstone; only the author or a project administrator may call it (DM-LIVE-020).
@@ -359,7 +359,7 @@ Actions per project:
   - Recovery and time travel unlock the store with it, without asking the user.
 - **Fallbacks.**
   - If no credential store is available (for example a headless Linux session), the user can set a **recovery passphrase**. The key is then derived with PBKDF2 at SQLCipher's default iteration count. The user can also turn encryption off for that machine; the status bar indicator then shows "Recovery data not encrypted".
-  - Organisations can require encryption by policy setting. Reviera then refuses to create a store without a usable key: editing continues, and the indicator shows the store as unavailable.
+  - Organisations can require encryption by policy setting. Riviera then refuses to create a store without a usable key: editing continues, and the indicator shows the store as unavailable.
 - **Losing the key.** If the key is lost (credential store reset, or passphrase forgotten), the live store can't be read. The recovery dialog says so and offers to **Discard**. The project's saved IFC file is unaffected.
 - **Scope.** Encryption applies to the live store only. Encrypting `.ifc` deliverables is out of scope, and remains for OS or file-system encryption or for document-management systems.
 - **Performance.** The overhead must stay within the targets in §4. SQLCipher typically adds 5–15 % to I/O-bound work, which the writer thread absorbs.
@@ -370,10 +370,10 @@ Actions per project:
 
 | ID | Requirement | Priority |
 |----|-------------|----------|
-| DM-LIVE-001 | Reviera shall keep a live SQLite store (schema §3) for every open project, including untitled ones, and update it after every committed transaction. | P0 |
+| DM-LIVE-001 | Riviera shall keep a live SQLite store (schema §3) for every open project, including untitled ones, and update it after every committed transaction. | P0 |
 | DM-LIVE-002 | Live-store writes shall run on a dedicated writer thread with group commit (default 250 ms) and never block the UI thread except under back-pressure (§4). | P0 |
 | DM-LIVE-003 | With default settings, an application crash shall lose no transaction committed more than 250 ms before the crash. | P0 |
-| DM-LIVE-004 | On startup or project open, Reviera shall detect unclean shutdowns (§6.1) and offer the recovery dialog (§6.2). | P0 |
+| DM-LIVE-004 | On startup or project open, Riviera shall detect unclean shutdowns (§6.1) and offer the recovery dialog (§6.2). | P0 |
 | DM-LIVE-005 | Restore shall rebuild the model from the materialised state; if the database is damaged, from the base IFC plus journal replay, with a report of how far recovery got (§6.3). | P0 |
 | DM-LIVE-006 | Undo and redo history shall be available after recovery, up to the configured depth. | P1 |
 | DM-LIVE-007 | The live store shall default to a local per-user directory. A store placed on a network file system shall trigger a warning. | P0 |
@@ -386,7 +386,7 @@ Actions per project:
 | DM-LIVE-014 | Durability, group-commit window, location, retention policy, quota and encryption shall be user preferences. | P1 |
 | DM-LIVE-015 | Interactive sessions (sketch, multi-click tools, group edit, in-place and Family Editor editing) shall be journaled as micro-operations and be resumable after a crash (§6.5). Every multi-step tool shall declare a micro-operation schema and a replay function. | P1 |
 | DM-LIVE-016 | The live store shall be encrypted at rest with SQLCipher by default, with its key held in the OS credential store and a passphrase fallback; organisations shall be able to require encryption (§10.1). | P1 |
-| DM-LIVE-017 | Reviera shall provide a History panel for time travel: a timeline with filters, read-only historical views with difference highlighting, compare, restore selected elements, revert to a point, revert a transaction or agent turn, save a copy at a point, and named snapshots (§8.5). | P2 |
+| DM-LIVE-017 | Riviera shall provide a History panel for time travel: a timeline with filters, read-only historical views with difference highlighting, compare, restore selected elements, revert to a point, revert a transaction or agent turn, save a copy at a point, and named snapshots (§8.5). | P2 |
 | DM-LIVE-018 | Keyframe snapshots and the retention policy (§7, §8.5) shall keep every retained point reconstructable within the performance target. | P2 |
 | DM-LIVE-019 | In BIMserver mode, the History panel shall show one combined timeline of local transactions, saves, sync points, server revisions and shared snapshots, with lane filters (Local, Server, Snapshot), on-demand historical views of server revisions, compare and restore. Reverting to a server revision is a new local transaction and never rewrites server history (§8.6.1). | P2 |
 | DM-LIVE-020 | Users shall be able to publish named snapshots to BIMserver without changing the project's latest revision: by default as Extended Data on the base revision, optionally as revisions of a companion `[Snapshots]` project. Teammates shall be able to list, view, compare, restore from and copy them, and authors to withdraw them (§8.6.2). | P2 |
@@ -400,7 +400,7 @@ Actions per project:
 - [ ] The UI frame time is not affected by live-store writes during a 10,000-element array operation: the 95th-percentile frame time stays within 10 % of the time with the live store disabled.
 - [ ] The `params` column contains no BIMserver password after a login command.
 - [ ] Kill the process halfway through sketching a floor boundary (6 lines drawn). After restoring and choosing **Resume sketch**, the 6 lines are back in sketch mode on the same view, and Undo inside the sketch removes the 6th.
-- [ ] Open the `.rvlive` file with plain `sqlite3`: it fails with "file is not a database". Recovery inside Reviera works with no prompt.
+- [ ] Open the `.rvlive` file with plain `sqlite3`: it fails with "file is not a database". Recovery inside Riviera works with no prompt.
 - [ ] With the credential store entry deleted, the recovery dialog explains that the data can't be decrypted and offers Discard. The saved IFC file opens normally.
 - [ ] Let an MCP agent make 12 changes in one turn, then the user makes 3 more. In History, *Revert agent turn* undoes the agent's changes as one new transaction and keeps the user's 3 changes, or lists the dependencies if they conflict.
 - [ ] Select a wall deleted 2 hours ago and choose *Restore selected elements*. It comes back with its hosted door and tag, as one undoable step.
@@ -464,7 +464,7 @@ All of these are exposed to Lua and MCP. `live.query` is **not** exposed over MC
 - ~~DM-LIVE-OD5~~ **Accepted (owner, 2026-10-12):** shared snapshots on BIMserver (§8.6.2, DM-LIVE-020).
 - **DM-LIVE-OD6:** if a future BIMserver version adds a way to delete extended data, `snapshot.withdraw` should use it instead of the tombstone. For now, withdrawing works through tombstones (§8.6.2).
 - **Implementation note (2026-10-12, first build).** The core keeps edited element state apart from the IFC population until Save, so the materialised state has two parts: `ifc_entity` (the IFC graph as of the last open or Save) and an additional `element` table (current elements as JSON). `txn.origin` stores the full origin as JSON, so session-scoped undo survives recovery. Restore rebuilds the IFC from `ifc_entity`, loads `element`, and marks the differences for the next Save. Encryption (DM-LIVE-016), session journaling (DM-LIVE-015), housekeeping (DM-LIVE-010) and time travel are not built yet. In the truncation test, nothing could be read from a half-truncated small store, so recovery returned the base IFC and reported the damage; reading the journal more robustly is follow-up work.
-- **Deviation from the reference.** The reference offers save reminders and rotating backups. Reviera adds continuous transactional persistence, and keeps the reference's numbered backups (`Chapter 6`, maintenance) as an independent safety net.
+- **Deviation from the reference.** The reference offers save reminders and rotating backups. Riviera adds continuous transactional persistence, and keeps the reference's numbered backups (`Chapter 6`, maintenance) as an independent safety net.
 
 ## 15. Traceability
 - The owner's directive of 2026-10-12. This feature does not come from the reference product. Reference context: research/04 §9 (backups, maintenance) and research/05 §3 (transactions, undo).

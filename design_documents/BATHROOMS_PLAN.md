@@ -57,13 +57,13 @@ landscape*). The pieces are scattered:
 Clearance zones are usually drawn by hand into each user's own content. Tile set-out is weak
 everywhere.
 
-Reviera's opening is to **treat the rules as data** and use them while drawing:
+Riviera's opening is to **treat the rules as data** and use them while drawing:
 
 - fixtures that carry their own clearance zones, taken from a chosen rule pack;
 - grab bars placed by rule;
 - rooms laid out and checked as you go.
 
-## 2. What Reviera already has
+## 2. What Riviera already has
 
 | Need | Existing tool | Status |
 |---|---|---|
@@ -85,7 +85,7 @@ components that every other tool already understands, as the greenhouse enclosur
 
 ## 3. Rule packs
 
-Every dimension in research 13 Part G belongs to one jurisdiction and edition. Reviera will ship
+Every dimension in research 13 Part G belongs to one jurisdiction and edition. Riviera will ship
 rules as **rule packs**, not as constants in code.
 
 - **What a rule pack is.** A pack is a versioned JSON file, published MIT like the other
@@ -130,7 +130,7 @@ rules as **rule packs**, not as constants in code.
 - **How zones behave.** Zones are shown in plan and 3D as hatched outlines, with their own
   visibility switch. They are not selectable by default and never drive geometry, avoiding the
   problems users report with clearance zones in Revit. They are stored as data and exported as a
-  Reviera property set, plus an `IfcVirtualElement` when the owner wants them in IFC (§11).
+  Riviera property set, plus an `IfcVirtualElement` when the owner wants them in IFC (§11).
 - **Checking while drawing.** The checks reuse the overlap detector:
   - a zone against walls, other fixtures and door swings;
   - a zone against another zone, where the pack forbids sharing.
@@ -193,7 +193,7 @@ rules as **rule packs**, not as constants in code.
   - drying areas, toilets and an accessible changing room with an accessible bench (ADA:
     42 × 20–24 in, 17–19 in high, against a wall).
 - **Sizing.** Locker counts come from users per shift, or from a given count. Aisle and bench
-  clearances come from the pack. Lockers have no IFC class, so they are Reviera furniture types
+  clearances come from the pack. Lockers have no IFC class, so they are Riviera furniture types
   with a mapped IFC fallback (§11).
 
 ### 6.4 Fixture counts (`bath.fixture_count`)
@@ -335,9 +335,9 @@ registered command, exposed to Lua and MCP, and takes sketched or typed points (
 2. **Build order:** residential bathrooms and accessibility first (§10)? Or should toilet cores
    and locker rooms come earlier for commercial work, as commercial greenhouses did?
 3. **Clearance zones in IFC:** export them as `IfcVirtualElement`s other tools can see, or only
-   as Reviera property data?
-4. **IFC classes Reviera must invent:** lockers, benches, partitions, towel rails and sauna
-   heaters have no good IFC class. Reviera-defined types in its own namespace, with an IFC
+   as Riviera property data?
+4. **IFC classes Riviera must invent:** lockers, benches, partitions, towel rails and sauna
+   heaters have no good IFC class. Riviera-defined types in its own namespace, with an IFC
    fallback (proxy or furniture), as agreed for greenhouses (2026-10-28)?
 5. ~~The IFC4 BathType conflict.~~ *Settled 2026-10-31* from buildingSMART's official pages
    (S1181): IFC4 ADD2 TC1 and IFC 4.3 both list DOMESTIC, FOOT, POOL, PLUNGE, SITZ, SPA
@@ -345,5 +345,5 @@ registered command, exposed to Lua and MCP, and takes sketched or typed points (
    No per-schema mapping is needed: a hot tub or whirlpool bath is BATH with BathType SPA.
 6. **Spa depth:** stop at hot tubs, saunas and steam rooms? Or include pools in the bath context
    (plunge pools and hydrotherapy pools, with their barriers and entrapment rules)?
-7. **Manufacturer content:** should Reviera ship any real product examples? (Licensing usually
+7. **Manufacturer content:** should Riviera ship any real product examples? (Licensing usually
    forbids redistribution, so the proposal is placeholders plus an import path.)

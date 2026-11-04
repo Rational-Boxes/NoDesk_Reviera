@@ -11,7 +11,7 @@ clashes. Together they show clash detection from start to finish (spec COL-CLASH
    Default 3D View).
 2. **Run a clash test.** View › Coordination › **Clash Detection** opens the pane at the bottom.
    Click **Run Test…**, tick nothing for set A and set B (every element against every element)
-   and OK both. The test runs outside Reviera, on the compute host, with progress in the pane;
+   and OK both. The test runs outside Riviera, on the compute host, with progress in the pane;
    then the list shows 19 *new* clashes, largest first, grouped by category pair (IfcRoof ×
    IfcSlab, IfcRoof × IfcWall, …).
 3. **Navigate.** Click a clash: both elements are selected and the view zooms to the clash. Use

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2026 Reviera contributors
+// Copyright (C) 2026 Riviera contributors
 
 //! A blocking client for buildingSMART's BCF API (3.0, with 2.1 as the fallback): the issue
 //! servers of coordination platforms (OpenCDE). It reads and writes projects, topics, comments,
@@ -159,7 +159,7 @@ fn http_client(timeout: Duration) -> Result<reqwest::blocking::Client> {
     reqwest::blocking::Client::builder()
         .tls_backend_preconfigured(tls)
         .timeout(timeout)
-        .user_agent(concat!("BIM-Reviera/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("BIM-Riviera/", env!("CARGO_PKG_VERSION")))
         .build()
         .map_err(|e| Error::new(ErrorKind::Transport, format!("the connection could not be set up: {e}")))
 }
@@ -245,7 +245,7 @@ impl Client {
         let (b, v) = split_version(&check_url(base, allow_http)?);
         let version = v.unwrap_or_else(|| version.to_owned());
         if !VERSIONS.contains(&version.as_str()) {
-            return Err(Error::new(ErrorKind::Url, format!("BCF API {version} is not one Reviera speaks (3.0, 2.1)")));
+            return Err(Error::new(ErrorKind::Url, format!("BCF API {version} is not one Riviera speaks (3.0, 2.1)")));
         }
         Ok(Self { base: b, version, http: http_client(Duration::from_secs(60))?, auth, session: Mutex::new(None) })
     }

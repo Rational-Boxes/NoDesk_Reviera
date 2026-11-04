@@ -6,7 +6,7 @@ city' features integrated with greater BIM workflows and propose advanced featur
 **Research:** `research/12_digital_twin_smart_city.md` (sources D001–D187, D058b, D138b, logged
 as Session 4 in RESEARCH_LOG.md). The source IDs below point there.
 **Related:**
-- spec Ch 2 (data model, RXD, published `Reviera_*` property sets);
+- spec Ch 2 (data model, RXD, published `Riviera_*` property sets);
 - Ch 4 (MEP systems, spaces, zones);
 - Ch 6 (BCF, COL-API);
 - Ch 7 and Ch 8 (analysis, compute jobs, remote analysis servers);
@@ -14,22 +14,22 @@ as Session 4 in RESEARCH_LOG.md). The source IDs below point there.
 - FILEENGINE_INTEGRATION.md;
 - the MIT-interfaces policy.
 
-## 1. What a twin means for Reviera
+## 1. What a twin means for Riviera
 
 A digital twin couples a model of an asset with data from the real asset, flowing at least from
 asset to model. A mature twin also acts on what the data shows D004 D005 D010. The UK National
 Digital Twin Programme stresses that the asset must run safely without its twin D011.
 
-Reviera's part is to be where the twin is **specified, linked and understood**:
+Riviera's part is to be where the twin is **specified, linked and understood**:
 - design the sensors and controls;
 - bind model elements to live points;
 - bring operational data back into the model's views and analyses;
 - hand the result to the city and to twin platforms in open formats.
 
-Reviera is not a building management system (BMS) or an IoT platform. It reads from them, and
+Riviera is not a building management system (BMS) or an IoT platform. It reads from them, and
 writes to them only if you decide it should (§9 Q1).
 
-What Reviera already has to build on:
+What Riviera already has to build on:
 - IFC 4.3 read and write with RXD;
 - MEP systems, spaces and zones (IfcZone);
 - COBie 2.4;
@@ -40,7 +40,7 @@ What Reviera already has to build on:
 - the PVGIS, Open-Meteo and Nominatim connectors;
 - compute jobs and remote analysis servers;
 - Lua and MCP for every command;
-- the published `Reviera_*` property-set file;
+- the published `Riviera_*` property-set file;
 - the FileEngine integration design.
 
 ## 2. The keystone: point bindings
@@ -59,7 +59,7 @@ CityGML 3.0's SensorConnection is the city-side equivalent D105.
   - its sampling interval;
   - the connection it is read through (a per-user setting, like FileEngine connections; never
     stored in the model).
-- **In the model:** a binding is a `Reviera_PointBinding` set beside the RXD record. On export
+- **In the model:** a binding is a `Riviera_PointBinding` set beside the RXD record. On export
   it is also written in standard form, as IfcPerformanceHistory assigned to the element with
   IfcRelAssignsToControl, with a library reference to the point D021 D022.
 - **Commands:**
@@ -73,7 +73,7 @@ CityGML 3.0's SensorConnection is the city-side equivalent D105.
 | # | Feature | What it does | Rests on |
 |---|---|---|---|
 | 1 | **Point bindings** (§2) | Element ↔ point records; discovery; matching; IFC export | Brick ref-schema D039; IfcPerformanceHistory D021; SensorConnection D105 |
-| 2 | **Read-only connectors** (compute jobs) | Read the latest value and history; no server inside Reviera | SensorThings 1.1 REST/MQTT D109; Haystack `hisRead`/`watchPoll` D054; MQTT 5 + Sparkplug B (ISO/IEC 20237) D071 D073; InfluxDB 3, Timescale/PostgreSQL, Prometheus D080 D081 D083; BACnet/IP and BACnet/SC D066 D094; OPC UA via open62541 (MPL-2.0) D093 |
+| 2 | **Read-only connectors** (compute jobs) | Read the latest value and history; no server inside Riviera | SensorThings 1.1 REST/MQTT D109; Haystack `hisRead`/`watchPoll` D054; MQTT 5 + Sparkplug B (ISO/IEC 20237) D071 D073; InfluxDB 3, Timescale/PostgreSQL, Prometheus D080 D081 D083; BACnet/IP and BACnet/SC D066 D094; OPC UA via open62541 (MPL-2.0) D093 |
 | 3 | **Sensor and controls layout** | Place IfcSensor, IfcActuator, IfcController, IfcUnitaryControlElement, IfcFlowMeter by predefined type; draw control links; produce a **points schedule** for the controls contractor | IFC 4.3 enums D015 D018; IfcRelFlowControlElements D019; Brick/Haystack point classes D036 D056; ISO 81346 designations D104 |
 | 4 | **Semantic export** | IFC → Brick TTL validated by SHACL; RealEstateCore/DTDL; Haystack; import a Brick model as sensors | Brick 1.4 (1.5 adds controllers) D036 D037 D040; REC/DTDL D060 D062; Haystack 5/Xeto D053 D056; ASHRAE 223P once published D045 D050 |
 | 5 | **Live overlays** | Spaces and equipment coloured by the latest or aggregated value in plans and 3D, with a time slider, legends and comfort bands | Existing colour-fill schemes; EN 16798-1 D171; ASHRAE 55 PMV D173; CO₂ above outdoor D172 |
@@ -83,17 +83,17 @@ CityGML 3.0's SensorConnection is the city-side equivalent D105.
 | 9 | **O&M register** | IfcAsset and IfcInventory; maintenance, condition, warranty and service-life property sets; IfcTask/IfcWorkSchedule plans; COBie Job/Resource/Event round-trip | IFC asset sets D025 D026 D027; COBie D033; ISO 19650-3 D003 |
 | 10 | **"Twin-ready" IDS packs** | Handover checks: sensors typed and bound, spaces in zones, assets identified, site at LoGeoRef 50 | IDS 1.0 D140 D141 |
 | 11 | **Georeferencing checker** | Reports the LoGeoRef level; validates IfcMapConversion against IfcProjectedCRS/EPSG; warns when only latitude/longitude is set | LoGeoRef D119 D120; IFC 4.3 D118 |
-| 12 | **City export** | CityJSON 2.0 with a `+Reviera` extension; CityGML 3.0 LoD1–3 with Dynamizer/SensorConnection for bound attributes; 3D Tiles 1.1 with GlobalIds in feature metadata; a footprint and roof generaliser for the envelope | D105 D107 D115; GeoBIM benchmark D124 D125 |
+| 12 | **City export** | CityJSON 2.0 with a `+Riviera` extension; CityGML 3.0 LoD1–3 with Dynamizer/SensorConnection for bound attributes; 3D Tiles 1.1 with GlobalIds in feature metadata; a footprint and roof generaliser for the envelope | D105 D107 D115; GeoBIM benchmark D124 D125 |
 | 13 | **Publishing to twin platforms** | One-way first, ids from GlobalIds: NGSI-LD (Smart Data Models Building, temporal API); Eclipse Ditto Things; DTDL twins; AAS Digital Nameplate and Time Series submodels for products; SensorThings Things/Datastreams | D126 D128 D152 D061 D156 D157 D109 |
 | 14 | **City scenario hand-off** | GeoJSON for URBANopt, CityJSON for urban energy models, roof solar potential per surface, OGC API Processes clients; run on remote analysis servers | D137 D136 D149 D146 |
 
-## 4. How it fits Reviera's architecture
+## 4. How it fits Riviera's architecture
 
 - **Commands everywhere.** Every feature is a registered command (`twin.*`, `ops.*`, `city.*`),
   in Lua and MCP. Agents can read, bind and analyse; credentials and any write path to a BMS
   stay UI and Lua only.
 - **Connectors are compute jobs.** They poll or subscribe, store a bounded local cache, and stop
-  when Reviera closes. Long histories stay in the external TSDB, with Reviera querying ranges.
+  when Riviera closes. Long histories stay in the external TSDB, with Riviera querying ranges.
   Remote analysis servers can host the always-on connectors and scheduled calibration (§9 Q8).
 - **Time in views.** The time slider is a view setting. Overlays read the cache, and a view can
   be saved with a time or a range for sheets (for example "comfort, July 2027").
@@ -106,11 +106,11 @@ CityGML 3.0's SensorConnection is the city-side equivalent D105.
 
 ## 5. Data model additions (published, MIT)
 
-- **`Reviera_PointBinding`:**
+- **`Riviera_PointBinding`:**
   - Protocol, Address, Quantity, Unit, Role, Interval;
   - ConnectionHint, which names a connection, never its credentials;
   - Source (Brick or Haystack id).
-- **`Reviera_TwinStatus`:**
+- **`Riviera_TwinStatus`:**
   - LastValue and LastSeen;
   - DataQuality (ok, stale, out of range, missing);
   - Calibration figures on the energy model.
@@ -119,7 +119,7 @@ CityGML 3.0's SensorConnection is the city-side equivalent D105.
     them;
   - `cat.assets` for IfcAsset registers.
 - **Standard first:** use the IFC control elements, IfcPerformanceHistory and the `Pset_*PHistory`
-  sets D023, and the asset sets, wherever they fit. No Reviera property repeats one.
+  sets D023, and the asset sets, wherever they fit. No Riviera property repeats one.
 
 ## 6. Phases
 
@@ -181,7 +181,7 @@ work did.
 
 1. **Writing to the BMS.** Read-only only, or later supervised writes (setpoints and schedules
    through the BACnet priority array, logged, never by agents)?
-2. **Where bindings live.** In the model (`Reviera_PointBinding` and RXD), or a shared registry
+2. **Where bindings live.** In the model (`Riviera_PointBinding` and RXD), or a shared registry
    on FileEngine that models reference, or both, with the registry as master?
 3. **First semantic target.** Brick first (published, permissive, has an IFC alignment), Haystack 5,
    or wait for ASHRAE 223P (public review 2025, publication expected end of 2026)?
@@ -195,7 +195,7 @@ work did.
 7. **First city format.** CityJSON 2.0 (lighter, CC0, easy extension) or CityGML 3.0 (Dynamizer
    for live data), with 3D Tiles for viewers either way?
 8. **Always-on parts.** Should remote analysis servers host connectors, scheduled calibration and
-   city scenario runs, so the twin keeps updating when no one has Reviera open?
+   city scenario runs, so the twin keeps updating when no one has Riviera open?
 9. **Scope of phase 1.** Commercial buildings first (as with greenhouses), with residential and
    city-scale later?
 

@@ -1,27 +1,27 @@
-# BIM Reviera
+# BIM Riviera
 
 ## Open-source BIM on native IFC. Build anywhere, even from the beach.
 
 ![A laptop showing a building model on a beach table, next to a "Beach Life" mug](../design_documents/beach_life.jpg)
 
-Reviera is a parametric Building Information Modeling application for architecture,
+Riviera is a parametric Building Information Modeling application for architecture,
 structure and MEP. Your model is an ordinary IFC file, not a proprietary container.
 Every tool is a command that the ribbon, Lua scripts and AI agents share.
 
-**[Get started](get-started.md)** · **[See it in action](screenshots.md)** · **[What it does](features.md)** · **[Source on GitHub](https://github.com/Rational-Boxes/NoDesk_Reviera)**
+**[Get started](get-started.md)** · **[See it in action](screenshots.md)** · **[What it does](features.md)** · **[Source on GitHub](https://github.com/Rational-Boxes/BIM_Riviera)**
 
-> **Pre-release.** Reviera is in early development. It already models a small building end to
+> **Pre-release.** Riviera is in early development. It already models a small building end to
 > end, frames, details and analyses a steel, timber or concrete structure, lays out air,
 > plumbing, fire protection and electrical systems, and draws plans, sections, elevations and
 > sheets. Pre-release 4 (0.1.0-pre.4) packages are available for Linux (Flatpak) and Windows.
 
 ---
 
-## Why Reviera
+## Why Riviera
 
 ### Your model stays yours
 
-IFC is Reviera's native format: IFC2X3, IFC4 and IFC4X3. Walls, floors, roofs, beams and
+IFC is Riviera's native format: IFC2X3, IFC4 and IFC4X3. Walls, floors, roofs, beams and
 connections are saved as ordinary IFC entities that other tools can read. Files you bring in
 from elsewhere survive the round trip intact. There is no lock-in and no export step.
 
@@ -81,10 +81,10 @@ moments while the 3D view draws the diagrams.*
 
 ## Built in the open
 
-Reviera is free software under the **GNU GPL v3.0 or later**. Its open data formats and
+Riviera is free software under the **GNU GPL v3.0 or later**. Its open data formats and
 protocols are MIT-licensed, so any tool can adopt them, whatever its licence.
 
-Reviera is an independent, original application. It does not copy or clone any existing
+Riviera is an independent, original application. It does not copy or clone any existing
 product, and it does not read or write any product's closed, proprietary formats. IFC is its
 native format, and DWG and DXF are exchanged only through open-source libraries.
 

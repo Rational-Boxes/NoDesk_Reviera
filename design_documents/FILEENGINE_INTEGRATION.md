@@ -4,9 +4,9 @@
 **Update (2026-10-29):** §7c uses the conversion/search/AI service's planned **headless research
 API** (`convert_search_ai/design_documents/HEADLESS_RESEARCH_API.md`, branch
 `research/headless-research-api` at 0db3dd3) to fill product data from documentation folders;
-the review of that design from Reviera's side is §11.7.
+the review of that design from Riviera's side is §11.7.
 **Implementation deferred (owner, 2026-10-27):** the owner is making the FileEngine improvements
-of §11 first; Reviera's side starts once they land. **Update (owner, 2026-10-28):** the
+of §11 first; Riviera's side starts once they land. **Update (owner, 2026-10-28):** the
 improvements in progress include strong generated credentials on the REST door, like
 FileEngine's other doors (§4, §11.2); the owner will say when FileEngine is deployed with them.
 **Related:**
@@ -17,37 +17,37 @@ FileEngine's other doors (§4, §11.2); the owner will say when FileEngine is de
 - DOC-OUT-015 (COBie);
 - `interfaces-are-mit` policy.
 
-## 1. What Reviera needs from FileEngine
+## 1. What Riviera needs from FileEngine
 
 FileEngine is the owner's document server: a versioned, multi-tenant virtual file system with
 ACLs, threaded discussion, BCF issues, search and conversion
-(<https://github.com/Rational-Boxes/>). Reviera uses it for three things:
+(<https://github.com/Rational-Boxes/>). Riviera uses it for three things:
 
 1. **Model storage.** Browse a FileEngine server, open models from it, save to it (each save
    a new version), and see and restore a model's past versions.
 2. **Issues.** Read and write the BCF issues that FileEngine users raise on a model (in its
-   web viewer, or from other BIM tools through its BCF service), so an issue opens in Reviera
+   web viewer, or from other BIM tools through its BCF service), so an issue opens in Riviera
    with the same camera, cut and selection, and replies go back to the same thread.
 3. **Publishing.** Save reports and exports (PDF sheets, schedules, COBie, clash and analysis
    reports, BCF archives, IFC copies) straight to a FileEngine folder, for simple sharing with
-   people who never open Reviera (owner request, 2026-10-27).
+   people who never open Riviera (owner request, 2026-10-27).
 4. **Component Libraries on FileEngine.** Host an organisation's Component Libraries in
-   FileEngine folders, browsed, placed from and added to from Reviera's Component Library panel,
+   FileEngine folders, browsed, placed from and added to from Riviera's Component Library panel,
    with FileEngine's permissions and versions (owner idea, 2026-10-27).
 5. **Product documentation.** Link materials, products and equipment in the model to FileEngine
    folders of support documents: technical specifications, sustainability certifications,
    installation and O&M manuals, warranties, safety data sheets. Each folder keeps the product's
-   identifying metadata (product code or SKU, MasterFormat division, …), and Reviera embeds file
+   identifying metadata (product code or SKU, MasterFormat division, …), and Riviera embeds file
    management for it: list, preview, upload, new version, search.
 
-**Decision (owner, 2026-10-27):** Reviera talks to FileEngine through its **REST API**, not
+**Decision (owner, 2026-10-27):** Riviera talks to FileEngine through its **REST API**, not
 WebDAV. WebDAV (DM-FILE-007) remains the general route for other servers. Using the API gives
 UIDs that survive renames and moves, versions, metadata, ACL checks, renditions and the
 discussion and BCF services, none of which WebDAV carries.
 
 ## 2. FileEngine as it is today (surveyed 2026-10-27)
 
-| Service (repository) | What Reviera uses it for | State |
+| Service (repository) | What Riviera uses it for | State |
 |---|---|---|
 | **REST door** (`fileengine_http_proxy`), `/v1`, OpenAPI 3.0.3 | Everything on files and folders: directories, files, streamed content (with `Range`), versions, metadata, ACLs, roles, sign-in | Feature-complete against its plan |
 | Core (`file_engine_core`), gRPC | Not reached directly; the REST door is a thin pass-through | Active development |
@@ -56,7 +56,7 @@ discussion and BCF services, none of which WebDAV carries.
 | Conversion, search and AI (`fileengine_convert_search_ai`) | Thumbnails and previews of documents (renditions), extracted text, permission-gated full-text search | Built |
 | Folder actions (`fileengine_folder_actions`) | Automating document folders: auto-sort, review on upload, notify, webhooks | Built |
 | Outside share links (`fileengine_external_share`) | Handing documents to people without an account | M0 |
-| MCP (`fileengine_mcp`) | Not needed by Reviera; agents can use it alongside Reviera's own MCP | Feature-complete |
+| MCP (`fileengine_mcp`) | Not needed by Riviera; agents can use it alongside Riviera's own MCP | Feature-complete |
 
 What the REST door gives, in the terms that matter here:
 
@@ -78,11 +78,11 @@ What the REST door gives, in the terms that matter here:
 
 **Licences:**
 - the services are AGPL-3.0, and the Python and JavaScript clients are LGPL-3.0;
-- Reviera talks to them over HTTP only, and never links or vendors their code;
-- Reviera's FileEngine client is MIT, like its other interoperability components, in
+- Riviera talks to them over HTTP only, and never links or vendors their code;
+- Riviera's FileEngine client is MIT, like its other interoperability components, in
   `clients/fileengine/` (§9).
 
-## 3. What Reviera already has to build on
+## 3. What Riviera already has to build on
 
 - **BCF:**
   - topics, comments and viewpoints are kept in the model (`coordination/issues`, COL-BCF-001);
@@ -93,13 +93,13 @@ What the REST door gives, in the terms that matter here:
   - issues can be raised from clash results.
 
   FileEngine's viewpoint anchor is "exactly what xeokit's `BCFViewpointsPlugin` emits", which
-  is the BCF-API JSON form. Reviera's viewpoint code reads and writes the same fields.
+  is the BCF-API JSON form. Riviera's viewpoint code reads and writes the same fields.
 - **Specified, not built:**
-  - the BCF-API client (COL-BCF-002, crate `reviera-opencde`);
-  - the shared REST and credentials crate (COL-API-001, `reviera-net`);
+  - the BCF-API client (COL-BCF-002, crate `riviera-opencde`);
+  - the shared REST and credentials crate (COL-API-001, `riviera-net`);
   - WebDAV (DM-FILE-007).
 
-  The FileEngine client builds on `reviera-net` for TLS, retries and keyring storage.
+  The FileEngine client builds on `riviera-net` for TLS, retries and keyring storage.
 - **Types and materials:**
   - type parameters Manufacturer, Model, Keynote, Description, Type Mark and others;
   - classification codes (Uniclass, OmniClass, MasterFormat tables) per type or element;
@@ -118,13 +118,13 @@ A **FileEngine connection** is a per-user setting, never stored in a model:
 - a display name;
 - the sign-in method:
   - **Username and password:** LDAP over HTTPS, exchanged for a bearer token. The password is
-    kept in the OS keyring only if the user asks; otherwise Reviera asks again when the token
+    kept in the OS keyring only if the user asks; otherwise Riviera asks again when the token
     expires.
-  - **Single sign-on:** the door's OAuth flow in the system browser, returning to Reviera. This
+  - **Single sign-on:** the door's OAuth flow in the system browser, returning to Riviera. This
     needs a native-app return path on the FileEngine side (§10, Q3).
   - **Generated credentials** (coming, owner 2026-10-28): a strong credential generated on the
     FileEngine side for this app, as FileEngine's other doors already take, pasted into
-    Reviera's connection settings. Its form, per the headless research design (2026-10-29): a
+    Riviera's connection settings. Its form, per the headless research design (2026-10-29): a
     key and secret (`fesk_…:fesks_…`) holding the `api` scope, exchanged at the bridge's token
     route for a session bearer and renewed at its refresh route while the key is live; the same
     bearer reaches the REST door and the conversion/search/AI service's headless routes (§7c). It is kept in the OS keyring and exchanged for a short-lived
@@ -146,7 +146,7 @@ Commands (UI, Lua and MCP; credential commands are UI and Lua only, never offere
 
 - **Browse.** *File › Open › From FileEngine…* lists a connection's folders
   (`GET /v1/dirs/{uid}`), with each model's size, owner, version count and thumbnail where one
-  exists. It filters to `.ifc` and `.ifczip` (and Reviera project folders, §10 Q5).
+  exists. It filters to `.ifc` and `.ifczip` (and Riviera project folders, §10 Q5).
   Recent-files entries remember `fileengine://<connection>/<uid>`, so a renamed or moved model
   still opens.
 - **Open.**
@@ -157,10 +157,10 @@ Commands (UI, Lua and MCP; credential commands are UI and Lua only, never offere
     learnt from a refused write), it opens read-only, with a banner.
 - **Save.**
   - Saving writes the working copy locally first (atomic), then `PUT`s it, which makes a new
-    FileEngine version. A save comment is kept as the version's metadata (`reviera.comment`).
-  - **Conflicts:** before uploading, Reviera reads the file's current version (`GET
-    /v1/nodes/{uid}`). If it is not the version Reviera opened or last saved, someone else has
-    saved. Reviera then offers:
+    FileEngine version. A save comment is kept as the version's metadata (`riviera.comment`).
+  - **Conflicts:** before uploading, Riviera reads the file's current version (`GET
+    /v1/nodes/{uid}`). If it is not the version Riviera opened or last saved, someone else has
+    saved. Riviera then offers:
     - *Save as a copy beside it*;
     - *Overwrite* (their version stays in the history);
     - *Open theirs read-only to compare*.
@@ -169,20 +169,20 @@ Commands (UI, Lua and MCP; credential commands are UI and Lua only, never offere
     conditional upload or a lock on the server can close (§10, Q2).
 - **Save As** to FileEngine creates the file (`POST /v1/dirs/{uid}/files`) and uploads.
   *Save As* to a local path keeps no link.
-- **Model metadata.** On save, Reviera writes metadata on the model's file:
+- **Model metadata.** On save, Riviera writes metadata on the model's file:
 
   | Key | Value |
   |---|---|
   | `ifc.schema` | the IFC schema |
   | `ifc.project_guid` | the IFC project's GlobalId (what BCF's *Header/Files* records) |
-  | `reviera.version` | the Reviera version that saved it |
-  | `reviera.levels` | the level names |
+  | `riviera.version` | the Riviera version that saved it |
+  | `riviera.levels` | the level names |
 
   FileEngine can then search and list models by them, and a BCF topic can name its model.
 - **Versions.** *File › Version History* lists the file's versions (`GET
   /v1/files/{uid}/versions`) with their saver, comment and date. It can:
   - open one read-only;
-  - compare it with the open model (Reviera's model diff, when built);
+  - compare it with the open model (Riviera's model diff, when built);
   - restore it (`POST …/restore`, a new version: nothing is lost).
 
   The History panel shows these versions on the same timeline as local undo history (as
@@ -190,7 +190,7 @@ Commands (UI, Lua and MCP; credential commands are UI and Lua only, never offere
 - **Offline.** If the server cannot be reached, the working copy can be opened explicitly with
   an *Offline* banner. Saves are kept locally and uploaded when the server returns, with the
   same conflict check.
-- **Thumbnails.** Reviera uploads a small PNG of the model's default 3D view with each save (as a
+- **Thumbnails.** Riviera uploads a small PNG of the model's default 3D view with each save (as a
   rendition, if FileEngine accepts client-made renditions, or as metadata; §10 Q6), so the
   browser and FileEngine's file list show it.
 
@@ -211,12 +211,12 @@ Two doors exist on the FileEngine side.
      *Collaborate › Issues › Connect to FileEngine* binds the open model to the folder it was
      opened from (or another).
    - A **topic** is a discussion thread with an issue facet (type, status, priority, assignee,
-     labels, due date, stage). These are the fields Reviera's topics already have, and the
+     labels, due date, stage). These are the fields Riviera's topics already have, and the
      project's lists come from the server's extensions.
    - **Viewpoints:**
      - the thread's anchor viewpoint, plus any additional viewpoints;
      - camera, clipping planes, selection and visibility by IFC GlobalId, and snapshot;
-     - read and written by Reviera's existing BCF viewpoint code, so section boxes, slices,
+     - read and written by Riviera's existing BCF viewpoint code, so section boxes, slices,
        hide/isolate and selection survive both ways.
    - **Comments:** BCF's flat list. FileEngine flattens nested replies on export. A comment
      pinned to a viewpoint keeps the pin.
@@ -234,12 +234,12 @@ Two doors exist on the FileEngine side.
    - the attention feed;
    - issues on a model version.
 
-   Reviera would read and write the thread's `model-viewpoint` anchor directly. Same data,
+   Riviera would read and write the thread's `model-viewpoint` anchor directly. Same data,
    richer behaviour, but FileEngine-only.
 
 Either way:
 - issues raised from clash results (`bcf.from_clash`) can be pushed to the server in one step;
-- opening a FileEngine issue link (a permalink to a thread) in Reviera opens the model at that
+- opening a FileEngine issue link (a permalink to a thread) in Riviera opens the model at that
   version and shows the issue.
 
 Commands:
@@ -270,7 +270,7 @@ type's documents.
 **Folder metadata (the product record).** FileEngine metadata on the folder holds the product's
 identity, under namespaced keys so other FileEngine tools can use them:
 
-| Key | Meaning | Maps to in Reviera |
+| Key | Meaning | Maps to in Riviera |
 |---|---|---|
 | `product.manufacturer` | Manufacturer | type parameter *Manufacturer* |
 | `product.model` | Model or product name | *Model* |
@@ -286,7 +286,7 @@ identity, under namespaced keys so other FileEngine tools can use them:
 
 - **Values:** strings, since that is what FileEngine metadata holds; numbers and dates are
   written in a fixed form.
-- **Which side is the master:** proposed as the folder. On linking, and on request, Reviera
+- **Which side is the master:** proposed as the folder. On linking, and on request, Riviera
   shows a side-by-side comparison of the folder's values and the type's parameters, and the
   user picks which to keep, field by field (§10 Q8).
 
@@ -339,7 +339,7 @@ example:
 - a review raised when a certification is uploaded;
 - an inbox folder that sorts uploaded documents into product folders by their text.
 
-This is FileEngine's side. Reviera only shows the results.
+This is FileEngine's side. Riviera only shows the results.
 
 Commands:
 - `docs.link(target_ids, connection_id, folder_uid)`, `docs.unlink(target_ids)`;
@@ -354,7 +354,7 @@ Commands:
 
 ## 7a. Publishing reports and exports
 
-Anything Reviera writes to a file can be written to FileEngine instead, so sharing a set of
+Anything Riviera writes to a file can be written to FileEngine instead, so sharing a set of
 drawings or a report is one step: publish, and FileEngine's people, links and notifications do
 the rest.
 
@@ -371,7 +371,7 @@ the rest.
   - `gbxml.export`, `hbjson.export`, `steel_nc.export`;
   - `file.save_as` (an IFC copy).
 
-  Reviera writes the file locally first, as it does now, then uploads it. A failed upload keeps
+  Riviera writes the file locally first, as it does now, then uploads it. A failed upload keeps
   the local file and says where it is, and the status bar retries it.
 - **In the window.** Every export dialog's location has a *FileEngine…* place beside the local
   folders, remembering the last folder used per connection and model.
@@ -383,11 +383,11 @@ the rest.
 
   | Key | Value |
   |---|---|
-  | `reviera.source_uid` and `reviera.source_version` | the model it came from, when that model is on FileEngine |
-  | `reviera.source_name` | the model's file name |
-  | `reviera.output` | `pdf`, `cobie`, `schedule`, `clash_report`, `carbon_report`, `bcf`, `ifc`, … |
-  | `reviera.views` | the sheets or views it contains |
-  | `reviera.published_by` and `reviera.published_at` | who published it, and when |
+  | `riviera.source_uid` and `riviera.source_version` | the model it came from, when that model is on FileEngine |
+  | `riviera.source_name` | the model's file name |
+  | `riviera.output` | `pdf`, `cobie`, `schedule`, `clash_report`, `carbon_report`, `bcf`, `ifc`, … |
+  | `riviera.views` | the sheets or views it contains |
+  | `riviera.published_by` and `riviera.published_at` | who published it, and when |
 
   FileEngine can therefore list "everything published from this model", and a reader can get
   back to the model from a PDF.
@@ -401,8 +401,8 @@ the rest.
 
   This is the simple form of an issue: the sheet revisions and transmittals of the
   documentation chapter can build on it later.
-- **Public share links, made in Reviera (owner decision, 2026-10-27).** The Publish dialog has
-  a *Share* step, and every FileEngine file and folder in Reviera has a *Share link…* command:
+- **Public share links, made in Riviera (owner decision, 2026-10-27).** The Publish dialog has
+  a *Share* step, and every FileEngine file and folder in Riviera has a *Share link…* command:
   in the FileEngine browser, the Documents pane, the list of published outputs, and
   *File › Share Link…* for a model opened from FileEngine. The *Share link…* dialog makes an
   outside share link through FileEngine's share service, for people without an account:
@@ -424,7 +424,7 @@ the rest.
   Each is chosen per publish; nothing is shared unless asked.
 - **Folder automation.** A publish folder can carry FileEngine folder actions (a review raised
   on each new PDF, a notification to the client, a webhook). That is configured in FileEngine;
-  Reviera only publishes into it.
+  Riviera only publishes into it.
 
 Commands:
 - every exporting command's `path` accepts `fileengine://…`;
@@ -446,7 +446,7 @@ Commands:
 A Component Library is already a plain folder:
 - mesh files (OBJ with MTL and textures, STL, PLY, glTF, GLB) and IFC model fragments;
 - sub-folders as the library's folders;
-- one JSON manifest, `reviera-library.json`, at its root (DM-LIB-001 … 004).
+- one JSON manifest, `riviera-library.json`, at its root (DM-LIB-001 … 004).
 
 A FileEngine folder with the same layout **is** a library, so an organisation keeps one shared,
 permissioned, versioned library on its FileEngine server instead of copies on every machine.
@@ -455,7 +455,7 @@ read-only static index over HTTPS or git.
 
 - **Opening.**
   - In the Component Library panel, *Open…* gains *From FileEngine…*: pick a connection and a
-    folder holding a `reviera-library.json`, or create one there (*New…*).
+    folder holding a `riviera-library.json`, or create one there (*New…*).
   - The library then appears under the panel's *Organisation* sources, with its state
     (indexed, indexing, offline, error).
   - An administrator can pre-configure FileEngine libraries for everyone, as DM-LIB-001's
@@ -488,7 +488,7 @@ read-only static index over HTTPS or git.
 
   Everyone else sees the library read-only.
 - **The manifest and concurrent edits.** The manifest is one file that several people may edit
-  at once. Its entries are keyed by item path and written with sorted keys, so Reviera saves it
+  at once. Its entries are keyed by item path and written with sorted keys, so Riviera saves it
   as a three-way merge:
   - it re-reads the server's current manifest;
   - applies its own changes entry by entry;
@@ -499,7 +499,7 @@ read-only static index over HTTPS or git.
   manifest's item entries instead.)
 - **Curation (FileEngine's side).** A library can have an *Incoming* folder bound to
   FileEngine's folder actions: a review raised on each new component, moved into the library
-  when approved. Reviera shows the review state on incoming items.
+  when approved. Riviera shows the review state on incoming items.
 - **Products and documents.** A library item's product data (manufacturer, model, code,
   classification) and its documentation folder (§7) live in its manifest entry. Placing the
   component therefore links the new type to the same documentation folder: a door placed from
@@ -521,7 +521,7 @@ Commands. The existing library commands (`library.open`, `library.create`,
 The documentation folders of §7 hold the values a model's types need: manufacturer, model and
 code, sizes, fire rating, U-value and g-value, EPD figures, certificate numbers and expiry
 dates. The conversion/search/AI service's planned **headless research API** reads them out of
-the documents (HEADLESS_RESEARCH_API.md §3.1), and Reviera puts what the user accepts into
+the documents (HEADLESS_RESEARCH_API.md §3.1), and Riviera puts what the user accepts into
 the model. It is the same comparison as §7's folder metadata, with each value backed by a quote.
 
 **Flow.**
@@ -529,52 +529,52 @@ the model. It is the same comparison as §7's folder metadata, with each value b
    materials: their linked folders, or files picked in the pane. Optionally a search first
    (`POST /csai/search` with `folder_uids`, §3.10) to find the datasheets, then extraction by
    file id.
-2. Reviera sends `POST /csai/v1/extract` with a **field set** as the JSON Schema and streams the
+2. Riviera sends `POST /csai/v1/extract` with a **field set** as the JSON Schema and streams the
    result (`plan`, `item`, `error`, `usage`, `done`). Progress shows per file; cancelling closes
    the stream.
 3. A review table: for each type and field, the current value beside the extracted one with
    its unit, the evidence quote and page, the document and version, and whether it came from
    the cache. Fields with `found: false` are listed as not found. Skipped files are listed with
    their reasons (no text, budget, not readable), so "no text" means *check by hand*.
-4. The user accepts values field by field (or all found). Reviera writes them as parameters in
+4. The user accepts values field by field (or all found). Riviera writes them as parameters in
    one undo step, through the same commands a user would use (`element.set_param`,
    `glazing.set_type`, `frame.set_type`, the carbon factors). Optionally it writes the product
    record's folder metadata too (§7's `product.*`, `cert.*`, `epd.*` keys) through the REST
    door. Nothing is written without the user accepting it; the service never writes values
    anywhere.
 
-**Field sets** ship as JSON Schemas (MIT, `schemas/extract/`), each field naming the Reviera
-parameter it fills and its data type, so units are parsed by Reviera's own unit parser:
+**Field sets** ship as JSON Schemas (MIT, `schemas/extract/`), each field naming the Riviera
+parameter it fills and its data type, so units are parsed by Riviera's own unit parser:
 
 | Set | Fields | Fills |
 |---|---|---|
 | Product | manufacturer, model, product code, GTIN, URL | *Manufacturer*, *Model*, *Product Code*, *URL* |
 | Dimensions | width, height, depth, weight | type sizes (shown, applied only on request: a size change moves geometry) |
 | Fire | fire rating (EI/REI or hours), reaction to fire class | `Pset_*Common.FireRating`, … |
-| Thermal | U-value, g-value, light transmission | `ThermalTransmittance`; glazing types' `Reviera_GlazingUnit` (ARC-GLZ-003) |
+| Thermal | U-value, g-value, light transmission | `ThermalTransmittance`; glazing types' `Riviera_GlazingUnit` (ARC-GLZ-003) |
 | Glazing (horticultural) | light and PAR transmission, haze, U, g, thickness, weight, least pitch | `glazing.set_type` |
 | EPD | EPD number, programme operator, declared unit, GWP A1–A3, valid until | embodied carbon (ANA-CARB-001), `epd.*` folder keys |
 | Certification | scheme (FSC, PEFC, C2C, …), certificate number, holder, valid until | `cert.*` folder keys, the Documents pane's expiry warnings |
 | Warranty | duration, start condition | COBie *Type.WarrantyDuration…* |
 
 Each schema field is a plain value (string, number, date); the service wraps it with `unit`,
-`evidence` and `found` (§3.1), so Reviera's schemas stay small.
+`evidence` and `found` (§3.1), so Riviera's schemas stay small.
 
 **Field sets as server prompt sets** (COL-FE-011, built 2026-11-02 against csai's
 EXTRACTION_PROMPT_SETS.md §4.5). The conversion service now keeps extraction definitions as
 versioned **prompt sets**. An application may publish the ones it relies on with any member's
-key, so no administrator has to create sets or grant roles first. Reviera publishes each field
-set as `reviera.<set>` the first time a session extracts with it (`docs.publish_field_sets` does
+key, so no administrator has to create sets or grant roles first. Riviera publishes each field
+set as `riviera.<set>` the first time a session extracts with it (`docs.publish_field_sets` does
 it ahead).
-- Publishing an unchanged definition changes nothing; a newer Reviera's changed one becomes the
+- Publishing an unchanged definition changes nothing; a newer Riviera's changed one becomes the
   next revision.
-- Extraction then names the set and the revision Reviera published, so the server's cache, its
+- Extraction then names the set and the revision Riviera published, so the server's cache, its
   marked-up PDF (the evidence highlighted, a sidecar of the document) and folder automation see
   the same definition.
 - The fields are typed as the service types them (number, date, enum…), with label, description
-  and unit. The `x-reviera` mapping (IFC property, folder key) stays in Reviera. No model is
+  and unit. The `x-riviera` mapping (IFC property, folder key) stays in Riviera. No model is
   named, so runs use the deployment's default.
-- An editor who takes a set over or locks it keeps it: Reviera uses it as the editor left it and
+- An editor who takes a set over or locks it keeps it: Riviera uses it as the editor left it and
   notes that in the run.
 - A retired set with no replacement, a refused publish, or a server from before prompt sets falls
   back to sending the schema, as before.
@@ -587,7 +587,7 @@ csai design). The Documents pane shows the quote by fetching the run. When a doc
 version, the pane marks the values taken from the old one as *from an earlier version* and
 offers to extract again.
 
-**Limits and usage.** Reviera reads the usage state the service returns (headers, the `usage`
+**Limits and usage.** Riviera reads the usage state the service returns (headers, the `usage`
 event, `GET /csai/v1/usage`) and shows it in the Documents pane, warning at `warning` and
 explaining a `429` or `skipped: budget` with its reset time. Re-asking the same question of the
 same version hits the service's cache (§3.7), so *Fill from Documents* is cheap to repeat;
@@ -605,7 +605,7 @@ Commands:
 
 ## 8. Permissions, credentials and agents
 
-- FileEngine decides every permission. Reviera shows read-only states and disables actions the
+- FileEngine decides every permission. Riviera shows read-only states and disables actions the
   user cannot take; it never tries to enforce ACLs itself.
 - Tokens and any stored password are in the OS keyring, never in settings files, models, logs
   or crash reports.
@@ -617,10 +617,10 @@ Commands:
 
 - **Client:** `clients/fileengine/rust` (MIT), a typed client for the REST door's OpenAPI
   contract (auth, nodes, content streaming, versions, metadata, permissions), with retries and
-  `Range` resume. It uses `reviera-net` for TLS and keyring storage. Later it gains the
+  `Range` resume. It uses `riviera-net` for TLS and keyring storage. Later it gains the
   discussion and search endpoints.
-- **Application:** commands in `reviera-app` (connections, storage, documents). The BCF-API
-  client in `reviera-opencde` gains FileEngine connections.
+- **Application:** commands in `riviera-app` (connections, storage, documents). The BCF-API
+  client in `riviera-opencde` gains FileEngine connections.
 - **Window:**
   - *File › Open › From FileEngine*, *Save to FileEngine* and *Version History*;
   - the Documents pane;
@@ -634,9 +634,9 @@ Commands:
      - service-credential sign-in only (no LDAP password or SSO yet);
      - connections are managed in the Open and Save dialogs, not in Options;
      - no thumbnails yet;
-     - the save comment is also kept per version as `reviera.comment.<version>`;
+     - the save comment is also kept per version as `riviera.comment.<version>`;
      - the client is tested against an in-memory fake (feature `fake`) and live, not against a local stack;
-     - it does not use `reviera-net`, because it has its own rustls set-up, as `clients/bimserver` does;
+     - it does not use `riviera-net`, because it has its own rustls set-up, as `clients/bimserver` does;
   2. publishing: FileEngine destinations for every export, publish sets, and public share links
      made in the window (once FileEngine's share door is live);
   3. BCF issues over BCF-API, once FileEngine's persistent BCF store lands;
@@ -653,7 +653,7 @@ Commands:
    FileEngine support be built in (shipped, off until a connection is added), or an optional
    add-in?
 2. **Concurrent saves** (§11, items 1 and 2). The REST door has no lock and no conditional `PUT`, so two people can
-   overwrite each other between Reviera's version check and its upload. Can FileEngine add
+   overwrite each other between Riviera's version check and its upload. Can FileEngine add
    `If-Match` on `PUT /v1/files/{uid}/content` (or a check-out lock), or is check-then-put with
    FileEngine's versions as the safety net enough?
 3. **Single sign-on for a desktop app** (§11, item 15). The door's OAuth flow returns the token in a URL
@@ -666,16 +666,16 @@ Commands:
    Which do you prefer?
 4. **One token for every service** (§11, item 17). Do the BCF and discussion services accept the REST door's
    bearer token (the discussion service says it does; the BCF service uses a shared HS256
-   secret), so Reviera signs in once per connection?
+   secret), so Riviera signs in once per connection?
 5. **What a "model" is on FileEngine.** A single `.ifc`/`.ifczip` file, or a folder (the model
    plus its `.resources`, linked models and exports)?
-6. **Thumbnails** (§11, item 10). Can a client upload a rendition for a file, or should Reviera keep its
+6. **Thumbnails** (§11, item 10). Can a client upload a rendition for a file, or should Riviera keep its
    thumbnail as a separate hidden file or as metadata?
 7. **The product library.** Is there one shared product library per tenant, or per project?
-   Where should Reviera create new documentation folders by default, and should it ship a
+   Where should Riviera create new documentation folders by default, and should it ship a
    folder template?
 8. **Master of product data.** Should the folder's metadata be the master for manufacturer,
-   model, code and classification (Reviera offers to update the type), or the model (Reviera
+   model, code and classification (Riviera offers to update the type), or the model (Riviera
    writes the folder), or neither, with a comparison either way?
 9. **Product fields.** *Answered (owner, 2026-10-27): "CLI/MF division" is the **CSI
    MasterFormat** division and section (`08 11 13`), kept as `class.masterformat`.* Still open:
@@ -684,7 +684,7 @@ Commands:
 10. **Instance documents.** Should individual elements (one installed unit with a serial
     number) have their own folders as well as their type's, or only types and materials?
 11. **Materials.** Should materials link to folders the same way as types (an EPD per
-    material), and should an EPD's embodied-carbon value feed Reviera's carbon calculation?
+    material), and should an EPD's embodied-carbon value feed Riviera's carbon calculation?
 12. **Issues route.** Start with BCF-API through the BCF service (standard, waits for its
     persistent store), or go straight to the discussion service (live, FileEngine-only)?
 13. **Publishing.**
@@ -700,16 +700,16 @@ Commands:
     - Is there one organisation library per tenant, or several (per discipline or client)?
     - Should new components go through a review (an *Incoming* folder with folder actions)
       before they appear in the library?
-    - Should an item's details stay in the shared `reviera-library.json`, merged on save as
+    - Should an item's details stay in the shared `riviera-library.json`, merged on save as
       proposed, or move to per-file FileEngine metadata? Per-file metadata means no merging,
       but a library copied to a local folder would then need its manifest rebuilt.
 
 ## 11. Improvements on the FileEngine side
 
 What FileEngine would need to change or add so the integration works well, found while
-surveying its services (§2). Each item says what Reviera needs, a suggested shape for the API,
-and which Reviera phase (§9) waits on it. *Needed* means the phase cannot ship without it;
-*wanted* means Reviera can work around its absence, less well.
+surveying its services (§2). Each item says what Riviera needs, a suggested shape for the API,
+and which Riviera phase (§9) waits on it. *Needed* means the phase cannot ship without it;
+*wanted* means Riviera can work around its absence, less well.
 
 ### 11.1 REST door (`fileengine_http_proxy`)
 
@@ -718,14 +718,14 @@ and which Reviera phase (§9) waits on it. *Needed* means the phase cannot ship 
    - Accept `If-Match` on `PUT /v1/files/{uid}/content` and on metadata writes, answering
      `412 Precondition Failed` when the version has moved on.
 
-   This closes the race between Reviera's version check and its upload (§5), and makes the
+   This closes the race between Riviera's version check and its upload (§5), and makes the
    Component Library manifest merge safe (§7b).
 2. **Check-out locks** (*wanted*, phase 1).
    - `POST /v1/files/{uid}/lock` (owner, time to live, renewable), `DELETE …/lock` to release,
      and the lock's holder and expiry shown in `stat`.
    - A write by anyone else answers `423 Locked`.
 
-   Reviera would take the lock while a model is open for editing and open a locked model
+   Riviera would take the lock while a model is open for editing and open a locked model
    read-only, as DM-FILE-007 does with WebDAV locks.
 3. **Large and resumable uploads** (*needed* for phase 1). Models and publish packages often
    exceed the 100 MB default request cap. Needed:
@@ -741,11 +741,11 @@ and which Reviera phase (§9) waits on it. *Needed* means the phase cannot ship 
 
    Today a save comment could only be file-level metadata, which the next save overwrites.
 5. **Content hash in `stat`** (*wanted*, phases 1 and 4). The SHA-256 the core already keeps,
-   so Reviera can check a cached model or library item without downloading it.
+   so Riviera can check a cached model or library item without downloading it.
 6. **Effective permissions for the caller** (*wanted*, phase 1). `GET /v1/nodes/{uid}/access`
    answering, for the signed-in user, `{read, write, delete, share, manage_acl}`. Today the
    permissions endpoint lists ACL entries, which a client would have to evaluate itself (roles,
-   claims, DENY precedence), and Reviera must not second-guess the core.
+   claims, DENY precedence), and Riviera must not second-guess the core.
 7. **Batch and listed metadata** (*wanted*, phases 2, 4 and 5).
    - `PATCH /v1/nodes/{uid}/metadata` setting several keys in one call (publishing writes about
      eight).
@@ -753,28 +753,28 @@ and which Reviera phase (§9) waits on it. *Needed* means the phase cannot ship 
      (`GET /v1/dirs/{uid}?metadata=doc.type,doc.expires`), so the Documents pane and the library
      browser don't make one call per file.
 8. **Metadata queries** (*wanted*, phases 5 and 7). Finding nodes by metadata (`product.code =
-   X`, `doc.expires < date`, `reviera.source_uid = Y`) within a subtree, either in the REST door
+   X`, `doc.expires < date`, `riviera.source_uid = Y`) within a subtree, either in the REST door
    or through the search service.
 9. **Paging and change lists** (*wanted*, phase 4).
    - Paging on directory listings (`?limit=&cursor=`).
    - A subtree change list (`GET /v1/dirs/{uid}/changes?since=<cursor>`) listing what was
-     added, changed, moved or deleted, so Reviera can index a large library incrementally
+     added, changed, moved or deleted, so Riviera can index a large library incrementally
      instead of walking it.
 10. **Client-made renditions** (*wanted*, phases 1 and 4). `PUT /v1/files/{uid}/renditions/{name}`
-    for a thumbnail or preview Reviera renders (a model's 3D view, a component's preview).
+    for a thumbnail or preview Riviera renders (a model's 3D view, a component's preview).
     Today renditions can be listed but only the conversion service makes them.
 11. **Folder downloads as zip** (*wanted*, phase 2). `GET /v1/dirs/{uid}/zip` (optionally
     recursive, at the latest versions) for handover packages and for copying a library to a
     local folder. The share service already builds such zips for outside links.
 12. **Change events for clients** (*wanted*, phases 1 and 4). A server-sent events or WebSocket
     feed of the core's `fileengine:events` for chosen folders, filtered by what the user can
-    read. Reviera could then say *"Someone saved a newer version of this model"* while it is
+    read. Riviera could then say *"Someone saved a newer version of this model"* while it is
     open, and offer library updates without polling.
 13. **Folder templates** (*wanted*, phases 2 and 5). Instantiating a stored folder tree with its
     metadata keys in one call, for product documentation folders, publish folders and new
-    libraries. Otherwise Reviera creates them call by call.
+    libraries. Otherwise Riviera creates them call by call.
 14. **Service discovery** (*wanted*, all phases). `GET /v1/services` listing the base URLs (and
-    versions) of the BCF, discussion, search and share services for the tenant, so a Reviera
+    versions) of the BCF, discussion, search and share services for the tenant, so a Riviera
     connection needs only the REST door's address.
 
 ### 11.2 Sign-in and tokens
@@ -789,7 +789,7 @@ and which Reviera phase (§9) waits on it. *Needed* means the phase cannot ship 
     - Or a device-authorization flow (RFC 8628): the user signs in on any browser with a short
       code.
 16. **Refresh** (*wanted*). A refresh token (or longer-lived app tokens that can be revoked), so
-    Reviera does not ask for the password every hour. *In progress (owner, 2026-10-28):* the
+    Riviera does not ask for the password every hour. *In progress (owner, 2026-10-28):* the
     REST door is getting strong generated credentials like the other doors, which covers this
     (§4).
 17. **One token for every service** (*needed* for phases 3 and 6). The BCF, discussion, search
@@ -801,44 +801,44 @@ and which Reviera phase (§9) waits on it. *Needed* means the phase cannot ship 
 
 18. **Persistent store** (*needed* for phase 3): the pending swap from the in-memory store to
     the per-tenant projection over the discussion service, with BCF-XML imports persisted.
-19. **BCF-API 3.0** (*wanted*). Reviera's client targets 3.0 with 2.1 as the fallback
+19. **BCF-API 3.0** (*wanted*). Riviera's client targets 3.0 with 2.1 as the fallback
     (COL-BCF-002); 3.0 adds topic and comment events, which make incremental sync exact.
 20. **Incremental sync** (*needed* for phase 3). OData `$filter` on `modified_date` for topics,
     comments and viewpoints (or events), and server-assigned modification dates on every
     change.
 21. **Files and versions** (*wanted*). A topic's *Header/Files* naming the model's FileEngine UID
-    and the version it was raised on, so Reviera opens the right version (§6).
+    and the version it was raised on, so Riviera opens the right version (§6).
 22. **Document references** (*wanted*), linking a topic to FileEngine documents (a
     specification sheet, a published report).
 
 ### 11.4 Discussion service (`fileengine_threaded_communication`)
 
 23. **A published anchor schema** (*wanted*, phase 6). The `fileengine.anchor.v1`
-    `model-viewpoint` shape as a versioned JSON Schema, under a permissive licence, so Reviera
+    `model-viewpoint` shape as a versioned JSON Schema, under a permissive licence, so Riviera
     can validate what it reads and writes (see 11.6).
 24. **Threads on a model version** (*wanted*). Anchoring a thread to the version of the model it
     was raised on, with a *"raised on an earlier version"* marker when the model moves on.
 25. **Live feed per folder** (*wanted*, phase 6). The `WS /files/{uid}/live` feed for every model
-    in a project folder at once, so Reviera does not open one socket per file.
+    in a project folder at once, so Riviera does not open one socket per file.
 
 ### 11.5 Share service (`fileengine_external_share`)
 
 26. **The public door** (*needed* for in-app share links): link redemption with the recipient's
     one-time code, deployed with the stack.
 27. **Links per node** (*wanted*). Listing the links on a file or folder (target, recipient,
-    expiry, downloads so far, state) and revoking them, for Reviera's *Shared links* list.
+    expiry, downloads so far, state) and revoking them, for Riviera's *Shared links* list.
 28. **Redemption notices** (*wanted*). Telling the creator when a link is first used, through the
-    attention feed (already planned) and an event Reviera can show.
+    attention feed (already planned) and an event Riviera can show.
 
 ### 11.6 Licensing and contracts
 
-29. **Permissive API descriptions** (*needed* before Reviera's client is published). The OpenAPI
+29. **Permissive API descriptions** (*needed* before Riviera's client is published). The OpenAPI
     contract (`openapi.yaml`), the anchor schema and the BCF extensions sit in AGPL repositories.
-    Publishing these interface descriptions under MIT or Apache-2.0, as Reviera does for its own
-    interfaces, puts beyond doubt that Reviera's MIT client, written against them, is not a
+    Publishing these interface descriptions under MIT or Apache-2.0, as Riviera does for its own
+    interfaces, puts beyond doubt that Riviera's MIT client, written against them, is not a
     derivative of the AGPL services.
 30. **A versioned contract** (*wanted*). The REST door's version in `/v1/version` or a header,
-    and a change log of the contract, so Reviera can tell users when a server is too old for a
+    and a change log of the contract, so Riviera can tell users when a server is too old for a
     feature.
 
 ### 11.7 Headless research API (`fileengine_convert_search_ai`), reviewed 2026-10-29
@@ -852,15 +852,15 @@ one key and scope shared with the REST door. Points from the desktop side:
     window, a laptop's sleep or a network change. Since runs are stored (§3.5), let the client
     read one back: `run_id` in the `plan` and `done` events and on every `item`, and
     `GET /csai/v1/runs/{run_id}` returning the request, the items so far and the state
-    (running, done, cancelled). Reviera then resumes the review table instead of paying again
+    (running, done, cancelled). Riviera then resumes the review table instead of paying again
     (cache hits make a rerun cheaper, but not free of requests).
 32. **Where the page comes from** (*needed*). `evidence.page` is read from `content_md`; does the
     stored Markdown keep page breaks (for example a marker per page from the PDF extractor)?
     If not, give `page: null` rather than a guess, and add a stable locator (heading path or
-    table and row) Reviera can show. Reviera opens the document at the page when there is one.
+    table and row) Riviera can show. Riviera opens the document at the page when there is one.
 33. **Units as printed, never converted** (*wanted*). `unit` is the unit the document prints
     (`W/m²K`, `Btu/h·ft²·°F`, `mm`), and `value` its number as printed (decimal comma kept as
-    found, or normalised: say which). Reviera converts with its own unit parser and shows the
+    found, or normalised: say which). Riviera converts with its own unit parser and shows the
     original. A `x-unit-kind` hint in the schema (length, thermal transmittance, mass) could
     let the service reject a quote whose unit does not fit.
 34. **Dates in ISO 8601** (*wanted*). Certificate and EPD validity as `YYYY-MM-DD` beside the
@@ -869,24 +869,24 @@ one key and scope shared with the REST door. Points from the desktop side:
 35. **Datasheets that cover a range** (*needed*). One datasheet often lists several models or
     sizes. The `instructions` field can name the product, but the answer needs to say when the
     document holds several candidates: `ambiguous: true` with the alternatives (each with its
-    own quote), not a pick. Reviera then asks the user which row is theirs.
+    own quote), not a pick. Riviera then asks the user which row is theirs.
 36. **The schema contract** (*wanted*). Which JSON Schema dialect (2020-12 suggested), which
     keywords are honoured (`type`, `enum`, `format: date`, `description`, nested objects,
     arrays), the largest schema accepted, and how a field's `description` reaches the prompt.
-    Reviera's field sets are small and flat, so a documented subset is enough.
-37. **A permissive contract for the headless routes** (*needed* before Reviera's client is
+    Riviera's field sets are small and flat, so a documented subset is enough.
+37. **A permissive contract for the headless routes** (*needed* before Riviera's client is
     published; as item 29). The OpenAPI description of §3.10, extended to `/csai/v1/*`, under
     MIT or Apache-2.0, including the SSE event schemas.
 38. **Token route path** (*check*). The design names `POST /api/v1/auth/token` and
     `/api/v1/auth/refresh` at the bridge with Basic `fesk_…:fesks_…`; this document (§4) assumed
-    `/v1/auth/token` at the REST door. Reviera will take the token URL from the connection's
+    `/v1/auth/token` at the REST door. Riviera will take the token URL from the connection's
     server (a discovery document or `/v1/version`, item 30) rather than hard-coding either.
 39. **Usage per key in the client's terms** (*wanted*). The `usage.message` text is helpful;
-    please also keep `state` and the limit names stable (they are what Reviera keys its
+    please also keep `state` and the limit names stable (they are what Riviera keys its
     warnings on), and include `resets_at` on the 429 body as on the event.
 40. **Cancel means stop** (*wanted*, already a §5 task). Closing the stream stops after the
     current file and the run is stored as `cancelled` with its items, so item 31 can resume it.
-41. **Consent stays off for Reviera** (*note*). Reviera will call `extract` and, later, `research`
+41. **Consent stays off for Riviera** (*note*). Riviera will call `extract` and, later, `research`
     with `tools.mcp: "deny"`; it does not need the consent relay (§3.9) for §7c. If a desktop
     research panel is added later, it would show the consent request in a dialog as §3.9
     proposes.
@@ -896,17 +896,17 @@ one key and scope shared with the REST door. Points from the desktop side:
 Reviewed against csai's branch `feat/extraction-prompt-sets` (plan b2a0da4…058372a,
 implementation P1–P3 5046600…ca04a2b) and folder_actions P3–P4. The branch was merged to master
 (20c85c3) with no interface changes after ca04a2b, and deployed on Proxima File Vault on
-2026-11-02. That day Reviera created `reviera.epd` and `reviera.hpd` there for the first time
+2026-11-02. That day Riviera created `riviera.epd` and `riviera.hpd` there for the first time
 (revision 1 each; publishing again changed nothing) and read the CertainTeed EPD and HPD in
-*Engineering › Reviera test › Product Library* through them. A server without prompt sets
-answers 404, which Reviera reads as "no prompt sets" and falls back.
+*Engineering › Riviera test › Product Library* through them. A server without prompt sets
+answers 404, which Riviera reads as "no prompt sets" and falls back.
 
-**What it gives Reviera:**
+**What it gives Riviera:**
 - one definition per field set, shared by the desktop, the cache and automation;
 - publishing with no server-side setup, idempotent by hash;
-- revisions Reviera can pin;
+- revisions Riviera can pin;
 - the marked-up PDF;
-- `extraction.complete` on the bus, so a folder rule can act on values Reviera's users extract.
+- `extraction.complete` on the bus, so a folder rule can act on values Riviera's users extract.
 
 Earlier items it settles:
 - 34 (dates): `date` fields compile to `format: date` with an ISO 8601 hint;
@@ -916,40 +916,40 @@ Earlier items it settles:
 Points from the desktop side:
 
 42. **Revision churn between releases** (*needed*). The hash is compared with the current
-    revision only. Two Reviera releases in one tenant with different definitions would each
+    revision only. Two Riviera releases in one tenant with different definitions would each
     publish a new revision at every start, alternating. After 20 revisions a day, both get
-    `429 revision_limit`, and Reviera falls back to the schema. Please answer a definition that
+    `429 revision_limit`, and Riviera falls back to the schema. Please answer a definition that
     matches *any* earlier published revision with that revision (`changed: false`, `revision: n`,
-    `current_revision`) instead of publishing it again. Reviera already pins the revision it gets
+    `current_revision`) instead of publishing it again. Riviera already pins the revision it gets
     back, so each release keeps its own.
 43. **The set's id in the 409 answers** (*wanted*). `managed_in_builder` and `locked` give
-    `current_revision` but not the set's `id`. Reviera then lists every set to find its slug. A
+    `current_revision` but not the set's `id`. Riviera then lists every set to find its slug. A
     `GET /v1/prompt-sets/slug/{slug}` would also do.
 44. **Listing by slug** (*wanted*). `?q=` matches name and description only; a slug filter
     would let item 43's lookup be one request.
 45. **The unit in the prompt** (*check*). A field's `unit` is added to its description as
     "(unit: …)". Please confirm the model still reports the unit as printed and does not convert
-    (item 33), or state that a value comes in the field's unit. Reviera converts with its own
+    (item 33), or state that a value comes in the field's unit. Riviera converts with its own
     parser and shows the printed unit.
 46. **Reading the marked-up PDF** (*check*). Each item's `markup` has the sidecar's `uid` and
     name. Can a member read that hidden child through the REST door
-    (`GET /api/v1/files/{uid}/content`) with their own key? Reviera would then open it at the
+    (`GET /api/v1/files/{uid}/content`) with their own key? Riviera would then open it at the
     page beside the review table. **Answered (live, 2026-11-02): yes.** The sidecar is a child
     of the document (`parent_uid` is the PDF's uid), and a member's key downloads it. The review
-    dialog's *Open Marked-up PDF* opens it; opening at the page waits on a viewer Reviera can
+    dialog's *Open Marked-up PDF* opens it; opening at the page waits on a viewer Riviera can
     direct (the system viewer is given only the file).
 47. **Retired sets stay retired** (*note*). A retired application-managed slug answers 410 to
-    every later publish, so a newer Reviera cannot bring it back; only an editor can. That is the
-    intended editor control. Reviera falls back to the schema, so those extractions emit
+    every later publish, so a newer Riviera cannot bring it back; only an editor can. That is the
+    intended editor control. Riviera falls back to the schema, so those extractions emit
     `extraction.complete` with `prompt_set: null`, which folder rules skip.
 48. **Contract and licence** (*needed*, as items 29 and 37). The prompt-set routes,
     `fileengine.prompt_set.v1` and the sidecar entry format (`fileengine.extract_cache.v1`)
-    should be in the permissively licensed OpenAPI description Reviera's MIT client is written
+    should be in the permissively licensed OpenAPI description Riviera's MIT client is written
     against.
 
-### 11.8 Summary by Reviera phase
+### 11.8 Summary by Riviera phase
 
-| Reviera phase (§9) | Needs | Wants |
+| Riviera phase (§9) | Needs | Wants |
 |---|---|---|
 | 1. Storage | 1, 3, 4, 29 | 2, 5, 6, 10, 12, 14, 16 |
 | 2. Publishing | 26 (share links only) | 7, 11, 13, 27, 28 |

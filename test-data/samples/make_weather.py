@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 Reviera contributors
-"""Writes reviera_synthetic.epw: a synthetic, temperate-maritime weather year at 51.5° N, 0° E
+# Copyright (C) 2026 Riviera contributors
+"""Writes riviera_synthetic.epw: a synthetic, temperate-maritime weather year at 51.5° N, 0° E
 for the sustainability samples. Every value is computed here (sun positions, a clear-sky model
 dimmed by a deterministic day-to-day cloud cover, seasonal and daily temperature swings), so the
 file is the project's own and can be shipped; it is not measured weather and must not be used to
 design a real building.
 
-    python3 make_weather.py   # rewrites reviera_synthetic.epw beside this script
+    python3 make_weather.py   # rewrites riviera_synthetic.epw beside this script
 """
 
 import math
@@ -43,12 +43,12 @@ def sun(doy, hour):
 
 def main():
     lines = [
-        f"LOCATION,Reviera Synthetic Temperate,,Synthetic,Reviera synthetic (not measured),000000,{LAT},{LON},{TZ},{ELEV}",
+        f"LOCATION,Riviera Synthetic Temperate,,Synthetic,Riviera synthetic (not measured),000000,{LAT},{LON},{TZ},{ELEV}",
         "DESIGN CONDITIONS,0",
         "TYPICAL/EXTREME PERIODS,0",
         "GROUND TEMPERATURES,0",
         "HOLIDAYS/DAYLIGHT SAVINGS,No,0,0,0",
-        "COMMENTS 1,Synthetic weather made by test-data/samples/make_weather.py for the BIM Reviera samples; not measured data",
+        "COMMENTS 1,Synthetic weather made by test-data/samples/make_weather.py for the BIM Riviera samples; not measured data",
         "COMMENTS 2,Clear-sky sun model dimmed by a repeatable cloud cover; GPL-3.0-or-later with the samples",
         "DATA PERIODS,1,1,Data,Monday, 1/ 1,12/31",
     ]
@@ -84,7 +84,7 @@ def main():
                     "9999,99999,9,999999999,999,0.120,0,88,0.200,0.0,0.0"
                 )
                 n += 1
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "reviera_synthetic.epw")
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "riviera_synthetic.epw")
     with open(path, "w", newline="\r\n") as f:
         f.write("\n".join(lines) + "\n")
 

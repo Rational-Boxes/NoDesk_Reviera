@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2026 Reviera contributors
+// Copyright (C) 2026 Riviera contributors
 
-use reviera_opencde::fake::Fake;
-use reviera_opencde::{Auth, Client, ErrorKind, OPENCONSTRUCTIONERP_LOGIN};
+use riviera_opencde::fake::Fake;
+use riviera_opencde::{Auth, Client, ErrorKind, OPENCONSTRUCTIONERP_LOGIN};
 use serde_json::json;
 
 fn login(user: &str, password: &str) -> Auth {

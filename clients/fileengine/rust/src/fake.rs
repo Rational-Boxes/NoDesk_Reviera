@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2026 Reviera contributors
+// Copyright (C) 2026 Riviera contributors
 
 //! An in-memory FileEngine REST door on localhost, for tests (feature `fake`). It answers the
 //! routes [`crate::Client`] uses the way the live door does: bearer tokens from a service

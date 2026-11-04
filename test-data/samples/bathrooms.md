@@ -15,7 +15,7 @@ the sizes given are inside the walls, from the inside corner named.
    across one end, and the WC and a pedestal lavatory go along a long wall at the IPC's
    spacings: the WC's centre is 15 in from the tub. **View › Coordination › Check Bathrooms**
    then reports that the WC stands in the tub's 21 in clear space. The source gives that space no
-   width, so Reviera takes the tub's whole length. **View › Coordination › Check
+   width, so Riviera takes the tub's whole length. **View › Coordination › Check
    Overlaps** lists the same intrusion; pick it and choose *Accept as intended*.
 2. **A three-quarter bath.** Walls round 1.6 × 2.8 m from (3, 0). Bathroom Layout again:
    *Three-quarter bath (shower)*. A 900 mm shower tray, the WC and the lavatory go along the wet

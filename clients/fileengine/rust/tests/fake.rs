@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2026 Reviera contributors
+// Copyright (C) 2026 Riviera contributors
 
 //! The client against the in-memory FileEngine: signing in and renewing, folders, files and
 //! their versions, the checked save, metadata and permissions.
 
-use reviera_fileengine::fake::Fake;
-use reviera_fileengine::{Client, ErrorKind, ROOT};
+use riviera_fileengine::fake::Fake;
+use riviera_fileengine::{Client, ErrorKind, ROOT};
 
 fn signed_in(fake: &Fake) -> Client {
     let c = Client::new(&fake.url, false).unwrap();
@@ -57,9 +57,9 @@ fn folders_files_and_versions() {
     let c = signed_in(&fake);
     let eng = c.resolve("Engineering").unwrap();
     assert!(eng.is_dir());
-    let test = c.ensure_dir(&eng.uid, "Reviera test").unwrap();
-    assert_eq!(c.ensure_dir(&eng.uid, "Reviera test").unwrap(), test, "found, not made again");
-    assert_eq!(c.resolve("Engineering/Reviera test").unwrap().uid, test);
+    let test = c.ensure_dir(&eng.uid, "Riviera test").unwrap();
+    assert_eq!(c.ensure_dir(&eng.uid, "Riviera test").unwrap(), test, "found, not made again");
+    assert_eq!(c.resolve("Engineering/Riviera test").unwrap().uid, test);
     assert_eq!(c.resolve("Engineering/Nowhere").unwrap_err().kind, ErrorKind::NotFound);
 
     let f = c.create_file(&test, "tower.ifc").unwrap();
@@ -94,15 +94,15 @@ fn folders_files_and_versions() {
     assert_eq!(c.stat(&f).unwrap().size, 300_000);
 
     c.set_metadata(&f, "ifc.schema", "IFC4").unwrap();
-    c.set_metadata(&f, "reviera.comment", "Level 3 slab").unwrap();
+    c.set_metadata(&f, "riviera.comment", "Level 3 slab").unwrap();
     assert_eq!(c.metadata(&f).unwrap().get("ifc.schema").map(String::as_str), Some("IFC4"));
-    c.delete_metadata(&f, "reviera.comment").unwrap();
+    c.delete_metadata(&f, "riviera.comment").unwrap();
     assert_eq!(fake.metadata(&f).len(), 1);
 
     c.rename(&f, "tower-a.ifc").unwrap();
     let sub = c.create_dir(&test, "Archive").unwrap();
     c.move_to(&f, &sub).unwrap();
-    assert_eq!(c.resolve("Engineering/Reviera test/Archive/tower-a.ifc").unwrap().uid, f);
+    assert_eq!(c.resolve("Engineering/Riviera test/Archive/tower-a.ifc").unwrap().uid, f);
     assert_eq!(c.move_to(&test, &sub).unwrap_err().kind, ErrorKind::Conflict, "into itself");
     c.delete_file(&f).unwrap();
     assert!(!c.exists(&f).unwrap());

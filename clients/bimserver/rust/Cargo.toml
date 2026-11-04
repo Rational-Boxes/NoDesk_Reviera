@@ -1,5 +1,5 @@
 [package]
-name = "reviera-bimserver"
+name = "riviera-bimserver"
 description = "Open Source BIMserver JSON API client"
 version.workspace = true
 edition.workspace = true

@@ -3,7 +3,7 @@
 """Render Revit_Application_Specification.md to a single self-contained web page.
 
 Usage: python3 design_documents/tools/build_spec_html.py
-Output: design_documents/web/reviera_spec.html
+Output: design_documents/web/riviera_spec.html
 Screenshots are intentionally not embedded (internal reference only; see RESEARCH_LOG.md).
 """
 import html
@@ -15,7 +15,7 @@ import markdown
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SRC = ROOT / "Revit_Application_Specification.md"
-OUT = ROOT / "web" / "reviera_spec.html"
+OUT = ROOT / "web" / "riviera_spec.html"
 
 
 HTML_TAGS = set("a abbr b blockquote br code del details div em h1 h2 h3 h4 h5 h6 hr i img kbd li ol p pre s span strong sub summary sup table tbody td th thead tr u ul".split())

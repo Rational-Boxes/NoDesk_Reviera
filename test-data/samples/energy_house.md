@@ -8,7 +8,7 @@ and open a Level 1 plan (View › Floor Plan).
 
 1. **The site.** Sustainability › Site › **Location**: latitude 51.5, longitude 0, elevation 20,
    time zone 0, place *Synthetic Temperate*.
-2. **Weather.** Sustainability › Site › **Weather**: import `reviera_synthetic.epw` from the
+2. **Weather.** Sustainability › Site › **Weather**: import `riviera_synthetic.epw` from the
    samples folder (a synthetic year made by `make_weather.py`, not measured weather). It is
    copied into `energy_house.resources/weather`.
 3. **The bungalow.** Architecture › **Wall**, 2700 high, clockwise round (0, 0), (0, 9000),

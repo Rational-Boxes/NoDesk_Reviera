@@ -1,10 +1,10 @@
 # Chapter 5 — Views, Graphics, Annotation, Schedules, Sheets and Output
 
 **Area code:** DOC · **Status:** Draft 1 (2026-10-12) · **Primary source:** `research/04_documentation_collaboration.md` (cited as `research/04 §n`)
-**Related chapters:** Chapter 1 (UI shell: ribbon, Project Browser, View Control Bar, keymap), Chapter 2 (DM: data model, families, parameters, formulas, file/IO), Chapter 2a (Reviera Extension Data, RXD), Chapter 3 (ARC: datums, rooms, areas), Chapter 6 (COL: worksharing display, links, positioning, BCF).
+**Related chapters:** Chapter 1 (UI shell: ribbon, Project Browser, View Control Bar, keymap), Chapter 2 (DM: data model, families, parameters, formulas, file/IO), Chapter 2a (Riviera Extension Data, RXD), Chapter 3 (ARC: datums, rooms, areas), Chapter 6 (COL: worksharing display, links, positioning, BCF).
 **Reference:** Autodesk Revit 2026/2027 documentation and output features, used as the functional reference only.
 
-This chapter specifies how Reviera turns its IFC model into drawings and deliverables. It covers every view type, the rules that decide how each element is drawn in each view, model-reporting and drafting annotation, schedules, sheets, and every output channel. It also specifies how documentation objects persist inside the IFC file, and the hidden-line and GPU pipelines that produce the pictures.
+This chapter specifies how Riviera turns its IFC model into drawings and deliverables. It covers every view type, the rules that decide how each element is drawn in each view, model-reporting and drafting annotation, schedules, sheets, and every output channel. It also specifies how documentation objects persist inside the IFC file, and the hidden-line and GPU pipelines that produce the pictures.
 
 ---
 
@@ -16,12 +16,12 @@ These principles apply to every requirement in this chapter.
 |----|-----------|----------|
 | DOC-CORE-001 | **Views are live projections.** A view stores only its *definition* (type, extents, camera, graphics settings, view-owned annotation). Projected model linework, cut poché and shaded images are always derived, and they are regenerated when the model changes. Derived results may be cached, but the cache is never the source of truth. Cache entries are keyed by element revision and view-definition revision (DOC-HLR-001); a cache miss or a corrupt entry only costs regeneration time, never a wrong drawing. Closing and reopening a project discards no definition data and may discard every cache. The only stored derived result is a saved rendering image (DOC-OUT-011). | P0 |
 | DOC-CORE-002 | **Paper-space sizing.** Annotation symbols, text, tag heads, dimension text, line patterns, drafting fill patterns and annotation line weights are specified in paper millimetres. They render at `paper size × view scale` in model space, so that changing the view scale resizes them automatically. Model patterns (DOC-GFX-014), model text and model lines are the exception: they are sized in real units. Annotation positions are stored in view coordinates, so a scale change keeps each tag's anchor on its host while its head grows or shrinks around that anchor; leaders are re-elbowed, never re-routed. Sheets are always 1:1, so sheet annotation is the same in paper and model space. | P0 |
-| DOC-CORE-003 | **Model-reporting annotation is associative.** Tags, dimensions, spot dimensions and element/material keynotes bind to model references (element GlobalId plus a stable geometric sub-reference). They update when the referenced element changes and become *orphaned* (kept, flagged, drawn in a warning colour) when the reference disappears. A reference is re-resolved on every regeneration of the view; when a sub-reference cannot be found but the element still exists, Reviera tries the named sub-reference rules of Chapter 2a (for example the same face role on a split wall) before orphaning. An orphan can be re-hosted with *Pick new host* or deleted; it never silently attaches to another element. | P0 |
+| DOC-CORE-003 | **Model-reporting annotation is associative.** Tags, dimensions, spot dimensions and element/material keynotes bind to model references (element GlobalId plus a stable geometric sub-reference). They update when the referenced element changes and become *orphaned* (kept, flagged, drawn in a warning colour) when the reference disappears. A reference is re-resolved on every regeneration of the view; when a sub-reference cannot be found but the element still exists, Riviera tries the named sub-reference rules of Chapter 2a (for example the same face role on a split wall) before orphaning. An orphan can be re-hosted with *Pick new host* or deleted; it never silently attaches to another element. | P0 |
 | DOC-CORE-004 | **View-owned elements.** Text, detail lines, regions, detail components, revision clouds and similar drafting items belong to exactly one view (or sheet) and appear nowhere else, except through dependent views (DOC-VIEW-011). Deleting a view deletes its view-owned elements in the same undo step; the confirmation states how many there are. Copying them to another view is an explicit act (clipboard *Paste aligned to selected views*, *Duplicate with Detailing*, or detail groups) and always creates new objects with new ids. Model elements are never view-owned. | P0 |
 | DOC-CORE-005 | **One sheet per model view.** A graphical model view (plan, section, elevation, callout, 3D, drafting, rendering) can be placed on at most one sheet. Schedules, legends, keynote legends, sheet lists, view lists and note blocks can be placed on any number of sheets. The rule is checked by `sheet.place_view`, `viewport.swap_view` and `viewport.move_to_sheet`, which fail with `view.already_on_sheet` (naming the sheet) instead of placing a second copy. To show the same area twice, the user duplicates the view, usually as a dependent (DOC-VIEW-011). Assembly views follow the same rule (§5.16). | P0 |
 | DOC-CORE-006 | **One draw list, many outputs.** Every 2D result (on-screen hidden-line view, print, PDF, DXF/DWG, raster image) is produced from the same intermediate *draw list* (DOC-HLR-004). Output is what you see on screen, apart from the documented print options (DOC-OUT-001). The differences allowed between screen and output are exactly: temporary display state (DOC-GFX-008, temporary view properties, reveal hidden, displacement highlight) never prints; *Thin lines* is screen-only; the print options hide or recolour the items they name; raster processing (DOC-HLR-007) changes shaded content only. Any other difference is a defect. | P0 |
 | DOC-CORE-007 | **Everything is a command.** Every creation, edit and output operation in this chapter is a registered command, so it is reachable from the ribbon, Lua and MCP. Read-only queries (for example `graphics.explain`) are commands too, flagged as not undoable. Commands that open a dialog (for example `template.manage`, `revision.manage`) are UI entry points only: every change made in the dialog is applied through the undoable commands of the same requirement, so a dialog session that changes five things records those five commands as one undo step named after the dialog. Without a UI (Lua, MCP, headless), dialog commands fail with `ui.unavailable`. | P0 |
-| DOC-CORE-008 | **RXD persistence.** Every documentation object defined here persists as Reviera Extension Data (RXD, §5.1, Chapter 2a), embedded in the IFC file by default and keyed to the model by IFC GlobalIds. A project opened locally or downloaded from BIMserver therefore reproduces every view, sheet and annotation exactly, and the file remains valid standard IFC. When another tool has deleted or changed elements that RXD refers to, the reconciliation pass of Chapter 2a §7 runs on open: references to missing elements become orphans (DOC-CORE-003), and nothing is deleted without a report. Session-only state (temporary hide/isolate, highlight modes, render history) is never written to RXD. | P0 |
+| DOC-CORE-008 | **RXD persistence.** Every documentation object defined here persists as Riviera Extension Data (RXD, §5.1, Chapter 2a), embedded in the IFC file by default and keyed to the model by IFC GlobalIds. A project opened locally or downloaded from BIMserver therefore reproduces every view, sheet and annotation exactly, and the file remains valid standard IFC. When another tool has deleted or changed elements that RXD refers to, the reconciliation pass of Chapter 2a §7 runs on open: references to missing elements become orphans (DOC-CORE-003), and nothing is deleted without a report. Session-only state (temporary hide/isolate, highlight modes, render history) is never written to RXD. | P0 |
 
 **Acceptance criteria (core).**
 - [ ] Changing a wall's thickness updates every plan, section, schedule and sheet that shows it, without the user refreshing anything.
@@ -35,11 +35,11 @@ These principles apply to every requirement in this chapter.
 
 **ID:** DOC-IFC-001 · **Priority:** P0 · **Ref:** research/04 §11; TECH_STACK §3.1, §3.7.3; spec/02a_extension_data_format.md
 
-**Purpose.** Views, sheets, schedules, graphic standards and annotation are not building data, and IFC entities cannot express them without loss. Reviera stores them as **Reviera Extension Data (RXD)**: versioned JSON documents with stable object ids, defined in Chapter 2a (`02a_extension_data_format.md`). By default RXD is embedded in the IFC file as valid, standard IFC, so a single `.ifc` file carries the whole project. Chapter 2a defines the carrier (property sets, payload encoding, the alternative external carrier), the object envelope, the reference syntax and the merge rules. This chapter does not redefine any of that. It only names the RXD documents this chapter uses, and specifies how documentation is *exported* as IFC annotation for other tools.
+**Purpose.** Views, sheets, schedules, graphic standards and annotation are not building data, and IFC entities cannot express them without loss. Riviera stores them as **Riviera Extension Data (RXD)**: versioned JSON documents with stable object ids, defined in Chapter 2a (`02a_extension_data_format.md`). By default RXD is embedded in the IFC file as valid, standard IFC, so a single `.ifc` file carries the whole project. Chapter 2a defines the carrier (property sets, payload encoding, the alternative external carrier), the object envelope, the reference syntax and the merge rules. This chapter does not redefine any of that. It only names the RXD documents this chapter uses, and specifies how documentation is *exported* as IFC annotation for other tools.
 
 **Behaviour & rules.**
 - **Loading.** On open, `views/index`, `sheets/index`, `views/templates`, `views/filters`, `views/types`, `views/color_schemes`, the `standards/*` documents and the `project/*` documents load at once. `views/<viewId>`, `views/annotation/<viewId>`, `schedules/<scheduleId>` and `sheets/<sheetId>` load lazily, the first time the view, sheet or schedule is opened, printed, exported, scheduled (view lists, sheet lists) or queried through Lua or MCP.
-- **Saving.** Reviera tracks changes per RXD document. On save, only changed documents are serialised again; unchanged documents are written byte-identical, which keeps BIMserver revisions and text diffs small.
+- **Saving.** Riviera tracks changes per RXD document. On save, only changed documents are serialised again; unchanged documents are written byte-identical, which keeps BIMserver revisions and text diffs small.
 - **Damaged documents.** A document that fails its schema check on load is quarantined: its view, sheet or schedule is listed as *damaged* in the Project Browser and cannot be opened, its raw JSON is kept unchanged and written back unchanged on save, and the problem is listed in the warnings list. The rest of the project opens normally. `rxd.status` (Chapter 2) reports quarantined documents.
 - **Versions.** Each document carries the RXD format version (Chapter 2a). Unknown fields from a newer minor version are kept and written back. A document from a newer major version opens read-only, with a banner naming the version.
 - **Deleting model elements** never deletes RXD annotation that refers to them; the annotation becomes an orphan (DOC-CORE-003). `rxd.reconcile` (Chapter 2a) can report or remove orphans in bulk.
@@ -75,10 +75,10 @@ These principles apply to every requirement in this chapter.
 
 **ID:** DOC-IFC-002 · **Priority:** P1 · **Ref:** research/04 §6.4 (*Export 2D plan view elements*)
 
-**Purpose.** Other IFC tools do not read RXD. Viewers, facility-management tools and other authoring tools may still want drawings and annotation. The export setup option *Include documentation as IFC annotation* (DOC-OUT-006) writes them as standard IFC4 presentation entities. This is an interoperability export: Reviera never treats it as its own store. When Reviera opens a foreign IFC containing such annotation, it shows that annotation read-only as imported drafting (Chapter 6, COL-LNK-001).
+**Purpose.** Other IFC tools do not read RXD. Viewers, facility-management tools and other authoring tools may still want drawings and annotation. The export setup option *Include documentation as IFC annotation* (DOC-OUT-006) writes them as standard IFC4 presentation entities. This is an interoperability export: Riviera never treats it as its own store. When Riviera opens a foreign IFC containing such annotation, it shows that annotation read-only as imported drafting (Chapter 6, COL-LNK-001).
 
 **Behaviour & rules.** When the option is on, for each view selected in the export setup:
-- **Contexts.** Reviera creates `IfcGeometricRepresentationSubContext` instances under the `Plan` and `Model` contexts with `ContextIdentifier = 'Annotation'`, a `TargetView` of `PLAN_VIEW`, `REFLECTED_PLAN_VIEW`, `SECTION_VIEW`, `ELEVATION_VIEW` or `MODEL_VIEW`, and `TargetScale` equal to the view's scale (for example `0.01` for 1:100). Sheets, if exported, use a sub-context with `TargetView = USERDEFINED` and `UserDefinedTargetView = 'Sheet'`, in paper millimetres.
+- **Contexts.** Riviera creates `IfcGeometricRepresentationSubContext` instances under the `Plan` and `Model` contexts with `ContextIdentifier = 'Annotation'`, a `TargetView` of `PLAN_VIEW`, `REFLECTED_PLAN_VIEW`, `SECTION_VIEW`, `ELEVATION_VIEW` or `MODEL_VIEW`, and `TargetScale` equal to the view's scale (for example `0.01` for 1:100). Sheets, if exported, use a sub-context with `TargetView = USERDEFINED` and `UserDefinedTargetView = 'Sheet'`, in paper millimetres.
 - **Grouping.** Each exported view becomes an `IfcGroup` (`ObjectType = 'DRAWING'`, `Name` = view name) whose members (`IfcRelAssignsToGroup`) are that view's `IfcAnnotation` objects. Plan annotation may optionally be contained in the view's storey (`IfcRelContainedInSpatialStructure`).
 - **Annotation objects.** Each annotation becomes one `IfcAnnotation`. In IFC4, its class is given by `ObjectType` (`DIMENSION`, `TEXT`, `TAG`, `SYMBOL`, `DETAIL_LINE`, `FILLED_REGION`, `REVISION_CLOUD`, `MATCHLINE`, …). In IFC4X3 exports, `PredefinedType` is set to the matching `IfcAnnotationTypeEnum` value where one exists, otherwise `USERDEFINED` with the same `ObjectType`. Model-reporting annotation is related to the element it reports on with `IfcRelAssignsToProduct` (RelatingProduct = the element), so consumers can tell which door a tag belongs to.
 - **Curves.** Lines, polylines, arcs and splines are items of an `IfcGeometricCurveSet`, using `IfcPolyline`, `IfcIndexedPolyCurve` (with arc segments), `IfcTrimmedCurve` of `IfcCircle`/`IfcEllipse`, and `IfcBSplineCurveWithKnots`. Representation identifier `Annotation`; representation type `Annotation2D`, or `GeometricCurveSet` when only curves are present.
@@ -89,14 +89,14 @@ These principles apply to every requirement in this chapter.
 - **Images.** Logos and images use `IfcBlobTexture` (PNG or JPEG) on an `IfcAnnotationFillArea`, through `IfcSurfaceStyleWithTextures`.
 - **Drawing linework.** With the setup option *Include 2D linework*, the view's computed draw list (DOC-HLR-004) is also written: one `IfcAnnotation` (`ObjectType = 'DRAWING_LINEWORK'`) per view, whose representation holds one `IfcGeometricCurveSet` per distinct line style (each with its `IfcStyledItem`), plus `IfcAnnotationFillArea` items for cut poché. Tools without hidden-line capability then get a finished 2D drawing.
 - **Other documentation data** written on export: phase status as the standard `Status` property (DOC-GFX-017); design options and worksets as `IfcGroup` (DOC-GFX-018; Chapter 6).
-- The same export setup can also *strip RXD* (a "clean" exchange file without Reviera data, DOC-OUT-006).
+- The same export setup can also *strip RXD* (a "clean" exchange file without Riviera data, DOC-OUT-006).
 
 **Acceptance criteria.**
 - [ ] An IFC4 file exported with *Include documentation as IFC annotation* validates with IfcOpenShell's schema validator with no errors.
 - [ ] A third-party IFC viewer that displays `Annotation` sub-contexts shows the exported floor plan's dimensions and text at the correct position and size.
 - [ ] Each exported door tag is related to its door by `IfcRelAssignsToProduct`.
 - [ ] With *Include 2D linework* on, the exported plan linework overlays the model plan with no visible offset.
-- [ ] Opening a stripped export in Reviera creates no native annotation; the exported annotation appears only as read-only imported drafting.
+- [ ] Opening a stripped export in Riviera creates no native annotation; the exported annotation appears only as read-only imported drafting.
 
 ### 5.1.3 Acceptance criteria (persistence)
 - [ ] A saved project is one valid IFC file that, when reopened, restores every view, sheet, schedule and annotation (RXD embedded by default).
@@ -104,7 +104,7 @@ These principles apply to every requirement in this chapter.
 - [ ] Opening a project with 500 views opens only the views that were open at the last save; `rxd.status` shows the other view documents as not loaded.
 - [ ] A view document edited by hand so that it fails its schema opens as *damaged*, the rest of the project opens, and saving writes the damaged JSON back unchanged.
 - [ ] Adding one text note to one view changes only that view's `views/annotation/<viewId>` RXD document (and the RXD index metadata defined in Chapter 2a).
-- [ ] Third-party IFC tools open a Reviera project file without errors, ignoring the RXD.
+- [ ] Third-party IFC tools open a Riviera project file without errors, ignoring the RXD.
 
 ---
 
@@ -187,7 +187,7 @@ These principles apply to every requirement in this chapter.
 **Workflow.**
 1. View tab › Create › Plan Views ▾ › Floor Plan / Reflected Ceiling Plan / Structural Plan / Area Plan.
 2. In the New Plan dialog the user picks the view family type, one or more levels, and the scale. By default, levels that already have a plan of that type are not listed; clearing *Do not duplicate existing views* lists them too.
-3. For an area plan the user also picks an area scheme (Chapter 3); Reviera offers to generate area boundary lines from walls.
+3. For an area plan the user also picks an area scheme (Chapter 3); Riviera offers to generate area boundary lines from walls.
 4. OK creates one view per level and opens the last one.
 
 **UI.** New Plan dialog: Type selector, Edit Type…, level list (multi-select), *Do not duplicate existing views*, Scale. The level tool (Chapter 3) has a *Make plan view* option that calls the same command.
@@ -215,7 +215,7 @@ These principles apply to every requirement in this chapter.
 **Workflow.**
 1. Properties › Extents › View Range › Edit… opens the View Range dialog.
 2. For each of the four planes (Top, Cut Plane, Bottom, View Depth), the user picks a level reference and an offset.
-3. A *Show diagram* toggle expands an explanatory section diagram that shows the four planes against the current level stack (drawn by Reviera; no reference artwork).
+3. A *Show diagram* toggle expands an explanatory section diagram that shows the four planes against the current level stack (drawn by Riviera; no reference artwork).
 4. Apply or OK validates and regenerates.
 
 **UI.** View Range dialog: four rows (Plane, Level reference drop-down, Offset field); level references are *Associated Level*, *Level Above*, *Level Below*, *Unlimited* (Top and View Depth only) and every named level. Apply / OK / Cancel, diagram toggle.
@@ -481,7 +481,7 @@ These principles apply to every requirement in this chapter.
 **Behaviour & rules.**
 - Toggling between parallel and perspective projection is available from the view cube context menu.
 - **Lock / Unlock 3D view** (View Control Bar lock menu) locks the camera so that tags, keynotes and text can be placed in the 3D view. Annotation in an unlocked view is disallowed. The menu has three items:
-  - *Save Orientation and Lock View* stores the current camera as the view's locked orientation and locks it. The user's default 3D view cannot be locked: Reviera asks for a name and saves it as a new named view (`save_as_name`). If the view already has a saved orientation that differs and contains annotation, Reviera warns that the annotation placed at the old orientation will be deleted, and continues only on confirmation.
+  - *Save Orientation and Lock View* stores the current camera as the view's locked orientation and locks it. The user's default 3D view cannot be locked: Riviera asks for a name and saves it as a new named view (`save_as_name`). If the view already has a saved orientation that differs and contains annotation, Riviera warns that the annotation placed at the old orientation will be deleted, and continues only on confirmation.
   - *Restore Orientation and Lock View* returns an unlocked view to its saved orientation and locks it again; annotation placed at that orientation shows again.
   - *Unlock View* allows orbiting. The view's annotation is kept but hidden (and excluded from print) until the orientation is restored.
 - In a locked view, orbit, pan-by-orbit and view cube rotation are refused; pan and zoom remain available. Perspective (camera) views can be locked, but tags and keynotes cannot be placed in them. Material tags, room, area and space tags are not allowed in any 3D view.
@@ -592,11 +592,11 @@ These principles apply to every requirement in this chapter.
 ### Blueprint mode (3D slice to 2D drawing)
 **ID:** DOC-VIEW-013 · **Priority:** P1 · **Ref:** owner requirement (2026-10-12); builds on DOC-VIEW-002, DOC-VR-001, DOC-VIEW-008 and §5.12
 
-**Purpose.** Go from the 3D model to a conventional 2D drawing in one step. The user slices the model where they want to look, and Reviera turns the slice into the drawing an architect would draw there: a horizontal slice through a storey becomes a floor plan, and a vertical slice becomes a section. The transition is continuous, so the user can see how the drawing comes out of the model.
+**Purpose.** Go from the 3D model to a conventional 2D drawing in one step. The user slices the model where they want to look, and Riviera turns the slice into the drawing an architect would draw there: a horizontal slice through a storey becomes a floor plan, and a vertical slice becomes a section. The transition is continuous, so the user can see how the drawing comes out of the model.
 
 **Workflow.**
 1. In any 3D view the user turns on **Blueprint mode**: View Control Bar › Blueprint, or the default shortcut BP.
-2. Reviera proposes a slice:
+2. Riviera proposes a slice:
    - **Horizontal** (default): at the cut-plane height of the level nearest the camera target (the level's default view range, DOC-VR-001).
    - **Vertical**: when the camera looks more horizontal than down (pitch below 30°), at the section box face or the plane through the camera target facing the camera.
    
@@ -714,7 +714,7 @@ These principles apply to every requirement in this chapter.
 - When drafting views are inserted, conflicting type names are resolved by the duplicate-type dialog (Chapter 2).
 - **Insert Views from File** (Insert › Import › Insert from File ▾ › *Insert Views from File*, `view.insert_from_file`): after a file is chosen, the *Insert Views* dialog lists the source's insertable views with a kind filter (All, Drafting views, Schedules, Legends, Renderings, Sheets) and a preview. Insertable kinds are drafting views, schedules (definitions only; rows come from this project's model), legends, rendering views and sheets whose viewports hold only drafting views, legends, schedules or renderings. Model views (plans, sections, 3D) are not offered, because their content is the source model. Inserted views keep their names; a clash adds a numeric suffix (`Detail 1 (2)`). Types and styles the views use (text, dimension, region, line and fill pattern, detail component families) are copied when missing; when a type of the same name exists, the *current project's* definition is kept and the insert report lists every such case.
 - **Insert 2D Elements from File** (Insert from File ▾ › *Insert 2D Elements from File*, `detail.insert_from_file`): copies the view-owned elements (detail lines, filled and masking regions, detail components, repeating details, insulation, text, symbols, dimensions between copied elements) from one source view into the active view, as a group of new objects that the user positions with the cursor (or at `position`), then *Finish*. The result is selected so it can be moved at once. Model geometry is never copied. Elements that cannot be copied are skipped and listed: cut profiles (DOC-GFX-020), elements that create other views (callouts, sections), and annotation that references model elements (tags, keynotes, dimensions to model geometry), since their hosts do not exist in the target.
-- Sources can be any IFC file with Reviera RXD, including library files written by *Save to Library* and projects opened read-only by another user. Sources without RXD offer nothing and say why. In BIMserver mode, a source may also be a BIMserver project revision (Chapter 6).
+- Sources can be any IFC file with Riviera RXD, including library files written by *Save to Library* and projects opened read-only by another user. Sources without RXD offer nothing and say why. In BIMserver mode, a source may also be a BIMserver project revision (Chapter 6).
 - Insertion is one undo step and assigns new ids to everything inserted; nothing keeps a link to the source.
 
 **Data (RXD).** `views/<viewId>` of kind `view.drafting`; its contents live in `views/annotation/<viewId>`. A library file written by *Save to Library* is an IFC file containing only the RXD for those views and the styles and types they use. Inserted objects record `ext.insertedFrom` (source file name and source object id) for traceability only.
@@ -795,7 +795,7 @@ These principles apply to every requirement in this chapter.
 
 *Built (2026-10-27), keynote legends:* View › *Keynote Legend* creates a schedule of kind `schedule.keynotelegend` and opens it: one row per key the model's keynote tags show (DOC-ANN-014), in natural order, with its text from the keynote table (*(not in the keynote table)* for a missing one); columns *Key Value* and *Keynote Text*, or one of them. *Filter by sheet* (asked on creation; `view.set_keynote_legend`) makes each copy placed on a sheet list only the keynotes of the views placed on that sheet; in its own tab it lists them all. Its columns, filters and sorting are its own: `schedule.set_fields` and the like refuse it (`schedule.keynote_legend`). `schedule.get_table(schedule_id, sheet_id?)` gives it as one sheet shows it. Commands: `view.create_keynote_legend(name?, fields?: [key, text], filter_by_sheet?)`, `view.set_keynote_legend(schedule_id, filter_by_sheet?, fields?)`. Legend views follow (below).
 
-*Built (2026-10-27), legend views and legend components:* View › *Legend* makes a legend (`view.legend`, default 1 : 50) and opens it; Annotate › *Legend Component* places a type's drawing in it: choose the type (any wall, floor, door, window or component type of the model) and the view direction (plan, front elevation, back elevation, or section for walls and floors), then click where the drawing's lower-left corner goes. A legend component draws the **type**, not a model element: Reviera builds a sample of the type alone in a scratch copy of the model's types, levels and settings (a wall `host_length` long, default 2 m, 3 m high; a floor `host_length` × 1 m; a door or window in the middle of a wall `host_length` long, default its width plus 1.2 m; a component at the origin), regenerates it, and draws it: in plan cut at 1.2 m with a door's swing, from the front or back as an elevation, or in section across the wall or floor, hidden edges left out, in the elements' pens at the legend's scale. Editing the type (its layers, its size) changes every legend component of it at once. Legend components are annotation (`anno.legendcomponent`): in no schedule, count or IFC export. Legends hold text notes too, are picked and selected like other views (a component inside its drawing's extent, outlined when selected; Properties: type, view direction, host length), print to PDF, and can be placed on many sheets (DOC-CORE-005), which other views cannot. Commands: `view.create_legend(name?, scale?)`, `legend.place_component(view_id, type_id, direction?, host_length?, point)`, `legend.set_component(component_ids, direction?, host_length?, point?)`, `legend.list(view_id) -> {items, failed}`. Not yet: roof, ceiling, column, beam and stair types; a detail level per component; changing a legend's scale in the window; dragging components (`legend.set_component` moves them); legend components in model views.
+*Built (2026-10-27), legend views and legend components:* View › *Legend* makes a legend (`view.legend`, default 1 : 50) and opens it; Annotate › *Legend Component* places a type's drawing in it: choose the type (any wall, floor, door, window or component type of the model) and the view direction (plan, front elevation, back elevation, or section for walls and floors), then click where the drawing's lower-left corner goes. A legend component draws the **type**, not a model element: Riviera builds a sample of the type alone in a scratch copy of the model's types, levels and settings (a wall `host_length` long, default 2 m, 3 m high; a floor `host_length` × 1 m; a door or window in the middle of a wall `host_length` long, default its width plus 1.2 m; a component at the origin), regenerates it, and draws it: in plan cut at 1.2 m with a door's swing, from the front or back as an elevation, or in section across the wall or floor, hidden edges left out, in the elements' pens at the legend's scale. Editing the type (its layers, its size) changes every legend component of it at once. Legend components are annotation (`anno.legendcomponent`): in no schedule, count or IFC export. Legends hold text notes too, are picked and selected like other views (a component inside its drawing's extent, outlined when selected; Properties: type, view direction, host length), print to PDF, and can be placed on many sheets (DOC-CORE-005), which other views cannot. Commands: `view.create_legend(name?, scale?)`, `legend.place_component(view_id, type_id, direction?, host_length?, point)`, `legend.set_component(component_ids, direction?, host_length?, point?)`, `legend.list(view_id) -> {items, failed}`. Not yet: roof, ceiling, column, beam and stair types; a detail level per component; changing a legend's scale in the window; dragging components (`legend.set_component` moves them); legend components in model views.
 
 - [x] *(Built 2026-10-27, `tests/sample_features.rs`.)* The annotated plan sample's *Types Legend* draws its wall type 1.5 m long in plan and 3 m high in section, its door in plan with the swing and from the front, and its window; layering the wall type to 240 mm redraws its plan swatch 240 mm thick; it goes on two sheets; a legend component cannot go in a plan or draw a level.
 
@@ -850,7 +850,7 @@ Further rules:
 - **Phase "Not displayed"** (layer 4) and **design option not shown** (layer 5) set `visible = false`.
 - The resolver is a pure function of (element state, view definition, project standards). Results are cached per view, keyed by element revision and view-definition revision, and recomputed in parallel (rayon) when invalidated.
 
-**UI.** The **Graphics Inspector** (context menu › *Why does this look like this?*) shows, for the picked element, each layer's contribution to each attribute and which layer won. This is a Reviera addition with no counterpart in the reference.
+**UI.** The **Graphics Inspector** (context menu › *Why does this look like this?*) shows, for the picked element, each layer's contribution to each attribute and which layer won. This is a Riviera addition with no counterpart in the reference.
 
 **Data (RXD).** Layers 0a–0c are project and family data: RXD `standards/object_styles`, IFC materials plus their RXD graphics (Chapter 2), and family recipes. Layers 1–3 are the view payload blocks `categoryOverrides` (keyed by category and sub-category), `filterOverrides` (ordered list keyed by filter id) and `elementOverrides` / `linework` (keyed by GlobalId or GlobalId plus edge sub-reference). Because each entry has its own key, two users can change different overrides in one view and the three-way merge keeps both. Layer 6 is session state and is not saved; *Apply hide/isolate to view* writes layer 3 entries.
 
@@ -962,7 +962,7 @@ Further rules:
 **UI.** View Control Bar menu (three items above). While the mode is on, the view has a coloured frame (default purple) and a label "Temporary View Properties" in its top-left corner. The Properties palette shows the temporary values with a marker.
 
 **Behaviour & rules.**
-- Reviera takes a snapshot of the view definition (every property, `categoryOverrides`, `filterOverrides`, `elementOverrides`, crop, view range) when the mode starts. Edits in the mode change a session copy; *Restore* discards the copy.
+- Riviera takes a snapshot of the view definition (every property, `categoryOverrides`, `filterOverrides`, `elementOverrides`, crop, view range) when the mode starts. Edits in the mode change a session copy; *Restore* discards the copy.
 - The edits are not undoable steps of the model, and they do not mark the project as changed. Undo inside the mode works on the session copy only.
 - If the view has an assigned template, *Temporarily Apply Template Properties* overrides the assigned template's included properties for the session; the assignment itself does not change.
 - Printing and export use the saved properties unless the user explicitly chooses *As displayed* in the output dialog.
@@ -1065,7 +1065,7 @@ Further rules:
 **Workflow (cut profile).**
 1. View tab › Graphics › *Cut Profile*, with the option *Face* (edit the whole cut face boundary) or *Boundary between faces* (edit the line between two adjoining cut faces, for example two layers or two elements).
 2. Hover a cut face or boundary in a plan, ceiling plan, section, callout or detail view; click to enter sketch mode.
-3. Sketch an open chain of lines and arcs that starts and ends on the face boundary. A flip arrow on the first segment shows the side that remains; click it to change sides. In *Boundary between faces* mode only the two end segments are sketched; Reviera adds the connecting segment along the old boundary.
+3. Sketch an open chain of lines and arcs that starts and ends on the face boundary. A flip arrow on the first segment shows the side that remains; click it to change sides. In *Boundary between faces* mode only the two end segments are sketched; Riviera adds the connecting segment along the old boundary.
 4. Finish. To restore the original shape, select the profile and choose *Remove Cut Profile*.
 
 **Behaviour & rules.**
@@ -1133,7 +1133,7 @@ Further rules:
 **Workflow.** Manage › Additional Settings ▾ › Line Weights: tabs *Model Lines* (16 pens × list of view scales), *Perspective Lines* (16 pens), *Annotation Lines* (16 pens); Add/Delete scale columns. Manage › Additional Settings › Halftone/Underlay: underlay line weight and pattern, halftone brightness (0–100).
 
 **Behaviour & rules.**
-- Model-line pen widths depend on the view scale: for a view scale not listed, Reviera uses the column of the nearest listed scale, measured by ratio (the larger of the two scale denominators divided by the smaller); ties go to the coarser scale.
+- Model-line pen widths depend on the view scale: for a view scale not listed, Riviera uses the column of the nearest listed scale, measured by ratio (the larger of the two scale denominators divided by the smaller); ties go to the coarser scale.
 - Perspective and annotation pens do not depend on scale.
 - Widths are in paper millimetres and are used unchanged by every output (DOC-CORE-006). On screen, *Thin lines* mode (View Control Bar) draws all lines one pixel wide.
 - Halftone blends the resolved colour towards the background by the brightness percentage.
@@ -1155,7 +1155,7 @@ Further rules:
 
 **Behaviour & rules.**
 - Coarse / Medium / Fine per view, overridable per category in the graphics dialog (layer 1) and by filter. The resolved detail level is an attribute of DOC-GFX-001, so the highest layer that sets it wins.
-- Family geometry declares which detail levels it appears at (Chapter 2). Geometry flagged for none of the levels is never drawn; Reviera warns about it in the family editor.
+- Family geometry declares which detail levels it appears at (Chapter 2). Geometry flagged for none of the levels is never drawn; Riviera warns about it in the family editor.
 - Walls, floors, roofs and ceilings show compound layers only at Medium and Fine; at Coarse they show their outline filled with the type's *Coarse scale fill pattern* and colour, with the category's cut line.
 - Structural framing and columns switch between a single-line symbol (Coarse) and their true section (Medium, Fine) as defined in Chapter 4.
 - MEP segments switch between single-line (Coarse) and double-line (Medium, Fine) as defined in Chapter 4.
@@ -1180,7 +1180,7 @@ Further rules:
 
 **Purpose.** Choose how surfaces and edges are drawn.
 
-| Style | Behaviour in Reviera |
+| Style | Behaviour in Riviera |
 |---|---|
 | Wireframe | All edges, no surfaces; hidden edges shown. |
 | Hidden Line | Visible edges only, surfaces in the background colour. This is the documentation style; for plans, sections and elevations it uses the exact HLR pipeline when printing and the GPU-assisted pipeline on screen (§5.12). |
@@ -1254,7 +1254,7 @@ Further rules:
 **Behaviour & rules.**
 - Two kinds: **Drafting** patterns are sized in paper millimetres and scale with the view; **Model** patterns are sized in real units and stay attached to the geometry they cover (for example brick courses or tiles).
 - *Simple* patterns: parallel lines or crosshatch, with angle and spacing.
-- *Custom* patterns: imported from the open, widely used text `.pat` hatch definition format, with an import scale. Reviera implements its own parser and ships its own pattern library written for the project.
+- *Custom* patterns: imported from the open, widely used text `.pat` hatch definition format, with an import scale. Riviera implements its own parser and ships its own pattern library written for the project.
 - Orientation in host layers: *Orient to view*, *Keep readable*, *Align with element*.
 - **Solid fill** is a built-in drafting pattern.
 - Model patterns on a face can be aligned and moved: the user can tab-select a pattern line and use Align/Move to set the pattern origin and rotation for that face, stored per face.
@@ -1295,7 +1295,7 @@ Further rules:
 - tags, keynotes and spots of elements outside it are hidden wherever they stand;
 - with the annotation crop on (offsets per side in paper mm, default 5), annotation lines are clipped to the annotation crop and text that is not wholly inside it is hidden; without it annotation is not clipped;
 - a visible region is drawn, and prints;
-- printed, exported and sheet drawings are cropped alike (`reviera_render::crop`), so a viewport on a sheet takes the cropped extent.
+- printed, exported and sheet drawings are cropped alike (`riviera_render::crop`), so a viewport on a sheet takes the cropped extent.
 
 Data: `crop` `{enabled, visible, min, max}` and `annotationCrop` `{enabled, offsets: [left, right, bottom, top]}` in the view payload. Commands: `view.set_crop(view_id, enabled?, visible?, shape?: {min, max})`, `view.reset_crop(view_id)`, `view.set_annotation_crop(view_id, enabled, offsets?)`, `view.size_crop(view_id, width?, height?, annotation_offsets?)` (*Size Crop*: about the region's centre, in one step; the dialog's proportional option scales the other size with the one changed). While the region is visible, its edges and corners can be dragged in the window (one `view.set_crop` step). Not yet: non-rectangular crops (*Edit Crop*), crop breaks, rotation, and crops of 3D views.
 
@@ -1311,7 +1311,7 @@ Data: `crop` `{enabled, visible, min, max}` and `annotationCrop` `{enabled, offs
 
 **Workflow.**
 1. Properties › Graphics › Discipline picks the view's discipline; the view regenerates.
-2. Manage › Settings › Discipline Profiles opens a table with one column per discipline and one row per model category: *Show*, *Halftone*, *Hidden lines* (drawn when Show Hidden Lines = By Discipline). Reset restores Reviera's defaults.
+2. Manage › Settings › Discipline Profiles opens a table with one column per discipline and one row per model category: *Show*, *Halftone*, *Hidden lines* (drawn when Show Hidden Lines = By Discipline). Reset restores Riviera's defaults.
 
 **Behaviour & rules.**
 - Each discipline (Architectural, Structural, Mechanical, Electrical, Plumbing, Coordination) has a profile in project settings: categories hidden, categories halftoned, and whether *Show Hidden Lines = By Discipline* draws hidden lines for its own categories.
@@ -1360,7 +1360,7 @@ Data: `crop` `{enabled, visible, min, max}` and `annotationCrop` `{enabled, offs
 - Linked models map their phases to host phases (Chapter 6, COL-LNK-001).
 - The phase definitions themselves are project data owned by Chapter 2; this requirement defines their display.
 
-**Data (RXD).** RXD document `project/phases`: kinds `phase` (ordered), `phase.filter`, `phase.override`. Each element's *Phase Created* and *Phase Demolished* are element-scoped RXD (Chapter 2a) holding phase ids. On IFC export, Reviera writes the standard `Status` property of the element's common property set (`NEW`, `EXISTING`, `DEMOLISH`, `TEMPORARY`) as seen in the phase being exported, and may write phases as `IfcTask` objects ordered by `IfcRelSequence` (export option).
+**Data (RXD).** RXD document `project/phases`: kinds `phase` (ordered), `phase.filter`, `phase.override`. Each element's *Phase Created* and *Phase Demolished* are element-scoped RXD (Chapter 2a) holding phase ids. On IFC export, Riviera writes the standard `Status` property of the element's common property set (`NEW`, `EXISTING`, `DEMOLISH`, `TEMPORARY`) as seen in the phase being exported, and may write phases as `IfcTask` objects ordered by `IfcRelSequence` (export option).
 
 **Commands.**
 `phasefilter.create(name, settings{status: by_category|overridden|hidden}) -> filter_id`
@@ -1439,7 +1439,7 @@ Data: `crop` `{enabled, visible, min, max}` and `annotationCrop` `{enabled, offs
 
 ## 5.12 Drawing generation: hidden-line pipeline and GPU viewport
 
-The reference product's rendering engine is not documented publicly, so this section is Reviera's own design. It is built on OpenCASCADE (OCCT) and a `wgpu` renderer, as set out in TECH_STACK §3.2 (the custom `wgpu` renderer fed by OCCT tessellation was adopted by the owner on 2026-10-12, TECH_STACK §5.2; OCCT's hidden-line algorithms provide the exact 2D output).
+The reference product's rendering engine is not documented publicly, so this section is Riviera's own design. It is built on OpenCASCADE (OCCT) and a `wgpu` renderer, as set out in TECH_STACK §3.2 (the custom `wgpu` renderer fed by OCCT tessellation was adopted by the owner on 2026-10-12, TECH_STACK §5.2; OCCT's hidden-line algorithms provide the exact 2D output).
 
 ### Pipeline overview
 **ID:** DOC-HLR-001 · **Priority:** P0 · **Ref:** research/04 §11 *Key behaviours* 1, 3; TECH_STACK §3.2–3.3
@@ -1482,7 +1482,7 @@ The reference product's rendering engine is not documented publicly, so this sec
 1. **Cut regions.** For each cuttable element crossing a cut plane (plan cut plane, section plane or plane segments of a jogged section, section box faces), compute the section of the solid with `BRepAlgoAPI_Section`, rebuild closed wires and faces from the section edges, and classify inner loops as holes. For compound elements, cut each layer solid separately so each layer gets its own material pattern. Results are 2D regions in view coordinates.
 2. **Clipping.** Clip each solid to the view volume (crop prism between the near plane and far clip, or the zone slabs of DOC-VR-002) with `BRepAlgoAPI_Common` against a box or half-spaces. Unchanged elements that lie entirely inside the volume skip this step.
 3. **Hidden-line removal.** Run OCCT's exact `HLRBRep_Algo` with an `HLRAlgo_Projector` set to the view's orthographic (or perspective, for camera views) projection. Feed it all clipped solids in the view, plus the cut regions as occluding planar faces. Extract visible sharp edges, visible smooth edges (only when the visual style shows smooth edges), visible outlines, and (when *Show Hidden Lines* applies) hidden edges with `HLRBRep_HLRToShape`.
-4. **Scaling up.** Exact HLR is quadratic in the worst case. Reviera splits large views into screen tiles, runs HLR per tile in parallel with only the solids whose projected boxes overlap the tile (plus all solids in front of them), and stitches edges at tile borders. For very large views it may first run `HLRBRep_PolyAlgo` (mesh-based) to find which solids can occlude which, and then run the exact algorithm only on those.
+4. **Scaling up.** Exact HLR is quadratic in the worst case. Riviera splits large views into screen tiles, runs HLR per tile in parallel with only the solids whose projected boxes overlap the tile (plus all solids in front of them), and stitches edges at tile borders. For very large views it may first run `HLRBRep_PolyAlgo` (mesh-based) to find which solids can occlude which, and then run the exact algorithm only on those.
 5. **Arcs and circles.** Edges that project to circles, arcs or lines are recognised and emitted as exact 2D primitives (not polylines), so that DXF and PDF output keep true arcs.
 6. Exact HLR is used for print, PDF, DXF/DWG and stored drawing linework. Interactive display may use DOC-HLR-003 while the exact result is computed in the background; once it is ready, the viewport switches to the exact draw list.
 
@@ -1520,7 +1520,7 @@ The reference product's rendering engine is not documented publicly, so this sec
 - **Coincident lines:** when two collinear overlapping segments with the same zone exist, the one with the heavier pen (or, on a tie, the higher-priority category per the object style table) is kept for the overlap, and the other is trimmed. The print option *Region edges mask coincident lines* applies the same rule between filled-region boundaries and model lines.
 - Draw lists are serialisable (for caching and for Lua and MCP inspection) but are never stored as RXD.
 
-**Commands.** `view.get_draw_list(view_id, region?) -> draw_list` (query, also exposed as the MCP resource `reviera://view/{id}/drawlist`).
+**Commands.** `view.get_draw_list(view_id, region?) -> draw_list` (query, also exposed as the MCP resource `riviera://view/{id}/drawlist`).
 
 **Acceptance criteria.**
 - [ ] The PDF, PNG and DXF outputs of one view contain the same set of edges (compared after rasterising each at 300 dpi; at most 0.1 % differing pixels).
@@ -1589,7 +1589,7 @@ The reference product's rendering engine is not documented publicly, so this sec
 ### Pluggable render backends
 **ID:** DOC-RBE-001 · **Priority:** P0 (interface, with the built-in viewport as its first implementation), P2 (third-party backends) · **Ref:** owner directive 2026-10-12 (pluggable renderer for future photo-real and game-engine walkthroughs); TECH_STACK §3.2
 
-**Purpose.** Keep 3D presentation open to other renderers. A realistic offline renderer, a game engine or Blender can show a Reviera model without changes to the core. The built-in `wgpu` viewport (DOC-HLR-005) is the first backend behind the same interface, not a special case.
+**Purpose.** Keep 3D presentation open to other renderers. A realistic offline renderer, a game engine or Blender can show a Riviera model without changes to the core. The built-in `wgpu` viewport (DOC-HLR-005) is the first backend behind the same interface, not a special case.
 
 **Architecture.**
 ```
@@ -1598,20 +1598,20 @@ The reference product's rendering engine is not documented publicly, so this sec
             ┌──────────────────────────┬───────────────────────┼──────────────────────────────┐
             ▼                          ▼                       ▼                              ▼
    built-in wgpu viewport     in-process plug-in       out-of-process bridge          offline renderer
-   (always present; editing,  (Rust/C ABI; GPL-       (Reviera Scene Protocol,       (stills, animations;
+   (always present; editing,  (Rust/C ABI; GPL-       (Riviera Scene Protocol,       (stills, animations;
     picking, 2D views)         compatible only)        ADV-RSP-001; any engine)       DOC-OUT-011)
 ```
 - **What is pluggable, and what is not.** Only the 3D *presentation* of a scene is pluggable. The 2D drawing pipeline (cut, exact HLR, draw lists, DOC-HLR-001…004), printing and export stay in the core, so drawings are identical whichever backend is installed. Editing, selection, in-canvas controls and annotation always use the built-in viewport.
 - **Render Scene.** The core keeps one render-agnostic scene per open model, built from the graphics resolver and the OCCT tessellation cache:
   - nodes: one per visible element occurrence, with element GlobalId, category, sub-category, phase/design-option state and a world transform (relative to a tile origin, DOC-HLR-005)
   - meshes: shared per type and detail level (instancing), with normals, UVs, and optional feature edges as line sets
-  - materials: the physically based description from Reviera appearance assets (base colour, metallic, roughness, transmission, IOR, emission, normal/bump/height maps, decals)
+  - materials: the physically based description from Riviera appearance assets (base colour, metallic, roughness, transmission, IOR, emission, normal/bump/height maps, decals)
   - lights: lighting-fixture light sources with IES LM-63 photometry and light groups, sun from the project location and time, sky model, environment image
   - cameras: view cameras, section boxes and clip planes as metadata (a backend may ignore what it cannot show, see capabilities)
   - per-element resolved graphics: visibility, colour override, transparency, halftone
 - **Deltas.** Each committed transaction produces a scene delta (nodes, meshes or materials added, changed or removed; graphics changes; light and sun changes). Deltas are coalesced per frame for the built-in viewport and per sync interval (default 250 ms) for external backends.
 - **Backend interface.** A backend implements: `describe() -> capabilities`, `open(scene_snapshot, target)`, `apply(delta)`, `set_camera(camera)`, `render(request) -> frames/tiles` (offline kinds), `pick(x, y) -> GlobalId?` (optional), and `close()`. A failing backend is unloaded, its views fall back to the built-in viewport, and the failure is reported. It never takes the model down with it.
-- **Capabilities** declared by each backend: kinds (`interactive`, `walkthrough`, `offline_still`, `offline_animation`, `vr`); clip planes and section boxes; feature-edge display; Reviera visual styles supported (DOC-GFX-011); IES lights; decals; picking; maximum scene size; colour pipeline (sRGB, HDR, ACES). The UI only offers a backend for tasks its capabilities cover. For example, a backend without clip planes is not offered for a view with an active section box, unless the user accepts "ignore section box".
+- **Capabilities** declared by each backend: kinds (`interactive`, `walkthrough`, `offline_still`, `offline_animation`, `vr`); clip planes and section boxes; feature-edge display; Riviera visual styles supported (DOC-GFX-011); IES lights; decals; picking; maximum scene size; colour pipeline (sRGB, HDR, ACES). The UI only offers a backend for tasks its capabilities cover. For example, a backend without clip planes is not offered for a view with an active section box, unless the user accepts "ignore section box".
 - **Selecting a backend.** Each 3D view has a *Presentation backend* property (default: built-in). Render (DOC-OUT-011) and walkthrough sessions (ADV-WALK-001) choose from the backends offering that kind. User preferences hold the default backend per kind.
 - **Discovery.** Backends are registered by add-in manifests (DM-ADDIN-001) with a `render_backend` entry (id, name, kinds, version, licence SPDX, entry point: library path or executable plus protocol version). `render.backend.list()` reports installed backends with their capabilities and health.
 
@@ -1629,8 +1629,8 @@ The reference product's rendering engine is not documented publicly, so this sec
 **Purpose.** Allow backends under different licences while keeping the GPL boundary clean.
 
 **Behaviour & rules.**
-- **In-process plug-ins** (dynamic library with a versioned C ABI wrapped by a Rust trait) run inside Reviera and are add-ins. They must carry a GPL-compatible SPDX licence (TECH_STACK §4.2, DM-ADDIN-003). Suitable for renderers such as Cycles (Apache-2.0), LuxCoreRender (Apache-2.0) or Mitsuba 3 (BSD-3-Clause).
-- **Out-of-process bridges** are separate programs that talk to Reviera only through the documented Reviera Scene Protocol (ADV-RSP-001), in the same way as MCP clients. Reviera ships no code of theirs and loads none. This is how game engines and other applications attach, for example a Blender add-on (Blender is GPL), a Godot (MIT) or Bevy (MIT/Apache-2.0) walkthrough application, or a user-built bridge to an engine under a proprietary licence that the user installs themselves. Whether a particular bridge stays at arm's length is for its authors; Reviera's obligation is to keep the protocol public and the boundary process-based. *(Legal review recommended before any official bridge to a proprietary engine.)*
+- **In-process plug-ins** (dynamic library with a versioned C ABI wrapped by a Rust trait) run inside Riviera and are add-ins. They must carry a GPL-compatible SPDX licence (TECH_STACK §4.2, DM-ADDIN-003). Suitable for renderers such as Cycles (Apache-2.0), LuxCoreRender (Apache-2.0) or Mitsuba 3 (BSD-3-Clause).
+- **Out-of-process bridges** are separate programs that talk to Riviera only through the documented Riviera Scene Protocol (ADV-RSP-001), in the same way as MCP clients. Riviera ships no code of theirs and loads none. This is how game engines and other applications attach, for example a Blender add-on (Blender is GPL), a Godot (MIT) or Bevy (MIT/Apache-2.0) walkthrough application, or a user-built bridge to an engine under a proprietary licence that the user installs themselves. Whether a particular bridge stays at arm's length is for its authors; Riviera's obligation is to keep the protocol public and the boundary process-based. *(Legal review recommended before any official bridge to a proprietary engine.)*
 - **Isolation.** An external bridge receives a *read-only* scene. It can send back only: camera and walk-pose updates, pick results (GlobalIds), viewpoint captures (for BCF, COL-BCF-001) and render results (images for the render gallery). It can never send model edits. A bridge that also wants to edit must use the MCP server with its own token and permission class (DM-MCP-002), subject to the usual approvals.
 - **Connection security.** Bridges connect to a local endpoint (Unix domain socket or named pipe; loopback TCP only if enabled). A per-session token is handed over at launch or shown in the *Connect backend* dialog. Remote connections are off by default. When enabled they require TLS and a token, and the scene stream can be limited to the active view's visible elements.
 - **Resource limits.** Per bridge: maximum scene upload rate, maximum texture resolution sent (default 4096 px), and an option to send simplified meshes (a coarser detail level) for large models.
@@ -1646,14 +1646,14 @@ The reference product's rendering engine is not documented publicly, so this sec
 
 ## 5.13 Annotation
 
-All annotation tools are on the **Annotate** tab, in the panels Dimension, Detail, Text, Tag, Color Fill and Symbol. Reviera has no Options Bar: tool options appear in the tool's contextual ribbon tab and in the Properties palette (Chapter 1). Every annotation object is stored in the RXD annotation document of its owning view (`views/annotation/<viewId>`, kinds `anno.*`); references to model geometry use GlobalIds plus named sub-references (§5.1).
+All annotation tools are on the **Annotate** tab, in the panels Dimension, Detail, Text, Tag, Color Fill and Symbol. Riviera has no Options Bar: tool options appear in the tool's contextual ribbon tab and in the Properties palette (Chapter 1). Every annotation object is stored in the RXD annotation document of its owning view (`views/annotation/<viewId>`, kinds `anno.*`); references to model geometry use GlobalIds plus named sub-references (§5.1).
 
 ### Common annotation rules
 **ID:** DOC-ANN-000 · **Priority:** P0 · **Ref:** research/04 §4 intro, §11 *Key behaviours* 3–4
 
 **Behaviour & rules.**
 - **Annotation types** (text types, dimension types, tag families, arrowhead styles) are project standards stored in RXD document `standards/text_styles`. Changing a type changes every instance of it.
-- **Fonts.** Text renders with fonts found through the system font configuration. Reviera bundles a default family of open-licence fonts (SIL Open Font License) so that output is the same on every platform. PDF output embeds font subsets. A font missing on a machine is substituted, and the substitution is reported.
+- **Fonts.** Text renders with fonts found through the system font configuration. Riviera bundles a default family of open-licence fonts (SIL Open Font License) so that output is the same on every platform. PDF output embeds font subsets. A font missing on a machine is substituted, and the substitution is reported.
 - **Orphans.** When a reference can no longer be resolved, model-reporting annotation keeps its last position, is drawn in the *orphaned* colour (default orange; never printed differently unless the print option *Print orphans in warning colour* is on), and is listed in the warnings list (Chapter 6, COL-MNT-004).
 - **Linked model references.** References may point into linked models (`link:<linkId>/ifc:<GlobalId>`, Chapter 6). When the link is unloaded, such annotation is hidden, not deleted; it is orphaned only if the element is missing after a reload.
 - **Read convention.** Text in annotation stays readable: rotated text flips so that it reads from the bottom or the right of the sheet, unless the type says otherwise.
@@ -1687,7 +1687,7 @@ All annotation tools are on the **Annotate** tab, in the panels Dimension, Detai
 - [ ] An aligned dimension between two wall faces updates its value when one wall moves.
 - [ ] Picking an entire wall with *opening widths* creates a string that includes every door and window opening.
 
-*Built (2026-10-26), in sections and elevations:* aligned dimensions go in sections and elevations too, measured in the view's frame (x to the viewer's right, height up). The Dimension tool there offers, nearest first: levels (`level`, across the view at their elevation); Reviera walls' bases and tops (`base`, `top`), their faces and axes where the view plane cuts them or, seen edge on, where they stand (`face:ext`, `face:int`, `axis`), and their ends (`end:start`, `end:end`); grids crossing the view (`axis`); else the drawing's cut and projected edges as fixed lines. Wall and level references follow the model as in plans. Not yet: floors', roofs' and slabs' tops and bottoms as references (their edges are fixed lines), and references in linked models.
+*Built (2026-10-26), in sections and elevations:* aligned dimensions go in sections and elevations too, measured in the view's frame (x to the viewer's right, height up). The Dimension tool there offers, nearest first: levels (`level`, across the view at their elevation); Riviera walls' bases and tops (`base`, `top`), their faces and axes where the view plane cuts them or, seen edge on, where they stand (`face:ext`, `face:int`, `axis`), and their ends (`end:start`, `end:end`); grids crossing the view (`axis`); else the drawing's cut and projected edges as fixed lines. Wall and level references follow the model as in plans. Not yet: floors', roofs' and slabs' tops and bottoms as references (their edges are fixed lines), and references in linked models.
 
 ### Linear dimensions
 **ID:** DOC-ANN-002 · **Priority:** P0 · **Ref:** research/04 §4.1
@@ -1797,7 +1797,7 @@ All annotation tools are on the **Annotate** tab, in the panels Dimension, Detai
 - [ ] A spot type with *Display = Top and Bottom* on a 250 mm slab shows two values 250 mm apart, each with its indicator text.
 - [ ] Changing the text location of a spot type to *In line with leader* hides the symbol on every spot of that type.
 
-*Built (2026-10-27):* Annotate › Dimension › *Spot Elevation* (EL) in plans, ceiling plans, sections and elevations: click a point on an element, then where the text goes (the leader's shoulder, which runs away from the point). A spot keeps the element, the point (model coordinates) and the direction it was picked along (down in plans, the view direction in sections and elevations); each time it is drawn the application finds the point again on the element's surface along that direction (`reviera_app::spots`), so on a moved or reshaped surface the value follows; *Top* and *Bottom* are the first and last surface of the element on the vertical there. In a plan the pick reads the top of what is there (a slab's top, the top of a wall the plan cuts). Values are signed in project length units (`+3000`, `−450`, `±0`), relative to the project base point (default), the survey point (shared height) or a level; *Top and Bottom* shows `T` and `B` lines; prefix and suffix. A spot whose element is gone, or no longer under its point, keeps its place and is drawn orphaned (orange, DOC-ANN-000). Drawn with the view and in PDF output, picked and highlighted like tags, with its value, base, display, prefix and suffix in Properties, and floating in 3D views as class *Spot elevations and coordinates* (DOC-ANN-025). Commands: `spot.create_elevation(view_id, ref?, point, leader_point?, direction?, base?: project|survey|{level}, display?, prefix?, suffix?)`, `spot.set(annotation_ids, base?, display?, include_elevation?, prefix?, suffix?, leader_point?)`, `spot.list(view_id) -> [{ id, data, picked, point, bottom?, lines, orphaned }]`. Not yet: spot types (`dimtype` kinds, symbols, text styles and indicator texts other than `T`/`B`), the Spot Dimensions dialog, spots in locked 3D views, on linked elements and toposolid points, and dragging a spot's text in the window (`spot.set` moves it).
+*Built (2026-10-27):* Annotate › Dimension › *Spot Elevation* (EL) in plans, ceiling plans, sections and elevations: click a point on an element, then where the text goes (the leader's shoulder, which runs away from the point). A spot keeps the element, the point (model coordinates) and the direction it was picked along (down in plans, the view direction in sections and elevations); each time it is drawn the application finds the point again on the element's surface along that direction (`riviera_app::spots`), so on a moved or reshaped surface the value follows; *Top* and *Bottom* are the first and last surface of the element on the vertical there. In a plan the pick reads the top of what is there (a slab's top, the top of a wall the plan cuts). Values are signed in project length units (`+3000`, `−450`, `±0`), relative to the project base point (default), the survey point (shared height) or a level; *Top and Bottom* shows `T` and `B` lines; prefix and suffix. A spot whose element is gone, or no longer under its point, keeps its place and is drawn orphaned (orange, DOC-ANN-000). Drawn with the view and in PDF output, picked and highlighted like tags, with its value, base, display, prefix and suffix in Properties, and floating in 3D views as class *Spot elevations and coordinates* (DOC-ANN-025). Commands: `spot.create_elevation(view_id, ref?, point, leader_point?, direction?, base?: project|survey|{level}, display?, prefix?, suffix?)`, `spot.set(annotation_ids, base?, display?, include_elevation?, prefix?, suffix?, leader_point?)`, `spot.list(view_id) -> [{ id, data, picked, point, bottom?, lines, orphaned }]`. Not yet: spot types (`dimtype` kinds, symbols, text styles and indicator texts other than `T`/`B`), the Spot Dimensions dialog, spots in locked 3D views, on linked elements and toposolid points, and dragging a spot's text in the window (`spot.set` moves it).
 
 - [x] *(Built 2026-10-27, `tests/sample_features.rs`.)* The annotated plan sample's spot on the north wall reads `+3000`, then `+3500` after the wall is raised, and `+48500` relative to a survey point at 45 m shared height; its elevation's *Top and Bottom* spot reads `T +3000` / `B ±0`, found on the wall's outer face; moving the wall away orphans the plan spot.
 
@@ -1876,7 +1876,7 @@ All annotation tools are on the **Annotate** tab, in the panels Dimension, Detai
 - **Text type editor** (`texttype.edit`; Annotate › Text panel launcher, or Edit Type on a text note): the Type Properties dialog for text types, listing the type properties above plus line weight, leader/border offset and tab size, with Duplicate, Rename, Delete and a sample preview. Validation: size 0.5–100 mm (paper), width factor 0.1–10, tab size 0.5–100 mm, offset 0–20 mm; the font must be available or a substitute is named (DOC-ANN-000). A type in use cannot be deleted without choosing a replacement.
 - **Spell check** (`text.check_spelling`; Annotate › Text › Check Spelling, default shortcut F7): checks text notes in the selection or, with nothing selected, in the active view or sheet. Other text (parameter values, schedule cells, tag labels) is not checked. A dialog shows each unknown word in context with suggestions and Ignore, Ignore All, Add to dictionary, Change, Change All; changes are made through `text.set_content` and form one undo step. Text notes inside groups are skipped unless the group is being edited, and the dialog reports how many were skipped. In BIMserver mode, notes in views owned by someone else are skipped and reported (Chapter 6).
 - **In-context spell check:** while the editor is open, unknown words are underlined; the context menu offers suggestions and *Add to dictionary*. Underlining disappears when the editor closes.
-- **Spelling options** (Options › Check Spelling, a per-user preference): ignore words in capitals, ignore words with numbers, flag repeated words, main dictionary (any installed Hunspell dictionary; Reviera ships British and American English), and additional user dictionaries (plain word lists; a building-terms list is shipped). In-context checking can be switched off.
+- **Spelling options** (Options › Check Spelling, a per-user preference): ignore words in capitals, ignore words with numbers, flag repeated words, main dictionary (any installed Hunspell dictionary; Riviera ships British and American English), and additional user dictionaries (plain word lists; a building-terms list is shipped). In-context checking can be switched off.
 
 **Data (RXD).** `anno.text`: `style`, `position`, `rotation`, `width` (null when unwrapped), `content` (portable rich-text runs: paragraphs, list levels, character styles `bold`, `italic`, `underline`, `sub`, `sup`, `caps`), `leaders[]`, `alignH`, `alignV`. Text types: `standards/text_styles`, kind `textstyle`. User dictionaries are per-user files outside the project and are never written to RXD.
 
@@ -1950,7 +1950,7 @@ All annotation tools are on the **Annotate** tab, in the panels Dimension, Detai
 - Tag placement:
   - A tag keeps its head at an offset from its host's anchor (an insert's centre, a wall's midpoint, a room's tag point), so it follows the host.
   - Moving a tag together with its host moves it once. A tag whose host is deleted is orphaned: drawn in orange, and kept.
-- Tag All tags the Reviera walls, doors, windows and rooms on the plan's level. Imported elements are tagged one by one with Tag by Category.
+- Tag All tags the Riviera walls, doors, windows and rooms on the plan's level. Imported elements are tagged one by one with Tag by Category.
 - Text notes:
   - Plain text: `\n` separates lines, and the text wraps at the type's size within an optional width.
   - Types: Text 2.5, 3.5 and 5 mm. Leaders are straight, with a closed arrowhead.
@@ -2018,7 +2018,7 @@ All annotation tools are on the **Annotate** tab, in the panels Dimension, Detai
 3. Element keynote: click an element; it shows the keynote of the element's type. Material keynote: click a face or layer; it shows the material's keynote. User keynote: pick any key from the hierarchy browser.
 
 **Behaviour & rules.**
-- **Keynote table format:** Reviera reads a plain tab-separated text file with columns key, text and optional parent key, which builds a tree. It also accepts the same three columns as CSV. Reviera ships its own sample tables (not derived from vendor files).
+- **Keynote table format:** Riviera reads a plain tab-separated text file with columns key, text and optional parent key, which builds a tree. It also accepts the same three columns as CSV. Riviera ships its own sample tables (not derived from vendor files).
 - The table can also be stored inside the project (RXD), which avoids missing-file problems in BIMserver mode. The settings choose *external file* or *embedded*; an external file can be embedded at any time.
 - A missing key shows "?" and is reported.
 - Keynote tag types: number only, text only, boxed number.
@@ -2050,7 +2050,7 @@ All annotation tools are on the **Annotate** tab, in the panels Dimension, Detai
 - Symbol instances can be scheduled with note-block schedules (DOC-SCH-006).
 - Symbols are view-owned (DOC-CORE-004); they can be placed in any 2D view, on sheets, and in locked 3D views (on the view plane). Labels in the symbol family that use instance parameters are edited in place or in Properties.
 - Symbols may have any number of leaders (0–4 from the ribbon; more through Lua), each ending in the type's arrowhead and not associated with model elements.
-- Symbol families come from Reviera's annotation family library or the user's own families (Chapter 2); a symbol family must have category *Generic Annotations* or another annotation category marked as placeable.
+- Symbol families come from Riviera's annotation family library or the user's own families (Chapter 2); a symbol family must have category *Generic Annotations* or another annotation category marked as placeable.
 - *Hide at scales coarser than* is available per instance, as for view markers.
 
 **Data (RXD).** `anno.symbol`: `type` (family type reference), `position`, `rotation`, `parameterValues`, `trueNorth` flag, `leaders[]`, `hideCoarserThan`.
@@ -2201,7 +2201,7 @@ All annotation tools are on the **Annotate** tab, in the panels Dimension, Detai
 - Matchlines are visible in the parent and in all its dependents. Their vertical extent (top and bottom constraints) controls which sections and elevations show them.
 - Appearance comes from the *Matchline* object style and the view's annotation category settings.
 - Top and Bottom are a level plus offset, or *Unlimited*; the default is the parent's level to the level above. Plans of other levels whose cut plane lies within that range also show the matchline when they are parents of dependents with the same scope boxes; otherwise matchlines belong to one parent only.
-- A matchline does not crop anything; the dependents' crop regions do. Reviera offers *Fit crops to matchline* on the contextual tab, which snaps the nearest crop edges of the dependents to the matchline (one undo step).
+- A matchline does not crop anything; the dependents' crop regions do. Riviera offers *Fit crops to matchline* on the contextual tab, which snaps the nearest crop edges of the dependents to the matchline (one undo step).
 - Editing a matchline (*Edit Sketch*) follows the sketch-mode rules of Conventions §2.1. Deleting the parent's last dependent leaves the matchline in place.
 - The matchline is printed with its view; *Hide crop boundaries* does not hide it.
 
@@ -2256,11 +2256,11 @@ All annotation tools are on the **Annotate** tab, in the panels Dimension, Detai
 **Acceptance criteria.**
 - [x] The annotated plan sample's 3D view shows its two notes and its door, window and room tags, and its dimensions when chosen; hiding door tags leaves the others; undo brings back the previous choice. *(Built 2026-10-26, `tests/sample_features.rs`.)*
 - [x] The annotated plan sample's section and elevation hold their own dimensions (3 m heights, the overall and clear widths), tags and notes, drawn and printed with them; shown in 3D when chosen, the elevation's note sits on the south wall's face and double-clicking the section's opens Section A. *(Built 2026-10-26, `tests/sample_features.rs`; checked in the window, with the Dimension tool in the elevation.)*
-- [x] Clicking the Kitchen tag's label selects the tag; double-clicking it opens Level 1 with the tag selected and framed; Zoom to Fit with it selected frames it in a plan and in 3D. *(Built 2026-10-26: label hit tests in `reviera_render::tooltips`, each label's plan in `tests/sample_features.rs`; checked in the window.)*
+- [x] Clicking the Kitchen tag's label selects the tag; double-clicking it opens Level 1 with the tag selected and framed; Zoom to Fit with it selected frames it in a plan and in 3D. *(Built 2026-10-26: label hit tests in `riviera_render::tooltips`, each label's plan in `tests/sample_features.rs`; checked in the window.)*
 
 *Built (2026-10-26):* as above. *(Owner, 2026-10-26: "On the 3D annotations should float as tool-tip style display. There needs to be a toggle to turn it on and off." "Visibility controls should be independent visibility, a control with a visibility check for each class of annotation.")* 
 
-*Built (2026-10-26), labels behind the model:* a label is left out while the model hides its place: rays from the eye (or, in a parallel view, from far back along the view direction) to three points up from its anchor (at it, 1.2 m and 2.4 m above) meet what one cannot see through (opaque meshes: not glass, room and space volumes, openings or virtual volumes) more than 0.4 m before the point; what the section box and slices cut away and what is hidden in the view do not count. The test runs every frame on a bounding volume hierarchy of the model's triangles, built once per change (`reviera_render::bvh`). Per view, on unless set (`occlude`, *Hide labels behind the model* in Annotation Visibility).
+*Built (2026-10-26), labels behind the model:* a label is left out while the model hides its place: rays from the eye (or, in a parallel view, from far back along the view direction) to three points up from its anchor (at it, 1.2 m and 2.4 m above) meet what one cannot see through (opaque meshes: not glass, room and space volumes, openings or virtual volumes) more than 0.4 m before the point; what the section box and slices cut away and what is hidden in the view do not count. The test runs every frame on a bounding volume hierarchy of the model's triangles, built once per change (`riviera_render::bvh`). Per view, on unless set (`occlude`, *Hide labels behind the model* in Annotation Visibility).
 
 *Built (2026-10-26), picking labels:* a click on a label (its box or its dot) selects its annotation, before the model under it; nearer labels, drawn in front, are picked first; Ctrl and Shift add and remove as elsewhere. A selected annotation's label is edged in the selection colour. A double click (the second click on the same label within 0.45 s) opens the plan the annotation is drawn in, with it selected. *(Also: a double click's second press now reaches the views as a press on every toolkit; wxWidgets sends it only as a double-click event, so the second of two quick clicks had been dropped.)* *Built (2026-10-26), framing:* the plan opened is zoomed to the annotation: Zoom to Fit (ZF) counts selected annotation, measured as drawn in the active plan (a note's or tag's outline, a dimension's lines) or, in a 3D view, at its labels' points; annotation selected alone is framed with room around it (1.5 times its size, at least 1.5 m), as a clash's box is. *Built (2026-10-27):* spots (class *Spot elevations and coordinates*, at the point each reads, read again on the model) and keynotes (class *Keynotes*, key and text at their element) float too (DOC-ANN-006 … 008, DOC-ANN-014).
 
@@ -2290,7 +2290,7 @@ Schedules are tabular views of live model data. Every schedule definition is an 
 
 **Data (RXD).** `schedules/<id>`, kind `schedule.component` (or `schedule.keyschedule`): `category` (or `"multi"`), `phase`, `phaseFilter`, `designOptions`, `includeLinks`, and the blocks `fields`, `filters`, `sortGroup`, `formatting`, `appearance`, `embedded`, `layout` (headers, merges, images, column widths).
 
-**Commands.** `schedule.create(kind, category, name, phase_id?, include_links?, key_name?) -> schedule_id`; `schedule.get_table(schedule_id, include_hidden?) -> table` (query; also MCP resource `reviera://schedule/{id}`)
+**Commands.** `schedule.create(kind, category, name, phase_id?, include_links?, key_name?) -> schedule_id`; `schedule.get_table(schedule_id, include_hidden?) -> table` (query; also MCP resource `riviera://schedule/{id}`)
 
 **Implementation notes (2026-10-13).**
 - As built:
@@ -2347,7 +2347,7 @@ Schedules are tabular views of live model data. Every schedule definition is an 
 
 **Behaviour & rules.**
 - Filter tab: a list of rules `field · operator · value`, combined with AND by default. Operators as in DOC-GFX-006.
-- Reviera removes the reference's limit of eight AND rules: the filter is a rule tree with nested AND/OR sets, using the same editor and evaluation engine as view filters (DOC-GFX-006). Hidden fields and calculated fields can be used.
+- Riviera removes the reference's limit of eight AND rules: the filter is a rule tree with nested AND/OR sets, using the same editor and evaluation engine as view filters (DOC-GFX-006). Hidden fields and calculated fields can be used.
 - *Filter by sheet*: when the schedule is placed on a sheet, each instance shows only elements visible in views placed on that sheet.
 - Rules can test any scheduled field, including hidden, calculated and combined fields, and any parameter of the category that is not scheduled (the editor lists them under *Other parameters*). Values are entered in display units; text comparisons follow the operator's case rule (case-insensitive by default, with a *Match case* option per rule).
 - A rule whose field is later removed from the schedule stays valid when it tests a category parameter; it is marked invalid when it tested a calculated field that no longer exists, and an invalid rule is ignored with a warning banner on the schedule view.
@@ -2578,8 +2578,8 @@ Sheets are paper-space views stored as RXD documents `sheets/index` and `sheets/
 **Purpose.** The sheet border and information panel, filled automatically from project, sheet and collection data.
 
 **Behaviour & rules.**
-- Title blocks are annotation families of category *Title Blocks*, created in the family editor (Chapter 2) from Reviera's own sheet-size templates (ISO A0–A4, ANSI A–E, ARCH A–E, and custom sizes). They contain lines, regions, images, logos and **labels**.
-- **Label sources**, in priority order for the same parameter name: sheet instance value; sheet collection value (DOC-SHT-006); project information value. Project information covers organisation name and description, building name, author, project issue date, status, client name, address, project name and number, plus custom project-information parameters. Where IFC has a home for a value (for example `IfcProject.Name`, `IfcProject.LongName`, `IfcPostalAddress` of the site or building, `IfcOrganization` of the owner history), Reviera stores it there and reads it back; the rest is RXD.
+- Title blocks are annotation families of category *Title Blocks*, created in the family editor (Chapter 2) from Riviera's own sheet-size templates (ISO A0–A4, ANSI A–E, ARCH A–E, and custom sizes). They contain lines, regions, images, logos and **labels**.
+- **Label sources**, in priority order for the same parameter name: sheet instance value; sheet collection value (DOC-SHT-006); project information value. Project information covers organisation name and description, building name, author, project issue date, status, client name, address, project name and number, plus custom project-information parameters. Where IFC has a home for a value (for example `IfcProject.Name`, `IfcProject.LongName`, `IfcPostalAddress` of the site or building, `IfcOrganization` of the owner history), Riviera stores it there and reads it back; the rest is RXD.
 - The *Scale* label shows the scale of the views on the sheet, or *As indicated* when they differ. The title block type can set a *Scale override for multiple values* text.
 - A sheet can hold several title block instances; the *Primary title block* flag decides which one supplies values to sheet list schedules.
 - The sheet's *Sheet width* and *Sheet height* come from the primary title block.
@@ -2633,7 +2633,7 @@ Sheets are paper-space views stored as RXD documents `sheets/index` and `sheets/
   - `sheet.place_view(sheet_id, view_id, position?)` and `sheet.place_schedule(sheet_id, schedule_id, position?)`.
   - `viewport.move(sheet_id, viewport_id, position)` and `viewport.remove(sheet_id, viewport_ids[])`. Viewport ids are per sheet, so these take the sheet too.
 - Storage: sheets are RXD-only elements (`rxd:sheets/<guid>`) with their data in `rxd:sheet`: number, size, title-block values, viewports and placed schedules.
-- Title block: until title block families exist, every sheet has Reviera's built-in ISO title block.
+- Title block: until title block families exist, every sheet has Riviera's built-in ISO title block.
   - The border has a 20 mm binding margin and 10 mm elsewhere.
   - A 180 × 48 mm information panel holds the project name and number (from `IfcProject`), sheet name and number, the five sheet values, the date, and the scale (*As indicated* when the viewports' scales differ).
 - Viewports:
@@ -2768,7 +2768,7 @@ Sheets are paper-space views stored as RXD documents `sheets/index` and `sheets/
 
 ## 5.16 Assemblies, assembly views and assembly sheets
 
-An **assembly** is a named, typed set of model elements that is documented and fabricated as one piece: a precast panel with its reinforcement and lifting anchors, a steel column with its welded plates, a prefabricated bathroom pod, a stud-wall panel, a reception desk. Reviera stores it as an `IfcElementAssembly` that aggregates its members. This section owns the assembly element, its type, its views and its sheets. Chapter 4 creates assemblies automatically for precast pieces (STR-PRE-002) and steel shop assemblies (STR-STL-010 numbering) and uses the views and sheets defined here for shop drawings (STR-PRE-006). Chapter 2 (DM-ELEM-002) fixes the storage summary.
+An **assembly** is a named, typed set of model elements that is documented and fabricated as one piece: a precast panel with its reinforcement and lifting anchors, a steel column with its welded plates, a prefabricated bathroom pod, a stud-wall panel, a reception desk. Riviera stores it as an `IfcElementAssembly` that aggregates its members. This section owns the assembly element, its type, its views and its sheets. Chapter 4 creates assemblies automatically for precast pieces (STR-PRE-002) and steel shop assemblies (STR-STL-010 numbering) and uses the views and sheets defined here for shop drawings (STR-PRE-006). Chapter 2 (DM-ELEM-002) fixes the storage summary.
 
 ### The assembly element and assembly types
 **ID:** DOC-ASM-001 · **Priority:** P2 · **Ref:** research/04 §3.6 (*Assembly Code* setting), §5.1 (assembly-specific sheet fields); web: About Assemblies, Create an Assembly, Assembly Instance Properties, Assembly Type Properties, IfcElementAssembly, IfcElementAssemblyType, IfcElementAssemblyTypeEnum, IfcAssemblyPlaceEnum
@@ -2778,7 +2778,7 @@ An **assembly** is a named, typed set of model elements that is documented and f
 **Workflow.**
 1. *Selection first:* select elements, then Modify | <category> › Create › *Create Assembly*. *Tool first:* Modify › Create › *Create Assembly* enters a pick mode with Add (default) and Remove; pick elements, then Finish.
 2. The *New Assembly* dialog shows the **naming category** (a drop-down of the categories of the picked elements; the category of the most numerous members is preselected), the **type name**, the **IFC assembly type** (`PredefinedType`, default *User-defined*) and **Assembly place** (Not defined, Site, Factory).
-3. Reviera checks whether an identical assembly type already exists (DOC-ASM-002). If one exists, the dialog says so, the type name is read-only and OK creates another instance of that type. Otherwise the type name is editable, prefilled with the naming category's last type name plus the next number (for example "Walls 004").
+3. Riviera checks whether an identical assembly type already exists (DOC-ASM-002). If one exists, the dialog says so, the type name is read-only and OK creates another instance of that type. Otherwise the type name is editable, prefilled with the naming category's last type name plus the next number (for example "Walls 004").
 4. OK creates the assembly. The new type appears in the Project Browser under *Assemblies*, with its instances' count.
 5. *Create Instance* (Project Browser › right-click an assembly type) places a copy of the type's members at a picked point, as a new instance of the same type.
 
@@ -2830,7 +2830,7 @@ An **assembly** is a named, typed set of model elements that is documented and f
   5. nested members (system aggregates) match recursively by the same rules.
   Identity data (Mark, comments), phase and workset are not compared.
 - **Correspondence** of members is found without relying on pick order: members are sorted by (category, type, position of their reference point in the origin frame), and nested assemblies by their own signature. The resulting order is stored as `memberOrder` and used for views and annotation mapping (DOC-ASM-005).
-- Reviera keeps a **signature** per assembly: a hash of the data in rules 1–5, with positions rounded to the tolerance grid. Signatures are compared first; instances with equal signatures are confirmed with the full comparison (to rule out rounding at the grid edges).
+- Riviera keeps a **signature** per assembly: a hash of the data in rules 1–5, with positions rounded to the tolerance grid. Signatures are compared first; instances with equal signatures are confirmed with the full comparison (to rule out rounding at the grid edges).
 - **When matching runs:** at creation; after any edit of an assembly's members or origin (DOC-ASM-003); after a change to a member that affects rules 2–4 (moving a member, changing its type or a geometric parameter); and after a change of naming category. Matching runs in the background and its result is applied as part of the edit that caused it.
 - **Type changes after edits.** When an edit makes an instance unique, it becomes an instance of a new type named "<old type name> (2)" (editable). When an edit makes it identical to another existing type, it joins that type. A type that loses its last instance is deleted, with its views and sheets unless they move with their owner instance (DOC-ASM-004).
 - **Steel and precast numbering** (Chapter 4) may use stricter or looser criteria for marks (for example ignoring holes). For those assemblies, Chapter 4 numbering decides the type, and the matching here only reports differences; it never re-types them.
@@ -2867,7 +2867,7 @@ An **assembly** is a named, typed set of model elements that is documented and f
 - Edit mode follows Conventions §2.1. Micro-operations: `asm.add(element)`, `asm.remove(element)`, `asm.create(element)` (an element created during the session), `asm.origin(transform)`; the replay function applies them to the assembly's state at the start of the session so an interrupted edit can be recovered after a crash (Chapter 2b, DM-LIVE-015). *Cancel* discards the session, including elements created in it.
 - Removing the last member is refused; use Disassemble.
 - The member rules of DOC-ASM-001 apply to *Add*.
-- Changing the origin changes only the orientation of the assembly views and the comparison frame; members do not move. Because matching uses the origin frame, changing the origin of one instance usually makes it a new type; Reviera offers *Apply origin to all instances of the type*, which moves each instance's origin by the same relative transform and keeps the type.
+- Changing the origin changes only the orientation of the assembly views and the comparison frame; members do not move. Because matching uses the origin frame, changing the origin of one instance usually makes it a new type; Riviera offers *Apply origin to all instances of the type*, which moves each instance's origin by the same relative transform and keeps the type.
 - **Changing type** replaces members: the old members are deleted and new ones created, so any annotation on the old members in project views is orphaned (DOC-CORE-003), and the confirmation says how many annotations are affected. Members cannot be swapped this way when they are hosts of elements outside the assembly (for example a wall hosting a door that is not a member); the command refuses with the list.
 - **Disassemble** deletes the `IfcElementAssembly` and its RXD instance object, restores the members' storey containment and their plain IFC relationships, and keeps their GlobalIds. If the instance owned the type's views (DOC-ASM-004) and other instances exist, ownership passes to the oldest remaining instance; if it was the last instance, the type and its views and sheets are deleted after a confirmation that lists them.
 - **Delete** of an instance deletes its members (one undo step). Delete of an assembly type (Project Browser › right-click › Delete) deletes all its instances, their members, and the type's views and sheets, after a confirmation that counts each.
@@ -2913,7 +2913,7 @@ Deleting an instance uses `element.delete` (Chapter 2).
 - **Isolation.** An assembly view shows only the owner instance's members (including nested members) and the view's own annotation and drafting; everything else is excluded at the candidate query (stage 1, DOC-HLR-001), before any graphics layer. Members of other assemblies, links and datums are never shown. Annotation in the view may reference only members.
 - **Geometry.** Views are set up in the owner's origin frame: elevations and sections are orthographic and cropped to the member bounding box plus a margin (default 5 mm at paper scale on every side, so 50 mm at 1:10); detail sections cut through the box centre, with far clipping at the box; the 3D view is an isometric from the origin's (+X, −Y, +Z) octant with the section box off. Views can afterwards be edited like any view (crop, scale, rotation of the crop, extra annotation, templates).
 - **Live update.** When the owner's members change, its views regenerate; when the assembly origin changes, views are re-aligned and their crop regions re-fitted unless the user has edited the crop (then only re-aligned). Annotation stays attached to members by reference.
-- **Type changes.** Views go with their owner instance. If an edit moves the owner to another type that already has views, Reviera asks which set to keep (the reference product deletes one set without a choice); the other set is deleted after confirmation.
+- **Type changes.** Views go with their owner instance. If an edit moves the owner to another type that already has views, Riviera asks which set to keep (the reference product deletes one set without a choice); the other set is deleted after confirmation.
 - **Extra views.** Sections, callouts and duplicates created inside an assembly view inherit its assembly relation and isolation. Assembly views can be placed on assembly sheets or on ordinary sheets, once each (DOC-CORE-005).
 - **Schedules.** The part list and material takeoff are ordinary schedules (DOC-SCH-006) with a fixed filter *Assembly = this type's owner instance* that cannot be removed; their rows are the owner's members. Their *Count* column counts members of one instance; a *Quantity per type* field multiplies by the number of instances of the type.
 - **Names.** Views are named "<type name> - 3D Ortho", "<type name> - Detail Section A", "<type name> - Top", "<type name> - Part List" and so on; a clash adds a numeric suffix. Renaming the type renames views whose names still start with the old type name.
@@ -2940,7 +2940,7 @@ Deleting an instance uses `element.delete` (Chapter 2).
 **Workflow.**
 1. Tick **Sheet** in *Create Assembly Views* (DOC-ASM-004) and choose a title block type; or Project Browser › right-click an assembly type › *Create Assembly Sheet*.
 2. Open the sheet (listed under the assembly type) and drag the type's views onto it; drafting views, legends and other project views may be placed on it too.
-3. To reuse the arrangement: on a finished assembly sheet, *Save as Assembly Template* (sheet context menu) stores the layout. Later, select assembly types or instances › *Apply Assembly Template*, choose the template, and Reviera creates the views and the sheet and places everything as in the template.
+3. To reuse the arrangement: on a finished assembly sheet, *Save as Assembly Template* (sheet context menu) stores the layout. Later, select assembly types or instances › *Apply Assembly Template*, choose the template, and Riviera creates the views and the sheet and places everything as in the template.
 4. To carry views to a similar type: Project Browser › right-click the documented type › *Propagate Views…*, choose target types, and choose whether to include annotation.
 
 **Behaviour & rules.**
@@ -2948,7 +2948,7 @@ Deleting an instance uses `element.delete` (Chapter 2).
 - One assembly type may have several assembly sheets. Deleting the type deletes them (DOC-ASM-003).
 - **Identical instances** need no propagation: they share the type's views and sheets by definition (DOC-ASM-004). The sheet's *Instances* label lists their Marks so the drawing states which pieces it covers.
 - **Assembly documentation templates** record: the view kinds and their templates, scale, crop margins, the sheet's title block type, each viewport's position (relative to the title block, by role), viewport types, schedule definitions for the part list and takeoff, and annotation *rules*: per-category tag types to place with *Tag All* in each view, and per-category dimension rules (overall dimensions, member-to-member dimension strings on faces of chosen categories, as in Chapter 4 shop drawings). Templates contain no element references, so they apply to any assembly type. Chapter 4 shop-drawing configuration (STR-PRE-006) chooses one of these templates per precast element kind.
-- **Applying a template** to several types creates one set of views and one sheet per type; with *Group identical* (the default), identical instances share one type and therefore one sheet. Viewports whose view kind is not in the template are left out. Reviera reports viewports that did not fit within the title block's drawing area and moves them into it if *Fit to sheet* is on.
+- **Applying a template** to several types creates one set of views and one sheet per type; with *Group identical* (the default), identical instances share one type and therefore one sheet. Viewports whose view kind is not in the template are left out. Riviera reports viewports that did not fit within the title block's drawing area and moves them into it if *Fit to sheet* is on.
 - **Propagate views** copies the source type's assembly views (definitions, crop, scale, templates, overrides) to each target type, and, if chosen, its annotation. Annotation is mapped through member correspondence (`memberOrder`, DOC-ASM-002): a tag or dimension whose references map to members of the same category and type in the target is copied; anything that cannot be mapped is skipped and listed in the report. Targets must have the same naming category; a target that already has views of the same role is skipped unless *Replace existing* is on. Propagation is one undo step.
 - Assembly sheets print and export like any sheet; the PDF naming rule can use assembly parameters (DOC-OUT-003).
 
@@ -2998,7 +2998,7 @@ All output commands work on an immutable **model snapshot** taken when the comma
 
 **Behaviour & rules.**
 - **Print setup** (named, saved in the project): paper size and source, orientation, paper placement (centre, or offset from corner with x/y), zoom (fit to page, or a percentage; 100 % prints sheets at true size), raster quality, colour mode, options (DOC-OUT-001). Save, Save As, Revert, Rename, Delete.
-- Printing goes through the platform print system: Reviera renders each page to a vector page description (the same renderer as PDF) and hands it to the printer driver through the wxWidgets printing framework (Windows GDI/XPS, macOS Quartz, CUPS on Linux).
+- Printing goes through the platform print system: Riviera renders each page to a vector page description (the same renderer as PDF) and hands it to the printer driver through the wxWidgets printing framework (Windows GDI/XPS, macOS Quartz, CUPS on Linux).
 - When a sheet is larger than the chosen paper and zoom is 100 %, the dialog warns that the output will be cropped.
 - Preview shows exactly what will be sent, page by page.
 
@@ -3019,10 +3019,10 @@ All output commands work on an immutable **model snapshot** taken when the comma
 
 **Behaviour & rules.**
 - **Naming rule:** a file name pattern composed of parameters (sheet number, sheet name, project number, current revision, sheet collection, view name, custom parameters) with prefix, suffix and separators, and a live sample. Characters invalid in file names are replaced with `_`.
-- **PDF content:** PDF 1.7 written by Reviera's own writer (built on the MIT/Apache `pdf-writer` crate, with font subsetting). Text is real, searchable text with embedded font subsets. Lines keep their exact widths, caps and dash patterns. Fills use PDF tiling patterns for hatches, or explicit geometry when the pattern is too complex for tiling.
+- **PDF content:** PDF 1.7 written by Riviera's own writer (built on the MIT/Apache `pdf-writer` crate, with font subsetting). Text is real, searchable text with embedded font subsets. Lines keep their exact widths, caps and dash patterns. Fills use PDF tiling patterns for hatches, or explicit geometry when the pattern is too complex for tiling.
 - **Hyperlinks:** view reference symbols, section heads, callout heads and elevation marks on a sheet become internal links to the target sheet when it is in the same combined PDF.
 - **Layers:** optional *PDF layers by category* writes optional content groups per category (and sub-category), so that a PDF viewer can toggle them.
-- **Metadata:** title (sheet number and name), author, project name and number, and the Reviera version are written to the document information and XMP metadata. Optional PDF/A-2b output.
+- **Metadata:** title (sheet number and name), author, project name and number, and the Riviera version are written to the document information and XMP metadata. Optional PDF/A-2b output.
 - Combined files get one bookmark per sheet or view.
 
 **Data (RXD).** `output.pdfSetups[]`.
@@ -3066,8 +3066,8 @@ All output commands work on an immutable **model snapshot** taken when the comma
 **Workflow.** File › Export › CAD Formats › DXF / DWG: choose an export setup (Modify Export Setup…), the range (current view/sheet or a view/sheet set), file naming (automatic long, automatic short, or manual), the file version, and whether views on sheets and links are exported as external references or bound.
 
 **Behaviour & rules.** The export setup dialog has these tabs:
-- **Layers:** per category and sub-category, a projection layer, a cut layer and colour numbers; layer modifiers (append category, sub-category, phase, workset, view kind and so on); *Export layer options*: properties by layer with overrides by entity, all by layer without overrides, or all by layer with new layers for overrides. Layer naming standards can be loaded from tables Reviera ships (ISO 13567 and other published conventions, written as Reviera's own tables).
-- **Lines:** line scaling mode (model space, paper space, or scaled definitions); mapping of line patterns to linetype names, with Reviera generating the `.lin`-style definitions it needs.
+- **Layers:** per category and sub-category, a projection layer, a cut layer and colour numbers; layer modifiers (append category, sub-category, phase, workset, view kind and so on); *Export layer options*: properties by layer with overrides by entity, all by layer without overrides, or all by layer with new layers for overrides. Layer naming standards can be loaded from tables Riviera ships (ISO 13567 and other published conventions, written as Riviera's own tables).
+- **Lines:** line scaling mode (model space, paper space, or scaled definitions); mapping of line patterns to linetype names, with Riviera generating the `.lin`-style definitions it needs.
 - **Patterns:** mapping of fill patterns to hatch names; unmapped patterns are exported as explicit hatch definitions.
 - **Text & fonts:** font mapping; text treatment (keep visual fidelity, or keep editability).
 - **Colours:** indexed (255) or true colour.
@@ -3075,7 +3075,7 @@ All output commands work on an immutable **model snapshot** taken when the comma
 - **Units & coordinates:** drawing unit; coordinate basis internal or shared (Chapter 6, COL-POS-001).
 - **General:** room/space/area boundaries on separate layers; non-plottable layer prefix; hide scope boxes, reference planes and unreferenced tags; preserve coincident lines; default version.
 - **Sheets** export to paper space layouts with each viewport as a model-space view at its scale (or flattened to paper space, by option).
-- **Writers:** DXF is written by Reviera's own writer (DXF is a published text format). DWG is written through LibreDWG (GPL-3.0-or-later), whose DWG writing is limited; Reviera therefore writes DWG only in the versions LibreDWG supports reliably and offers DXF as the recommended format.
+- **Writers:** DXF is written by Riviera's own writer (DXF is a published text format). DWG is written through LibreDWG (GPL-3.0-or-later), whose DWG writing is limited; Riviera therefore writes DWG only in the versions LibreDWG supports reliably and offers DXF as the recommended format.
 - Exact arcs, circles and ellipses from the draw list are written as true arc, circle and ellipse entities.
 
 **Data (RXD).** `output.cadSetups[]`.
@@ -3090,19 +3090,19 @@ All output commands work on an immutable **model snapshot** taken when the comma
 ### IFC export settings
 **ID:** DOC-OUT-006 · **Priority:** P0 (save-as variants), P1 (setups, MVD conversion) · **Ref:** research/04 §6.4
 
-**Purpose.** IFC is Reviera's native format, so "IFC export" means writing a *derived* IFC file tailored to a recipient: a different schema or model view definition, a filtered subset, or a clean file without Reviera data.
+**Purpose.** IFC is Riviera's native format, so "IFC export" means writing a *derived* IFC file tailored to a recipient: a different schema or model view definition, a filtered subset, or a clean file without Riviera data.
 
 **Workflow.** File › Export › IFC: file name; setup (in-session, or named setups including built-in ones for IFC4 Reference View, IFC4 Design Transfer View, IFC2X3 Coordination View 2.0, IFC4X3, and a *Basic FM Handover* setup consistent with COBie export, DOC-OUT-015); *Modify setup…*; *Export linked models as separate files* or *federate into one file*.
 
 **Behaviour & rules.** Setup tabs:
 - **General:** schema (IFC2X3, IFC4, IFC4X3); model view definition (Reference View writes tessellated geometry such as `IfcTriangulatedFaceSet`; Design Transfer View keeps parametric geometry such as extrusions and Boolean results); file type (`.ifc`, `.ifcXML`, `.ifczip`); phase to export (sets the standard `Status` property, DOC-GFX-017); space boundaries (none, first level, second level); coordinate base (internal origin, project base point, shared coordinates; Chapter 6, COL-POS-003); split walls, columns and ducts by storey; file header (author, organisation, authorisation).
-- **Content:** *Include Reviera Extension Data* (on by default; off produces a clean exchange file); *Include documentation as IFC annotation* (DOC-IFC-002) with *Include 2D linework*; export only elements visible in a chosen view; include rooms/areas/spaces as `IfcSpace` volumes; include linked models.
-- **Properties:** standard property sets; Reviera parameters as user property sets (with a mapping table from parameter to property set and property name, loadable from a text file); base quantities (computed by OCCT); schedules as property sets (each schedule's fields become a property set on its elements); classification references.
+- **Content:** *Include Riviera Extension Data* (on by default; off produces a clean exchange file); *Include documentation as IFC annotation* (DOC-IFC-002) with *Include 2D linework*; export only elements visible in a chosen view; include rooms/areas/spaces as `IfcSpace` volumes; include linked models.
+- **Properties:** standard property sets; Riviera parameters as user property sets (with a mapping table from parameter to property set and property name, loadable from a text file); base quantities (computed by OCCT); schedules as property sets (each schedule's fields become a property set on its elements); classification references.
 - **Level of detail:** tessellation tolerance for curved geometry.
-- **Advanced:** export parts as building elements; use type name only for type objects; store exported GlobalIds back (not needed in Reviera because GlobalIds are native, so this option is absent); export bounding boxes.
+- **Advanced:** export parts as building elements; use type name only for type objects; store exported GlobalIds back (not needed in Riviera because GlobalIds are native, so this option is absent); export bounding boxes.
 - **Geographic reference:** writes `IfcMapConversion` and `IfcProjectedCRS` from the project's positioning (Chapter 6, COL-POS-003).
 - **Entity mapping:** a per-category table of IFC class and predefined type used when a category's native class should be exported differently (for example exporting generic models as `IfcBuildingElementProxy`); family types can override it with an *Export as* parameter.
-- **Schema conversion:** IFC4 to IFC2X3 and IFC4 to IFC4X3 are done with IfcOpenShell's schema migration functions, followed by Reviera's own fix-ups for entities that have no counterpart. Losses are listed in an export report.
+- **Schema conversion:** IFC4 to IFC2X3 and IFC4 to IFC4X3 are done with IfcOpenShell's schema migration functions, followed by Riviera's own fix-ups for entities that have no counterpart. Losses are listed in an export report.
 - **Validation:** after writing, the file is validated with IfcOpenShell (schema and, where available, MVD rules); problems are listed in the export report.
 
 **Data (RXD).** `output.ifcSetups[]`.
@@ -3111,7 +3111,7 @@ All output commands work on an immutable **model snapshot** taken when the comma
 
 **Acceptance criteria.**
 - [ ] A Reference View export contains no `IfcExtrudedAreaSolid` or `IfcBooleanResult` and opens in at least two other IFC viewers.
-- [ ] A clean export contains no Reviera Extension Data property sets and validates without errors.
+- [ ] A clean export contains no Riviera Extension Data property sets and validates without errors.
 - [ ] An IFC2X3 Coordination View export of the sample project validates against the IFC2X3 schema, and the report lists every converted or dropped entity.
 - [ ] *Schedules as property sets* writes a property set named after the door schedule onto each door, containing that schedule's field values.
 
@@ -3124,7 +3124,7 @@ All output commands work on an immutable **model snapshot** taken when the comma
 - **glTF 2.0** (`.gltf` or binary `.glb`): the recommended visualisation format. Exports the visible contents of the active 3D view (respecting section box, visibility and phase), with physically based materials, texture maps, instancing for repeated family types, lights (`KHR_lights_punctual`), cameras, and per-node `extras` holding the element GlobalId, category and chosen parameters. Large coordinates are offset to a local origin stored in the asset's `extras`.
 - **OBJ/MTL:** simple mesh exchange, one group per element.
 - **STEP AP214/AP242:** solid exchange through OCCT's STEP writer, with one product per element, colours and names.
-- **FBX:** the format's official software kit is proprietary and cannot be used in a GPL program. Reviera does not plan an FBX writer; glTF is the supported alternative. A community writer for the documented ASCII FBX form may be considered later as an add-in.
+- **FBX:** the format's official software kit is proprietary and cannot be used in a GPL program. Riviera does not plan an FBX writer; glTF is the supported alternative. A community writer for the documented ASCII FBX form may be considered later as an add-in.
 - Vendor live-link and proprietary visualisation formats are out of scope (P3). Open alternatives: glTF, USD (P2, through the Apache-licensed OpenUSD libraries, as a possible later addition).
 
 **Commands.** `export.gltf(path, view_id?, binary?, options?) -> job_id`; `export.obj(path, view_id?, options?) -> job_id`; `export.step(path, view_id_or_element_ids, schema?: ap214|ap242) -> job_id`
@@ -3159,7 +3159,7 @@ All output commands work on an immutable **model snapshot** taken when the comma
 ### Reports and other exports
 **ID:** DOC-OUT-009 · **Priority:** P1 (schedule and room reports), P2 (database export), P3 (vendor formats) · **Ref:** research/04 §6.5
 
-| Output | Reviera behaviour | Priority |
+| Output | Riviera behaviour | Priority |
 |---|---|---|
 | Schedule export | DOC-SCH-012. | P0–P1 |
 | Room/area report | HTML report listing each room or area with its boundary triangulation and computed area, for checking area calculations. | P2 |
@@ -3194,7 +3194,7 @@ All output commands work on an immutable **model snapshot** taken when the comma
 
 | COBie table | Source in the model |
 |---|---|
-| Instruction | Export date and time, units, classification systems, Reviera and the COBie version |
+| Instruction | Export date and time, units, classification systems, Riviera and the COBie version |
 | Company | The contacts of the COBie settings |
 | Facility | Project and building: names, project number, site, units, phase, `ExtIdentifier` = the building's GlobalId |
 | Level | Levels (`IfcBuildingStorey`): name, elevation, height to the next level; the site as a level of category "Site" when spaces are placed on it |
@@ -3211,7 +3211,7 @@ All output commands work on an immutable **model snapshot** taken when the comma
 | Resource, Job, Event, Package, Risk | Written with headers and no rows, unless the project has operations data in RXD for them (not specified yet) |
 
 - **COBie 2.4 (legacy layout)** writes the same data under the earlier names and columns: Contact (for Company), Floor (for Level) and the 2.4 worksheet order. It has Assembly, Connection, Spare, Impact and Issue sheets with headers only. SpaceType values go to the Space sheet's Category column.
-- **Identity columns.** Every record carries `ExtSystem` = "BIM Reviera <version>", `ExtObject` = the IFC class, and `ExtIdentifier` = the element's IFC GlobalId. A data set exported twice from an unchanged model is identical except for the Instruction table's date, so re-exports can be compared.
+- **Identity columns.** Every record carries `ExtSystem` = "BIM Riviera <version>", `ExtObject` = the IFC class, and `ExtIdentifier` = the element's IFC GlobalId. A data set exported twice from an unchanged model is identical except for the Instruction table's date, so re-exports can be compared.
 - **Names.** COBie requires a unique Name within each table. Duplicates are reported by validation. With *Make names unique* on, the export suffixes them (" (2)", " (3)") and lists every renamed record in the report; the model is not changed.
 - **Units.** Values are written in the project's units, with the unit names in the Instruction table and the PickList.
 - **Required and optional data.** Columns that COBie requires but the model has no value for are written as "n/a". The export never invents values. The report lists each "n/a" by table and column, so the team can fill them in (typically through a schedule, DOC-SCH-010).
@@ -3283,11 +3283,11 @@ All output commands work on an immutable **model snapshot** taken when the comma
 4. *Save to project* creates a rendering view (placeable on a sheet); *Export* writes PNG, JPEG, TIFF, or OpenEXR (high dynamic range).
 
 **Behaviour & rules.**
-- **Renderer back-ends** are render backends of kind `offline_still`/`offline_animation` (DOC-RBE-001). In-process ones are plug-ins behind the backend trait (scene in, image tiles out); external ones (for example a Blender bridge) attach through the Reviera Scene Protocol (ADV-RSP-001) and return images with `render.result`:
-  - **Reviera path tracer** (built in, optional at build time): a progressive unidirectional path tracer in `wgpu` compute shaders, with a BVH built on the GPU, multiple importance sampling, and the same materials as the Realistic style. It also drives the *Path Traced* visual style (DOC-GFX-011).
+- **Renderer back-ends** are render backends of kind `offline_still`/`offline_animation` (DOC-RBE-001). In-process ones are plug-ins behind the backend trait (scene in, image tiles out); external ones (for example a Blender bridge) attach through the Riviera Scene Protocol (ADV-RSP-001) and return images with `render.result`:
+  - **Riviera path tracer** (built in, optional at build time): a progressive unidirectional path tracer in `wgpu` compute shaders, with a BVH built on the GPU, multiple importance sampling, and the same materials as the Realistic style. It also drives the *Path Traced* visual style (DOC-GFX-011).
   - **Cycles** (Apache-2.0), used as the standalone library, as an external render engine with CPU and GPU devices.
   - Others that fit the trait with GPL-compatible licences may be added, for example LuxCoreRender (Apache-2.0) or Mitsuba 3 (BSD-3-Clause).
-- **Scene translation:** tessellated geometry from the OCCT cache, with instancing; materials mapped from Reviera appearance data (base colour, metallic, roughness, transmission, IOR, emission, normal and bump maps) to a principled surface model; artificial lights from lighting fixture families with IES LM-63 photometric files and light groups (with dimming); sun position from the project location, date and time; physical sky model.
+- **Scene translation:** tessellated geometry from the OCCT cache, with instancing; materials mapped from Riviera appearance data (base colour, metallic, roughness, transmission, IOR, emission, normal and bump maps) to a principled surface model; artificial lights from lighting fixture families with IES LM-63 photometric files and light groups (with dimming); sun position from the project location, date and time; physical sky model.
 - **Denoising:** optional Intel Open Image Denoise (Apache-2.0).
 - People and plant entourage use ordinary families with mesh geometry; no proprietary entourage formats.
 - Vendor cloud rendering services are out of scope (P3).
@@ -3298,7 +3298,7 @@ All output commands work on an immutable **model snapshot** taken when the comma
   - Decals are taggable, schedulable (category *Decals*) and exported to glTF as textured quads offset 0.5 mm from the face (DOC-OUT-007).
 - **Render gallery** (`render.gallery`; View tab › Presentation › Render Gallery). A local browser of this user's render history for the open project: every finished or stopped render job is kept with its image (stored as 32-bit floating-point OpenEXR so exposure can be changed later), a thumbnail, the source view, renderer, settings, resolution, samples and render time. The gallery lists them newest first with filters by view and renderer, and offers: open full size, compare two side by side with a slider, *Adjust exposure* (re-tone-maps the stored image without rendering again), *Render again with these settings*, *Save to project* (`render.save_to_project`), *Export* (`render.export`), and delete. History is stored per user in the local application data folder, keyed by the project's GlobalId, with a size limit (default 2 GB; oldest entries are removed first). It is never written into the project, never shared through BIMserver and never uploaded anywhere; only renderings saved to the project become project data.
 
-**Data (RXD).** Render settings in the 3D view payload (`render` block). Saved renderings are views of kind `view.rendering` whose image is an RXD asset; the image is the only derived result stored (§5.1). Decal types: `standards/materials`, kind `decal.type` (`image` asset reference and the attributes above). Placed decals are element-scoped RXD on the host element (`Reviera_Element` section `decals[]`: `id`, `type`, `face` sub-reference, `uv` position, `width`, `height`, `rotation`), so moving or deleting the host carries them; they have no IFC entity of their own. On IFC export the host's face style is not changed; with *Include Reviera Extension Data* off, decals are lost and the export report says so.
+**Data (RXD).** Render settings in the 3D view payload (`render` block). Saved renderings are views of kind `view.rendering` whose image is an RXD asset; the image is the only derived result stored (§5.1). Decal types: `standards/materials`, kind `decal.type` (`image` asset reference and the attributes above). Placed decals are element-scoped RXD on the host element (`Riviera_Element` section `decals[]`: `id`, `type`, `face` sub-reference, `uv` position, `width`, `height`, `rotation`), so moving or deleting the host carries them; they have no IFC entity of their own. On IFC export the host's face style is not changed; with *Include Riviera Extension Data* off, decals are lost and the export report says so.
 
 **Commands.** `render.start(view_id, settings, renderer?, region?) -> job_id`; `render.stop(job_id) -> ()`; `render.save_to_project(job_id, name) -> view_id`; `render.export(job_id_or_view_id, path, format) -> ()`; `render.list_renderers() -> renderer_info[]` (query); `render.gallery() -> ()` (opens the gallery; session UI, not undoable); `decal.place(view_id, decal_type_id, face_ref, position, width?, height?) -> element_id` (returns the decal's id; a perspective view fails with `decal.perspective_view`, an unsupported face with `decal.face_unsupported`); `decaltype.create(name, image_asset_or_path, attributes?) -> type_id`
 
@@ -3346,7 +3346,7 @@ All output commands work on an immutable **model snapshot** taken when the comma
 **Behaviour & rules.**
 - Publishing to a vendor cloud document service is out of scope. Open alternative: *Publish review set* writes a chosen view/sheet set as a combined PDF plus a glTF (or IFC) of chosen 3D views, and, in BIMserver mode, attaches them to the current BIMserver revision as revision extended data (Chapter 6; call names to verify against the deployed server), so that an open-source web viewer pointed at the server can show them. Issues raised on the published set travel as BCF (Chapter 6, COL-BCF-001).
 - A review set folder contains `<set name>.pdf`, one `<view name>.glb` (or `.ifc`) per 3D view, and a `manifest.json` listing every file with its SHA-256, the project name and number, the source revision (local save time or BIMserver revision id), the publishing user and the time. The manifest lets a reviewer check that files belong together and are unchanged.
-- The 3D files keep element GlobalIds (glTF `extras`, IFC natively), so BCF issues raised against them point at the right elements in Reviera.
+- The 3D files keep element GlobalIds (glTF `extras`, IFC natively), so BCF issues raised against them point at the right elements in Riviera.
 - In BIMserver mode, publishing requires write access to the project; without it, the command fails before writing anything. The upload is one job; partial uploads are rolled back where the server allows it and reported otherwise.
 - Publishing never changes the model; it is not undoable and does not create a project revision on its own.
 
@@ -3361,7 +3361,7 @@ All output commands work on an immutable **model snapshot** taken when the comma
 
 ## 5.18 Command catalog
 
-Every command below is registered once in the command registry and is therefore available from the UI, from Lua (`reviera.<domain>.<verb>{...}`) and as an MCP tool. "Undoable = No" marks queries, session-only display state, and output commands that do not change the model (output setups themselves are undoable project data). Parameters marked `?` are optional.
+Every command below is registered once in the command registry and is therefore available from the UI, from Lua (`riviera.<domain>.<verb>{...}`) and as an MCP tool. "Undoable = No" marks queries, session-only display state, and output commands that do not change the model (output setups themselves are undoable project data). Parameters marked `?` are optional.
 
 | Command | Parameters | Returns | Undoable | Req ID |
 |---|---|---|---|---|
@@ -3751,9 +3751,9 @@ Every command below is registered once in the command registry and is therefore 
 
 **Deviations (intentional).**
 
-| # | Topic | Reviera behaviour | Reason |
+| # | Topic | Riviera behaviour | Reason |
 |---|---|---|---|
-| D5-1 | Storage of documentation | Views, sheets, schedules, standards and annotation are Reviera Extension Data (RXD) embedded in the IFC file by default (Chapter 2a), not a proprietary project database. Annotation is written as `IfcAnnotation` only on export. | Native IFC with full compatibility; per-object three-way merge for BIMserver mode. |
+| D5-1 | Storage of documentation | Views, sheets, schedules, standards and annotation are Riviera Extension Data (RXD) embedded in the IFC file by default (Chapter 2a), not a proprietary project database. Annotation is written as `IfcAnnotation` only on export. | Native IFC with full compatibility; per-object three-way merge for BIMserver mode. |
 | D5-2 | Options Bar | None. Tool options are on the contextual ribbon tab and in the Properties palette. | Matches the reference's own 2027 direction; one less UI surface to implement. |
 | D5-3 | Schedule filters | A nested AND/OR rule tree with no limit on the number of rules, shared with view filters; calculated and hidden fields can be used anywhere. | The reference's eight AND-only rules are a common complaint; one engine for both is simpler. |
 | D5-4 | Graphics Inspector | `graphics.explain` and the *Why does this look like this?* command show which override layer won. | Makes the precedence model transparent for users and AI agents. |
@@ -3763,14 +3763,14 @@ Every command below is registered once in the command registry and is therefore 
 | D5-8 | DWG | DXF is the primary CAD format. DWG is written only through LibreDWG and only in the versions it supports reliably; no proprietary DWG libraries. | Licence compatibility (GPL-3.0-or-later). |
 | D5-9 | FBX, DWF, DGN, NWC, Datasmith, ODBC, proprietary solid formats | Not provided (P3). Alternatives: glTF, USD (later), STEP, PDF, DXF, IFC + BCF, SQLite/CSV. | Proprietary formats or SDKs incompatible with the GPL. |
 | D5-10 | Rendering | Optional open renderers (built-in `wgpu` path tracer, Cycles; others such as LuxCoreRender or Mitsuba possible) behind one interface; no cloud rendering. | No proprietary renderer can be shipped; vendor cloud services are out of scope. |
-| D5-11 | Accelerated graphics | There is only one GPU viewport (`wgpu`), always on, which supports every visual style, section boxes, halftone, transparency and links. | Reviera starts with a modern renderer, so there is no legacy engine to toggle. |
+| D5-11 | Accelerated graphics | There is only one GPU viewport (`wgpu`), always on, which supports every visual style, section boxes, halftone, transparency and links. | Riviera starts with a modern renderer, so there is no legacy engine to toggle. |
 | D5-12 | Publishing | Publishing to a vendor cloud is replaced by review sets (PDF + glTF/IFC) written to a folder or attached to a BIMserver revision, with issues in BCF. | Vendor cloud out of scope; open formats instead. |
 | D5-13 | Walkthrough video | WebM/AV1 or image sequences; no bundled patent-encumbered codecs. | Licensing. |
-| D5-14 | Unused IFC export option | "Store IFC GlobalId in a parameter after export" does not exist. | GlobalIds are native in Reviera. |
+| D5-14 | Unused IFC export option | "Store IFC GlobalId in a parameter after export" does not exist. | GlobalIds are native in Riviera. |
 | D5-15 | Assembly members | Whole system elements (beam systems, trusses, curtain walls, stairs, railings, reinforcement systems) may be members of an assembly as nested aggregates; parts are members through `IfcRelAssignsToProduct` (DOC-ASM-001). | The reference refuses complex structures; IFC allows nested `IfcElementAssembly`, and precast and steel shop assemblies need it. |
 | D5-16 | Assembly views after a type change | When an edited owner instance joins a type that already has views, the user chooses which set to keep (DOC-ASM-004). | The reference deletes one set without a choice. |
 | D5-17 | Render gallery | A local render history with exposure re-adjustment (DOC-OUT-011) replaces the reference's cloud render gallery. | Vendor cloud services are out of scope (P3). |
-| D5-19 | Pluggable presentation backends | The reference product has one built-in renderer plus a vendor cloud service. Reviera puts all 3D presentation behind an open backend interface (DOC-RBE-001…002). The scene protocol, walkthroughs, the Godot translation layer for VR/AR and the reference bridges are specified in Chapter 7. | Owner directive 2026-10-12: future photo-real, game-engine and Blender backends for simulated walkthroughs. |
+| D5-19 | Pluggable presentation backends | The reference product has one built-in renderer plus a vendor cloud service. Riviera puts all 3D presentation behind an open backend interface (DOC-RBE-001…002). The scene protocol, walkthroughs, the Godot translation layer for VR/AR and the reference bridges are specified in Chapter 7. | Owner directive 2026-10-12: future photo-real, game-engine and Blender backends for simulated walkthroughs. |
 | D5-18 | Displaced elements | Displacement is a pure per-view transform, so constrained or hosted elements can be displaced; dimensions to displaced elements are refused instead (DOC-VIEW-012). | The model is never moved, so constraints cannot be violated; a dimension would report a false distance. |
 
 **Open questions.**
@@ -3850,6 +3850,6 @@ Every command below is registered once in the command registry and is therefore 
 | Owner directive 2026-10-12 (pluggable renderer; Godot translation layer for walkthrough and VR/AR); Khronos glTF 2.0 and OpenXR public specifications | DOC-RBE-001 … 002 (and Chapter 7) |
 | §10 Version change log | Version-specific behaviours folded into the requirements above (for example DOC-SHT-005, DOC-SHT-006, DOC-ANN-012, DOC-GFX-008) |
 
-Screenshots consulted (internal reference only, never used as Reviera assets): all files in `screenshots/documentation/` that are cited in the requirement headers above.
+Screenshots consulted (internal reference only, never used as Riviera assets): all files in `screenshots/documentation/` that are cited in the requirement headers above.
 
 Web sources marked `web:` are public reference-product help pages and buildingSMART documentation, listed with URLs, access date and HTTP status in the session sources file for this chapter (to be merged into `RESEARCH_LOG.md`).

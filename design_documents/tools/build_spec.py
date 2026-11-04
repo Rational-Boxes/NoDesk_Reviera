@@ -58,8 +58,8 @@ def build_indexes():
                     cmds.setdefault(name, (ch, *cells[1:5]))
         for m in re.finditer(r"\*\*ID:\*\*\s*([A-Z]+-[A-Z0-9]+-\d+)[^\n]*?\*\*Priority:\*\*\s*([^·\n]+)", text):
             reqs.setdefault(m.group(1), m.group(2))
-        # Reviera-originated features (owner directives, no reference-product counterpart).
-        # A requirement whose Ref line cites no reference-product research is Reviera's own design.
+        # Riviera-originated features (owner directives, no reference-product counterpart).
+        # A requirement whose Ref line cites no reference-product research is Riviera's own design.
         for m in re.finditer(r"^\*\*ID:\*\*\s*([A-Z]+-[A-Z0-9]+-\d+)([^\n]*)", text, re.M):
             if "research/" in m.group(2) or "web:" in m.group(2):
                 continue
@@ -72,10 +72,10 @@ def build_indexes():
                 reqs.setdefault(f"{pre}{n:03d}", prio)
         for m in re.finditer(r"^\| ([A-Z]+-[A-Z0-9]+-\d+) \|(.*)\| (P\d[^|]*)\|\s*$", text, re.M):
             reqs.setdefault(m.group(1), m.group(3))
-        # Chapters 2a and 2b (RXD format, live store) are wholly Reviera's own design.
+        # Chapters 2a and 2b (RXD format, live store) are wholly Riviera's own design.
         if ch in ("2a", "2b"):
             for m in re.finditer(r"^\| ([A-Z]+-[A-Z0-9]+-\d+) \| ([^|]+)\|", text, re.M):
-                desc = re.sub(r"^Reviera shall ", "", m.group(2).strip().strip("*"))
+                desc = re.sub(r"^Riviera shall ", "", m.group(2).strip().strip("*"))
                 originals.setdefault(m.group(1), (ch, (desc[:90].rsplit(" ", 1)[0] + " …") if len(desc) > 90 else desc))
         # Grouped requirements ("**Priority:** see table"): read the Priority column of tables keyed by ID.
         pri_col = None
@@ -122,8 +122,8 @@ def build_indexes():
             + (f" ({', '.join('`' + k + '`' for k in mismatched)})." if mismatched else "."), "",
             "| Command | Chapters (owner first) | Signatures |", "|---------|------------------------|------------|"]
     out += [f"| `{k}` | {', '.join(v)} | {'identical' if ok else '**differ**'} |" for k, (v, ok) in sorted(shared.items())]
-    out += ["", "## A.2a Reviera-originated features", "",
-            f"{len(originals)} requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, "
+    out += ["", "## A.2a Riviera-originated features", "",
+            f"{len(originals)} requirements are Riviera's own design: owner directives, the technology stack (IFC/RXD storage, "
             "live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines "
             "cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every "
             "other requirement traces to public research on the reference product.", "",
@@ -131,7 +131,7 @@ def build_indexes():
     out += [f"| {r} | {c} | {t} |" for r, (c, t) in originals.items()]
     out += ["", "## A.3 Consolidated command index", "",
             f"**{len(cmds)} unique commands** in {len(domains)} domains. Every command is exposed automatically to the UI, "
-            "to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.", "",
+            "to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.", "",
             "| Domain | Commands |", "|--------|---------:|"]
     out += [f"| `{d}` | {n} |" for d, n in sorted(domains.items())]
     out += ["", "| Command | Ch | Parameters | Returns | Undoable | Req ID |",
@@ -146,21 +146,21 @@ def build_indexes():
     return len(cmds), len(reqs), totals
 
 
-HEADER = """# Reviera Application Specification
+HEADER = """# Riviera Application Specification
 
 **Functional reference:** Autodesk® Revit® 2026/2027, described only from publicly available sources
-**Product:** Reviera, an open-source BIM authoring application (GPL-3.0-or-later; RXD schemas MIT)
+**Product:** Riviera, an open-source BIM authoring application (GPL-3.0-or-later; RXD schemas MIT)
 **Compiled from:** `design_documents/spec/*.md` by `tools/build_spec.py`. Edit the chapter files, not this file.
 **Companion documents:** `TECH_STACK.md` (architecture and licensing) · `RESEARCH_LOG.md` (clean-room provenance) · `SOURCE_REGISTER.md` (public sources, reference screenshots) · `research/01–07` (raw research, internal)
 
-> Autodesk and Revit are trademarks of Autodesk, Inc., used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk. Screenshot paths cited in "Ref:" lines point to internal reference material; it is not part of Reviera.
+> Autodesk and Revit are trademarks of Autodesk, Inc., used here only to identify the functional reference. Riviera is not affiliated with or endorsed by Autodesk. Screenshot paths cited in "Ref:" lines point to internal reference material; it is not part of Riviera.
 
 """
 
 
 def assemble():
     order = ["00_overview.md"] + [f for f, _ in CHAPTERS] + ["A_indexes.md", "00_conventions.md"]
-    renames = {"00_overview.md": ("# Reviera Application Specification", "# Chapter 0 — Overview"),
+    renames = {"00_overview.md": ("# Riviera Application Specification", "# Chapter 0 — Overview"),
                "00_conventions.md": ("# Specification Conventions (for chapter authors)", "# Appendix B — Specification Conventions")}
     toc = ["## Contents", "", "| Part | Title | Source file |", "|------|-------|-------------|"]
     parts = []

@@ -6,7 +6,7 @@ step the window cannot do yet ([gaps](#gaps)). The script `daylight_studio.lua` 
 Start with **File › New**, save it (**File › Save As**), and open a Level 1 plan.
 
 1. **The site and weather.** Sustainability › Site › **Location** (51.5, 0, elevation 20, time
-   zone 0) and **Weather**: `reviera_synthetic.epw` from the samples folder.
+   zone 0) and **Weather**: `riviera_synthetic.epw` from the samples folder.
 2. **A roof level.** Architecture › Datum › **Level** at 3000, named *Roof*.
 3. **The studios.** Architecture › **Wall**, 3000 high, clockwise round (0, 0), (0, 6000),
    (12000, 6000), (12000, 0); a party wall from (6000, 0) to (6000, 6000), 2700 high.

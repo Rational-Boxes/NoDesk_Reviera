@@ -1,5 +1,5 @@
 [package]
-name = "reviera-dstv"
+name = "riviera-dstv"
 description = "DSTV NC1 (Standard Description for Steel Structure Pieces for the Numerical Controls) writer and reader"
 version.workspace = true
 edition.workspace = true

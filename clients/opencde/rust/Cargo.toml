@@ -1,5 +1,5 @@
 [package]
-name = "reviera-opencde"
+name = "riviera-opencde"
 description = "buildingSMART OpenCDE clients: BCF API 3.0 (2.1 fallback)"
 version.workspace = true
 edition.workspace = true
@@ -20,7 +20,7 @@ serde_json.workspace = true
 workspace = true
 
 [dev-dependencies]
-reviera-opencde = { path = ".", features = ["fake"] }
+riviera-opencde = { path = ".", features = ["fake"] }
 
 [features]
 # An in-memory BCF API server for tests.

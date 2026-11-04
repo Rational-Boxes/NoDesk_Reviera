@@ -2,16 +2,16 @@
 
 [← Home](index.md)
 
-Reviera is in early development. This page lists what works today. The
-[README](https://github.com/Rational-Boxes/NoDesk_Reviera#not-built-yet) lists what is still to
+Riviera is in early development. This page lists what works today. The
+[README](https://github.com/Rational-Boxes/BIM_Riviera#not-built-yet) lists what is still to
 come.
 
 ## Native IFC
 
 - Open, edit and save **IFC2X3, IFC4 and IFC4X3** models through IfcOpenShell and OpenCASCADE.
-- Reviera's own elements are **standard IFC entities** with their relationships, so other tools
+- Riviera's own elements are **standard IFC entities** with their relationships, so other tools
   see real walls, slabs, beams and plates, not proxies.
-- Elements Reviera doesn't model itself are kept, drawn and selectable, so files from other
+- Elements Riviera doesn't model itself are kept, drawn and selectable, so files from other
   tools round-trip losslessly.
 - **Crash recovery:** every change is mirrored to an encrypted local store, so unsaved work and its
   undo history come back after a crash.
@@ -83,7 +83,7 @@ come.
 - **MCP server** for AI agents. Every command is a tool, grouped into toolsets that agents enable as
   they need them. Agents get preview and confirm for destructive changes, and the same
   transactions and permission checks as the user.
-- A **command shell** (`reviera shell`) for running commands headlessly.
+- A **command shell** (`riviera shell`) for running commands headlessly.
 
 ## Platforms
 

@@ -2,14 +2,14 @@
 
 **Area code:** DM · **Status:** Draft 1 (2026-10-12) · **Primary source:** `research/05_data_model_platform.md` · **Architecture source:** `TECH_STACK.md` · **Extension data carrier:** `spec/02a_extension_data_format.md`
 
-This chapter is the backbone of the Reviera specification. It defines what a Reviera model *is*, how it is stored, how it changes, how users and programs extend it, and how it moves in and out of the application. Other chapters (ARC, STR, MEP, ANA, DOC, COL) define particular element kinds and tools. They build on the element model, parameter system, transaction model, storage split and command registry defined here. Where this chapter and a domain chapter disagree about storage or identity, this chapter wins. Where this chapter and `02a_extension_data_format.md` disagree about *how* extension data is physically carried, `02a` wins.
+This chapter is the backbone of the Riviera specification. It defines what a Riviera model *is*, how it is stored, how it changes, how users and programs extend it, and how it moves in and out of the application. Other chapters (ARC, STR, MEP, ANA, DOC, COL) define particular element kinds and tools. They build on the element model, parameter system, transaction model, storage split and command registry defined here. Where this chapter and a domain chapter disagree about storage or identity, this chapter wins. Where this chapter and `02a_extension_data_format.md` disagree about *how* extension data is physically carried, `02a` wins.
 
-> **Storage design (owner decision, 2026-10-12; compatibility first).** A Reviera project is a **single valid IFC file** (`.ifc` or `.ifczip`).
+> **Storage design (owner decision, 2026-10-12; compatibility first).** A Riviera project is a **single valid IFC file** (`.ifc` or `.ifczip`).
 > 1. **Standard IFC** holds everything IFC can express: spatial structure, elements, types, geometry, materials and layer sets, standard `Pset_*`/`Qto_*`, the *values* of user parameters (as property sets that other tools can read), classifications, grids, openings and voids.
-> 2. **Reviera Extension Data (RXD)** holds everything IFC cannot express: constraints, sketches, family parametric definitions, parameter definition metadata, views, sheets, schedules, view-specific annotation, phases, design options, worksets, revisions, links, styles, patterns and settings. RXD has two forms:
->    - **RXD element data**: data scoped to one IFC element (its recipe, sketch, constraints, hosting detail and memberships). By default it is carried in a `Reviera_Element` property set on that element.
->    - **RXD documents**: project-scoped documents (for example `views`, `sheets`, `annotation`, `styles`, `families/<guid>`). By default they are carried in `Reviera_Document_*` property sets on `IfcProject`.
-> 3. An external **`.reviera` sidecar** is an *alternative carrier* for the same RXD. It is useful for git, or when a downstream tool strips unknown property sets.
+> 2. **Riviera Extension Data (RXD)** holds everything IFC cannot express: constraints, sketches, family parametric definitions, parameter definition metadata, views, sheets, schedules, view-specific annotation, phases, design options, worksets, revisions, links, styles, patterns and settings. RXD has two forms:
+>    - **RXD element data**: data scoped to one IFC element (its recipe, sketch, constraints, hosting detail and memberships). By default it is carried in a `Riviera_Element` property set on that element.
+>    - **RXD documents**: project-scoped documents (for example `views`, `sheets`, `annotation`, `styles`, `families/<guid>`). By default they are carried in `Riviera_Document_*` property sets on `IfcProject`.
+> 3. An external **`.riviera` sidecar** is an *alternative carrier* for the same RXD. It is useful for git, or when a downstream tool strips unknown property sets.
 >
 > How RXD is encoded, chunked, compressed, versioned and validated, and how the sidecar carrier works, is defined in **`spec/02a_extension_data_format.md`**. This chapter defines **what** RXD holds, **which** element or document it belongs to, and how it refers to IFC. Document and key names used here are proposals for `02a`; if `02a` renames one, `02a` wins.
 
@@ -35,13 +35,13 @@ This chapter is the backbone of the Reviera specification. It defines what a Rev
 - **Requirement keywords.** "Shall" is mandatory. "Should" is recommended. "May" is optional.
 - **Lua examples** use the API surface defined in §2.13. **JSON examples** are informative; the normative JSON Schemas are published with `02a`.
 - **IFC entity names** follow IFC4 ADD2 TC1. Where IFC4X3 differs (for example `IfcBuildingElementType` became `IfcBuiltElementType`), the difference is noted.
-- **"RXD document `x`"** means the data is stored in that RXD document. By default it is embedded in the IFC file as a `Reviera_Doc:<path>` property set; the external `.reviera` container is the alternative carrier (see `02a`). Document names given here are proposals for `02a`; if `02a` renames a document, `02a` wins.
+- **"RXD document `x`"** means the data is stored in that RXD document. By default it is embedded in the IFC file as a `Riviera_Doc:<path>` property set; the external `.riviera` container is the alternative carrier (see `02a`). Document names given here are proposals for `02a`; if `02a` renames a document, `02a` wins.
 - **Grammar** is written in EBNF (ISO/IEC 14977 style, with `|`, `[ ]`, `{ }`).
 - **Internal units** are SI (§2.9). Any number in this chapter without a unit is in internal units.
 
 ### 2.0.3 Glossary
 
-| Term | Meaning in Reviera |
+| Term | Meaning in Riviera |
 |---|---|
 | **Element** | Anything with identity in the model: physical objects, datums, annotation, views, sheets, types, settings. An element is an IFC entity, an RXD-only record, or an IFC entity with RXD element data. |
 | **Category** | A fixed classification defined by the application. It sets default graphics, behaviour flags and the IFC entity class. |
@@ -50,7 +50,7 @@ This chapter is the backbone of the Reviera specification. It defines what a Rev
 | **Instance** | A placed occurrence of a type. It is stored as an IFC occurrence entity (`IfcWall`, `IfcDoor`, …). |
 | **IFC-backed element** | An element whose primary record is an `IfcRoot` entity in the `.ifc` file (it may also have RXD element data). |
 | **RXD-only element** | An element that has no IFC entity (views, sheets, annotation, phases, …). It exists only as a record in an RXD document. It still has a GUID in the same 22-character IFC format. |
-| **RXD** | Reviera Extension Data: the data IFC cannot express, as *RXD element data* (on one IFC element) and *RXD documents* (project-scoped). Carriers are defined in `spec/02a_extension_data_format.md` (§2.4). |
+| **RXD** | Riviera Extension Data: the data IFC cannot express, as *RXD element data* (on one IFC element) and *RXD documents* (project-scoped). Carriers are defined in `spec/02a_extension_data_format.md` (§2.4). |
 | **Command** | A typed, registered operation. It is the only way to change the model (§2.12). |
 | **Regeneration** | Recomputing derived values and geometry after a change, in dependency order (§2.6). |
 | **Family package** | A family stored on disk as an `.ifc` type library carrying the family's RXD (§2.8.14). |
@@ -65,23 +65,23 @@ This chapter is the backbone of the Reviera specification. It defines what a Rev
 **Purpose.** These rules shape every other requirement in this chapter.
 
 **Behaviour & rules.**
-1. **IFC is the model of record for everything it can express.** The in-memory building model is an IFC instance population, managed through IfcOpenShell. Reviera has no proprietary project format. RXD holds only what IFC cannot express.
+1. **IFC is the model of record for everything it can express.** The in-memory building model is an IFC instance population, managed through IfcOpenShell. Riviera has no proprietary project format. RXD holds only what IFC cannot express.
 2. **One database per project.** In memory, IFC entities and RXD records form one element store with one transaction system. Every view, schedule and sheet is a live query of it. A change made anywhere appears everywhere on the next regeneration.
 3. **Everything with identity is an element.** Every element has an internal ID and a durable GUID (§2.5). IFC-backed elements use their `GlobalId`. RXD-only elements get a GUID in the same format.
 4. **IFC first.** Data is stored in a standard IFC entity, attribute, relationship or buildingSMART property set (`Pset_*`, `Qto_*`) whenever one has the right meaning. Data goes to RXD only when IFC has no suitable construct (the split is in §2.4.2).
-5. **The building stands without RXD.** The file shall be valid for its declared schema. A tool that ignores or strips every `Reviera_*` property set shall still see correct geometry, spatial structure, types, materials, standard properties and user parameter values. Losing RXD loses *intent* (constraints, views, annotation), not the building.
+5. **The building stands without RXD.** The file shall be valid for its declared schema. A tool that ignores or strips every `Riviera_*` property set shall still see correct geometry, spatial structure, types, materials, standard properties and user parameter values. Losing RXD loses *intent* (constraints, views, annotation), not the building.
 6. **References by GUID only.** RXD refers to IFC entities by `GlobalId`, never by STEP instance number (`#123`).
-7. **Integrity checks.** `02a` defines how Reviera detects RXD that is missing, stale or belongs to another project (for example, after a downstream tool rewrote the file). This chapter defines the user-facing reconciliation (§2.4.3).
-8. **Lossless pass-through.** IFC entities, properties and relationships that Reviera does not understand are kept and written back unchanged, with the same GlobalId and values, unless the user edits or deletes their owner. Unknown RXD documents and unknown keys are also kept (`02a`).
+7. **Integrity checks.** `02a` defines how Riviera detects RXD that is missing, stale or belongs to another project (for example, after a downstream tool rewrote the file). This chapter defines the user-facing reconciliation (§2.4.3).
+8. **Lossless pass-through.** IFC entities, properties and relationships that Riviera does not understand are kept and written back unchanged, with the same GlobalId and values, unless the user edits or deletes their owner. Unknown RXD documents and unknown keys are also kept (`02a`).
 9. **Commands only.** Every change goes through a registered command inside a transaction (§2.7, §2.12). The UI, Lua, add-ins and MCP have no other write path.
 10. **SI internal units.** All stored quantities use SI base or derived units (metre, radian, kilogram, second, kelvin, …). Display units are a formatting layer (§2.9.5).
 11. **Deterministic results.** For the same model and the same command sequence, regeneration gives the same geometry and values, whatever the number of threads (§2.6.4).
 12. **Mode independence.** Everything in this chapter behaves the same in Local mode and BIMserver mode. Only open, save, sync and history differ. Because RXD is embedded in IFC by default, it travels with each BIMserver revision as ordinary properties (COL chapter; `02a`).
 
 **Acceptance criteria.**
-- [ ] A model saved by Reviera passes IfcOpenShell schema validation and the buildingSMART validation service's schema and normative rule checks for IFC4 ADD2 TC1.
-- [ ] Opening a third-party IFC4 file, then saving it without edits, keeps every entity's GlobalId, every property value and every relationship. A semantic diff with IfcOpenShell's diff tooling reports no differences except the header, `IfcOwnerHistory`/application entries and added `Reviera_*` property sets.
-- [ ] Stripping every `Reviera_*` property set from a saved project and opening it gives a model with all elements, types, materials and parameter values, plus a notice that views, annotation and constraints were not found.
+- [ ] A model saved by Riviera passes IfcOpenShell schema validation and the buildingSMART validation service's schema and normative rule checks for IFC4 ADD2 TC1.
+- [ ] Opening a third-party IFC4 file, then saving it without edits, keeps every entity's GlobalId, every property value and every relationship. A semantic diff with IfcOpenShell's diff tooling reports no differences except the header, `IfcOwnerHistory`/application entries and added `Riviera_*` property sets.
+- [ ] Stripping every `Riviera_*` property set from a saved project and opening it gives a model with all elements, types, materials and parameter values, plus a notice that views, annotation and constraints were not found.
 - [ ] No code path outside the command layer can mutate the element store. This is enforced by Rust visibility (the store's mutating API is crate-private to the transaction module).
 
 ---
@@ -208,7 +208,7 @@ This chapter is the backbone of the Reviera specification. It defines what a Rev
 | Kind | Definition lives in | Created by | Editable with | Portability |
 |---|---|---|---|---|
 | **System family** | The application (geometry logic in Rust). Its types live in the project. | Built in. Types are created with *Duplicate* in Type Properties. | Specialised editors (for example the wall layer editor in ARC) | Types move between projects only through Transfer Project Standards (§2.10.9) or copy/paste |
-| **Loadable family** | A family package (§2.8.14). A full copy is embedded in each project that uses it. | The Reviera Family Editor | The Family Editor (opened from a package, or from the project with *Edit Family*) | Saved and loaded as family packages |
+| **Loadable family** | A family package (§2.8.14). A full copy is embedded in each project that uses it. | The Riviera Family Editor | The Family Editor (opened from a package, or from the project with *Edit Family*) | Saved and loaded as family packages |
 | **In-place family** | The project only. It is single-use. | *Model In-Place* inside a project | The Family Editor tools, in an in-place session | Not reusable. Copying makes an independent copy. |
 
 - A loadable family embedded in a project shall carry its **full** definition (parameters, formulas, forms, constraints, nested families, lookup tables), not only the evaluated geometry. This lets the family be edited from the project and saved back out as a package.
@@ -334,13 +334,13 @@ This chapter is the backbone of the Reviera specification. It defines what a Rev
 **Behaviour & rules.**
 - The **default project schema** is **IFC4 ADD2 TC1** (`FILE_SCHEMA(('IFC4'))`). Projects may be created in, or converted to, **IFC4X3_ADD2** in Local mode. In BIMserver mode this is allowed only when the server advertises a matching deserializer (COL chapter).
 - Reading is supported for **IFC2X3 TC1**, **IFC4** and **IFC4X3_ADD2**. An IFC2X3 file is upgraded in memory to the project schema (§2.11.8). The user is told that saving writes the new schema, and that "Export IFC2X3" (§2.11.4) remains available.
-- The header written by Reviera shall contain:
+- The header written by Riviera shall contain:
   - `FILE_DESCRIPTION(('ViewDefinition [DesignTransferView]'),'2;1')`;
-  - `FILE_NAME` with the application name `Reviera`, the version, the author and organisation from Project Information, and a UTC timestamp;
+  - `FILE_NAME` with the application name `Riviera`, the version, the author and organisation from Project Information, and a UTC timestamp;
   - `FILE_SCHEMA(('IFC4'))` or `FILE_SCHEMA(('IFC4X3_ADD2'))`.
-- `IfcOwnerHistory` is **optional** in IFC4. Reviera shall write it on `IfcRoot` entities only when the project setting "Write owner history" is on (default: off in Local mode, on in BIMserver mode). Change attribution is otherwise kept in RXD element data (`identity`) (§2.5).
+- `IfcOwnerHistory` is **optional** in IFC4. Riviera shall write it on `IfcRoot` entities only when the project setting "Write owner history" is on (default: off in Local mode, on in BIMserver mode). Change attribution is otherwise kept in RXD element data (`identity`) (§2.5).
 - `IfcProject.RepresentationContexts` shall contain a `Model` context (3D) with sub-contexts `Body`, `Axis`, `Box`, `FootPrint`, `Clearance` and `Reference`, and a `Plan` context (2D) with sub-contexts `Annotation` (`PLAN_VIEW`, `SECTION_VIEW`, `ELEVATION_VIEW`) and `Body`/`Axis`. `TrueNorth` and `WorldCoordinateSystem` follow §2.10.7.
-- `IfcProject.UnitsInContext` shall declare SI units for every measure Reviera writes. It shall use `IfcSIUnit` (`METRE`, `SQUARE_METRE`, `CUBIC_METRE`, `RADIAN`, …), even when display units are imperial. Display units are kept in RXD document `project/settings` (§2.9.5).
+- `IfcProject.UnitsInContext` shall declare SI units for every measure Riviera writes. It shall use `IfcSIUnit` (`METRE`, `SQUARE_METRE`, `CUBIC_METRE`, `RADIAN`, …), even when display units are imperial. Display units are kept in RXD document `project/settings` (§2.9.5).
 
 **Acceptance criteria.**
 - [ ] A new project file has exactly one `IfcProject`, one `IfcUnitAssignment` in SI, and the representation contexts listed above.
@@ -350,11 +350,11 @@ This chapter is the backbone of the Reviera specification. It defines what a Rev
 **ID:** DM-IFC-002 · **Priority:** P0 · **Ref:** research/05 §1.1, §1.2; TECH_STACK §3.1
 
 **Behaviour & rules.**
-- Every Reviera **type** shall be an `IfcTypeObject` subtype matching its category (§2.2.2). Its `Name` is `<FamilyName>:<TypeName>`, the convention other tools use to split family and type. Its `ElementType` is `<TypeName>`. Its `Tag` holds the type mark.
+- Every Riviera **type** shall be an `IfcTypeObject` subtype matching its category (§2.2.2). Its `Name` is `<FamilyName>:<TypeName>`, the convention other tools use to split family and type. Its `ElementType` is `<TypeName>`. Its `Tag` holds the type mark.
 - `PredefinedType` shall be set from the category default, or from the family's IFC classification family parameter (§2.8.2). When it is `USERDEFINED`, the type's `ElementType` and the occurrence's `ObjectType` shall carry the user-defined value.
-- Every **instance** shall be linked to its type through exactly one `IfcRelDefinesByType` (`RelatingType` = type, `RelatedObjects` = all its instances). Reviera keeps **one relationship per type** and updates its `RelatedObjects` set, rather than creating one relationship per instance.
+- Every **instance** shall be linked to its type through exactly one `IfcRelDefinesByType` (`RelatingType` = type, `RelatedObjects` = all its instances). Riviera keeps **one relationship per type** and updates its `RelatedObjects` set, rather than creating one relationship per instance.
 - **Shared geometry.** A type's evaluated geometry for the default parameter state is written once as `IfcTypeProduct.RepresentationMaps` (an `IfcRepresentationMap` with `Body`, and also `Axis`, `FootPrint` or plan `Annotation` maps where they exist). An instance whose geometry equals the type's geometry under a rigid transform (plus mirroring) shall use an `IfcMappedItem` referencing that map. An instance with unique geometry (because of instance parameters, joins or cuts) shall have its own representation.
-- An occurrence's `PredefinedType` shall be `NOTDEFINED`, or equal to its type's value. Reviera writes `NOTDEFINED` on occurrences when the type is set, so the value is not duplicated.
+- An occurrence's `PredefinedType` shall be `NOTDEFINED`, or equal to its type's value. Riviera writes `NOTDEFINED` on occurrences when the type is set, so the value is not duplicated.
 - **Families** have no IFC class. A loadable or in-place family is an `IfcProjectLibrary` declared by the `IfcProject` through `IfcRelDeclares`, and it declares its types (§2.2.3). This is valid IFC4 and lets other tools see which types belong together.
 
 **Example (informative, STEP fragment).**
@@ -380,20 +380,20 @@ This chapter is the backbone of the Reviera specification. It defines what a Rev
 
 **Behaviour & rules.**
 - **Type parameters** live in property sets attached to the type through `IfcTypeObject.HasPropertySets`. **Instance parameters** live in property sets attached to the occurrence through `IfcRelDefinesByProperties`.
-- When an occurrence has a property set with the same `Name` as one on its type, IFC treats the occurrence's property as the override. Reviera never writes the *same* property on both type and occurrence for one parameter, because a parameter is either type or instance (§2.9.1). When reading third-party files, Reviera follows IFC: the occurrence value wins, and the property is shown as an instance parameter.
+- When an occurrence has a property set with the same `Name` as one on its type, IFC treats the occurrence's property as the override. Riviera never writes the *same* property on both type and occurrence for one parameter, because a parameter is either type or instance (§2.9.1). When reading third-party files, Riviera follows IFC: the occurrence value wins, and the property is shown as an instance parameter.
 - Each parameter has exactly one **IFC home** (`pset_name`, `property_name`), taken from its definition (§2.9.2). The order of preference is:
   1. a direct IFC attribute (for example `Name`, `Description`, `Tag`, `OverallHeight`);
   2. a buildingSMART property set for the entity (`Pset_WallCommon`, …);
   3. a buildingSMART quantity set (`Qto_*BaseQuantities`), for computed quantities;
   4. the property set named in the parameter definition (project, shared and family parameters; §2.9.2);
   5. for built-in parameters with no standard home, a property set named after the parameter's group (for example `Identity Data`, `Constraints`, `Other`), with the property named after the parameter (see Q-DM-03).
-- **Quantity sets** are written as `IfcElementQuantity` with `MethodOfMeasurement = 'BaseQuantities'` from regenerated geometry on each save. They are read-only in Reviera. If a user edits a quantity in a third-party file, the edit is kept as an "imported quantity" until the element is regenerated.
+- **Quantity sets** are written as `IfcElementQuantity` with `MethodOfMeasurement = 'BaseQuantities'` from regenerated geometry on each save. They are read-only in Riviera. If a user edits a quantity in a third-party file, the edit is kept as an "imported quantity" until the element is regenerated.
 - Property values shall use the IFC measure type of the parameter's data type (§2.9.4). Enumerations shall use `IfcPropertyEnumeratedValue` with a shared `IfcPropertyEnumeration`. Element references (material, family type, element) shall use `IfcPropertyReferenceValue`.
 - A property set with no values is not written. A bound parameter with no value is written as a property with a null `NominalValue`, so schedules in other tools can see the field.
 
 **Standard property sets written (baseline; domain chapters extend).**
 
-| Category | Property set | Properties Reviera maps |
+| Category | Property set | Properties Riviera maps |
 |---|---|---|
 | Walls | `Pset_WallCommon` | Reference (type name), Status (phase status §2.3.11), AcousticRating, FireRating, Combustible, SurfaceSpreadOfFlame, ThermalTransmittance (from layers §2.10.5), IsExternal (Function = Exterior), LoadBearing (Structural Usage), ExtendToStructure, Compartmentation |
 | Walls | `Qto_WallBaseQuantities` | Length, Width, Height, GrossFootprintArea, NetFootprintArea, GrossSideArea, NetSideArea, GrossVolume, NetVolume, GrossWeight, NetWeight |
@@ -428,9 +428,9 @@ This chapter is the backbone of the Reviera specification. It defines what a Rev
 
 **Acceptance criteria.**
 - [ ] Setting a wall's Fire Rating to "EI 60" writes `Pset_WallCommon.FireRating = IfcLabel('EI 60')` on the wall *type*, because the built-in definition is type-level for walls.
-- [ ] Opening the saved file in a third-party IFC viewer shows `Qto_WallBaseQuantities.NetSideArea` equal (within 1 mm²) to the Reviera schedule's wall area.
-- [ ] A third-party file with `Pset_DoorCommon.FireRating` on both a type and an occurrence shows the occurrence value in Reviera, marked as an instance override.
-- [ ] A shared parameter "Acoustic Class" bound to doors appears in a third-party viewer under its configured property set name, with the value entered in Reviera.
+- [ ] Opening the saved file in a third-party IFC viewer shows `Qto_WallBaseQuantities.NetSideArea` equal (within 1 mm²) to the Riviera schedule's wall area.
+- [ ] A third-party file with `Pset_DoorCommon.FireRating` on both a type and an occurrence shows the occurrence value in Riviera, marked as an instance override.
+- [ ] A shared parameter "Acoustic Class" bound to doors appears in a third-party viewer under its configured property set name, with the value entered in Riviera.
 
 ### 2.3.4 Spatial structure
 **ID:** DM-IFC-004 · **Priority:** P0 · **Ref:** research/05 §1.3, §9.1, §9.8
@@ -441,7 +441,7 @@ This chapter is the backbone of the Reviera specification. It defines what a Rev
 - Elements that are parts of another element (curtain panels, stair flights, roof slabs, assembly members, shared nested components) shall **not** be contained in a spatial structure directly. They are reached through `IfcRelAggregates` from the parent, as IFC requires.
 - **Rooms** (`IfcSpace`) shall be aggregated by their storey through `IfcRelAggregates`, not contained.
 - Elements that span several storeys (for example a multi-storey column or a curtain wall) are contained in their base storey. The other storeys are listed through `IfcRelReferencedInSpatialStructure`.
-- Reviera may support several buildings on one site. `level.create` takes an optional building.
+- Riviera may support several buildings on one site. `level.create` takes an optional building.
 
 **Commands.**
 `site.create(name) -> element_id` · `building.create(site_id, name) -> element_id` · `spatial.reassign(element_ids[], container_id)`
@@ -467,34 +467,34 @@ This chapter is the backbone of the Reviera specification. It defines what a Rev
 **ID:** DM-IFC-006 · **Priority:** P0 · **Ref:** research/05 §1.3; TECH_STACK §3.1
 
 **Behaviour & rules.**
-- Reviera treats each grid line as its own element (selectable, with its own name, type and extents). IFC groups axes into an `IfcGrid`. The mapping is:
+- Riviera treats each grid line as its own element (selectable, with its own name, type and extents). IFC groups axes into an `IfcGrid`. The mapping is:
   - each **grid system** (default: one per building, or one per user-defined grid group) is one `IfcGrid`, contained in the lowest storey, or in the building;
-  - each Reviera grid line is one `IfcGridAxis` in `UAxes`, `VAxes` or `WAxes`. Reviera assigns U to lines within ±45° of project X, V to the rest, and W to arcs and multi-segment grids;
+  - each Riviera grid line is one `IfcGridAxis` in `UAxes`, `VAxes` or `WAxes`. Riviera assigns U to lines within ±45° of project X, V to the rest, and W to arcs and multi-segment grids;
   - `IfcGridAxis.AxisTag` is the grid name, and `AxisCurve` is the 2D curve. Multi-segment grids use an `IfcCompositeCurve`.
 - `IfcGridAxis` is not an `IfcRoot`, so it has no GlobalId. Per-axis identity is kept in RXD under `model/datums`: one RXD document per grid line, `model/datums/<axis_guid>`, so grid lines merge one by one. Each record holds `{grid_guid, axis_guid, internal_id, curve, grid_type, extents, bubble_visibility}`; the record's name is the axis tag.
 - Renaming a grid updates `AxisTag` and the record's name in the same transaction. The axis GUID is unchanged.
-- **Edits by other tools.** Everything that defines a grid line is also in IFC, so on open the `IfcGridAxis` entities of a Reviera grid system win over the RXD records, without asking (unlike recipes, Ch 2a §7). Records and axes are matched by tag:
+- **Edits by other tools.** Everything that defines a grid line is also in IFC, so on open the `IfcGridAxis` entities of a Riviera grid system win over the RXD records, without asking (unlike recipes, Ch 2a §7). Records and axes are matched by tag:
   - an axis whose curve differs from its record's moves the grid;
   - an unmatched axis and an unmatched record with the same curve are a renamed grid;
-  - an unmatched axis is a grid added by another tool and becomes a Reviera grid; its `axis_guid` is derived from the `IfcGrid` GlobalId and the tag, so opening the same file again gives the same identity;
+  - an unmatched axis is a grid added by another tool and becomes a Riviera grid; its `axis_guid` is derived from the `IfcGrid` GlobalId and the tag, so opening the same file again gives the same identity;
   - an unmatched record is a grid another tool removed, as is every record of an `IfcGrid` that no longer exists;
-  - axes whose curve Reviera cannot read are left alone, with their records.
+  - axes whose curve Riviera cannot read are left alone, with their records.
 
   The changes are listed when the file opens (Ch 2a §7, step 5) and written back with the next save.
 
 **Acceptance criteria.**
 - [ ] Six orthogonal grid lines produce one `IfcGrid` with three U axes and three V axes, and a third-party viewer shows their tags.
 - [ ] After renaming a grid from "A" to "A1" and reopening, the grid keeps its GUID, and dimensions to it are still attached.
-- [ ] An axis moved, retagged, added or removed in a third-party tool moves, renames, adds or removes the Reviera grid on the next open; a moved or renamed grid keeps its GUID, and opening the file again reports nothing more.
+- [ ] An axis moved, retagged, added or removed in a third-party tool moves, renames, adds or removes the Riviera grid on the next open; a moved or renamed grid keeps its GUID, and opening the file again reports nothing more.
 
 ### 2.3.7 Openings, voids and fillings
 **ID:** DM-IFC-007 · **Priority:** P0 · **Ref:** research/05 §2.2, §4.4; TECH_STACK §3.1
 
 **Behaviour & rules.**
-- When a hosted component cuts its host (doors, windows, wall openings, shafts, and components with an "opening cut" void), Reviera shall create an `IfcOpeningElement` (`PredefinedType = OPENING` or `RECESS`). It is linked to the host by `IfcRelVoidsElement` (`RelatingBuildingElement` = host, `RelatedOpeningElement` = opening).
+- When a hosted component cuts its host (doors, windows, wall openings, shafts, and components with an "opening cut" void), Riviera shall create an `IfcOpeningElement` (`PredefinedType = OPENING` or `RECESS`). It is linked to the host by `IfcRelVoidsElement` (`RelatingBuildingElement` = host, `RelatedOpeningElement` = opening).
 - When a component fills that opening, `IfcRelFillsElement` (`RelatingOpeningElement` = opening, `RelatedBuildingElement` = component) shall link it.
 - The opening's placement shall be relative to the host. The component's placement shall be relative to the opening (or to the host), so that moving the host in a third-party tool keeps the door in place.
-- The host's `Body` representation written to IFC shall be the **uncut** body. Other tools apply the opening, as IFC intends. Reviera's own display uses the cut body (computed by OCCT). For coordination exports, the option "Write cut host geometry" (default off) writes the cut body instead.
+- The host's `Body` representation written to IFC shall be the **uncut** body. Other tools apply the opening, as IFC intends. Riviera's own display uses the cut body (computed by OCCT). For coordination exports, the option "Write cut host geometry" (default off) writes the cut body instead.
 - **Voids that cut several hosts** (for example a shaft through floors) produce one `IfcOpeningElement` per host. RXD element data (`hosting`) on each opening records which source element made each opening.
 - **Non-cutting hosting** (a face-hosted light fixture on a ceiling, or a wall-hosted cabinet without a cut) shall be written as `IfcRelConnectsElements` (no connection geometry) between host and hosted element, so other tools can see the link. The host reference detail (stable reference string §2.8.3, face UV, offset) is in RXD element data (`hosting`).
 
@@ -511,14 +511,14 @@ This chapter is the backbone of the Reviera specification. It defines what a Rev
   - `Material` (`IfcMaterial`), `LayerThickness`, `IsVentilated` (for air layers);
   - `Name` = layer function (`Structure`, `Substrate`, `ThermalInsulation`, `Membrane`, `Finish1`, `Finish2`);
   - `Category` = `LoadBearing` / `Insulation` / `Finish`, following buildingSMART recommendations;
-  - `Priority` = join priority (0–100), mapped from Reviera's layer priority (ARC chapter).
+  - `Priority` = join priority (0–100), mapped from Riviera's layer priority (ARC chapter).
 - Each **instance** of a layered type shall have an `IfcMaterialLayerSetUsage` attached through `IfcRelAssociatesMaterial`. It records:
   - `LayerSetDirection` = `AXIS2` for walls and `AXIS3` for slabs, roofs and ceilings;
   - `DirectionSense` = `POSITIVE` or `NEGATIVE`, depending on flip state;
   - `OffsetFromReferenceLine` = the signed distance from the wall location line (or slab reference plane) to the first layer;
   - `ReferenceExtent` = the wall height, where it applies.
 - Layer data IFC cannot hold (core boundaries, wrapping at inserts and ends, "variable" layer flags, structural-material flag, stacked-wall and sweep/reveal definitions) is in RXD element data (`types`), keyed by type GlobalId (ARC chapter).
-- **Profiled types** (beams, columns, mullions, braces) shall use `IfcMaterialProfileSet` on the type and `IfcMaterialProfileSetUsage` on the instance. `CardinalPoint` maps from the Reviera justification.
+- **Profiled types** (beams, columns, mullions, braces) shall use `IfcMaterialProfileSet` on the type and `IfcMaterialProfileSetUsage` on the instance. `CardinalPoint` maps from the Riviera justification.
 - **Components with several materials** (doors, furniture) shall use `IfcMaterialConstituentSet` on the type. There is one constituent per material parameter (for example "Frame", "Panel", "Glass"), and its `Name` is the parameter name.
 - **Instance material overrides** (a material bound to an instance parameter) shall be written as a constituent set on the occurrence.
 - `<By Category>` materials take the subcategory or category material from Object Styles (§2.10.3), and that resolved material is the one written.
@@ -531,7 +531,7 @@ This chapter is the backbone of the Reviera specification. It defines what a Rev
 ### 2.3.9 Other relationships
 **ID:** DM-IFC-009 · **Priority:** P0 (joins, aggregation) / P1 (others) · **Ref:** research/05 §1.4, §2.2, §2.3
 
-| Reviera relationship | IFC | RXD |
+| Riviera relationship | IFC | RXD |
 |---|---|---|
 | Wall-to-wall joins | `IfcRelConnectsPathElements` (`ATSTART` / `ATEND` / `ATPATH`) | element data `joins`: join style (butt, miter, square-off), disallow-join flags |
 | Join Geometry / Cut Geometry | `IfcRelConnectsElements` | element data `joins`: join order, cutting element |
@@ -564,9 +564,9 @@ This chapter is the backbone of the Reviera specification. It defines what a Rev
   6. `Tessellation` (`IfcPolygonalFaceSet`, `IfcTriangulatedFaceSet`) for mesh imports and as a fallback.
 - **Axis** (`Curve2D`/`Curve3D`) shall be written for walls, beams, columns, members, ducts and pipes. **FootPrint** shall be written for slabs and spaces. **Box** (`IfcBoundingBox`) shall be written for every product.
 - **Plan-symbolic geometry** of types (door swings, plan-only symbols) shall be written in the `Plan` context `Annotation` sub-context as `IfcAnnotationFillArea`/`IfcPolyline`/`IfcIndexedPolyCurve` on the type's `RepresentationMaps`. This is building content that IFC can express, so it stays in IFC. The visibility rules that choose *which* symbolic geometry to show are in the family definition (RXD).
-- **Detail-level variants** (Coarse/Medium/Fine) are a Reviera concept. The **Fine** body is written to the `Body` sub-context. Coarse and Medium bodies, where they differ, are written as additional `IfcShapeRepresentation`s with `RepresentationIdentifier = 'Body'` in **additional sub-contexts** named `Body-Coarse` / `Body-Medium` (target view `MODEL_VIEW`). This keeps all geometry in IFC. Reviera reads them back by sub-context name.
+- **Detail-level variants** (Coarse/Medium/Fine) are a Riviera concept. The **Fine** body is written to the `Body` sub-context. Coarse and Medium bodies, where they differ, are written as additional `IfcShapeRepresentation`s with `RepresentationIdentifier = 'Body'` in **additional sub-contexts** named `Body-Coarse` / `Body-Medium` (target view `MODEL_VIEW`). This keeps all geometry in IFC. Riviera reads them back by sub-context name.
 - **Styling.** Surface styles come from materials (§2.10.5) through the material's `IfcMaterialDefinitionRepresentation`, or through `IfcStyledItem` on body items.
-- **Default styles** (owner request, 2026-10-31: viewers such as xeokit show unstyled geometry white on white). On save, every body item of a product or type that has no `IfcStyledItem` gets one. Its colour and transparency are the ones Reviera's own views give its class (`reviera_core::display_colors`): walls sand, slabs mid grey, roofs terracotta, doors wood, structure steel grey, spaces translucent green, pipes blue, ducts galvanised, sanitary ware white. A window's frame is solid and its glass translucent, and a door's glass and metal parts have their own colours. One shared `IfcSurfaceStyle` is written per colour, named `Reviera default: <class>`. It holds an `IfcSurfaceStyleRendering`, with `Transparency` below full opacity: IFC2X3 defines transparency only on a rendering, and web-ifc (xeokit's IFC conversion, which FileEngine's preview uses) reads it only there, so a plain shading's windows came out opaque (2026-11-02). A file's first save in a session styles its unstyled items even with no edit, so a model saved before default styles gets them when it is opened and saved. Reviera's own older shadings become renderings, and its own styles take the table's current colours; colours are chosen to stay distinct under a web viewer's lighting (EXPERT_REVIEW E-82). The styled items are named `Reviera default`, so a later save recognises its own and removes them when their item is gone. Styles written by other tools or from materials are never changed, and openings get none.
+- **Default styles** (owner request, 2026-10-31: viewers such as xeokit show unstyled geometry white on white). On save, every body item of a product or type that has no `IfcStyledItem` gets one. Its colour and transparency are the ones Riviera's own views give its class (`riviera_core::display_colors`): walls sand, slabs mid grey, roofs terracotta, doors wood, structure steel grey, spaces translucent green, pipes blue, ducts galvanised, sanitary ware white. A window's frame is solid and its glass translucent, and a door's glass and metal parts have their own colours. One shared `IfcSurfaceStyle` is written per colour, named `Riviera default: <class>`. It holds an `IfcSurfaceStyleRendering`, with `Transparency` below full opacity: IFC2X3 defines transparency only on a rendering, and web-ifc (xeokit's IFC conversion, which FileEngine's preview uses) reads it only there, so a plain shading's windows came out opaque (2026-11-02). A file's first save in a session styles its unstyled items even with no edit, so a model saved before default styles gets them when it is opened and saved. Riviera's own older shadings become renderings, and its own styles take the table's current colours; colours are chosen to stay distinct under a web viewer's lighting (EXPERT_REVIEW E-82). The styled items are named `Riviera default`, so a later save recognises its own and removes them when their item is gone. Styles written by other tools or from materials are never changed, and openings get none.
 - **Precision.** `IfcGeometricRepresentationContext.Precision` = 1e-5 m. OCCT tolerances are set from it (§2.6.5).
 
 **Acceptance criteria.**
@@ -581,16 +581,16 @@ This chapter is the backbone of the Reviera specification. It defines what a Rev
 **Behaviour & rules.**
 - **Phases** and **phase filters** are RXD-only: RXD document `project/phases` holds the ordered phases, the phase filters and the project's current phase. Each element's created/demolished phase is element data `phasing`.
 - The IFC **Status** property of each element's `Pset_*Common` shall be *derived* on save from the element's phases *relative to the current phase*: `NEW` (created in it), `EXISTING` (created earlier, not demolished), `DEMOLISH` (demolished in it), `TEMPORARY` (created and demolished in it). On reading a file with no RXD, phases are inferred from Status: `EXISTING` → phase "Existing", everything else → phase "New Construction".
-- **Design option sets and options** are RXD-only (RXD document `project/design_options`; each element's membership is element data `membership`). On save, the IFC file contains elements of the main model and of **every** option. Non-primary option elements are listed in RXD so Reviera can hide them. On *export* to an exchange MVD (§2.11.4), only the main model and primary options are written, unless the user chooses otherwise.
+- **Design option sets and options** are RXD-only (RXD document `project/design_options`; each element's membership is element data `membership`). On save, the IFC file contains elements of the main model and of **every** option. Non-primary option elements are listed in RXD so Riviera can hide them. On *export* to an exchange MVD (§2.11.4), only the main model and primary options are written, unless the user chooses otherwise.
 - **Worksets and ownership** are RXD-only (RXD document `project/worksets`, element data `membership`; COL chapter).
 
 **Acceptance criteria.**
 - [ ] With the current phase set to "New Construction", a wall created in "Existing" and demolished in "New Construction" exports `Status = DEMOLISH`.
-- [ ] Opening the `.ifc` alone in a third-party viewer shows elements of secondary design options. Opening it in Reviera hides them in views set to show the primary option.
+- [ ] Opening the `.ifc` alone in a third-party viewer shows elements of secondary design options. Opening it in Riviera hides them in views set to show the primary option.
 
 ---
 
-## 2.4 Storage split: standard IFC and Reviera Extension Data (RXD)
+## 2.4 Storage split: standard IFC and Riviera Extension Data (RXD)
 
 ### 2.4.1 Principles
 **ID:** DM-RXD-001 · **Priority:** P0 · **Ref:** research/05 §2.3, §13.1 (extensible storage), §16.9; TECH_STACK §3.1, §3.7; spec/02a_extension_data_format.md
@@ -598,7 +598,7 @@ This chapter is the backbone of the Reviera specification. It defines what a Rev
 **Purpose.** IFC cannot hold parametric intent: constraints, sketches, family formulas, view and sheet definitions, or the meaning of annotation. RXD stores that intent with the model.
 
 **Behaviour & rules.**
-- Physical carriage (property-set names, JSON or compressed chunks, sizes, schema versions, validation, the alternative `.reviera` sidecar carrier) is defined in `spec/02a_extension_data_format.md`. This chapter does not redefine it.
+- Physical carriage (property-set names, JSON or compressed chunks, sizes, schema versions, validation, the alternative `.riviera` sidecar carrier) is defined in `spec/02a_extension_data_format.md`. This chapter does not redefine it.
 - **Scope rule.** Data about one IFC element, which is meaningless without that element, is **RXD element data** on that element. Everything else is a record in a project-scoped **RXD document**. Examples:
   - a floor's sketch, a wall's attach constraints, a door's flip flags, an element's phase and design-option membership → RXD element data;
   - a view, a sheet, a dimension, a phase definition, an object style, a family recipe → RXD document records.
@@ -606,11 +606,11 @@ This chapter is the backbone of the Reviera specification. It defines what a Rev
 - **References to sub-element geometry** (a face of a wall, the "Left" reference of a door) use **stable reference strings** (§2.8.3).
 - **Ownership.** Each RXD document record has exactly one owner: an IFC element GUID, or an RXD-only element GUID. When the owner is deleted, its records are deleted in the same transaction. Element data is deleted with its element automatically. This keeps BIMserver merges by GlobalId correct (COL chapter).
 - **Orphans.** On open, RXD records whose owner GUID is missing from the IFC (for example, because another tool deleted the element) shall be listed in an **Extension Data Reconciliation** report. The user can drop them (default) or keep them, inactive, for a later merge.
-- **Edits outside Reviera.** For each IFC-backed element with intent, RXD element data keeps a BLAKE3 hash of its IFC placement and body (`identity.geometry_hash`). If another tool changed the IFC so that the hash no longer matches, Reviera shall flag the element as "edited outside Reviera" and offer to **keep the IFC** (dropping conflicting intent, for example a sketch) or to **reapply intent** (regenerating from RXD and overwriting the outside edit).
+- **Edits outside Riviera.** For each IFC-backed element with intent, RXD element data keeps a BLAKE3 hash of its IFC placement and body (`identity.geometry_hash`). If another tool changed the IFC so that the hash no longer matches, Riviera shall flag the element as "edited outside Riviera" and offer to **keep the IFC** (dropping conflicting intent, for example a sketch) or to **reapply intent** (regenerating from RXD and overwriting the outside edit).
 - **Forward compatibility.** Unknown documents and unknown keys are kept and written back unchanged (`02a`).
 
 **Acceptance criteria.**
-- [ ] Deleting a floor in a third-party tool and reopening in Reviera removes its element data with it. Constraints in RXD documents that referenced it are listed as orphans, and dropping them leaves no dangling references.
+- [ ] Deleting a floor in a third-party tool and reopening in Riviera removes its element data with it. Constraints in RXD documents that referenced it are listed as orphans, and dropping them leaves no dangling references.
 - [ ] A floor whose extrusion depth was changed in another IFC editor is flagged on open, and both resolutions work.
 
 ### 2.4.2 What goes where
@@ -658,17 +658,17 @@ This chapter is the backbone of the Reviera specification. It defines what a Rev
 **ID:** DM-RXD-003 · **Priority:** P0 · **Ref:** spec/02a_extension_data_format.md; TECH_STACK §3.7
 
 **Behaviour & rules.**
-- On every open, Reviera shall run the integrity checks that `02a` defines. Their outcomes are shown to the user like this:
+- On every open, Riviera shall run the integrity checks that `02a` defines. Their outcomes are shown to the user like this:
   - **RXD present and consistent:** open normally.
-  - **No RXD found** (a third-party file, or a file whose `Reviera_*` property sets were stripped): open as an IFC-only model (§2.11.1) and tell the user. If an external `.reviera` sidecar for this file is found beside it, offer to attach it.
+  - **No RXD found** (a third-party file, or a file whose `Riviera_*` property sets were stripped): open as an IFC-only model (§2.11.1) and tell the user. If an external `.riviera` sidecar for this file is found beside it, offer to attach it.
   - **RXD belongs to another project** (identity mismatch as defined in `02a`): refuse to bind it. Offer to open IFC-only, or to choose another sidecar.
-  - **RXD stale or partial** (for example, IFC edited by another tool after the last Reviera save): open with the RXD, then run reconciliation (§2.4.1) and show which elements and documents are affected.
+  - **RXD stale or partial** (for example, IFC edited by another tool after the last Riviera save): open with the RXD, then run reconciliation (§2.4.1) and show which elements and documents are affected.
 - The reconciliation report lists orphans, hash mismatches and documents that failed schema validation. Each item has a resolution, and every resolution can be undone.
 
 **Commands.** `rxd.status() -> {present, carrier, schema_version, orphans, mismatches, invalid_documents}` · `rxd.reconcile(mode: report|apply, drop_orphans?=true) -> report` · `rxd.attach_sidecar(path)` · `rxd.export_sidecar(path)`
 
 **Acceptance criteria.**
-- [ ] A project saved by Reviera, then re-saved by a tool that strips unknown property sets, opens as IFC-only. Attaching the sidecar exported before the strip restores views and annotation.
+- [ ] A project saved by Riviera, then re-saved by a tool that strips unknown property sets, opens as IFC-only. Attaching the sidecar exported before the strip restores views and annotation.
 - [ ] Pairing a project's IFC with another project's sidecar is refused.
 
 ### 2.4.4 Constraints
@@ -724,7 +724,7 @@ This chapter is the backbone of the Reviera specification. It defines what a Rev
   - New GUIDs shall be random UUID v4, or UUID v7 when the setting "time-ordered GUIDs" is on (this improves locality in BIMserver).
   - A GUID is never reused, and never changes over the life of the element. That includes save, reopen, schema upgrade, type swap, move between levels, conversion between storey and non-storey level, and BIMserver sync.
   - Copy, paste, duplicate, mirror-copy and array create new GUIDs. The source GUID is kept in element data `identity` (`source_guid`).
-- **Non-rooted IFC resources** (materials, profiles, styles, grid axes) have no GlobalId in IFC. Reviera gives them an RXD GUID, mapped in RXD document `project/identity` to a resource key (for example `material:<Name>` or `<IfcGrid GlobalId>/<AxisTag>`). Renaming a material updates the key, not the GUID.
+- **Non-rooted IFC resources** (materials, profiles, styles, grid axes) have no GlobalId in IFC. Riviera gives them an RXD GUID, mapped in RXD document `project/identity` to a resource key (for example `material:<Name>` or `<IfcGrid GlobalId>/<AxisTag>`). Renaming a material updates the key, not the GUID.
 - **Internal ID** (`ElementId`) is an unsigned 64-bit integer, unique within one model and never reused within it:
   - It is persisted in element data `identity` (for IFC-backed elements) or in the element's record (for RXD-only elements). The next free value is in RXD document `project/identity`.
   - On opening a file with no RXD (a third-party file), IDs are assigned in ascending order of STEP instance number. This makes them deterministic for that file.
@@ -891,12 +891,12 @@ This chapter is the backbone of the Reviera specification. It defines what a Rev
 4. **No global state changes during regeneration.** Global OCCT settings (for example `BRepAlgo` fuzzy values via static setters, `Standard::` allocator settings, message gravity) are set once at start-up and never changed while workers run.
 5. **Memory manager.** OCCT shall be configured to use the system allocator in its thread-safe mode (`MMGT_OPT=0` or the build's equivalent; verify for the chosen OCCT version), set before the first OCCT call.
 6. **Handles across threads.** `Handle(Standard_Transient)` reference counts are atomic in current OCCT releases, so passing handles of immutable objects between threads is allowed. This shall be confirmed by a stress test for the OCCT version that is pinned.
-7. **Internal parallelism.** Boolean and meshing algorithms support `SetRunParallel(true)`. Reviera shall enable it only when the current regeneration level has fewer tasks than the number of worker threads, to avoid oversubscription. OCCT's thread pool (`OSD_ThreadPool`) shall be sized to the rayon pool size.
+7. **Internal parallelism.** Boolean and meshing algorithms support `SetRunParallel(true)`. Riviera shall enable it only when the current regeneration level has fewer tasks than the number of worker threads, to avoid oversubscription. OCCT's thread pool (`OSD_ThreadPool`) shall be sized to the rayon pool size.
 8. **Tolerances.** Fuzzy values and tolerances come from the project precision (1e-5 m, §2.3.10). Boolean failures are retried once with a fuzzy value 10× larger. If that also fails, the element gets a warning, and the uncut shape is shown.
 9. **Isolation of crashes.** OCCT exceptions (`Standard_Failure`) are caught at the FFI boundary and become element warnings. A failure in one task never aborts other tasks.
 
 **Acceptance criteria.**
-- [ ] A ThreadSanitizer/stress test runs 1,000 random boolean regenerations on 16 threads with no data races reported in Reviera code or in the FFI layer.
+- [ ] A ThreadSanitizer/stress test runs 1,000 random boolean regenerations on 16 threads with no data races reported in Riviera code or in the FFI layer.
 - [ ] A deliberately failing boolean (coincident faces) produces one element warning, and the other 999 elements regenerate normally.
 
 ---
@@ -953,8 +953,8 @@ This chapter is the backbone of the Reviera specification. It defines what a Rev
 **ID:** DM-TXN-003 · **Priority:** P1 · **Ref:** research/05 §11.1 (journals, backups)
 
 **Behaviour & rules.**
-- Reviera shall write a **session journal**: an append-only log of every executed command with its parameters, its origin and its result. It is in JSON Lines (`journal-<date>-<pid>.jsonl` in the user's state directory). It is used for diagnostics and crash recovery. MCP tool calls are logged with the client name.
-- **Crash recovery.** Reviera writes an **autosave** of the model every N minutes (default 10) to a recovery file, in the background, from a committed snapshot. On the next start after a crash, it offers to restore the autosave and replay the journal entries since the autosave.
+- Riviera shall write a **session journal**: an append-only log of every executed command with its parameters, its origin and its result. It is in JSON Lines (`journal-<date>-<pid>.jsonl` in the user's state directory). It is used for diagnostics and crash recovery. MCP tool calls are logged with the client name.
+- **Crash recovery.** Riviera writes an **autosave** of the model every N minutes (default 10) to a recovery file, in the background, from a committed snapshot. On the next start after a crash, it offers to restore the autosave and replay the journal entries since the autosave.
 - Journal replay can also be used as a **macro recording** source (§2.13.8).
 - Journals never contain credentials or MCP authentication tokens.
 
@@ -1004,9 +1004,9 @@ This chapter is the backbone of the Reviera specification. It defines what a Rev
 
 ---
 
-## 2.8 The Reviera Family Editor
+## 2.8 The Riviera Family Editor
 
-The **Reviera Family Editor** is a document mode for creating and editing loadable families. It opens a *family document*. That is an in-memory model of the same kind as a project, with its own transactions and undo, but holding one family definition instead of a building. In-place families use the same tools inside a project (§2.2.3).
+The **Riviera Family Editor** is a document mode for creating and editing loadable families. It opens a *family document*. That is an in-memory model of the same kind as a project, with its own transactions and undo, but holding one family definition instead of a building. In-place families use the same tools inside a project (§2.2.3).
 
 ### 2.8.0 Family Editor environment
 **ID:** DM-FED-000 · **Priority:** P1 · **Ref:** research/05 §4 (intro), §4.9; screenshots/platform/family_types_dialog_parameter_groups.png, screenshots/platform/family_types_cabinet_variations_2026.png
@@ -1062,7 +1062,7 @@ The **Reviera Family Editor** is a document mode for creating and editing loadab
   - **placement mode**: `level`, `work_plane`, `face`, `wall_hosted`, `floor_hosted`, `ceiling_hosted`, `roof_hosted`, `line`, `two_level`, `adaptive`, `pattern_panel`, `view_specific`, `profile`, `title_block`, `annotation`, `mass`. This **cannot** be changed after creation, except that `level` families may be switched to `work_plane` with the *Work Plane-Based* flag (§2.8.2);
   - **dimensionality**: 3D, 2D detail, 2D annotation, 2D profile, title block, conceptual (CME, §2.8.13);
   - **default references and parameters**: for example Left/Right/Front/Back/Centre planes and Width/Depth labels; or, for door templates, a host wall with a default opening and Width/Height parameters.
-- Reviera shall ship its own templates. They shall be authored from scratch (not copied from the reference product's content) and cover these groups:
+- Riviera shall ship its own templates. They shall be authored from scratch (not copied from the reference product's content) and cover these groups:
 
 | Group | Templates (metric and imperial variants) |
 |---|---|
@@ -1244,7 +1244,7 @@ occurrence   = digit , { digit } ;   (* nth occurrence, for repeated features *)
 - **Lock** (padlock) makes a dimension's value fixed, or locks an alignment created by *Align* or by sketching onto a reference.
 - **Reporting parameters.** A labelled dimension can be marked *reporting*. It then **reads** the geometry instead of driving it, and its value can be used in formulas. A reporting parameter that reads host geometry (for example host wall thickness in a wall-hosted family) is always an instance parameter. Reporting parameters cannot be given formulas.
 - **Flexing.** In the Family Types dialog (§2.8.6), **Apply** regenerates the family with the current values. Solver errors are reported as in §2.6.3, naming the conflicting constraints. A **Flex Test** command runs every type, plus optional random values in declared ranges, and reports failures.
-- **Parameter ranges.** Numeric parameters may declare `min`/`max` (a Reviera addition). Values outside the range are refused in Properties and in commands, with an error. Flex Test uses the ranges.
+- **Parameter ranges.** Numeric parameters may declare `min`/`max` (a Riviera addition). Values outside the range are refused in Properties and in commands, with an error. Flex Test uses the ranges.
 
 **Commands.**
 `family_doc.dimension.create(refs[], kind, view_id, position) -> element_id` ·
@@ -1391,7 +1391,7 @@ name         = name_start , { name_char } ;                      (* longest matc
 | `count_true` | `count_true(b1, b2, …)` | Integer count of true values |
 
 **(d) Scope and evaluation.**
-- **Family formulas** may reference parameters of the same family, and **global parameters** with `@Name`. Global references are resolved in the project the family is loaded into. In the family document, and in projects without that global, the *default value declared in the family* is used. That default is part of the parameter's "global input" declaration. This is a Reviera extension (P2).
+- **Family formulas** may reference parameters of the same family, and **global parameters** with `@Name`. Global references are resolved in the project the family is loaded into. In the family document, and in projects without that global, the *default value declared in the family* is used. That default is part of the parameter's "global input" declaration. This is a Riviera extension (P2).
 - **Type parameter formulas** may reference only type parameters (and globals). **Instance parameter formulas** may reference type and instance parameters.
 - **Global parameter formulas** may reference other global parameters (P1) and the project information parameters (P2).
 - Formulas are compiled once into a typed expression tree with constant folding. They are evaluated in Rust, not in Lua, for speed and determinism. Evaluation order follows the dependency graph (§2.6.2). Cycles are rejected.
@@ -1427,7 +1427,7 @@ Elbow Radius        = lookup_interp(ElbowRadii, "Radius", 1.5 * Diameter, Diamet
 
 **Behaviour & rules.**
 - Tables are **embedded** in the family. Files are only used for import and export.
-- **Reviera table format** (CSV, RFC 4180, UTF-8, `,` separator, `.` decimal mark):
+- **Riviera table format** (CSV, RFC 4180, UTF-8, `,` separator, `.` decimal mark):
   - The first header cell is the row label (it is not used for lookup).
   - Every other header cell is `ColumnName[spec]` or `ColumnName[spec:unit]`, where `spec` is a data-type key from §2.9.4 (`length`, `area`, `angle`, `number`, `integer`, `text`, `yes_no`, …) and `unit` is a unit key from §2.9.5 (default: SI).
   - Each data row has a label, then one value per column, in the declared unit. Empty cells are null.
@@ -1475,7 +1475,7 @@ DN25,25,37.5,22,Copper
   - Columns are matched to family parameters by name, then by shared GUID when the header carries one (§2.8.8). Unknown columns, values that fail unit parsing, and values outside a parameter's `min`/`max` are reported per row and cell; the row is still imported with those cells left at the family default.
   - Formula-driven and reporting parameters cannot be set from a catalogue; such columns are reported and ignored.
   - The whole import is one transaction ("Import Family Types"); its report lists created, overwritten, skipped and failed rows.
-  - Both the Reviera `.types.csv` grammar and the reference product's catalogue header grammar (`Name##LENGTH##MILLIMETERS` style) are accepted on import, so existing catalogues can be reused.
+  - Both the Riviera `.types.csv` grammar and the reference product's catalogue header grammar (`Name##LENGTH##MILLIMETERS` style) are accepted on import, so existing catalogues can be reused.
 
 **Commands.**
 `family.list_types(path) -> [{type_name, values}]` (reads a package or catalog without loading it) ·
@@ -1487,7 +1487,7 @@ DN25,25,37.5,22,Copper
 - [ ] A package with 400 types loads in under 2 s when 3 types are selected, and the project then contains only those 3 types.
 - [ ] A type catalog with a column that is not a parameter of the family reports that column and ignores it.
 - [ ] Importing a 10-row catalogue into a loaded "HEA" family whose project already has 2 of those types creates 8 types, skips 2 (by default), and one undo removes all 8.
-- [ ] A catalogue written with the reference product's `##`-typed header imports into a Reviera family with the same values (within unit-conversion tolerance).
+- [ ] A catalogue written with the reference product's `##`-typed header imports into a Riviera family with the same values (within unit-conversion tolerance).
 
 ### 2.8.10 Nested and shared nested families
 **ID:** DM-NEST-001 · **Priority:** P1 · **Ref:** research/05 §4.10
@@ -1618,7 +1618,7 @@ DN25,25,37.5,22,Copper
 ### 2.8.14 Family package file format
 **ID:** DM-FFMT-001 · **Priority:** P0 (reading packages for placement) / P1 (writing from the Family Editor) · **Ref:** research/05 §4.9, §11.1, §16.9; TECH_STACK §3.1; spec/02a_extension_data_format.md
 
-**Purpose.** Families are stored as **IFC type libraries**, so that any IFC tool can use a family's types and geometry, while Reviera keeps the full parametric definition as RXD.
+**Purpose.** Families are stored as **IFC type libraries**, so that any IFC tool can use a family's types and geometry, while Riviera keeps the full parametric definition as RXD.
 
 **Behaviour & rules.**
 - A **family package** is a valid IFC4 file (IFC4X3 optional, matching the target project schema). Recommended names: `<Family>.family.ifc` for one family, `<Library>.library.ifc` for a collection, `<Name>.familytemplate.ifc` for templates. `.ifczip` is allowed.
@@ -1635,7 +1635,7 @@ DN25,25,37.5,22,Copper
   5. for annotation, title block, detail and profile families, which have no IFC type class: no IFC types. Their whole definition is RXD.
 - **RXD content** (carried as `02a` defines; logical content only here):
   - an RXD document `families/<id>/package` (the package manifest):
-    - package format version and minimum Reviera version;
+    - package format version and minimum Riviera version;
     - the primary family GUID and the list of contained families;
     - the template flag and the source template GUID;
     - a preview image (RXD asset, PNG, 512 × 512);
@@ -1645,7 +1645,7 @@ DN25,25,37.5,22,Copper
 
 ```json
 {
-  "schema": "reviera.family", "schema_version": "1.0.0",
+  "schema": "riviera.family", "schema_version": "1.0.0",
   "guid": "3vB2…", "name": "Single-Flush Door", "category": "cat.doors",
   "template": "door", "placement_mode": "wall_hosted",
   "flags": { "shared": false, "room_calculation_point": true, "ifc_predefined_type": "DOOR" },
@@ -1668,12 +1668,12 @@ DN25,25,37.5,22,Copper
 - **Consistency rule.** On save, the IFC types and their geometry shall be regenerated from the RXD definition, so the two always agree. On load, if the RXD is missing (for example, the package was re-saved by a tool that strips unknown property sets), the family loads as a **static family**. Its types and geometry are usable, but parametric editing is unavailable, and the user is told why.
 - **Third-party type libraries.** Any IFC file whose `IfcProject` declares an `IfcProjectLibrary` with types (or declares types directly) can be loaded as static families, one family per library, or per type class when there is no library.
 - **Embedding.** Inside a project, an embedded family is exactly the same content: an `IfcProjectLibrary` + types in the project's IFC, plus the `families/<guid>` RXD document. *Save Family As* writes a package from it unchanged.
-- **Versioning.** Each family has a `family_version` (semver) that increases on every save from the Family Editor. On load, Reviera compares family GUID and version (§2.2.3).
+- **Versioning.** Each family has a `family_version` (semver) that increases on every save from the Family Editor. On load, Riviera compares family GUID and version (§2.2.3).
 
 **Commands.** `family.package.inspect(path) -> {families[], types[], has_rxd, version, licence}` · plus `family.load`, `family.save_as` (§2.2.3) and `family_doc.save` (§2.8.0).
 
 **Acceptance criteria.**
-- [ ] A family package saved by Reviera passes IFC4 schema validation. It opens in at least two other open-source IFC tools (for example IfcOpenShell-based Bonsai, and one web viewer), which show its types with correct geometry and property values.
+- [ ] A family package saved by Riviera passes IFC4 schema validation. It opens in at least two other open-source IFC tools (for example IfcOpenShell-based Bonsai, and one web viewer), which show its types with correct geometry and property values.
 - [ ] Re-saving a package through a tool that strips unknown property sets, then loading it, gives a static family with all types, and the user is told that parametric editing is unavailable.
 - [ ] *Save Family As* from a project, followed by loading into a new project, gives types and instances that match the original exactly (the same geometry hashes).
 
@@ -1689,16 +1689,16 @@ DN25,25,37.5,22,Copper
 4. Choose **Load** (opens Specify Types when the family has many types, §2.8.9), **Load and Place** (loads, then starts placement with the chosen type), or **Open** (opens the package in the Family Editor; not available for read-only sources unless saved as a copy).
 
 **UI.**
-- **Sources tree**: *Reviera Library* (shipped content), *My Libraries* (user folders), *Organisation* (configured remote libraries and network folders), *Favourites*, *Recently loaded*. Each source shows its state (indexed, indexing n %, offline, error).
+- **Sources tree**: *Riviera Library* (shipped content), *My Libraries* (user folders), *Organisation* (configured remote libraries and network folders), *Favourites*, *Recently loaded*. Each source shows its state (indexed, indexing n %, offline, error).
 - **Search box** with free text over name, type names, category, keywords and description; **filters** for category, placement mode (§2.8.1), IFC class, discipline, licence, author or publisher, and "has types matching" (for example `Width >= 900 mm`, using the collector's operators, §2.13.3).
 - **Results** as a thumbnail grid or a list (Name, Category, Types, Source, Version, Licence, Modified), sortable, with the count of matches.
-- **Preview pane**: an interactive 3D preview (orbit, zoom; plan and front views for 2D families) rendered locally from the package geometry; the type list with each type's values for up to 8 key parameters chosen by the family's author (default: the dimension group); the licence (SPDX), author, version and description from the package manifest (§2.8.14); and warnings (for example "Static family: no parametric data", "Requires Reviera 1.3").
+- **Preview pane**: an interactive 3D preview (orbit, zoom; plan and front views for 2D families) rendered locally from the package geometry; the type list with each type's values for up to 8 key parameters chosen by the family's author (default: the dimension group); the licence (SPDX), author, version and description from the package manifest (§2.8.14); and warnings (for example "Static family: no parametric data", "Requires Riviera 1.3").
 - Context menu: Add to / Remove from Favourites, Show in folder, Copy path or URL, Properties.
 
 **Behaviour & rules.**
-- **Indexing.** Each source is indexed in the background into a per-user cache (`<cache_dir>/reviera/library-index.sqlite`). The index stores, per family: package path or URL, content hash, family GUID and version, name, category, placement mode, type names and key values, keywords, licence and the 512 × 512 preview image from the manifest. Re-indexing is incremental by modification time and hash. A 10,000-family folder indexes once and is searchable within 200 ms per query afterwards.
+- **Indexing.** Each source is indexed in the background into a per-user cache (`<cache_dir>/riviera/library-index.sqlite`). The index stores, per family: package path or URL, content hash, family GUID and version, name, category, placement mode, type names and key values, keywords, licence and the 512 × 512 preview image from the manifest. Re-indexing is incremental by modification time and hash. A 10,000-family folder indexes once and is searchable within 200 ms per query afterwards.
 - **Library files.** A `<Library>.library.ifc` holding several families shows one result per family. Third-party IFC type libraries are indexed as static families (§2.8.14) and marked so.
-- **Organisation libraries (P2).** A remote library is a static JSON index (`reviera.library-index`, version 1) at an HTTPS URL or in a git repository: one entry per package with URL, SHA-256, family GUID, version, licence and preview URL. Packages are downloaded on demand into the cache and verified against the checksum; a mismatch is refused. Sources can be pre-configured by an administrator policy file, and those cannot be removed by the user. No vendor service is needed.
+- **Organisation libraries (P2).** A remote library is a static JSON index (`riviera.library-index`, version 1) at an HTTPS URL or in a git repository: one entry per package with URL, SHA-256, family GUID, version, licence and preview URL. Packages are downloaded on demand into the cache and verified against the checksum; a mismatch is refused. Sources can be pre-configured by an administrator policy file, and those cannot be removed by the user. No vendor service is needed.
 - **Duplicates.** When the same family GUID appears in several sources, results group them and show the highest version first; the user can pick another version.
 - **Loading** uses `family.load` (§2.2.3) with its reload rules: if the family is already in the project, the comparison of GUID and version is shown before loading.
 - **Licence display.** Packages without a licence are shown with "Licence not stated". A package whose licence forbids redistribution is still loadable for private use, but a notice is shown once per package.
@@ -1720,7 +1720,7 @@ DN25,25,37.5,22,Copper
 - [ ] *Load and Place* on a door with 30 types opens Specify Types, then starts door placement with the chosen type.
 
 ### 2.8.16 Stamps: placing components again and again (Place Component)
-**ID:** DM-LIB-002 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); DM-LIB-001, DM-IMP-015, ARC-COMP-001; Reviera's own design
+**ID:** DM-LIB-002 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); DM-LIB-001, DM-IMP-015, ARC-COMP-001; Riviera's own design
 
 **Purpose.** Make custom geometry quick to reuse. Any custom object (DM-IMP-015), family type or saved group in a library can be picked up as a **stamp**, and every click in a view inserts another copy. *(Owner requirement, 2026-10-14: "a library system so that custom objects can be used as a stamp to easily insert a duplicate of the object".)*
 
@@ -1797,7 +1797,7 @@ The Place Component tool is the UI over `component.place`.
 - **Not built yet:** pinned and recent stamps, Alt+click to pick a stamp from the model, Shift+Spacebar mirroring (Properties has Mirrored), rows and scatter, drag from the palette, and stamping fragments.
 
 ### 2.8.17 Model fragments in the library
-**ID:** DM-LIB-003 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); DM-LIB-001, DM-LIB-002, ARC-GRP-001 (Save Group, Load as Group); Reviera's own design
+**ID:** DM-LIB-003 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); DM-LIB-001, DM-LIB-002, ARC-GRP-001 (Save Group, Load as Group); Riviera's own design
 
 **Purpose.** Let a library hold whole pieces of buildings, not only single objects: a bathroom with its walls, door, fixtures and room; a stair core; a kitchen run; a balcony with its railing; a façade bay; or part of a consultant's or manufacturer's IFC model. Like a family in the reference product, a library item is a named, reusable definition that can have several variants. Unlike a family, it may be a full IFC **model fragment** of many related elements. *(Owner requirement, 2026-10-14: "may include full IFC model fragments. A selection of objects in a model could be added to the library.")*
 
@@ -1828,7 +1828,7 @@ The Place Component tool is the UI over `component.place`.
 - **IFC files as fragments.** An IFC file copied into a library folder is a fragment at once (see Data). **Import to Library** (Manage › Library) writes a part of an external IFC file into a library folder as a new IFC file:
   - the part is chosen by storey, by IFC class, by system, or by picking in a preview;
   - elements keep their IFC classes, property sets, materials and geometry;
-  - elements Reviera recognises become Reviera elements (DM-IMP-001 Recognise); the rest stay IFC-native (§2.11.1).
+  - elements Riviera recognises become Riviera elements (DM-IMP-001 Recognise); the rest stay IFC-native (§2.11.1).
 - **Stamping a fragment** (DM-LIB-002) creates the elements again at the clicked point, in one of two modes, chosen per stamp:
   - **As a group** (default): a group instance (ARC-GRP-001). Editing the group changes every stamped copy; Ungroup makes one independent.
   - **As elements**: independent elements with no group.
@@ -1843,12 +1843,12 @@ The Place Component tool is the UI over `component.place`.
 
 **Data (storage).**
 - A fragment is an IFC file in a library folder.
-  - **Written by Reviera** (Create Component, Import to Library): a standalone IFC4 model of the fragment, with:
+  - **Written by Riviera** (Create Component, Import to Library): a standalone IFC4 model of the fragment, with:
     - a project, site and building;
     - one storey per relative level;
     - the elements with their types, materials, property sets, openings, hosting and other relationships.
 
-    Its RXD carries the group template, the relative levels, the base point and the list of dropped outside references. For Import to Library, it also carries the source file's name and SHA-256. The RXD is optional to the file's meaning: with it stripped, Reviera still uses the file as an IFC fragment, as below.
+    Its RXD carries the group template, the relative levels, the base point and the list of dropped outside references. For Import to Library, it also carries the source file's name and SHA-256. The RXD is optional to the file's meaning: with it stripped, Riviera still uses the file as an IFC fragment, as below.
   - **Any other IFC file** placed in a library folder is a fragment as it is. Stamping it brings its elements in as an IFC merge does (DM-IMP-001):
     - its storeys become relative levels by elevation;
     - its base point is the bottom-centre, unless its manifest entry names one;
@@ -1875,7 +1875,7 @@ The Place Component tool is the UI over `component.place`.
 - [ ] A door saved alone as a fragment, without its wall, is stamped into a wall and cuts it.
 - [ ] Tab-selecting two chairs inside a placed dining-set component and choosing Create Component writes a new IFC file holding only those two chairs.
 - [ ] Edit Component on a placed bathroom opens its IFC file in a tab. Adding a towel rail and saving updates every placed bathroom in the open project.
-- [ ] A component file written by Reviera, with its RXD removed by another tool, still opens as a model in other IFC viewers and still stamps in Reviera.
+- [ ] A component file written by Riviera, with its RXD removed by another tool, still opens as a model in other IFC viewers and still stamps in Riviera.
 
 **Implementation note (2026-10-14, first build).**
 - **Create Component** (`component.create`, quick menu, Modify tab, Modify | Components) collects:
@@ -1883,7 +1883,7 @@ The Place Component tool is the UI over `component.place`.
   - what it hosts: elements naming a member, repeatedly;
   - everything they name: hosts, types, levels and other referenced elements, all brought in rather than dropped.
 
-  It writes them as a standalone IFC4 model through Reviera's own writer, with the base point (the selection's bottom centre) at the origin and the lowest level at 0. The file goes into the library folder shown, with a manifest entry, or to a chosen file. The model is unchanged; *Replace selection with the component* is not built yet.
+  It writes them as a standalone IFC4 model through Riviera's own writer, with the base point (the selection's bottom centre) at the origin and the lowest level at 0. The file goes into the library folder shown, with a manifest entry, or to a chosen file. The model is unchanged; *Replace selection with the component* is not built yet.
 - **Placing** (`component.place_fragment`; the panel's IFC thumbnails, rendered from the fragment's bodies):
   - elements are copied with new GlobalIds, every GlobalId inside their recipes rewritten;
   - levels are mapped by height above the lowest, and made when missing;
@@ -1898,14 +1898,14 @@ The Place Component tool is the UI over `component.place`.
   - the outside-references dialog and the type-conflict question.
 
 ### 2.8.18 Library folders and large libraries
-**ID:** DM-LIB-004 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); DM-LIB-001 … 003; Reviera's own design
+**ID:** DM-LIB-004 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); DM-LIB-001 … 003; Riviera's own design
 
 **Purpose.** Keep thousands of imported objects and model fragments in order. A library is a tree of nested folders of any depth. It can be browsed, searched, reorganised and shared like a well-kept file system. *(Owner requirement, 2026-10-14: "the library needs to support nested hierarchies to manage large sets of imported and model fragments".)*
 
 **Behaviour & rules.**
 - **A library is a folder that is opened.** *(Owner clarification, 2026-10-14.)*
   - **Library › Open Library** (`library.open`) opens any folder on a local disk, a network share or WebDAV as a library, the way a project file is opened.
-  - Its root holds one JSON manifest, `reviera-library.json`; nothing else in the folder is Reviera's own.
+  - Its root holds one JSON manifest, `riviera-library.json`; nothing else in the folder is Riviera's own.
   - Opening a folder that has no manifest offers to create one, or to browse it read-only with defaults.
   - Open libraries are the sources of the Library panel (DM-LIB-001), are remembered per user, and reopen at start-up.
   - **Library › New Library** creates a folder with an empty manifest.
@@ -1918,10 +1918,10 @@ The Place Component tool is the UI over `component.place`.
   - Its items are ordinary 3D files, read where they are:
     - OBJ, with its MTL and texture files beside it;
     - STL, PLY, glTF/GLB, 3MF and OFF;
-    - IFC files, whether whole models or fragments, written by Reviera or any other tool.
-  - Reviera converts nothing and copies nothing into a private store. A file dropped into a library folder by any means is an item after the next refresh. The same folders can be kept in git, synced, or used by other programs.
-- **The manifest** (`reviera-library.json`, in the library's root) is a JSON object:
-  - `format`: `"reviera-library"`, and `version`: 1;
+    - IFC files, whether whole models or fragments, written by Riviera or any other tool.
+  - Riviera converts nothing and copies nothing into a private store. A file dropped into a library folder by any means is an item after the next refresh. The same folders can be kept in git, synced, or used by other programs.
+- **The manifest** (`riviera-library.json`, in the library's root) is a JSON object:
+  - `format`: `"riviera-library"`, and `version`: 1;
   - `id` (a UUID, so stamped types can find the library after it is moved or renamed), `name`, `description`, `author`, `licence` (SPDX) and `homepage`;
   - `defaults`: import options for mesh files (units, up axis, insertion point, clean-up, DM-IMP-015), the default category and the default stamp mode;
   - `folders`: settings per folder, keyed by the folder's path relative to the root. A folder inherits its parent's settings, and the entry overrides only what it names: category, import options, stamp mode, tags and thumbnail;
@@ -1933,11 +1933,11 @@ The Place Component tool is the UI over `component.place`.
   - `smart_folders`: saved searches shared by everyone using the library.
 
   Every key is optional except `format` and `version`. Files with no entry use their folder's settings, then the format's defaults, so a manifest of only `format`, `version`, `id` and `name` makes any folder of 3D files a working library.
-- **Writing the manifest.** Reviera updates the manifest when the user edits details, moves or renames items or folders, or adds files through the panel. Each update is an atomic replace, with keys in a stable sorted order, so the manifest diffs and merges cleanly in git. Files added or moved outside Reviera are reconciled on refresh:
+- **Writing the manifest.** Riviera updates the manifest when the user edits details, moves or renames items or folders, or adds files through the panel. Each update is an atomic replace, with keys in a stable sorted order, so the manifest diffs and merges cleanly in git. Files added or moved outside Riviera are reconciled on refresh:
   - new files get default details;
   - a moved file keeps its entry when its SHA-256 matches;
   - entries for missing files are listed and can be cleaned up.
-- **Thumbnails** are rendered by Reviera and kept in the per-user cache, keyed by the file's hash, not written into library folders.
+- **Thumbnails** are rendered by Riviera and kept in the per-user cache, keyed by the file's hash, not written into library folders.
 - **Folder settings** (inherited by sub-folders unless overridden):
   - default category;
   - default stamp mode (group or elements);
@@ -1953,7 +1953,7 @@ The Place Component tool is the UI over `component.place`.
 
     For an IFC fragment, the preview also lists its elements by category, and selecting one in the list highlights it in the preview.
   - The preview renders from the file in the library, without loading anything into the open project; the model's version is unchanged.
-  - The **Details** form beside the preview edits the item's metadata. It is saved in the item's manifest entry, never in the file, so a file is never rewritten to hold what its format cannot. Examples: an STL has no units, name or materials; an OBJ has no units; a PLY has no category; and an IFC from a manufacturer may lack Reviera's tags. The fields are:
+  - The **Details** form beside the preview edits the item's metadata. It is saved in the item's manifest entry, never in the file, so a file is never rewritten to hold what its format cannot. Examples: an STL has no units, name or materials; an OBJ has no units; a PLY has no category; and an IFC from a manufacturer may lack Riviera's tags. The fields are:
     - **Identity:** name, description, category (the IFC class it becomes, DM-IMP-015), tags, and a classification code (Uniclass, OmniClass or another system, with the code and its title).
     - **Placement:** units, up axis, insertion point and base point, default stamp mode, default rotation, and a uniform scale. Changing any of these updates the preview at once.
     - **Product:** manufacturer, model, model number or reference, URL, cost and its currency, and notes.
@@ -1979,7 +1979,7 @@ The Place Component tool is the UI over `component.place`.
   - **Dropping files from the system's file manager** onto a folder in the Library panel opens the same dialog with those files.
   - **Name clashes:** a file whose name is already used in the destination folder is renamed with a suffix. A file whose SHA-256 matches an item already in the library is reported, with the choice to skip it or to import it again.
   - **Its own undo:** Import into Library is undone from the panel (*Undo Import*), which removes the copied files and their manifest entries. It is not part of the model's undo history.
-  - **Formats Reviera reads but a library does not hold**, such as STEP (DM-IMP-008), are converted on import into a supported format: IFC for solids, glTF for meshes. The original is copied beside it only when *Keep original* is ticked.
+  - **Formats Riviera reads but a library does not hold**, such as STEP (DM-IMP-008), are converted on import into a supported format: IFC for solids, glTF for meshes. The original is copied beside it only when *Keep original* is ticked.
 - **Existing folders.** **Add Folder as Source** adds any directory tree of 3D files as a source as it is. It is indexed in the background, with progress, and its folder structure is the library tree. **Copy Folder into Library** copies a directory tree into a folder of an existing source instead. Both end with a report:
   - files read;
   - files unreadable, with the reason;
@@ -1993,10 +1993,10 @@ The Place Component tool is the UI over `component.place`.
   - the index (DM-LIB-001) covers every folder.
 
   A source of 50,000 items in 2,000 folders opens its tree in under 1 s once indexed, and a search over it returns in under 200 ms.
-- **Organisation libraries (P2).** A remote library is the same folder layout served over HTTPS or WebDAV. Its `reviera-library.json` doubles as the index of DM-LIB-001: each item's entry carries its SHA-256, so downloads are verified. The same tree appears for everyone. Remote libraries are read-only. Items are added through the organisation's own process: a git pull request, or a write-enabled WebDAV folder (DM-FILE-007).
+- **Organisation libraries (P2).** A remote library is the same folder layout served over HTTPS or WebDAV. Its `riviera-library.json` doubles as the index of DM-LIB-001: each item's entry carries its SHA-256, so downloads are verified. The same tree appears for everyone. Remote libraries are read-only. Items are added through the organisation's own process: a git pull request, or a write-enabled WebDAV folder (DM-FILE-007).
 - **Project Library.** The Project Library source lists the types, families and group types already in the open project, in the same tree form: by category, or by the folder they were stamped from.
 
-**Data (storage).** A library is its directories and files, plus `reviera-library.json` in its root, Reviera's only file there. The search index and thumbnails are per-user caches (DM-LIB-001), rebuilt when missing. Smart folders, favourites and pinned stamps are per-user settings. No model data.
+**Data (storage).** A library is its directories and files, plus `riviera-library.json` in its root, Riviera's only file there. The search index and thumbnails are per-user caches (DM-LIB-001), rebuilt when missing. Smart folders, favourites and pinned stamps are per-user settings. No model data.
 
 **Commands.**
 `library.open(path) -> library_id` · `library.create(path, name) -> library_id` · `library.close(library_id)` ·
@@ -2028,7 +2028,7 @@ The Place Component tool is the UI over `component.place`.
 - [ ] A smart folder *Fragments over 2 levels* lists every matching fragment across all sources.
 - [ ] A folder added to the library directory by a file manager appears in the panel after Refresh.
 - [ ] A deleted folder's items can be restored from *Deleted items* the next day.
-- [ ] Library › Open Library on a folder of 3D files with no manifest offers to create one; the created `reviera-library.json` holds only `format`, `version`, `id` and `name`, and every file in the folder is usable.
+- [ ] Library › Open Library on a folder of 3D files with no manifest offers to create one; the created `riviera-library.json` holds only `format`, `version`, `id` and `name`, and every file in the folder is usable.
 - [ ] Moving a library folder to another disk and opening it there keeps every item's details, and stamped types in projects still find the library by its `id`.
 
 **Implementation note (2026-10-14, first build).**
@@ -2038,16 +2038,16 @@ The Place Component tool is the UI over `component.place`.
 - **The sample library:** `test-data/library` ships beside the samples in every package.
 - **Not built yet:** smart folders, moving and renaming in the panel, drag and drop, search, bulk edits and organisation libraries.
 
-### 2.8.19 A familiar workflow, in Reviera's own words
+### 2.8.19 A familiar workflow, in Riviera's own words
 **ID:** DM-LIB-005 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); research/06 (the reference product's family UI and workflow); DM-LIB-001 … 004
 
-**Purpose.** Users who know the reference product's families should find components familiar: the same gestures, places and sequence. Reviera keeps its own names and its own model of libraries as folders of ordinary files. *(Owner requirements, 2026-10-14: "not called Families; our term will be Component Libraries"; "differentiate, but be familiar to users with a Revit background"; "stamps just means a quick and easy mechanism to add library items, like a stamp in GIMP".)*
+**Purpose.** Users who know the reference product's families should find components familiar: the same gestures, places and sequence. Riviera keeps its own names and its own model of libraries as folders of ordinary files. *(Owner requirements, 2026-10-14: "not called Families; our term will be Component Libraries"; "differentiate, but be familiar to users with a Revit background"; "stamps just means a quick and easy mechanism to add library items, like a stamp in GIMP".)*
 
 **Behaviour & rules.**
-- **Names.** The feature is **Component Libraries** and its items **components**; the reference product's term is not used in Reviera's interface or help. A component's variants are its **types**.
-- **The same gestures where they fit.** The reference product's patterns (research/06) map onto Reviera like this:
+- **Names.** The feature is **Component Libraries** and its items **components**; the reference product's term is not used in Riviera's interface or help. A component's variants are its **types**.
+- **The same gestures where they fit.** The reference product's patterns (research/06) map onto Riviera like this:
 
-| What users know (research/06) | In Reviera |
+| What users know (research/06) | In Riviera |
 |---|---|
 | Architecture › Component › Place a Component, shortcut CM; places until Esc; Spacebar turns 90° | Architecture › Component › **Component**, shortcut **CM**; places until Esc; Spacebar turns 90° (DM-LIB-002) |
 | Load Family (a file dialog with a preview), then place | The **Component Library** panel: folders and thumbnails; a click picks a component up and places it. Loading happens on the first copy, and the panel stays open. |
@@ -2057,10 +2057,10 @@ The Place Component tool is the UI over `component.place`.
 | Type Selector and Properties during placement | Properties during Place Component: the component, its details, rotation, mirror and offset |
 | Edit Family, then Load into Project (and Close); Family Already Exists: overwrite, or overwrite with parameter values | **Edit Component**, then Save, which updates placed copies; a type conflict asks *Use project's*, *Use library's* or *Keep both* (DM-LIB-003) |
 | Save As › Library › Family; Save Group and Load as Group for repeated layouts | **Create Component** from any selection, written as an IFC file (DM-LIB-003) |
-| Thumbnails taken from the view saved last | Thumbnails rendered by Reviera from the file, cached per user (DM-LIB-004) |
+| Thumbnails taken from the view saved last | Thumbnails rendered by Riviera from the file, cached per user (DM-LIB-004) |
 | Project Browser › Families: category, family, type; drag a type into a view | The Model Tree and Project Browser list placed components and types; dragging a type from the browser is P2 |
 
-- **Where Reviera differs, on purpose:**
+- **Where Riviera differs, on purpose:**
   - libraries are plain folders of open 3D files and IFC, readable by other tools;
   - any selection becomes a component, as an IFC file;
   - placing is stamp-like, from a thumbnail palette, with no separate load step;
@@ -2091,11 +2091,11 @@ The Place Component tool is the UI over `component.place`.
 | **Project** | The project, bound to categories | Name (if local) or GUID (if shared) | Schedules yes. Tags only if shared. | Project-specific data on many categories |
 | **Global** | The project | GUID of the global parameter | Not directly (they can be shown through calculated values) | Driving dimensions and values project-wide |
 | **Key schedule** | A key schedule (DOC) | Name | Yes | Pick-list values that set several parameters at once |
-| **IFC-native** | A third-party IFC file | (`Pset name`, `property name`) | Yes | Properties Reviera found in imported files that do not match any definition |
+| **IFC-native** | A third-party IFC file | (`Pset name`, `property name`) | Yes | Properties Riviera found in imported files that do not match any definition |
 
 - Every parameter value is either a **type** value (stored on the type) or an **instance** value (stored on the instance). The definition's binding decides which (§2.9.3). It is never both.
 - **Read-only computed parameters** (Area, Volume, Length, Perimeter, Count, Host, Room) are produced by regeneration. They are shown greyed out, and commands that try to set them fail with a clear error.
-- **IFC-native parameters.** When Reviera opens an IFC file, every property that does not match a built-in, shared or project definition becomes an *IFC-native parameter*. It is shown in Properties under its property-set name, can be edited and scheduled, and is written back to the same property set. The user can **promote** one to a project or shared parameter. Promotion keeps the values and adds a definition.
+- **IFC-native parameters.** When Riviera opens an IFC file, every property that does not match a built-in, shared or project definition becomes an *IFC-native parameter*. It is shown in Properties under its property-set name, can be edited and scheduled, and is written back to the same property set. The user can **promote** one to a project or shared parameter. Promotion keeps the values and adds a definition.
 
 **Acceptance criteria.**
 - [ ] A third-party IFC file with a custom property set `ACME_Asset` (property `AssetTag`) shows `AssetTag` in Properties and in the schedule field list. Edits are written back to `ACME_Asset.AssetTag`.
@@ -2125,7 +2125,7 @@ The Place Component tool is the UI over `component.place`.
 | `formula` | Family and global parameters only |
 | `reporting` | Family and global parameters only |
 
-- **Parameter groups** (the "group under" list; keys are stable and display names are localisable): `analysis_results`, `analytical_model`, `constraints`, `construction`, `data`, `dimensions`, `division_geometry`, `electrical`, `electrical_circuiting`, `electrical_lighting`, `electrical_loads`, `electrical_analysis`, `energy_analysis`, `fire_protection`, `forces`, `general`, `graphics`, `green_building`, `identity_data`, `ifc_parameters`, `layers`, `materials_and_finishes`, `mechanical`, `mechanical_flow`, `mechanical_loads`, `model_properties`, `moments`, `other`, `phasing`, `photometrics`, `plumbing`, `primary_end`, `rebar_set`, `releases_member_forces`, `secondary_end`, `segments_and_fittings`, `set`, `slab_shape_edit`, `structural`, `structural_analysis`, `text`, `title_text`, `visibility`, `carbon` (Reviera addition).
+- **Parameter groups** (the "group under" list; keys are stable and display names are localisable): `analysis_results`, `analytical_model`, `constraints`, `construction`, `data`, `dimensions`, `division_geometry`, `electrical`, `electrical_circuiting`, `electrical_lighting`, `electrical_loads`, `electrical_analysis`, `energy_analysis`, `fire_protection`, `forces`, `general`, `graphics`, `green_building`, `identity_data`, `ifc_parameters`, `layers`, `materials_and_finishes`, `mechanical`, `mechanical_flow`, `mechanical_loads`, `model_properties`, `moments`, `other`, `phasing`, `photometrics`, `plumbing`, `primary_end`, `rebar_set`, `releases_member_forces`, `secondary_end`, `segments_and_fittings`, `set`, `slab_shape_edit`, `structural`, `structural_analysis`, `text`, `title_text`, `visibility`, `carbon` (Riviera addition).
 - **Default IFC home** for user parameters: a property set named by the binding's configured *property-set name*. The default is `<Project or Library name> Parameters`, for example "ACME Parameters". Parameters may be given a specific property set name and property name, so that they map onto a buildingSMART property (for example a shared parameter "Acoustic Rating" mapped to `Pset_WallCommon.AcousticRating` for walls and `Pset_DoorCommon.AcousticRating` for doors). The IFC home can differ per bound category.
 - **No collisions.** Built-in parameters keep their established names and their IFC homes (for example built-in Fire Rating owns `Pset_<Class>Common.FireRating`). A user parameter may not take a built-in's name for a bound category (§2.9.3), and may not be mapped onto an IFC home that a built-in or another parameter already uses for that category (`param.home_clash`). User parameters that map onto a standard property are named after that property, as above.
 - **Built-in parameter registry.** The application ships a registry of built-in parameters: key, name, data type, group, the categories it applies to, type/instance, read-only flag and IFC home. Domain chapters add rows. Examples:
@@ -2168,11 +2168,11 @@ The Place Component tool is the UI over `component.place`.
 
 **Behaviour & rules.**
 - A binding is (definition, categories, type or instance, group behaviour). A definition can have only one binding in a project.
-- Changing a binding from instance to type (or back) is allowed. Reviera asks how to resolve values that differ between instances of the same type (take the most common value, take the first value, or clear). The resolution is reported.
+- Changing a binding from instance to type (or back) is allowed. Riviera asks how to resolve values that differ between instances of the same type (take the most common value, take the first value, or clear). The resolution is reported.
 - Parameters can also be created from the schedule-field dialog (DOC) and from the Family Types dialog (as family parameters). Those are the same definitions.
 - A project or shared parameter with the same name as a built-in parameter of a bound category is refused; built-in names follow established convention and take precedence (§2.9.2, *No collisions*).
 - **Project Parameters dialog** (`param.project.manage()`). The list shows every project and shared parameter binding with Name, Data type, Type/Instance, Group, Categories (count, with the list in a tooltip), Source (Project, or the library name for shared ones) and IFC property set. Buttons: **Add**, **Modify**, **Remove** and **Duplicate** (copies a project parameter's definition and binding under a new name and GUID, without values; it is `param.project.add` with the copied definition). A search field filters by name, and a drop-down filters by category.
-  - The **Parameter Properties** sub-dialog validates before OK is enabled: a name is required, at most 255 characters, unique among definitions bound to any of the chosen categories, and free of `[ ] { } | ; < >` (characters reserved by formulas and naming rules); a data type is required; at least one category must be ticked; a property-set name, if given, must not start with `Pset_` or `Qto_` unless it maps onto that standard set's existing property (§2.9.2), and must not start with `Reviera_`.
+  - The **Parameter Properties** sub-dialog validates before OK is enabled: a name is required, at most 255 characters, unique among definitions bound to any of the chosen categories, and free of `[ ] { } | ; < >` (characters reserved by formulas and naming rules); a data type is required; at least one category must be ticked; a property-set name, if given, must not start with `Pset_` or `Qto_` unless it maps onto that standard set's existing property (§2.9.2), and must not start with `Riviera_`.
   - Changes made in the dialog (several adds, modifies and removes) are applied together on **OK** as one transaction named "Project Parameters"; **Cancel** discards them.
   - Removing a binding used by schedules, filters, tags, view templates or formulas lists those uses first.
 
@@ -2200,7 +2200,7 @@ The Place Component tool is the UI over `component.place`.
 **Purpose.** A fixed, versioned catalogue of data types. Each type maps to an IFC measure type and an SI internal unit.
 
 **Behaviour & rules.**
-- Each data type has a **key** (for example `length`) and a **versioned ID** (`reviera:spec/length@1`). Keys are used in formulas, tables and APIs. Versioned IDs are stored in RXD, so that a future change in meaning can be migrated.
+- Each data type has a **key** (for example `length`) and a **versioned ID** (`riviera:spec/length@1`). Keys are used in formulas, tables and APIs. Versioned IDs are stored in RXD, so that a future change in meaning can be migrated.
 - The catalogue (normative baseline; domain chapters may add types, but not change existing ones):
 
 | Key | Discipline | Storage | IFC value type | SI internal unit |
@@ -2275,10 +2275,10 @@ The Place Component tool is the UI over `component.place`.
 | `resistivity` | electrical | f64 | `IfcElectricResistanceMeasure` × m (as `IfcReal`) | Ω·m |
 | `number_of_poles` | electrical | i64 | `IfcCountMeasure` | — |
 | `demand_factor` | electrical | f64 | `IfcRatioMeasure` | — |
-| `global_warming_potential` | carbon (Reviera) | f64 | `IfcMassMeasure` (kg CO₂e) | kg CO₂e |
-| `gwp_per_mass` / `gwp_per_volume` / `gwp_per_area` | carbon (Reviera) | f64 | `IfcReal` (unit in the template) | kgCO₂e/kg, /m³, /m² |
+| `global_warming_potential` | carbon (Riviera) | f64 | `IfcMassMeasure` (kg CO₂e) | kg CO₂e |
+| `gwp_per_mass` / `gwp_per_volume` / `gwp_per_area` | carbon (Riviera) | f64 | `IfcReal` (unit in the template) | kgCO₂e/kg, /m³, /m² |
 
-- Where IFC has no measure type, the value is written as `IfcReal`. The unit is given in the matching `IfcSimplePropertyTemplate.PrimaryUnit` when templates are exported (§2.11.4). Reviera reads the unit from the definition, not from the value.
+- Where IFC has no measure type, the value is written as `IfcReal`. The unit is given in the matching `IfcSimplePropertyTemplate.PrimaryUnit` when templates are exported (§2.11.4). Riviera reads the unit from the definition, not from the value.
 - Changing the data type of an existing definition is not allowed for shared parameters (it would break GUID identity). For project and family parameters it is allowed only between compatible types (for example `number` ↔ `integer`, `text` ↔ `multiline_text`), with a preview of the converted values.
 
 **Acceptance criteria.**
@@ -2292,7 +2292,7 @@ The Place Component tool is the UI over `component.place`.
 
 **Behaviour & rules.**
 - **Internal units are SI**: metre, radian, kilogram, second, kelvin, ampere, mole, candela and their derived units. This differs from the reference product, which uses decimal feet internally. Conversion happens only at input (parsing) and output (formatting).
-- **Unit catalogue.** Every unit has a key (`millimetre`), a versioned ID (`reviera:unit/millimetre@1`), symbols (`mm`), the data types it applies to, and an exact conversion to SI (scale + offset, held as rationals where possible, for example 1 in = 0.0254 m exactly). It shall include at least: mm, cm, dm, m, km, in, ft, ft-in (with fractional and decimal inch forms), yd, mi; mm², cm², m², ha, km², in², ft², ac; mm³, cm³, L, m³, in³, ft³, yd³, gal (US/UK); °, rad, grad, % slope, rise/run (1:n), rise per 12 in; kg, t, g, lb, kip; N, kN, lbf, kip-force; Pa, kPa, MPa, bar, psi, in H₂O, in Hg; °C, °F, K, °R (with offsets); L/s, m³/h, CFM, GPM; W, kW, BTU/h, ton of refrigeration; lx, fc; V, A, VA, kVA; and the project currency.
+- **Unit catalogue.** Every unit has a key (`millimetre`), a versioned ID (`riviera:unit/millimetre@1`), symbols (`mm`), the data types it applies to, and an exact conversion to SI (scale + offset, held as rationals where possible, for example 1 in = 0.0254 m exactly). It shall include at least: mm, cm, dm, m, km, in, ft, ft-in (with fractional and decimal inch forms), yd, mi; mm², cm², m², ha, km², in², ft², ac; mm³, cm³, L, m³, in³, ft³, yd³, gal (US/UK); °, rad, grad, % slope, rise/run (1:n), rise per 12 in; kg, t, g, lb, kip; N, kN, lbf, kip-force; Pa, kPa, MPa, bar, psi, in H₂O, in Hg; °C, °F, K, °R (with offsets); L/s, m³/h, CFM, GPM; W, kW, BTU/h, ton of refrigeration; lx, fc; V, A, VA, kVA; and the project currency.
 - **Project Units** (Manage › Settings › Project Units; shortcut UN):
   - a **discipline** selector (Common, Structural, HVAC, Electrical, Piping, Energy, Infrastructure);
   - per data type, a **format**: unit, **rounding** (number of decimal places, or a custom increment such as 5 mm or 1/16″), unit **symbol** (none, or one of the unit's symbols), and the flags *suppress trailing zeros*, *suppress 0 feet*, *suppress 0 inches*, *show + for positive values*, *use digit grouping*, *suppress spaces*;
@@ -2337,7 +2337,7 @@ The Place Component tool is the UI over `component.place`.
 *Built (2026-10-14):* the unit presets and number format are set in **Model Properties** (Manage › Settings, UN; also File menu) beside the building code (DM-CODE-001) and the accessibility rule set, through `units.set_preset` and `units.set_number_format`. The per-data-type Format dialog is not built yet.
 
 ### 2.9.5a Building code
-**ID:** DM-CODE-001 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); Reviera's own design (Appendix A.2a); code clauses as cited below (RESEARCH_LOG 2026-10-14)
+**ID:** DM-CODE-001 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); Riviera's own design (Appendix A.2a); code clauses as cited below (RESEARCH_LOG 2026-10-14)
 
 **Purpose.** The building code the model follows, kept with the other model-wide settings, so that tools that apply code values (stair headroom today; risers, treads, guards and clearances later) use it by default. *(Owner requests, 2026-10-14: "Code related options needs to be a model property interface along with other paramiters like metric/imperial measurements, etc." and "Both, set model default but a tool can select an alternate code.")*
 
@@ -2412,15 +2412,15 @@ The Place Component tool is the UI over `component.place`.
 ### 2.9.7 Parameter libraries (shared-parameter equivalent)
 **ID:** DM-SPAR-001 · **Priority:** P1 · **Ref:** research/05 §7.2, §7.5, §16.7; screenshots/platform/edit_shared_parameters_dialog.png
 
-**Purpose.** GUID-identified parameter definitions shared across projects and families, in an open, diff-friendly format of Reviera's own design.
+**Purpose.** GUID-identified parameter definitions shared across projects and families, in an open, diff-friendly format of Riviera's own design.
 
 **Behaviour & rules.**
-- A **Reviera parameter library** is a UTF-8 JSON file with the extension `.rplib.json`. It is validated by a published JSON Schema (`reviera.paramlib`, version 1). A library contains **groups** (for organising only) and **definitions**. Several libraries may be active at once. Each has a stable library ID, so definitions from different libraries never clash.
+- A **Riviera parameter library** is a UTF-8 JSON file with the extension `.rplib.json`. It is validated by a published JSON Schema (`riviera.paramlib`, version 1). A library contains **groups** (for organising only) and **definitions**. Several libraries may be active at once. Each has a stable library ID, so definitions from different libraries never clash.
 - **Format (normative).**
 
 ```json
 {
-  "schema": "reviera.paramlib",
+  "schema": "riviera.paramlib",
   "schema_version": "1.0.0",
   "library": {
     "id": "6f1c9d2e-8a4b-4c1e-9f0a-2b7d3e5c1a90",
@@ -2469,9 +2469,9 @@ The Place Component tool is the UI over `component.place`.
   - New, Edit and Deprecate definition; New and Rename group; **Export to IFC templates** (§2.11.4).
   - Read-only libraries (opened from a URL or a read-only file) show a lock.
   - The dialog (`paramlib.manage()`) edits library files, not the model, so its changes are not undoable in the project. Edits are held in memory per library and written on **Save library** or on **OK** (an atomic write, with sorted keys and 2-space indentation as the rules above require); **Cancel** discards unsaved edits after confirmation. A library changed on disk by another program while open is reloaded on request, with a notice if local edits would be lost.
-  - **Definition editor validation:** a name is required (at most 255 characters, unique within its group, free of `[ ] { } | ; < >`); a data type is required and is locked once the definition has been saved; `enum` values must be unique and valid for the data type; `min` must not exceed `max`; the IFC property set must not start with `Reviera_`, and a `Pset_` home must name a property that exists in that standard set; `superseded_by` must name a non-deprecated definition with the same data type.
+  - **Definition editor validation:** a name is required (at most 255 characters, unique within its group, free of `[ ] { } | ; < >`); a data type is required and is locked once the definition has been saved; `enum` values must be unique and valid for the data type; `min` must not exceed `max`; the IFC property set must not start with `Riviera_`, and a `Pset_` home must name a property that exists in that standard set; `superseded_by` must name a non-deprecated definition with the same data type.
   - A column **In project** marks definitions already embedded in the active project, and **Add to project…** opens Project Parameters with the definition pre-selected (§2.9.3).
-- **Team distribution (open alternative to a vendor cloud service).** A library can be opened from an HTTPS URL or a git repository path. Reviera caches it, and checks for updates on start-up and on demand. Firms publish their standard library as a versioned file in their own repository or web server. No vendor service is needed.
+- **Team distribution (open alternative to a vendor cloud service).** A library can be opened from an HTTPS URL or a git repository path. Riviera caches it, and checks for updates on start-up and on demand. Firms publish their standard library as a versioned file in their own repository or web server. No vendor service is needed.
 - **Import** of the reference product's shared-parameter text files is supported for migration. GUIDs, names, groups, data types (mapped to §2.9.4 keys), visibility and descriptions are preserved. Unknown data-type tokens go to a mapping dialog. **Export** to that text format is P2, for interoperability with firms that still use it.
 - **IFC templates.** A library can also be written as an IFC file containing an `IfcProjectLibrary` with `IfcPropertySetTemplate` and `IfcSimplePropertyTemplate` entities. Each template's `GlobalId` is the definition GUID (encoded to 22 characters), with `PrimaryMeasureType` and units from §2.9.4. This is a read/write interchange form, for tools that use IFC templates.
 
@@ -2488,11 +2488,11 @@ The Place Component tool is the UI over `component.place`.
 `paramlib.search(text?, labels?, data_type?) -> definition[]` ·
 `paramlib.manage()` (opens the Parameter Libraries dialog)
 
-*Built (2026-10-22):* The format is `reviera_core::paramlib`, its JSON Schema published (MIT) as `schemas/paramlib/reviera.paramlib-1.schema.json`; every library is checked against it and the rules above on open and before each write, and written with sorted keys and 2-space indentation, atomically. Application commands: `paramlib.open` (files; a copy of each library is cached when opened, so a removed definition or a changed data type is refused next time, and a GUID the open project has with another data type is refused naming both), `paramlib.create`, `paramlib.close`, `paramlib.list`, `paramlib.definition.add` / `.edit` (data type locked) / `.deprecate` (with `superseded_by`), `paramlib.group.add` / `.rename`, `paramlib.import_legacy` (tab-separated `*GROUP`/`*PARAM` files, UTF-8 or UTF-16, GUIDs kept, data-type tokens mapped, unknown ones listed unless `mapping` gives them), `paramlib.export_ifc_templates` (an `IfcProjectLibrary` declaring `IfcPropertySetTemplate`s of `IfcSimplePropertyTemplate`s whose GlobalIds are the GUIDs and whose PrimaryMeasureType is the data type's IFC type), `paramlib.search` (with *in project*), `paramlib.add_to_project` (embeds the definition with the library's id, name and version via `param.project.add`; `on_conflict` keep or update), `paramlib.manage`. Manage › Settings › **Parameter Libraries**: open libraries (Open, New, Close, a lock on read-only files) and each one's definitions (New, Edit, Deprecate, Add to Project with Keep or Update on a conflict, Import Legacy, Export IFC Templates). Not yet: libraries from a URL or git repository, remembering the active libraries between sessions, the group tree, filtering by label and data type in the dialog, edits held until Save, reloading on outside change, `Pset_` property checks against the standard sets, families (so the family half of the legacy-import criterion), legacy export (P2).
+*Built (2026-10-22):* The format is `riviera_core::paramlib`, its JSON Schema published (MIT) as `schemas/paramlib/riviera.paramlib-1.schema.json`; every library is checked against it and the rules above on open and before each write, and written with sorted keys and 2-space indentation, atomically. Application commands: `paramlib.open` (files; a copy of each library is cached when opened, so a removed definition or a changed data type is refused next time, and a GUID the open project has with another data type is refused naming both), `paramlib.create`, `paramlib.close`, `paramlib.list`, `paramlib.definition.add` / `.edit` (data type locked) / `.deprecate` (with `superseded_by`), `paramlib.group.add` / `.rename`, `paramlib.import_legacy` (tab-separated `*GROUP`/`*PARAM` files, UTF-8 or UTF-16, GUIDs kept, data-type tokens mapped, unknown ones listed unless `mapping` gives them), `paramlib.export_ifc_templates` (an `IfcProjectLibrary` declaring `IfcPropertySetTemplate`s of `IfcSimplePropertyTemplate`s whose GlobalIds are the GUIDs and whose PrimaryMeasureType is the data type's IFC type), `paramlib.search` (with *in project*), `paramlib.add_to_project` (embeds the definition with the library's id, name and version via `param.project.add`; `on_conflict` keep or update), `paramlib.manage`. Manage › Settings › **Parameter Libraries**: open libraries (Open, New, Close, a lock on read-only files) and each one's definitions (New, Edit, Deprecate, Add to Project with Keep or Update on a conflict, Import Legacy, Export IFC Templates). Not yet: libraries from a URL or git repository, remembering the active libraries between sessions, the group tree, filtering by label and data type in the dialog, edits held until Save, reloading on outside change, `Pset_` property checks against the standard sets, families (so the family half of the legacy-import criterion), legacy export (P2).
 
 **Acceptance criteria.**
 - [x] A library with 500 definitions opens in under 200 ms, and its JSON Schema validation passes.
-- [ ] Importing a reference-product shared-parameter file with 50 parameters gives 50 definitions with identical GUIDs. A family using one of them, after round-tripping through Reviera, schedules in the same column as a project parameter with that GUID.
+- [ ] Importing a reference-product shared-parameter file with 50 parameters gives 50 definitions with identical GUIDs. A family using one of them, after round-tripping through Riviera, schedules in the same column as a project parameter with that GUID.
 - [x] Changing `data_type` of an existing GUID in a library file is reported as a validation error on open.
 - [x] A project that uses shared parameters opens and schedules correctly with every library file removed from the machine.
 
@@ -2504,9 +2504,9 @@ The Place Component tool is the UI over `component.place`.
 **Behaviour & rules.**
 - The vendor-cloud feature is out of scope (P3).
 - **Open alternative (P2):** an add-in API (§2.13) for **external property providers**. A provider registers a namespace, and answers `get_properties(guid[]) -> {name, value, data_type}[]` (read-only). Results are shown in Properties under the provider's name, and are available in schedules as *external fields*. They are never written to IFC unless the user chooses **Materialise**, which copies them into a property set.
-- **Registration.** `reviera.external_props.register{namespace, name, fields = {{name, data_type, unit?}}, get_properties = fn, refresh_interval_s?}`. The declared `fields` list is what schedules and filters offer before any value is fetched. A provider needs trust level `standard` or higher when it reads files or the network (§2.13.7).
+- **Registration.** `riviera.external_props.register{namespace, name, fields = {{name, data_type, unit?}}, get_properties = fn, refresh_interval_s?}`. The declared `fields` list is what schedules and filters offer before any value is fetched. A provider needs trust level `standard` or higher when it reads files or the network (§2.13.7).
 - **Fetching and caching.** Values are requested in batches of at most 1,000 GUIDs, on a worker coroutine (§2.13.6), never on the UI thread. They are cached per session with the time fetched. Properties shows cached values immediately, marked with the provider's icon and a "fetched hh:mm" tooltip; **Refresh** (per provider, or on the palette's context menu) re-fetches. A provider that times out (default 10 s per batch) or raises an error shows "unavailable" in its rows; the rest of the UI is unaffected.
-- **Matching.** Providers key on IFC `GlobalId` by default. A provider may declare `key = {param = "<param_ref>"}` instead (for example an asset tag), in which case Reviera sends that parameter's values.
+- **Matching.** Providers key on IFC `GlobalId` by default. A provider may declare `key = {param = "<param_ref>"}` instead (for example an asset tag), in which case Riviera sends that parameter's values.
 - **Use in documentation.** External fields can be shown in schedules, used in schedule filters and sorting, and in view filters (DOC). They cannot be edited, used in family formulas, or drive geometry. A schedule that uses an external field shows a "live data" note with the fetch time, and PDF export prints the fetch time in the schedule footer.
 - **Materialise.** Copies the current values into a user property set as one undoable transaction, creating project parameter bindings if needed (§2.9.3). Data types are preserved; unknown types become `text`.
 - **Data (storage).** Nothing is stored in the model unless materialised. The list of providers a schedule uses is kept in that schedule's RXD document, so opening the project without the add-in shows the columns as "provider missing".
@@ -2541,7 +2541,7 @@ The Place Component tool is the UI over `component.place`.
 | Inquiry | IDs of Selection · Select by ID · Review Warnings · Extension Data Status (§2.4.3) |
 | Scripts | Script Manager · Run Script… · Script Security (§2.13.7, §2.13.8) |
 | Add-ins | Add-in Manager (§2.14) |
-| Visual Programming | Reviera Graph · Graph Player (§2.15, P2) |
+| Visual Programming | Riviera Graph · Graph Player (§2.15, P2) |
 | AI Agents | MCP Server status · Permissions · Session log (§2.16) |
 
 **Acceptance criteria.**
@@ -2622,7 +2622,7 @@ The Place Component tool is the UI over `component.place`.
   - Each pattern is *simple* (parallel lines or crosshatch, with angle and spacing), *custom* (a grid of line families with angle, origin, offset, shift and dash sequence), or *solid fill*.
   - Patterns may be **rotated** (custom patterns too).
   - **Double fill**: filled regions, materials and overrides may use a **foreground** and a **background** pattern, each with its own colour.
-- **Pattern files.** Reviera reads and writes **`.pat`** files (the widely used, publicly documented hatch format used by many CAD tools) for import and export. Its own storage is the RXD form. Reviera ships its own default pattern set, authored from scratch.
+- **Pattern files.** Riviera reads and writes **`.pat`** files (the widely used, publicly documented hatch format used by many CAD tools) for import and export. Its own storage is the RXD form. Riviera ships its own default pattern set, authored from scratch.
 
 **Data (storage).** RXD document `standards/styles` (`line_weights`, `line_patterns[]`, `line_styles[]`, `fill_patterns[]`). In IFC, a material's cut and surface patterns are also written as `IfcFillAreaStyle` with `IfcFillAreaStyleHatching` (simple and crosshatch patterns), so other tools can draw them (§2.10.5).
 
@@ -2660,7 +2660,7 @@ The Place Component tool is the UI over `component.place`.
 - **Assets** (appearance, physical, thermal, carbon) are separate, shareable records in RXD document `standards/materials`. Several materials may share one asset. The UI shows a sharing indicator with the user count, and offers *Duplicate asset* to make a private copy. When written to IFC, shared asset values are copied into each material's property sets.
 - **Names.** Material names are unique in a project (case-insensitive) and at most 255 characters. Because IFC identifies non-rooted materials by name, renaming updates the RXD resource key (§2.5) and every `IfcMaterial.Name`, layer set and constituent set that uses it, in one transaction.
 - **Default material.** Every project has a built-in *Default* material, used where an element or family form says `<By Category>` and the category's object style has no material (§2.10.3). It cannot be deleted or renamed, but its values can be edited.
-- **Third-party materials.** An `IfcMaterial` found in an opened file with no RXD becomes a Reviera material: its `IfcMaterialProperties` populate the matching asset fields, its surface style populates Graphics and Appearance, and properties with no Reviera home are kept as IFC-native parameters of the material (§2.9.1). Two third-party materials with the same name are kept apart by suffixing " (2)" on the second, and the change is reported.
+- **Third-party materials.** An `IfcMaterial` found in an opened file with no RXD becomes a Riviera material: its `IfcMaterialProperties` populate the matching asset fields, its surface style populates Graphics and Appearance, and properties with no Riviera home are kept as IFC-native parameters of the material (§2.9.1). Two third-party materials with the same name are kept apart by suffixing " (2)" on the second, and the change is reported.
 - **Where materials are used.** Materials are assigned to layers of layered types, to profile sets, to family forms (fixed or by parameter), to painted faces (ARC) and through object styles. `material.list` reports, per material, the number of types and instances that use it, which the browser shows as a count.
 - **Acceptance.** Renaming "Concrete C30" to "Concrete C30/37" changes the name in every layer set of the exported IFC and keeps the material's RXD GUID; opening a third-party file with an `IfcMaterial` "Brick" carrying `Pset_MaterialCommon.MassDensity = 1800` shows 1800 kg/m³ on the Physical tab.
 
@@ -2698,18 +2698,18 @@ The Place Component tool is the UI over `component.place`.
   - **GWP A1–A3** (kg CO₂e per declared unit), and optional **A4, A5, B, C1–C4, D** stages;
   - **biogenic carbon**, **reference service life**, **EPD validity date**, **notes**.
 - The carbon asset is used by carbon reporting (ANA chapter). Element-level results are calculated from material quantities (volume × density → mass, then × GWP/kg, or area × GWP/m²). They are written to `Pset_EnvironmentalImpactIndicators.ClimateChangePerUnit` and the related properties of the element type, when *Write carbon results to IFC* is on.
-- **Data connectors** to online EPD databases are add-ins (§2.14), not built in. The open data sets that Reviera may bundle shall be checked for licence compatibility before inclusion.
+- **Data connectors** to online EPD databases are add-ins (§2.14), not built in. The open data sets that Riviera may bundle shall be checked for licence compatibility before inclusion.
 
 #### DM-MAT-006 — Material Browser and libraries (P0 basic, P1 libraries)
 - **Material Browser** (Manage › Settings › Materials; shortcut MAT):
   - **left top**: project materials (search, filter by class, list or thumbnail view);
-  - **left bottom**: library panel (shipped Reviera library, Favourites, user libraries; tree by class);
+  - **left bottom**: library panel (shipped Riviera library, Favourites, user libraries; tree by class);
   - **right**: the editor, with tabs Identity / Graphics / Appearance / Physical / Thermal / Carbon;
   - **toolbar**: New, Duplicate, Rename, Delete, Add to Favourites, Add from library to project (also by drag-and-drop), Create/Open/Remove library;
   - each asset tab has *Replace asset* (opens the **Asset Browser**), *Duplicate asset*, *Remove asset*;
   - batch operations: select several materials and change a shared field (for example class, cut pattern) at once.
 - **Material libraries** are IFC files (`<Name>.materials.ifc`). The file has one `IfcProject` that declares an `IfcProjectLibrary` named after the library. Each material is associated with the library through `IfcRelAssociatesMaterial`, so the file is valid IFC. Assets and other RXD go in the library's RXD documents (`materials`), carried as `02a` defines. Textures are RXD assets.
-- Reviera ships a starter library authored from scratch, with appearance textures under compatible licences (for example CC0).
+- Riviera ships a starter library authored from scratch, with appearance textures under compatible licences (for example CC0).
 - **Deleting** a material in use asks for a replacement material. Purge removes unused materials and assets (§2.10.11).
 - **Browser workflow** (`material.browser(material_id?)`). The browser opens on the given material, on the material of the selected element's first layer or form, or on the last material viewed. Selecting a project material loads it into the editor. Edits on the editor tabs are held as pending changes; **Apply** commits them as one transaction ("Edit Material: <name>"), **OK** applies and closes, **Cancel** discards pending changes. Switching to another material with pending changes asks *Apply*, *Discard* or *Cancel*.
 - **Project list.** Search matches name, description, class, keywords and comments. Filters: class, *Used in project* / *Unused*, *Has appearance texture*, *Has carbon data*. Each row shows a swatch, the name and a use count. Multi-selection enables the batch edit described above; fields that differ across the selection show "<varies>".
@@ -2735,7 +2735,7 @@ The Place Component tool is the UI over `component.place`.
 - [ ] Two materials sharing a physical asset both update when the asset's density changes. After *Duplicate asset* on one, they are independent.
 - [ ] A wall type with layers 15 mm gypsum (λ = 0.25), 100 mm mineral wool (λ = 0.035) and 15 mm gypsum reports U ≈ 0.32 W/(m²·K) (with Rsi + Rse = 0.17 m²K/W), and writes it to `Pset_WallCommon.ThermalTransmittance`.
 - [ ] A material with carbon GWP A1–A3 = 0.15 kg CO₂e/kg and density 2400 kg/m³, used for 10 m³ of wall, reports 3,600 kg CO₂e for those walls.
-- [ ] A material library saved by Reviera opens as valid IFC4, and its materials can be added to a second project, keeping all assets.
+- [ ] A material library saved by Riviera opens as valid IFC4, and its materials can be added to a second project, keeping all assets.
 
 #### DM-MAT-007 — Asset Browser and asset editing (P1)
 **ID:** DM-MAT-007 · **Priority:** P1 · **Ref:** research/05 §10; screenshots/platform/material_browser_physical_asset_annotated_2026.png
@@ -2748,7 +2748,7 @@ The Place Component tool is the UI over `component.place`.
 3. Select an asset to preview its values (and, for appearance, a rendered swatch).
 4. **Replace in material** swaps the material's asset for the chosen one (`material.asset.replace`), or **Add to project** copies a library asset without assigning it.
 
-**UI.** Asset Browser: kind tabs (Appearance, Physical, Thermal, Carbon); a tree of sources (Project, Reviera library, user libraries) and classes; a results list (name, class, users, source); a preview pane. Toolbar: Replace in material, Add to project, Duplicate, Rename, Delete (project assets only), Show users.
+**UI.** Asset Browser: kind tabs (Appearance, Physical, Thermal, Carbon); a tree of sources (Project, Riviera library, user libraries) and classes; a results list (name, class, users, source); a preview pane. Toolbar: Replace in material, Add to project, Duplicate, Rename, Delete (project assets only), Show users.
 
 **Behaviour & rules.**
 - An asset tab shows the asset's name and a **sharing indicator** ("Shared by 4 materials"). Editing a shared asset asks first whether to edit it for all users or to **Duplicate asset** for this material only (`material.asset.duplicate`). The choice can be remembered for the session.
@@ -2833,7 +2833,7 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 - [x] Rotating true north by 30° changes `TrueNorth` and the shadow direction of sun studies, but no element coordinates. *(Sun studies are not built; they will read the same angle.)*
 - [x] Report Shared Coordinates at a picked point gives values consistent with the survey point within 0.1 mm. *(At a typed point.)*
 
-*Built (2026-10-25), the P0 part:* Manage › **Project Location** › *Location* (one dialog, one undo step: place, latitude, longitude, elevation, time zone, daylight saving, the project base point and angle to true north, the survey point with its shared coordinates, the CRS) and *Report Coordinates*. The values are RXD on the project (`rxd:location`). True north is the angle from project north to true north, counter-clockwise; shared = R(−θ)·(p − survey point) + (E, N), height = z − survey z + H; project coordinates are measured from the project base point along project north. Plans draw the project base point (a circle with a cross) and the survey point (a triangle). On save: `IfcSite.RefLatitude`/`RefLongitude` as compound angles and `RefElevation`; the model context's `TrueNorth`; with a CRS (IFC4 and later) an `IfcMapConversion` (Eastings, Northings, OrthogonalHeight of the internal origin, XAxisAbscissa/Ordinate, Scale from the file's length unit to metres) to an `IfcProjectedCRS` (Name the EPSG code, MapUnit metre), both replaced on each save. A file from another tool with a site latitude and longitude and no Reviera location takes them as its location. Commands: `location.set`, `location.set_all`, `location.get`, `coordinates.set_survey_point`, `coordinates.set_project_base_point`, `coordinates.set_crs`, `coordinates.report`, `position.rotate_true_north`. Not yet: map search and the city list, weather, named sites, acquire and publish coordinates, relocate, rotate project north and mirror, specifying coordinates at a picked point, clipped and unclipped points, base point as the IfcSite placement, CRS validation with a CRS database, the shared-coordinate elevation datum for levels.
+*Built (2026-10-25), the P0 part:* Manage › **Project Location** › *Location* (one dialog, one undo step: place, latitude, longitude, elevation, time zone, daylight saving, the project base point and angle to true north, the survey point with its shared coordinates, the CRS) and *Report Coordinates*. The values are RXD on the project (`rxd:location`). True north is the angle from project north to true north, counter-clockwise; shared = R(−θ)·(p − survey point) + (E, N), height = z − survey z + H; project coordinates are measured from the project base point along project north. Plans draw the project base point (a circle with a cross) and the survey point (a triangle). On save: `IfcSite.RefLatitude`/`RefLongitude` as compound angles and `RefElevation`; the model context's `TrueNorth`; with a CRS (IFC4 and later) an `IfcMapConversion` (Eastings, Northings, OrthogonalHeight of the internal origin, XAxisAbscissa/Ordinate, Scale from the file's length unit to metres) to an `IfcProjectedCRS` (Name the EPSG code, MapUnit metre), both replaced on each save. A file from another tool with a site latitude and longitude and no Riviera location takes them as its location. Commands: `location.set`, `location.set_all`, `location.get`, `coordinates.set_survey_point`, `coordinates.set_project_base_point`, `coordinates.set_crs`, `coordinates.report`, `position.rotate_true_north`. Not yet: map search and the city list, weather, named sites, acquire and publish coordinates, relocate, rotate project north and mirror, specifying coordinates at a picked point, clipped and unclipped points, base point as the IfcSite placement, CRS validation with a CRS database, the shared-coordinate elevation datum for levels.
 
 ### 2.10.8 Snaps
 **ID:** DM-SET-004 · **Priority:** P0 · **Ref:** research/05 §9.5
@@ -2888,13 +2888,13 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 
 **Behaviour & rules.**
 - **Classification systems** (for example Uniclass 2015, OmniClass, MasterFormat, Uniformat II, CCI, or national systems) are loaded from files into the project. They are stored in IFC as `IfcClassification` (Source, Edition, Name, Location), with the referenced codes as `IfcClassificationReference` (Identification, Name, ReferencedSource for hierarchy). They are associated with types or occurrences through `IfcRelAssociatesClassification`.
-- Reviera reads classification tables from CSV (`code,parent_code,title`) and from IFC files that contain `IfcClassification` trees, and from the buildingSMART Data Dictionary (bSDD) API when online (P2).
+- Riviera reads classification tables from CSV (`code,parent_code,title`) and from IFC files that contain `IfcClassification` trees, and from the buildingSMART Data Dictionary (bSDD) API when online (P2).
 - The *Classification Code* / *Assembly Code* fields in Properties open a searchable tree picker for the active system. More than one system may be used at once (one code per system per element).
 - **Keynotes** are tab-separated text files (`key`, `text`, `parent_key`). The path is relative to the project, or absolute. Keynote tags (DOC) read them. Keynote values on elements and materials are parameters (§2.9.2).
 
 **Commands.** `classification.load(path_or_url, name?) -> system_id` · `classification.assign(element_ids[], system_id, code)` · `classification.unassign(element_ids[], system_id)` · `keynotes.load(path)` · `keynotes.reload()`
 
-*Built (2026-10-22):* Systems are kept on the project (`rxd:classifications`): name, source, edition, location and the table of codes with parents and titles; an element (type or occurrence) has one code per system (`rxd:classification`). Commands: `classification.load(path_or_url, name?, source?, edition?)` (application: a `code,parent_code,title` CSV, quoted fields allowed, or an IFC file's `IfcClassification` tree with its references, Identification or ItemReference, parents first; a system of the same name is replaced keeping its id), `classification.create`, `classification.assign` / `.unassign` (codes checked against the table), `classification.delete` (unclassifies), `classification.list`, `classification.search`, `classification.of`; `keynotes.load(path)` (tab-separated, kept relative to the project when beside it), `keynotes.reload`, `keynotes.set`, `keynotes.list`. On save each system with codes in use is an `IfcClassification` (Name, Source, Edition, Location), each code used and its ancestors an `IfcClassificationReference` (Identification, Name, ReferencedSource up to the classification), associated with its elements by `IfcRelAssociatesClassification`; all tagged `rxd:classification` and rewritten each save; none in IFC2X3. Manage › Settings › **Classification Systems** (Load, Remove), **Classify** (system, search, code for the selection), **Load Keynotes**. Reviera ships no tables. Not yet: the tree picker in Properties' Classification Code and Assembly Code fields, the Data Dictionary (bSDD, P2), keynote tags (DOC).
+*Built (2026-10-22):* Systems are kept on the project (`rxd:classifications`): name, source, edition, location and the table of codes with parents and titles; an element (type or occurrence) has one code per system (`rxd:classification`). Commands: `classification.load(path_or_url, name?, source?, edition?)` (application: a `code,parent_code,title` CSV, quoted fields allowed, or an IFC file's `IfcClassification` tree with its references, Identification or ItemReference, parents first; a system of the same name is replaced keeping its id), `classification.create`, `classification.assign` / `.unassign` (codes checked against the table), `classification.delete` (unclassifies), `classification.list`, `classification.search`, `classification.of`; `keynotes.load(path)` (tab-separated, kept relative to the project when beside it), `keynotes.reload`, `keynotes.set`, `keynotes.list`. On save each system with codes in use is an `IfcClassification` (Name, Source, Edition, Location), each code used and its ancestors an `IfcClassificationReference` (Identification, Name, ReferencedSource up to the classification), associated with its elements by `IfcRelAssociatesClassification`; all tagged `rxd:classification` and rewritten each save; none in IFC2X3. Manage › Settings › **Classification Systems** (Load, Remove), **Classify** (system, search, code for the selection), **Load Keynotes**. Riviera ships no tables. Not yet: the tree picker in Properties' Classification Code and Assembly Code fields, the Data Dictionary (bSDD, P2), keynote tags (DOC).
 
 **Acceptance criteria.**
 - [x] Assigning Uniclass `Ss_25_10_30` to a wall type writes an `IfcClassificationReference` with Identification `Ss_25_10_30`, linked to an `IfcClassification` named "Uniclass 2015".
@@ -2959,7 +2959,7 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 - **Starting view**: the view opened when the project opens (default: the last view used). It is stored in RXD document `project/settings`.
 - **Images** are managed as described in §2.10.14, and **decal types** in §2.10.15.
 - **Project templates (DM-TMPL-001, P0).** A project template is a project marked as a template in its RXD manifest (`02a`). By convention it is named `<Name>.template.ifc`. *New Project* creates a copy with **new GUIDs** for everything (project, site, building, storeys, views, types, …), so projects made from the same template never share element GUIDs. Exception: definitions with intended global identity (shared parameter GUIDs, family GUIDs, material RXD GUIDs) keep their GUIDs.
-- Reviera ships these templates, authored from scratch: *Architectural (metric)*, *Architectural (imperial)*, *Multi-discipline (metric)*, *Multi-discipline (imperial)*, *Construction*, and *Empty*.
+- Riviera ships these templates, authored from scratch: *Architectural (metric)*, *Architectural (imperial)*, *Multi-discipline (metric)*, *Multi-discipline (imperial)*, *Construction*, and *Empty*.
 
 **Commands.** `project.new(template_path?) -> document_id` · `project.save_as_template(path)` · `settings.starting_view.set(view_id | "last")`
 
@@ -3100,12 +3100,12 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 ## 2.11 File I/O
 
 ### 2.11.0 Creating new documents
-**ID:** DM-FILE-006 · **Priority:** P0 (model, model template, family) / P1 (title block, annotation symbol, conceptual mass) · **Ref:** research/05 §4.1, §9.12, §11.1; spec/01 (File › New, Reviera Home)
+**ID:** DM-FILE-006 · **Priority:** P0 (model, model template, family) / P1 (title block, annotation symbol, conceptual mass) · **Ref:** research/05 §4.1, §9.12, §11.1; spec/01 (File › New, Riviera Home)
 
-**Purpose.** One entry point to start any kind of Reviera document from a template.
+**Purpose.** One entry point to start any kind of Riviera document from a template.
 
 **Workflow.**
-1. **File › New** (Ctrl+N), or **New…** on Reviera Home (`file.new(kind, template?, schema?)`). The **New** dialog opens for the chosen kind (Model by default).
+1. **File › New** (Ctrl+N), or **New…** on Riviera Home (`file.new(kind, template?, schema?)`). The **New** dialog opens for the chosen kind (Model by default).
 2. For a model: choose a project template from the list (from the template folders in Options › File Locations, plus *Browse…* and *None*), choose **Create new: Model** or **Model template**, and, in Local mode, the IFC schema (IFC4, default, or IFC4X3).
 3. For a family, title block, annotation symbol or conceptual mass: the family template chooser opens, filtered to that kind (§2.8.1).
 4. **OK** creates an untitled document and opens its starting view. The document is saved only when the user saves.
@@ -3115,10 +3115,10 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 - **No template.** `template` omitted for a model uses the default template set in Options; *None* creates an empty project with one site, one building, one storey ("Level 1", elevation 0), SI units in IFC, the Metric (mm) display preset and the built-in standards (line weights, patterns, object styles). Families always need a template.
 - **Schema.** `schema` applies to models only. IFC4X3 is offered only in Local mode and when the template's schema allows it; a template saved in IFC4 is converted on creation (§2.11.3) with the usual report. In BIMserver mode the schema is the server project's schema.
 - **Untitled documents** get a live store at once (Ch 2b §2), so work is recoverable before the first save. The title bar shows "Untitled 1", "Untitled 2", … per session.
-- **Missing or invalid templates** (not found, not a Reviera template, newer RXD major version) are reported in the dialog with the reason, and the user picks another; a template from an older RXD version is migrated in memory (§2.11.8).
+- **Missing or invalid templates** (not found, not a Riviera template, newer RXD major version) are reported in the dialog with the reason, and the user picks another; a template from an older RXD version is migrated in memory (§2.11.8).
 - New documents take the project information defaults from the template, with Project Issue Date set to today and Author set to the user name from Options.
 
-**Data (storage).** Nothing is written until the first save. The new project's `Reviera_Manifest` records the source template's name and DataId for traceability (`02a`).
+**Data (storage).** Nothing is written until the first save. The new project's `Riviera_Manifest` records the source template's name and DataId for traceability (`02a`).
 
 **Commands.** `file.new(kind: model|model_template|family|title_block|annotation_symbol|mass_family, template?, schema?: IFC4|IFC4X3) -> document_id` (plus `project.new`, §2.10.13, and `family_doc.new`, §2.8.0, which it calls)
 
@@ -3130,10 +3130,10 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 ### 2.11.1 Opening models
 **ID:** DM-FILE-001 · **Priority:** P0 · **Ref:** research/05 §11.1, §11.2, §12.1; TECH_STACK §3.1, §3.7
 
-**Purpose.** To open any IFC file, whether written by Reviera or by another tool, and make it editable.
+**Purpose.** To open any IFC file, whether written by Riviera or by another tool, and make it editable.
 
 **Workflow.**
-1. **File › Open** (Ctrl+O), choose an `.ifc` or `.ifczip` file. Or choose a recent file on Reviera Home (UI chapter), or a BIMserver project (COL chapter).
+1. **File › Open** (Ctrl+O), choose an `.ifc` or `.ifczip` file. Or choose a recent file on Riviera Home (UI chapter), or a BIMserver project (COL chapter).
 2. A progress bar shows the stages: parse → build element store → RXD binding and checks (§2.4.3) → regeneration of view caches for the starting view.
 3. If the file needs a schema upgrade, or has RXD warnings, a summary dialog lists them before editing begins.
 
@@ -3144,10 +3144,10 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
   - they can be selected, moved, copied, rotated, mirrored, deleted, scheduled and tagged;
   - their properties can be edited;
   - their geometry is fixed (treated like a direct shape).
-  - **Recognise** (Modify › Recognise, P1) converts them to parametric Reviera elements where possible: walls with an `IfcMaterialLayerSetUsage` and an extruded or clipped body become basic walls; extruded slabs become floors with a sketch; storey-contained doors and windows in openings become placed instances of static families made from their types. Recognition never changes the GUIDs. It reports elements it could not convert.
+  - **Recognise** (Modify › Recognise, P1) converts them to parametric Riviera elements where possible: walls with an `IfcMaterialLayerSetUsage` and an extruded or clipped body become basic walls; extruded slabs become floors with a sketch; storey-contained doors and windows in openings become placed instances of static families made from their types. Recognition never changes the GUIDs. It reports elements it could not convert.
 - **Large models (P1).** *Partial open*: choose storeys, disciplines (by IFC class) or worksets to load; unloaded elements stay in the file untouched and are written back on save. **Incremental open (P2)**: show the model while geometry is still being tessellated, coarse first.
 - **Read-only open** is available (for example, for files on read-only media). Save is disabled, and *Save As* is offered.
-- **Files from a newer Reviera** follow §2.11.8.
+- **Files from a newer Riviera** follow §2.11.8.
 - **IFC open options** (File › Open › *IFC open options…*; `file.ifc_open_options(options?) -> options`). A per-user dialog that sets the defaults used when opening IFC files; called without arguments it opens the dialog, with `options` it sets them and returns the result. Settings:
   - *Partial open*: always open everything (default), or always ask with the storey, IFC-class and workset chooser;
   - *Incremental open* (P2): on or off;
@@ -3176,7 +3176,7 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 - **Deterministic output.** For an unchanged model, two saves produce identical files except the header timestamp. Entity order is stable: by kind (project and contexts, units, spatial structure, types, elements, relationships, resources), then by GlobalId (or by owner for non-rooted entities). STEP instance numbers are reassigned in that order. This makes `.ifc` files usable in version control and keeps diffs small.
 - **Backups.** Local saves keep N previous versions (default 3), as `<name>.<nnnn>.ifc` in a `<name>_backup` folder next to the project. Each backup is a full copy (with its RXD).
 - **Save As** can change the file name, the format (`.ifc` ↔ `.ifczip`) and the RXD carrier (embedded, sidecar, or both; `02a`). It cannot change the schema. Use **Convert Schema** for that (§2.11.3).
-- **File locking.** In Local mode, Reviera creates a lock file (`.~lock.<name>#`) while a project is open, and warns if another user or process has the file open. It then offers read-only open.
+- **File locking.** In Local mode, Riviera creates a lock file (`.~lock.<name>#`) while a project is open, and warns if another user or process has the file open. It then offers read-only open.
 - **Compression.** `.ifczip` uses DEFLATE (level 6 by default). STEP text for large models typically compresses by 80–90%.
 
 **Commands.** `file.save(document_id? (default: active)) -> status` · `file.save_as(document_id? (default: active), path, kind?, format?: ifc|ifczip, carrier?: embedded|external_file|external_dir|bundle) -> status` · `file.backups(document_id) -> backup[]` · `file.restore_backup(document_id, backup_id)`
@@ -3233,10 +3233,10 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
   - classification systems to include;
   - export parameter templates (`IfcPropertySetTemplate`) for user parameters;
   - level of detail (Coarse, Medium, Fine) for the `Body`;
-  - Reviera-only categories (masses, reference planes): exclude by default.
+  - Riviera-only categories (masses, reference planes): exclude by default.
 - **Property Mapping** (P1):
   - a tree of IFC classes on the left, with a filter;
-  - for the selected class, a grid of property sets and properties: include on/off; target property set and property name; data type; source (a Reviera parameter, a formula over parameters, or a constant); and *reset to default* per row;
+  - for the selected class, a grid of property sets and properties: include on/off; target property set and property name; data type; source (a Riviera parameter, a formula over parameters, or a constant); and *reset to default* per row;
   - pre-defined groups: *IFC common property sets*, *Base quantities*, *User parameters*;
   - mapping profiles can be saved per setup, and exported or imported as JSON.
   - This takes the place of a mapping text file. Ref: screenshots/platform/ifc_property_mapping_2027.png.
@@ -3261,7 +3261,7 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 **ID:** DM-IMP-001 … 012 · **Priority:** see table · **Ref:** research/05 §12.1, §12.3
 
 **Behaviour & rules.**
-- **Insert › Import** brings content into the model, as an import element in a view (2D), or as model geometry (3D). **Insert › Link** keeps a reference to the external file, reloaded on open or on demand (COL chapter for links of IFC and Reviera models).
+- **Insert › Import** brings content into the model, as an import element in a view (2D), or as model geometry (3D). **Insert › Link** keeps a reference to the external file, reloaded on open or on demand (COL chapter for links of IFC and Riviera models).
 - Common options for CAD imports:
   - positioning: auto centre-to-centre, auto origin-to-internal-origin, by shared coordinates, or manual;
   - units: auto-detect, or a chosen unit;
@@ -3280,7 +3280,7 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 | DM-IMP-004 | PDF (as underlay) | ✔ | ✔ | P1 | PDFium (BSD-3/Apache-2.0) | Choose a page, resolution, and vector snapping to the PDF's path geometry. Pages are rendered at 72–600 dpi (default 150) for display; vector paths are extracted once into a snapping cache. Scale is set by the page's declared size or calibrated by two picked points of known distance. Password-protected PDFs are refused. Placed in plan, drafting and sheet views. |
 | DM-IMP-005 | Images (PNG, JPEG, TIFF, BMP, WebP) | ✔ | ✔ | P1 | `image` crate (MIT/Apache-2.0) | Placed in views, or on sheets. Images are RXD assets de-duplicated by hash, or linked by path (§2.10.14, COL-LNK-005). Native size comes from the image's dpi (96 dpi if none); maximum 16,384 × 16,384 pixels. Draw layer background or foreground; scale calibration by two points; alpha transparency kept. |
 | DM-IMP-006 | OBJ, STL, PLY | ✔ (project or family; as a custom object, DM-IMP-015) | — | P1 | Rust crates (MIT/Apache-2.0) | Mesh. Optional decimation, and conversion to `IfcTriangulatedFaceSet`. Options: units (auto from file, or chosen), up-axis (Y or Z), merge coplanar triangles, decimate to a target triangle count, and category. Into a family, the mesh becomes a non-parametric form; into a project, a direct shape (§2.13.10). Non-manifold meshes are accepted for display and flagged. |
-| DM-IMP-007 | glTF 2.0 / GLB | ✔ (project or family; as a custom object, DM-IMP-015) | — | P1 *(raised from P2, owner, 2026-10-14)* | `gltf` crate (MIT/Apache-2.0) | Mesh with PBR materials (mapped to §2.10.5). Each glTF material becomes a Reviera material (matched by name to existing ones, or created) with its textures as RXD assets. Node hierarchy becomes nested groups or one element per node (option). Animations and cameras are ignored with a note. |
+| DM-IMP-007 | glTF 2.0 / GLB | ✔ (project or family; as a custom object, DM-IMP-015) | — | P1 *(raised from P2, owner, 2026-10-14)* | `gltf` crate (MIT/Apache-2.0) | Mesh with PBR materials (mapped to §2.10.5). Each glTF material becomes a Riviera material (matched by name to existing ones, or created) with its textures as RXD assets. Node hierarchy becomes nested groups or one element per node (option). Animations and cameras are ignored with a note. |
 | DM-IMP-008 | STEP AP203/AP214/AP242, IGES, BREP | ✔ (project or family) | — | P1 | OCCT (LGPL-2.1 + exception) | Exact B-rep, used for manufacturer content in families. Solids keep exact faces (`IfcAdvancedBrep` on export); assemblies can be imported as one element or one element per part. Units come from the file. Colour and layer attributes (AP214/AP242) set materials and subcategories. Healing (sewing, small-edge removal) runs with a report. |
 | DM-IMP-009 | 3DM (Rhino) | ✔ | — | P2 | openNURBS (licence to be checked) | Only if the licence check passes; otherwise P3. Imports breps, extrusions and meshes with layer names as subcategories; NURBS surfaces kept exact. Block instances become nested groups. Units from the file. |
 | DM-IMP-010 | Point clouds: E57, LAS/LAZ, PLY | — | ✔ | P2 | libE57Format (BSL-1.0), `las`/`laz` crates (MIT/Apache-2.0) | Indexed into an octree cache stored on disk next to the project (not part of IFC or RXD; rebuilt if missing). The link itself is in RXD document `project/links`. Snapping to points. Indexing runs in the background with progress; display uses level-of-detail streaming within a point budget (default 5 million points). Colour by RGB, intensity, elevation or classification. Clipped by section boxes and view ranges. |
@@ -3347,18 +3347,18 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 ### 2.11.7 Headless and command-line operation
 **ID:** DM-FILE-005 · **Priority:** P1 · **Ref:** research/05 §13.3 (cloud batch processing), §11.2 (batch upgrade)
 
-**Purpose.** An open, local equivalent of cloud batch processing: run Reviera without a UI for upgrades, exports, checks and configurators.
+**Purpose.** An open, local equivalent of cloud batch processing: run Riviera without a UI for upgrades, exports, checks and configurators.
 
 **Behaviour & rules.**
-- `reviera --headless [--script <file.lua>] [--command <name> --args <json>] [--trust <level>] <model.ifc> …` runs commands or Lua scripts against one or more models, then exits. The exit code is 0 for success and non-zero for failure, and a JSON report goes to stdout or to a file.
-- `reviera --mcp-stdio [model.ifc]` starts the MCP server on stdio without a UI (§2.16.2).
+- `riviera --headless [--script <file.lua>] [--command <name> --args <json>] [--trust <level>] <model.ifc> …` runs commands or Lua scripts against one or more models, then exits. The exit code is 0 for success and non-zero for failure, and a JSON report goes to stdout or to a file.
+- `riviera --mcp-stdio [model.ifc]` starts the MCP server on stdio without a UI (§2.16.2).
 - Headless mode uses the same command registry and transactions. Commands that need user interaction (picks, dialogs) fail with `ui.required`, unless their parameters are fully given.
 - Typical scripts: batch schema conversion, batch IFC/PDF export, model checking, parameter updates from CSV, and family package upgrades.
 
 **Commands.** (process-level, not registry commands) — documented in the user manual.
 
 **Acceptance criteria.**
-- [ ] `reviera --headless --command export.ifc --args '{"path":"out.ifc","setup_name":"IFC4 Reference View"}' model.ifc` produces the same file as the UI export.
+- [ ] `riviera --headless --command export.ifc --args '{"path":"out.ifc","setup_name":"IFC4 Reference View"}' model.ifc` produces the same file as the UI export.
 - [ ] Running a headless script on 100 files in a loop uses all cores when invoked as several processes, and leaks no memory between files within one process.
 
 ### 2.11.8 Versioning, upgrade and migration
@@ -3369,10 +3369,10 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 **Behaviour & rules.**
 - **Two version axes:**
   1. the **IFC schema** (governed by buildingSMART; §2.11.3);
-  2. the **RXD schema version** (semver, set by Reviera; `02a`).
+  2. the **RXD schema version** (semver, set by Riviera; `02a`).
   The application version is recorded too, but it does not by itself make files incompatible.
 - **Compatibility promise:**
-  - **Same RXD major version**: any Reviera release opens and saves the file without loss. Newer minor versions add optional keys. Older releases keep unknown keys (§2.4.1) and warn that "some features were created in a newer version and are shown read-only".
+  - **Same RXD major version**: any Riviera release opens and saves the file without loss. Newer minor versions add optional keys. Older releases keep unknown keys (§2.4.1) and warn that "some features were created in a newer version and are shown read-only".
   - **Newer RXD major version**: older releases open the file as **IFC-only plus read-only RXD**. Building elements and parameters are editable. RXD documents that cannot be read are kept unchanged on save, and are flagged as stale for reconciliation when the newer release reopens the file.
   - **Older RXD major version**: newer releases migrate on open, using a chain of migration steps (vN → vN+1 → …). Each step is a pure function over RXD documents, with a unit test and sample files. The original file is never overwritten until the user saves, and a backup of the pre-migration file is kept.
 - **Save to previous version (P1).** *File › Save As › Previous Version* writes RXD at the previous major version, when the model uses no features that exist only in the newer one. If it does, the dialog lists those features, and they are dropped (or turned into static IFC geometry) on export.
@@ -3405,8 +3405,8 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
   - Opening downloads the file to a local working copy in the session folder. The model is opened from that copy, and the live store and crash recovery (Ch 2b) work exactly as for local files.
   - Saving writes the copy locally first (atomic, §2.11.2), then uploads it with `PUT` and `If-Match` set to the ETag seen at open or last save.
 - **Conflicts.**
-  - If the server's ETag has changed (someone else saved), the upload is refused (412). Reviera then offers to save the local version to another name or to overwrite after confirmation; it never merges silently.
-  - With a server that supports `LOCK`, Reviera takes an exclusive write lock while the model is open for editing, renews it before it expires, and releases it on close. A file locked by someone else opens read-only, like a locked local file (§2.11.1).
+  - If the server's ETag has changed (someone else saved), the upload is refused (412). Riviera then offers to save the local version to another name or to overwrite after confirmation; it never merges silently.
+  - With a server that supports `LOCK`, Riviera takes an exclusive write lock while the model is open for editing, renews it before it expires, and releases it on close. A file locked by someone else opens read-only, like a locked local file (§2.11.1).
 - **Credentials.**
   - Basic (over HTTPS only), Digest and Bearer token authentication.
   - Credentials and tokens are stored in the OS keyring (like the live-store key, Ch 2b), never in settings files, RXD or logs.
@@ -3415,15 +3415,15 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 - **Paths everywhere.** `file.open`, `file.save_as`, recent files, links and the Lua and MCP APIs accept `https://` and `webdav://` URLs wherever they accept a path.
 - **Integrations.** Server-specific behaviour (metadata, sharing or version history) is out of scope here. FileEngine has its own integration over its REST API (`design_documents/FILEENGINE_INTEGRATION.md`).
 
-**Data (storage).** Locations live in the user's settings, with credentials in the keyring. Nothing about the server is written into the IFC file, apart from the usual `Reviera_Manifest` fields.
+**Data (storage).** Locations live in the user's settings, with credentials in the keyring. Nothing about the server is written into the IFC file, apart from the usual `Riviera_Manifest` fields.
 
 **Commands.** `file.location.add(url, name?, auth: none|basic|digest|bearer, trusted_http?: bool) -> location_id`; `file.location.list() -> location[]`; `file.location.remove(location_id) -> ()`; `file.location.browse(location_id, path?) -> entry[]` (query). `file.open` and `file.save_as` accept URLs.
 
 **Acceptance criteria.**
 - [ ] A model opened from a WebDAV folder, edited and saved, is updated on the server, and its ETag changes.
 - [ ] If another client saves the same file in between, Save is refused with a conflict message, and *Save As* to a new name succeeds.
-- [ ] With a server that supports `LOCK`, a second Reviera session opening the same file gets it read-only.
-- [ ] Killing Reviera while a WebDAV model has unsaved work offers recovery on restart, as for a local file.
+- [ ] With a server that supports `LOCK`, a second Riviera session opening the same file gets it read-only.
+- [ ] Killing Riviera while a WebDAV model has unsaved work offers recovery on restart, as for a local file.
 - [ ] No password or token appears in settings files, logs or the saved IFC.
 
 ---
@@ -3431,14 +3431,14 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 ### 2.11.10 CADCraft interoperability
 **ID:** DM-IMP-013 · **Priority:** P1 · **Ref:** the public CADCraft repository (github.com/storytold/cadcraft, MIT or Apache-2.0) and the public `acadrust` crate (MPL-2.0); see RESEARCH_LOG 2026-10-13
 
-**Purpose.** CADCraft is an open-source 2D drafting application written in Rust. Reviera and CADCraft complement each other: drawings made in CADCraft (site plans, surveys, details, consultant drawings) come into Reviera as imported or linked CAD, and Reviera's drawings go back to CADCraft as DXF or DWG. The exchange goes through files only; neither application depends on the other's code.
+**Purpose.** CADCraft is an open-source 2D drafting application written in Rust. Riviera and CADCraft complement each other: drawings made in CADCraft (site plans, surveys, details, consultant drawings) come into Riviera as imported or linked CAD, and Riviera's drawings go back to CADCraft as DXF or DWG. The exchange goes through files only; neither application depends on the other's code.
 
 **Behaviour & rules.**
-- **Formats.** CADCraft writes DXF R2000 (ASCII) and DWG R2000, and reads DXF R12–2018 (ASCII and binary) and DWG R13–2018. Reviera imports and links every DXF and DWG version CADCraft writes (DM-IMP-002, DM-IMP-003, COL-LNK-002), and exports DXF and DWG in versions CADCraft reads (DM-EXP-003, DM-EXP-004).
-- **One reader for both.** Reviera reads DXF and DWG with `acadrust` (MPL-2.0), the library CADCraft uses for DWG, so both applications read a file the same way. The `acadrust` version is pinned, and every upgrade runs the compatibility verification of DM-IMP-014 before it is accepted.
-- **Entity mapping.** Each CADCraft entity has a defined result in Reviera. Anything else is listed in the import report with its type, layer and handle, never dropped silently.
+- **Formats.** CADCraft writes DXF R2000 (ASCII) and DWG R2000, and reads DXF R12–2018 (ASCII and binary) and DWG R13–2018. Riviera imports and links every DXF and DWG version CADCraft writes (DM-IMP-002, DM-IMP-003, COL-LNK-002), and exports DXF and DWG in versions CADCraft reads (DM-EXP-003, DM-EXP-004).
+- **One reader for both.** Riviera reads DXF and DWG with `acadrust` (MPL-2.0), the library CADCraft uses for DWG, so both applications read a file the same way. The `acadrust` version is pinned, and every upgrade runs the compatibility verification of DM-IMP-014 before it is accepted.
+- **Entity mapping.** Each CADCraft entity has a defined result in Riviera. Anything else is listed in the import report with its type, layer and handle, never dropped silently.
 
-| CADCraft entity (DXF type) | Reviera import result |
+| CADCraft entity (DXF type) | Riviera import result |
 |---|---|
 | Line (`LINE`), extended line and ray (`XLINE`, `RAY`) | Line; extended lines and rays are clipped to the drawing extents and listed in the report |
 | Polyline with arcs and widths (`LWPOLYLINE`, `POLYLINE`), rectangle, polygon, donut | Chain of lines and arcs (bulges kept as exact arcs); a non-zero width becomes a filled region of that outline |
@@ -3454,7 +3454,7 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 
 - **Layers and styles.** Each layer becomes an Imported Objects subcategory with its colour, linetype and lineweight (COL-LNK-002). Layers that are off or frozen in the file import hidden. ByLayer and ByBlock properties resolve as the file defines them.
 - **Units and position.** Units come from `$INSUNITS`; when it is missing or unitless, the user's chosen unit is used and the report says so. Positioning follows COL-LNK-001 (origin to origin by default; *Auto – by shared coordinates* when the drawing is in survey coordinates).
-- **Export preset "CADCraft".** DXF and DWG export (DOC-OUT-005) offer a preset for CADCraft. It writes R2000, uses only entities in the table above (anything else is exploded into lines, arcs, text and hatches), writes `$INSUNITS` from the project's length unit, and maps Reviera line patterns to linetypes CADCraft reads.
+- **Export preset "CADCraft".** DXF and DWG export (DOC-OUT-005) offer a preset for CADCraft. It writes R2000, uses only entities in the table above (anything else is exploded into lines, arcs, text and hatches), writes `$INSUNITS` from the project's length unit, and maps Riviera line patterns to linetypes CADCraft reads.
 - **Linked files reload.** A CADCraft drawing linked with `link.add_cad` reloads when the file changes, so the two applications can be used side by side on one project.
 
 **Commands.** No new commands: `import.cad`, `link.add_cad` and `export.dxf` / `export.dwg` with `preset: "cadcraft"`. `import.cad_report(path, options?) -> report` *(query)* reads a file without importing it and returns the entity counts by type and layer, the units found and every entity that would not be imported as itself.
@@ -3468,22 +3468,22 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 ### 2.11.11 CADCraft compatibility verification
 **ID:** DM-IMP-014 · **Priority:** P1 · **Ref:** DM-IMP-013
 
-**Purpose.** Prove, continuously, that Reviera reads what CADCraft writes and that CADCraft reads what Reviera writes, and notice at once when a new version of either application breaks this.
+**Purpose.** Prove, continuously, that Riviera reads what CADCraft writes and that CADCraft reads what Riviera writes, and notice at once when a new version of either application breaks this.
 
 **Behaviour & rules.**
-- **Reference corpus.** The repository holds a corpus of drawings saved by CADCraft under `test-data/cadcraft/`. Each file has a provenance note recording the CADCraft version (release or commit), how the drawing was made, and its licence (made for Reviera's tests, or published under a licence that allows redistribution). The corpus covers at least:
+- **Reference corpus.** The repository holds a corpus of drawings saved by CADCraft under `test-data/cadcraft/`. Each file has a provenance note recording the CADCraft version (release or commit), how the drawing was made, and its licence (made for Riviera's tests, or published under a licence that allows redistribution). The corpus covers at least:
   - every entity type in the DM-IMP-013 mapping table, each on its own named layer;
   - DXF R2000 ASCII, DXF binary and DWG R2000 copies of the same drawing;
   - millimetre, metre, inch and unitless drawings;
   - nested blocks with attributes, ByLayer and ByBlock properties, and layers that are off or frozen;
   - a drawing in survey coordinates far from the origin (above 10⁶ units), to check precision.
-- **Expected results.** Each corpus file has an expected-results file (JSON) beside it: entity counts by type and layer, the drawing extents, chosen coordinates and texts, and the units. The expected results are written from the drawing's own definition (how it was drawn), not from Reviera's output.
+- **Expected results.** Each corpus file has an expected-results file (JSON) beside it: entity counts by type and layer, the drawing extents, chosen coordinates and texts, and the units. The expected results are written from the drawing's own definition (how it was drawn), not from Riviera's output.
 - **Automated checks.** The test suite (`cargo test`) imports every corpus file and compares the result with its expected results:
   - coordinates within 10⁻⁶ drawing units, angles within 10⁻⁹ rad, texts exactly;
   - the DXF, binary DXF and DWG copies of one drawing give identical results;
   - export round trip: the imported drawing exported with the CADCraft preset and read again gives the same entities and coordinates.
-- **Checking in CADCraft itself.** When a CADCraft build is available on the test machine (found on the path, or named by `REVIERA_CADCRAFT`), the export round trip also opens Reviera's exported files in CADCraft, using its command-line or scripting interface where one is offered, and checks that every expected entity was read. Without CADCraft these checks are skipped and reported as skipped, never as passed.
-- **Compatibility matrix.** `docs/interop/cadcraft.md` records the Reviera, CADCraft and `acadrust` versions last verified together, the entity coverage in both directions, and known differences. It is updated with every corpus change, every `acadrust` upgrade, and every CADCraft release used for verification.
+- **Checking in CADCraft itself.** When a CADCraft build is available on the test machine (found on the path, or named by `RIVIERA_CADCRAFT`), the export round trip also opens Riviera's exported files in CADCraft, using its command-line or scripting interface where one is offered, and checks that every expected entity was read. Without CADCraft these checks are skipped and reported as skipped, never as passed.
+- **Compatibility matrix.** `docs/interop/cadcraft.md` records the Riviera, CADCraft and `acadrust` versions last verified together, the entity coverage in both directions, and known differences. It is updated with every corpus change, every `acadrust` upgrade, and every CADCraft release used for verification.
 - **Failures.** A corpus file that fails blocks the change that caused it. A difference caused by a new CADCraft version is recorded in the matrix with an issue, and that version's files are added to the corpus.
 
 **Acceptance criteria.**
@@ -3493,12 +3493,12 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 - [ ] The compatibility matrix names the CADCraft version that produced every corpus file.
 
 ### 2.11.12 Custom objects from meshes
-**ID:** DM-IMP-015 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); DM-IMP-006, DM-IMP-007; Reviera's own design
+**ID:** DM-IMP-015 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); DM-IMP-006, DM-IMP-007; Riviera's own design
 
-**Purpose.** Bring any mesh made in another open tool (a chair from a modelling program, a scanned statue, a manufacturer's product, a 3D-print model) into a project as a **custom object**: a type of object, with a category, materials and parameters, placed as many times as needed and treated like Reviera's own elements. *(Owner requirement, 2026-10-14: "import an arbitrary mesh from common open 3D formats as custom objects".)*
+**Purpose.** Bring any mesh made in another open tool (a chair from a modelling program, a scanned statue, a manufacturer's product, a 3D-print model) into a project as a **custom object**: a type of object, with a category, materials and parameters, placed as many times as needed and treated like Riviera's own elements. *(Owner requirement, 2026-10-14: "import an arbitrary mesh from common open 3D formats as custom objects".)*
 
 **Behaviour & rules.**
-- **Formats.** OBJ (with its MTL materials), STL (ASCII and binary), PLY (ASCII and binary), glTF 2.0 and GLB are P1; 3MF and OFF are P2. Each is read with a GPL-compatible open-source reader (a Rust crate, or Reviera's own reader for the simpler formats), recorded in the research log when chosen. Formats that need proprietary SDKs stay P3 (DM-IMP-001 … 012).
+- **Formats.** OBJ (with its MTL materials), STL (ASCII and binary), PLY (ASCII and binary), glTF 2.0 and GLB are P1; 3MF and OFF are P2. Each is read with a GPL-compatible open-source reader (a Rust crate, or Riviera's own reader for the simpler formats), recorded in the research log when chosen. Formats that need proprietary SDKs stay P3 (DM-IMP-001 … 012).
 - **Insert › Import Object** (`mesh_object.import`) opens the file and shows a dialog with a 3D preview:
   - **Units**: from the file when it states them (glTF is in metres; 3MF states its unit), otherwise chosen (mm, cm, m, in, ft). The preview shows the object's resulting width, depth and height, so a wrong unit is obvious before import.
   - **Up axis**: Z or Y (glTF's default is Y-up; OBJ, STL and PLY have no convention, so Z-up is the default with a one-click flip).
@@ -3537,7 +3537,7 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 - [ ] Importing a 6,000,000-triangle mesh is refused with the triangle count in the message.
 
 **Implementation note (2026-10-14, first build).**
-- **Readers:** Reviera's own readers, with no new dependencies, for OBJ (with MTL colours), STL (ASCII and binary), PLY (ASCII and binary, both byte orders) and glTF 2.0/GLB (node transforms, base colours; Draco and sparse accessors refused with a message).
+- **Readers:** Riviera's own readers, with no new dependencies, for OBJ (with MTL colours), STL (ASCII and binary), PLY (ASCII and binary, both byte orders) and glTF 2.0/GLB (node transforms, base colours; Draco and sparse accessors refused with a message).
 - **Storage:** the type stores its mesh in its RXD recipe (base64 `f32` positions, `u32` triangles, `u16` slots, keyed by a content hash so it is decoded once). In IFC it is written once as an `IfcRepresentationMap` of one `IfcTriangulatedFaceSet` per slot, each with an `IfcStyledItem`. Copies are `IfcMappedItem`s; a mirrored copy uses `IfcCartesianTransformationOperator3DnonUniform`.
 - **Copies:** each has its own scale as well as the type's.
 - **Library-loaded types:** these record the library's id and name and the item's path in it, but no absolute folders, so shared models do not carry the author's paths.
@@ -3559,7 +3559,7 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 | `name` | `domain.verb` or `domain.sub.verb`, lower snake case (for example `wall.create`, `family_doc.form.extrusion`). Unique and stable. |
 | `version` | Integer, increased on any breaking change to parameters or result |
 | `summary` / `description` | One line, and a paragraph (localisable). Used for tooltips, Lua docs and MCP tool descriptions. |
-| `params` | A JSON Schema (draft 2020-12), generated from Rust types (`schemars`). It includes units (`x-reviera-data-type: "length"`), element-reference kinds (`x-reviera-element: {category: "cat.walls"}`), defaults and enums. |
+| `params` | A JSON Schema (draft 2020-12), generated from Rust types (`schemars`). It includes units (`x-riviera-data-type: "length"`), element-reference kinds (`x-riviera-element: {category: "cat.walls"}`), defaults and enums. |
 | `result` | A JSON Schema for the result |
 | `effect` | One or more of `read`, `edit`, `file_read`, `file_write`, `network`, `script`, `ui`, `destructive`, `settings` |
 | `undoable` | Whether it creates an undo item (`false` for `read`, file and UI-only commands) |
@@ -3577,7 +3577,7 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 - **Errors** are typed: `{code, message, details, resolutions?}`. Codes are stable strings (for example `param.read_only`, `ui.required`, `availability.wrong_view`, `failure.unresolved`).
 - **Generated outputs:** the Lua binding (§2.13.2), MCP tools (§2.16.3), ribbon and shortcut bindings, the command-reference documentation (Markdown and HTML), JSON Schemas for each command (published with each release), and conformance test stubs.
 
-**Commands.** `registry.list(filter?) -> command_summary[]` · `registry.describe(name) -> definition` · `registry.execute(name, args)` (the generic entry point; exposed to Lua as `reviera.run` and to MCP as `run_command`)
+**Commands.** `registry.list(filter?) -> command_summary[]` · `registry.describe(name) -> definition` · `registry.execute(name, args)` (the generic entry point; exposed to Lua as `riviera.run` and to MCP as `run_command`)
 
 **Acceptance criteria.**
 - [ ] A CI check fails if any `pub` model-mutating function in the core can be reached other than through a registered command.
@@ -3603,41 +3603,41 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 **ID:** DM-LUA-001 · **Priority:** P0 · **Ref:** research/05 §13.1, §13.4, §13.7; TECH_STACK §3.5
 
 **Behaviour & rules.**
-- LuaJIT is embedded through `mlua` (feature `luajit`). The language level is **Lua 5.1 plus LuaJIT extensions**. Scripts shall not rely on Lua 5.3+ features (integers, `goto` in 5.1 mode, `utf8` library). Reviera provides a `reviera.utf8` helper, and 64-bit integer IDs are exposed as LuaJIT `int64_t` cdata *or* as strings, as chosen by `reviera.config.id_mode` (default: strings for GUIDs, Lua numbers for internal IDs below 2^53, which covers all IDs in practice).
+- LuaJIT is embedded through `mlua` (feature `luajit`). The language level is **Lua 5.1 plus LuaJIT extensions**. Scripts shall not rely on Lua 5.3+ features (integers, `goto` in 5.1 mode, `utf8` library). Riviera provides a `riviera.utf8` helper, and 64-bit integer IDs are exposed as LuaJIT `int64_t` cdata *or* as strings, as chosen by `riviera.config.id_mode` (default: strings for GUIDs, Lua numbers for internal IDs below 2^53, which covers all IDs in practice).
 - **States:**
   - a **main state** runs on the command thread. It runs macros, add-ins, updaters and event handlers. It has full access to the API (subject to trust level);
   - **worker states** (optional) run pure-computation functions in parallel (for example geometry calculations for many elements). They have no access to the model or to I/O. They receive copied data and return values. They are pooled.
   - Each add-in gets its **own environment** (a separate global table) in the main state, so add-ins cannot overwrite each other's globals. Add-ins at trust level `native` may use their own state on request.
-- **Platform check.** On platforms where the LuaJIT JIT is not reliable (to be checked per release; for example some ARM64 macOS builds), Reviera runs LuaJIT in interpreter mode (`jit.off()`). Results stay the same, but some scripts run more slowly.
+- **Platform check.** On platforms where the LuaJIT JIT is not reliable (to be checked per release; for example some ARM64 macOS builds), Riviera runs LuaJIT in interpreter mode (`jit.off()`). Results stay the same, but some scripts run more slowly.
 
 **Acceptance criteria.**
 - [ ] Two add-ins that both define a global `config` do not see each other's value.
-- [ ] A worker-state function that tries to call `reviera.query` fails with `lua.no_model_access`.
+- [ ] A worker-state function that tries to call `riviera.query` fails with `lua.no_model_access`.
 
 ### 2.13.2 Module map
 **ID:** DM-LUA-002 · **Priority:** P0 · **Ref:** research/05 §13.1; TECH_STACK §3.5
 
-**Behaviour & rules.** The global table `reviera` contains:
+**Behaviour & rules.** The global table `riviera` contains:
 
 | Module | Contents | Generated? |
 |---|---|---|
-| `reviera.<domain>.<verb>(args)` | One function per registered command (for example `reviera.wall.create{...}`). Takes a table of named arguments, and returns the result table. Raises a Lua error with a typed error object on failure. | Yes, from the registry |
-| `reviera.run(name, args)` | Generic command call by name | — |
-| `reviera.doc` | The active document: `id`, `kind`, `path`, `title`, `is_family`, `version()`, `documents()` (all open documents), `activate(id)` | — |
-| `reviera.query` | The element collector (§2.13.3) | — |
-| `reviera.element(id_or_guid)` | Returns an element proxy (read-only properties, plus convenience writes that call commands) | — |
-| `reviera.txn` | Transactions (§2.13.4) | — |
-| `reviera.events` | Events (§2.13.5) | — |
-| `reviera.updaters` | Updaters (§2.13.5) | — |
-| `reviera.post`, `reviera.timer`, `reviera.async` | Deferred and asynchronous execution (§2.13.6) | — |
-| `reviera.geom` | Read-only geometry access, and value types `XYZ`, `UV`, `Transform`, `BBox`, `Curve`, `Plane`, `Solid` (§2.13.10) | — |
-| `reviera.units` | `parse`, `format`, `convert`, data-type constants | Wrappers of `units.*` |
-| `reviera.ui` | Selection, picks, task dialogs, forms, ribbon and dockable panels (§2.13.9) | — |
-| `reviera.fs`, `reviera.http` | File and network access, subject to trust level (§2.13.7) | — |
-| `reviera.json`, `reviera.csv`, `reviera.utf8`, `reviera.log` | Utilities | — |
-| `reviera.addin` | The calling add-in's ID, version, data folder and settings store | — |
+| `riviera.<domain>.<verb>(args)` | One function per registered command (for example `riviera.wall.create{...}`). Takes a table of named arguments, and returns the result table. Raises a Lua error with a typed error object on failure. | Yes, from the registry |
+| `riviera.run(name, args)` | Generic command call by name | — |
+| `riviera.doc` | The active document: `id`, `kind`, `path`, `title`, `is_family`, `version()`, `documents()` (all open documents), `activate(id)` | — |
+| `riviera.query` | The element collector (§2.13.3) | — |
+| `riviera.element(id_or_guid)` | Returns an element proxy (read-only properties, plus convenience writes that call commands) | — |
+| `riviera.txn` | Transactions (§2.13.4) | — |
+| `riviera.events` | Events (§2.13.5) | — |
+| `riviera.updaters` | Updaters (§2.13.5) | — |
+| `riviera.post`, `riviera.timer`, `riviera.async` | Deferred and asynchronous execution (§2.13.6) | — |
+| `riviera.geom` | Read-only geometry access, and value types `XYZ`, `UV`, `Transform`, `BBox`, `Curve`, `Plane`, `Solid` (§2.13.10) | — |
+| `riviera.units` | `parse`, `format`, `convert`, data-type constants | Wrappers of `units.*` |
+| `riviera.ui` | Selection, picks, task dialogs, forms, ribbon and dockable panels (§2.13.9) | — |
+| `riviera.fs`, `riviera.http` | File and network access, subject to trust level (§2.13.7) | — |
+| `riviera.json`, `riviera.csv`, `riviera.utf8`, `riviera.log` | Utilities | — |
+| `riviera.addin` | The calling add-in's ID, version, data folder and settings store | — |
 
-- **Element proxies.** `reviera.element(x)` returns a proxy with fields `id`, `guid`, `category`, `name`, `type` (a proxy), `level`, `host`, `owner_view`, `location`, `bbox`, and methods:
+- **Element proxies.** `riviera.element(x)` returns a proxy with fields `id`, `guid`, `category`, `name`, `type` (a proxy), `level`, `host`, `owner_view`, `location`, `bbox`, and methods:
   - `:param(name_or_guid_or_key)` returns `{value, display, data_type, is_read_only, is_type}`;
   - `:params()` returns all parameters;
   - `:set(name, value)` calls `param.set`, and therefore needs an open transaction;
@@ -3648,32 +3648,32 @@ Coordinates ▾: *Acquire Coordinates* (from a link), *Publish Coordinates* (to 
 
 ```lua
 -- Number all doors on Level 1 by room, inside one undoable transaction.
-local doors = reviera.query()
+local doors = riviera.query()
   :of_category("cat.doors")
   :instances()
   :on_level("Level 1")
   :to_list()
 
-reviera.txn.run("Renumber doors", function()
+riviera.txn.run("Renumber doors", function()
   for i, d in ipairs(doors) do
     local room = d:param("To Room").value or d:param("From Room").value
-    local num  = room and reviera.element(room):param("Number").value or "X"
+    local num  = room and riviera.element(room):param("Number").value or "X"
     d:set("Mark", string.format("%s-%02d", num, i))
   end
 end)
 ```
 
 **Acceptance criteria.**
-- [ ] Every registered command is callable as `reviera.<name>` with a table argument, and the result matches the MCP tool result for the same arguments.
+- [ ] Every registered command is callable as `riviera.<name>` with a table argument, and the result matches the MCP tool result for the same arguments.
 - [ ] The example above runs on the sample project, creates one undo item named "Renumber doors", and changes only Mark values.
 
 ### 2.13.3 Element queries (the collector)
 **ID:** DM-LUA-003 · **Priority:** P0 · **Ref:** research/05 §13.1 (filtered element collector); TECH_STACK §3.5
 
-**Purpose.** A fast, chainable way to find elements. It is the Reviera counterpart of a filtered element collector.
+**Purpose.** A fast, chainable way to find elements. It is the Riviera counterpart of a filtered element collector.
 
 **Behaviour & rules.**
-- `reviera.query([doc])` starts a query over a **consistent snapshot**: the committed state, or the transaction's current state when called inside a transaction. Filters are chained, and the query is **lazy**: nothing runs until it is iterated or a terminal method is called.
+- `riviera.query([doc])` starts a query over a **consistent snapshot**: the committed state, or the transaction's current state when called inside a transaction. Filters are chained, and the query is **lazy**: nothing runs until it is iterated or a terminal method is called.
 - **Quick filters** use indexes in the element store (category, class, type, level, owner view, workset, design option, bounding-box R-tree, GUID). **Slow filters** need element data (parameter values, geometry intersection, Lua predicates). The query planner always applies quick filters first, whatever order they were written in.
 
 | Method | Kind | Meaning |
@@ -3713,13 +3713,13 @@ end)
 **ID:** DM-LUA-004 · **Priority:** P0 · **Ref:** research/05 §3; TECH_STACK §3.3, §3.5
 
 **Behaviour & rules.**
-- `reviera.txn.run(name, fn)` opens a transaction, runs `fn`, and commits. If `fn` raises an error, or returns `false`, the transaction is rolled back. It returns `true, result`, or `false, err`.
-- `reviera.txn.savepoint(fn)` runs `fn` inside a savepoint. An error inside it rolls back the savepoint only, and the error is returned instead of raised.
-- `reviera.txn.group(name, mode, fn)` runs `fn` inside a transaction group. `mode` is `"assimilate"`, `"commit"` or `"rollback"` (rollback is useful for "what-if" calculations).
+- `riviera.txn.run(name, fn)` opens a transaction, runs `fn`, and commits. If `fn` raises an error, or returns `false`, the transaction is rolled back. It returns `true, result`, or `false, err`.
+- `riviera.txn.savepoint(fn)` runs `fn` inside a savepoint. An error inside it rolls back the savepoint only, and the error is returned instead of raised.
+- `riviera.txn.group(name, mode, fn)` runs `fn` inside a transaction group. `mode` is `"assimilate"`, `"commit"` or `"rollback"` (rollback is useful for "what-if" calculations).
 - Explicit forms `txn.begin/commit/rollback` exist for advanced use. A transaction that is still open when the script ends is rolled back, with a warning.
 - **Write outside a transaction.** Calling an `edit` command outside a transaction opens and commits an **implicit** transaction for that single command (one undo item per call). This is convenient for interactive use. Scripts should use `txn.run` to group changes.
-- `reviera.txn.on_failure(fn)` registers a failure preprocessor for the current transaction (§2.7.4). `fn(failures)` returns a table of actions: `{id = "dismiss" | "<resolution>" | "continue"}`.
-- `reviera.regen.now()` runs regeneration part-way through the transaction (§2.6.4).
+- `riviera.txn.on_failure(fn)` registers a failure preprocessor for the current transaction (§2.7.4). `fn(failures)` returns a table of actions: `{id = "dismiss" | "<resolution>" | "continue"}`.
+- `riviera.regen.now()` runs regeneration part-way through the transaction (§2.6.4).
 
 **Acceptance criteria.**
 - [ ] `txn.run` with a function that errors after creating 3 elements leaves 0 elements and no undo item, and returns `false` with the error.
@@ -3731,7 +3731,7 @@ end)
 **Purpose.** Scripts can react to changes **after** they are committed (events), or **inside** the transaction that made them (updaters), so that dependent data stays correct automatically.
 
 **Behaviour & rules.**
-- **Events** (handlers run after commit, read-only by default; a handler may start its own transaction with `reviera.post`, §2.13.6):
+- **Events** (handlers run after commit, read-only by default; a handler may start its own transaction with `riviera.post`, §2.13.6):
 
 | Event | Payload |
 |---|---|
@@ -3749,7 +3749,7 @@ end)
 - **Updaters** (the equivalent of dynamic model update):
 
 ```lua
-reviera.updaters.register{
+riviera.updaters.register{
   id       = "org.example.roomtools.door-room-sync",   -- unique, stable
   name     = "Copy room number to door",
   triggers = {
@@ -3761,9 +3761,9 @@ reviera.updaters.register{
   optional = true,         -- if the add-in is missing, the model still opens without prompts
   run = function(ctx)      -- runs INSIDE the triggering transaction, before commit
     for _, id in ipairs(ctx.affected("cat.doors")) do
-      local d = reviera.element(id)
+      local d = riviera.element(id)
       local room = d:param("To Room").value
-      if room then d:set("Room Number", reviera.element(room):param("Number").value) end
+      if room then d:set("Room Number", riviera.element(room):param("Number").value) end
     end
   end,
 }
@@ -3790,14 +3790,14 @@ reviera.updaters.register{
 
 **Behaviour & rules.**
 - The model can only be changed on the command thread, in a transaction. Code running in other contexts (dockable-panel callbacks, timers, HTTP callbacks, worker states) cannot change the model directly. Instead it uses:
-  - **`reviera.post(fn, opts?)`** queues `fn` to run on the command thread, in the next free slot, with full API access. `opts.name` labels it in the journal. `opts.coalesce = key` replaces a pending call with the same key. Returns a handle with `:cancel()` and `:status()`.
-  - **`reviera.timer(ms, fn, {repeat?})`** runs `fn` through `post` after a delay.
-  - **`reviera.async(fn)`** runs `fn` as a coroutine on the command thread. Inside it, `reviera.await(x)` suspends without blocking the UI until `x` (an HTTP request, a worker-state job, a timer, or a user pick in the UI) completes. It then resumes on the command thread. Transactions cannot be held open across an `await`. Trying to do so fails with `txn.await_in_transaction`.
-  - **`reviera.workers.map(fn_source, items, opts)`** runs a pure function over items in worker states, in parallel, and returns the results to the coroutine.
+  - **`riviera.post(fn, opts?)`** queues `fn` to run on the command thread, in the next free slot, with full API access. `opts.name` labels it in the journal. `opts.coalesce = key` replaces a pending call with the same key. Returns a handle with `:cancel()` and `:status()`.
+  - **`riviera.timer(ms, fn, {repeat?})`** runs `fn` through `post` after a delay.
+  - **`riviera.async(fn)`** runs `fn` as a coroutine on the command thread. Inside it, `riviera.await(x)` suspends without blocking the UI until `x` (an HTTP request, a worker-state job, a timer, or a user pick in the UI) completes. It then resumes on the command thread. Transactions cannot be held open across an `await`. Trying to do so fails with `txn.await_in_transaction`.
+  - **`riviera.workers.map(fn_source, items, opts)`** runs a pure function over items in worker states, in parallel, and returns the results to the coroutine.
 - The UI never waits for Lua code to finish. Long-running script steps show a progress bar with *Cancel*. Cancel raises `lua.cancelled` at the next API call or yield point.
 
 **Acceptance criteria.**
-- [ ] A dockable panel button that calls `reviera.post` to create a wall works while the user is orbiting a 3D view, and the wall appears as one undo item.
+- [ ] A dockable panel button that calls `riviera.post` to create a wall works while the user is orbiting a 3D view, and the wall appears as one undo item.
 - [ ] An `async` script that awaits an HTTP request of 5 s does not freeze the UI. The user can keep editing, and the script's transaction runs after the response.
 
 ### 2.13.7 Sandbox and trust levels
@@ -3815,7 +3815,7 @@ reviera.updaters.register{
 | 3 | `trusted` | As level 2 | Any path the user can access | Any host | `os.execute`/`io.popen` with a confirmation prompt the first time | ✘ | Firm-internal tools |
 | 4 | `native` | As level 3 | Any | Any | Any | ✔ `ffi`, `debug`, bytecode loading | Add-ins that bind native libraries. Requires explicit user approval with a strong warning. |
 
-- **Removed or wrapped globals** at levels 0–2: `io`, `os` (except `os.time`, `os.clock`, `os.date`), `require` of C modules, `package.loadlib`, `load`/`loadstring` with bytecode (text chunks are allowed), `dofile`/`loadfile` (replaced by `reviera.addin.require` for files inside the add-in package), `debug`, `ffi`, `jit` (except `jit.status`), `collectgarbage("stop")`.
+- **Removed or wrapped globals** at levels 0–2: `io`, `os` (except `os.time`, `os.clock`, `os.date`), `require` of C modules, `package.loadlib`, `load`/`loadstring` with bytecode (text chunks are allowed), `dofile`/`loadfile` (replaced by `riviera.addin.require` for files inside the add-in package), `debug`, `ffi`, `jit` (except `jit.status`), `collectgarbage("stop")`.
 - **Resource limits** (all levels except `native`, configurable):
   - wall-clock limit per synchronous call (default 30 s, then a prompt to continue or cancel);
   - instruction-count hook, for interrupting runaway loops (the JIT is disabled for level-0 scripts so the hook is reliable; at higher levels the check also runs on every API call);
@@ -3852,10 +3852,10 @@ reviera.updaters.register{
 - tabs: **Application** (user scripts in the user script folder) and **Document** (scripts stored in the model);
 - each tab is a tree of modules (Lua files) and entry points (functions marked with an annotation comment, for example `--@macro "Renumber doors"`);
 - buttons: New module, New macro, Edit, Rename, Delete, Run, Step into (debugger), Import, Export, *Open folder*;
-- **Edit** opens the built-in **script editor**: a dockable panel with syntax highlighting, completion generated from the registry, inline docs, a console (REPL) with result inspection, breakpoints and a variable view. Or it opens an **external editor** chosen in settings (any editor; Reviera provides a Language Server for completion, `reviera-lua-ls`, and writes type stub files for common Lua language servers).
+- **Edit** opens the built-in **script editor**: a dockable panel with syntax highlighting, completion generated from the registry, inline docs, a console (REPL) with result inspection, breakpoints and a variable view. Or it opens an **external editor** chosen in settings (any editor; Riviera provides a Language Server for completion, `riviera-lua-ls`, and writes type stub files for common Lua language servers).
 
 **Behaviour & rules.**
-- **Application scripts** live in `$XDG_CONFIG_HOME/reviera/scripts` (or the platform equivalent) and are available in every document.
+- **Application scripts** live in `$XDG_CONFIG_HOME/riviera/scripts` (or the platform equivalent) and are available in every document.
 - **Document scripts** are stored in RXD document `scripts/<name>` and travel with the model. They are subject to §2.13.7.
 - **Recording (P2).** *Record* captures the commands the user runs (from the journal, §2.7.3) into a new Lua macro, with literal arguments. The user can then edit it.
 - **Quick-access shell.** A **Lua console** panel (View › User Interface › Lua Console) runs one-line commands against the active document, at trust level `model`, or higher if granted.
@@ -3872,7 +3872,7 @@ reviera.updaters.register{
 **Acceptance criteria.**
 - [ ] A macro created in the Script Manager appears in the Run list immediately, and can be bound to a keyboard shortcut and a Quick Access Toolbar button.
 - [ ] A document script survives save and reopen, and is listed under Document after reopening.
-- [ ] The built-in editor offers completion for `reviera.wall.cr…` with the parameter list of `wall.create`.
+- [ ] The built-in editor offers completion for `riviera.wall.cr…` with the parameter list of `wall.create`.
 - [ ] `script.run_file` on a file that calls `wall.create` asks for trust once, creates one undo item, and on a second run with the same file hash runs without asking.
 - [ ] A document module with a syntax error is shown in the Script Manager with its line number, and its entry points cannot be run.
 
@@ -3880,14 +3880,14 @@ reviera.updaters.register{
 **ID:** DM-LUA-009 · **Priority:** P1 · **Ref:** research/05 §13.1 (ribbon, dockable panes, dialogs, selection)
 
 **Behaviour & rules.**
-- **Ribbon.** Add-ins declare ribbon items in their manifest (§2.14.1) or at runtime with `reviera.ui.ribbon.add{tab, panel, items}`. Items are push buttons, split buttons, pull-downs, toggles, combo boxes and text boxes. Each one calls a registered command, with an availability predicate. Add-ins get their own tab by default, or their own panel in the *Add-ins* tab.
-- **Selection and picks.** `reviera.ui.selection()` and `reviera.ui.select(ids)`. `reviera.ui.pick_object{filter, prompt}`, `pick_objects`, `pick_point{snap, work_plane}`, `pick_box`, `pick_face`, `pick_edge`. Picks work inside `reviera.async` coroutines (§2.13.6) and in synchronous commands.
+- **Ribbon.** Add-ins declare ribbon items in their manifest (§2.14.1) or at runtime with `riviera.ui.ribbon.add{tab, panel, items}`. Items are push buttons, split buttons, pull-downs, toggles, combo boxes and text boxes. Each one calls a registered command, with an availability predicate. Add-ins get their own tab by default, or their own panel in the *Add-ins* tab.
+- **Selection and picks.** `riviera.ui.selection()` and `riviera.ui.select(ids)`. `riviera.ui.pick_object{filter, prompt}`, `pick_objects`, `pick_point{snap, work_plane}`, `pick_box`, `pick_face`, `pick_edge`. Picks work inside `riviera.async` coroutines (§2.13.6) and in synchronous commands.
 - **Dialogs.**
-  - `reviera.ui.task_dialog{title, main, content, buttons, commands, checkbox}` shows a task dialog;
-  - `reviera.ui.form{title, fields = {...}}` builds a declarative form, with fields such as text, number with unit, element picker, drop-down, check box, table and file picker, plus validation;
+  - `riviera.ui.task_dialog{title, main, content, buttons, commands, checkbox}` shows a task dialog;
+  - `riviera.ui.form{title, fields = {...}}` builds a declarative form, with fields such as text, number with unit, element picker, drop-down, check box, table and file picker, plus validation;
   - forms are rendered in native wxWidgets controls.
-- **Dockable panels.** `reviera.ui.panel.register{id, title, default_dock, build = function(p) … end}` uses the same declarative controls, plus a list or table view, a tree view and an HTML view. The HTML view is a sandboxed web view with no access to the API except through a message channel that calls registered commands.
-- **Transient graphics.** `reviera.ui.overlay` draws temporary lines, points, text and meshes in views (not saved, cleared on command end or on request), for previews and analysis display.
+- **Dockable panels.** `riviera.ui.panel.register{id, title, default_dock, build = function(p) … end}` uses the same declarative controls, plus a list or table view, a tree view and an HTML view. The HTML view is a sandboxed web view with no access to the API except through a message channel that calls registered commands.
+- **Transient graphics.** `riviera.ui.overlay` draws temporary lines, points, text and meshes in views (not saved, cleared on command end or on request), for previews and analysis display.
 
 **Acceptance criteria.**
 - [ ] An add-in that declares a ribbon tab with 3 buttons shows them on start-up. Each button is greyed out when its command's availability predicate is false (for example, when no wall is selected).
@@ -3897,7 +3897,7 @@ reviera.updaters.register{
 **ID:** DM-LUA-010 · **Priority:** P1 · **Ref:** research/05 §13.1 (geometry, direct shapes, ray casting)
 
 **Behaviour & rules.**
-- **Value types** (immutable, in `reviera.geom`): `XYZ`, `UV`, `Transform`, `Plane`, `BBox`, `Curve` (line, arc, ellipse, NURBS, polyline), `CurveLoop`, `Solid`, `Mesh`.
+- **Value types** (immutable, in `riviera.geom`): `XYZ`, `UV`, `Transform`, `Plane`, `BBox`, `Curve` (line, arc, ellipse, NURBS, polyline), `CurveLoop`, `Solid`, `Mesh`.
 - **Access:** `element:geometry{detail = "fine", view = id?, include_symbolic?}` returns solids, curves and meshes in world coordinates, with stable references for faces and edges (§2.8.3).
 - **Operations** (pure, run on OCCT copies):
   - boolean union, difference and intersection;
@@ -3905,8 +3905,8 @@ reviera.updaters.register{
   - section by plane;
   - volume, area and centroid;
   - point containment, distance, closest point;
-  - ray cast against the model (`reviera.geom.raycast{origin, direction, filter}` returns hits with element ID, face reference and distance).
-- **Direct shapes.** `reviera.direct_shape.create{category, geometry, name?, type?}` creates a non-parametric element of a category from solids or meshes. It is stored as an IFC element with that geometry (§2.11.1 "IFC-native element" behaviour).
+  - ray cast against the model (`riviera.geom.raycast{origin, direction, filter}` returns hits with element ID, face reference and distance).
+- **Direct shapes.** `riviera.direct_shape.create{category, geometry, name?, type?}` creates a non-parametric element of a category from solids or meshes. It is stored as an IFC element with that geometry (§2.11.1 "IFC-native element" behaviour).
 
 **Commands.** `direct_shape.create(category, geometry, name?, type_id?) -> element_id` · `direct_shape.set_geometry(element_id, geometry)` · `geom.raycast(origin, direction, filter?) -> hit[]`
 
@@ -3916,25 +3916,25 @@ reviera.updaters.register{
 ### 2.13.11 API versioning and documentation
 **ID:** DM-LUA-011 · **Priority:** P0 · **Ref:** research/05 §13.1 (API changes by release), §16.11
 
-**Purpose.** Add-ins and scripts must keep working across Reviera releases, and authors must know exactly what changed. This avoids the forced rebuilds that the reference product's runtime changes caused (Appendix A).
+**Purpose.** Add-ins and scripts must keep working across Riviera releases, and authors must know exactly what changed. This avoids the forced rebuilds that the reference product's runtime changes caused (Appendix A).
 
 **Behaviour & rules.**
 - The Lua API has a **semver API version**, separate from the application version. Add-ins declare a compatible range (§2.14.1). Minor versions only add features. Major versions may remove features, after one minor release of deprecation warnings.
-- **What the API version covers:** every `reviera.*` module function and its arguments, the element proxy fields and methods, event names and payloads, updater trigger kinds, error codes, and the **command versions** visible to Lua (§2.12.2). A command's own `version` changing is an API change: a breaking command change bumps the API major version, unless the old command version stays callable through an adapter (in which case it is a minor change).
-- **Range check at load.** The add-in's `reviera_api` range (Cargo-style semver syntax: `^`, `~`, `>=`, `<`, comma for AND) is checked against the running API version before its `entry` runs. Outside the range, the add-in is not loaded and the Add-in Manager shows both versions. Scripts without a manifest (Script Manager, `script.run_file`) may declare `--@reviera_api "^1.2"` on their first line; without it they run against the current version with no check.
-- **Deprecations.** A deprecated function or command still works and logs one warning per add-in per session, naming the replacement and the removal version. `reviera.api.deprecations()` lists the deprecated items an add-in has called in this session; the Add-in Manager shows a count per add-in.
-- **Feature probing.** `reviera.api.version` (a string), `reviera.api.has(name)` (true if a module function or command exists in this build) let scripts adapt to optional features (for example BIMserver mode, P2 commands).
+- **What the API version covers:** every `riviera.*` module function and its arguments, the element proxy fields and methods, event names and payloads, updater trigger kinds, error codes, and the **command versions** visible to Lua (§2.12.2). A command's own `version` changing is an API change: a breaking command change bumps the API major version, unless the old command version stays callable through an adapter (in which case it is a minor change).
+- **Range check at load.** The add-in's `riviera_api` range (Cargo-style semver syntax: `^`, `~`, `>=`, `<`, comma for AND) is checked against the running API version before its `entry` runs. Outside the range, the add-in is not loaded and the Add-in Manager shows both versions. Scripts without a manifest (Script Manager, `script.run_file`) may declare `--@riviera_api "^1.2"` on their first line; without it they run against the current version with no check.
+- **Deprecations.** A deprecated function or command still works and logs one warning per add-in per session, naming the replacement and the removal version. `riviera.api.deprecations()` lists the deprecated items an add-in has called in this session; the Add-in Manager shows a count per add-in.
+- **Feature probing.** `riviera.api.version` (a string), `riviera.api.has(name)` (true if a module function or command exists in this build) let scripts adapt to optional features (for example BIMserver mode, P2 commands).
 - **Documentation.** Generated reference documentation (HTML and Markdown) lists every module, function, command and event, with examples. It is published per API version, and shipped offline with the application. Each entry shows the version that introduced it, and deprecated entries show their replacement. A **changelog** per API version lists additions, deprecations and removals, generated from the registry and the Lua binding definitions and checked in CI.
 - Lua type stubs (for common Lua language servers) are generated per API version.
 - **Support window.** Each API major version is supported (bug fixes, no removals) for at least two years after the next major version ships, matching the RXD policy (§2.11.8).
 
-**Commands.** None of its own; `registry.describe` (§2.12.1) reports each command's version and deprecation, and the documentation is served as MCP resources `reviera://docs/{topic}` (§2.16.6).
+**Commands.** None of its own; `registry.describe` (§2.12.1) reports each command's version and deprecation, and the documentation is served as MCP resources `riviera://docs/{topic}` (§2.16.6).
 
 **Acceptance criteria.**
-- [ ] An add-in that declares `reviera_api = "^1.2"` loads on API 1.5, and is refused on API 2.0 with a message naming the incompatibility.
+- [ ] An add-in that declares `riviera_api = "^1.2"` loads on API 1.5, and is refused on API 2.0 with a message naming the incompatibility.
 - [ ] Calling a deprecated function logs exactly one warning per session for that add-in, naming the replacement, and the call still succeeds.
 - [ ] The generated changelog for a release lists every command whose `version` changed, and CI fails if a command's schema changed without a version change.
-- [ ] `reviera.api.has("bimserver.connect")` returns false in a build without BIMserver support and true otherwise.
+- [ ] `riviera.api.has("bimserver.connect")` returns false in a build without BIMserver support and true otherwise.
 
 ---
 
@@ -3946,7 +3946,7 @@ reviera.updaters.register{
 **Purpose.** A declarative description of an add-in. It is used for discovery, licence policy, trust, command registration and UI placement.
 
 **Behaviour & rules.**
-- An add-in is a folder (or a `.revieraaddin` ZIP of that folder) containing `reviera-addin.toml`, Lua sources, resources, a `LICENSE` file and, optionally, `README`, icons, translations and tests.
+- An add-in is a folder (or a `.rivieraaddin` ZIP of that folder) containing `riviera-addin.toml`, Lua sources, resources, a `LICENSE` file and, optionally, `README`, icons, translations and tests.
 - **Manifest format (normative; TOML 1.0):**
 
 ```toml
@@ -3961,9 +3961,9 @@ authors     = ["Jane Doe <jane@example.org>"]
 description = "Renumbering and room-door synchronisation."
 homepage    = "https://example.org/roomtools"
 source      = "https://git.example.org/roomtools"   # REQUIRED for registry submission
-reviera_api = "^1.2"                       # semver range of the Lua API (§2.13.11)
+riviera_api = "^1.2"                       # semver range of the Lua API (§2.13.11)
 entry       = "main.lua"                   # run on load; returns an init function
-min_reviera = "1.0.0"                      # optional
+min_riviera = "1.0.0"                      # optional
 
 [trust]
 level = "standard"                         # requested level (§2.13.7)
@@ -3997,7 +3997,7 @@ module = "ui.browser"
 "org.example.common" = "^2.0"
 
 [signature]                                 # optional
-key_id = "minisign:<publisher public key>"     # signature file: reviera-addin.toml.minisig
+key_id = "minisign:<publisher public key>"     # signature file: riviera-addin.toml.minisig
 ```
 
 - **`license` is mandatory.** Its value must be a valid SPDX license expression (SPDX 2.3 syntax, including `AND`, `OR`, `WITH` and `+`).
@@ -4007,7 +4007,7 @@ key_id = "minisign:<publisher public key>"     # signature file: reviera-addin.t
 **Commands.** `addin.validate(path) -> {ok, errors[], license_status}`
 
 **Acceptance criteria.**
-- [ ] A manifest missing `license`, `id`, `version` or `reviera_api` fails validation, and each missing field is named.
+- [ ] A manifest missing `license`, `id`, `version` or `riviera_api` fails validation, and each missing field is named.
 - [ ] A manifest whose `[[commands]]` entry refers to a missing JSON Schema file fails validation. With a valid schema, the command appears in `registry.describe` and as an MCP tool with that schema.
 
 ### 2.14.2 Discovery, licence policy and loading
@@ -4015,16 +4015,16 @@ key_id = "minisign:<publisher public key>"     # signature file: reviera-addin.t
 
 **Behaviour & rules.**
 - **Locations** (searched in this order; a later location never overrides an add-in ID already found, and duplicates are reported):
-  1. per user: `$XDG_DATA_HOME/reviera/addins/<id>/` (Linux), `%APPDATA%\Reviera\addins\<id>\` (Windows), `~/Library/Application Support/Reviera/addins/<id>/` (macOS);
-  2. all users: a system-wide, admin-writable location (for example `/usr/share/reviera/addins/`, `%ProgramFiles%\Reviera\addins\`). It is not user-writable, for security;
+  1. per user: `$XDG_DATA_HOME/riviera/addins/<id>/` (Linux), `%APPDATA%\Riviera\addins\<id>\` (Windows), `~/Library/Application Support/Riviera/addins/<id>/` (macOS);
+  2. all users: a system-wide, admin-writable location (for example `/usr/share/riviera/addins/`, `%ProgramFiles%\Riviera\addins\`). It is not user-writable, for security;
   3. folders listed in settings (for example a firm network share), which can be marked trusted by an administrator policy file.
 - **Licence check (as required by TECH_STACK §4.2).** The loader parses the SPDX expression and evaluates it against the **GPL-compatible allow-list**:
   - allowed identifiers: `GPL-3.0-only`, `GPL-3.0-or-later`, `LGPL-2.1-or-later`, `LGPL-3.0-only`, `LGPL-3.0-or-later`, `AGPL-3.0-only`, `AGPL-3.0-or-later`, `MIT`, `MIT-0`, `BSD-2-Clause`, `BSD-3-Clause`, `ISC`, `Apache-2.0`, `MPL-2.0`, `Zlib`, `0BSD`, `Unlicense`, `CC0-1.0`, `BSL-1.0`, `Artistic-2.0`, `X11`, `Python-2.0`, and others that a maintainer adds after review;
-  - the allow-list is a versioned data file shipped with Reviera and updated with releases;
+  - the allow-list is a versioned data file shipped with Riviera and updated with releases;
   - evaluation: an `OR` is compatible if **any** branch is compatible; an `AND` is compatible if **all** parts are; `WITH <exception>` is compatible if the base licence is and the exception is on the allowed-exceptions list (for example `Classpath-exception-2.0`, `LLVM-exception`);
   - `GPL-2.0-only` (without an `OR` to a compatible licence), proprietary, `LicenseRef-*`, "non-commercial" and missing licences are **not** compatible.
 - **Not compatible → not loaded by default.** The Add-in Manager lists the add-in as *Blocked (licence)*, showing its expression and why it failed.
-- **User override.** The user can enable a clearly labelled override per add-in ("Load this add-in anyway. I understand that it is not GPL-compatible, and that I may not distribute it with Reviera"). Overrides are remembered per add-in ID and version. The GPL does not restrict private use, so this matches TECH_STACK §4.2.
+- **User override.** The user can enable a clearly labelled override per add-in ("Load this add-in anyway. I understand that it is not GPL-compatible, and that I may not distribute it with Riviera"). Overrides are remembered per add-in ID and version. The GPL does not restrict private use, so this matches TECH_STACK §4.2.
 - **Load order.** Dependencies first (topological). Cycles are refused. Each add-in's `entry` runs in its own environment at its granted trust level (§2.13.7). Its returned `init(ctx)` is called. Its commands, ribbon items, panels and updaters are registered.
 - **Unload and reload** (P1): an add-in can be disabled or reloaded without restarting. Its commands, ribbon items, panels and updaters are removed, and its handlers are unregistered. This is useful for development (a hot-reload button).
 - **Failure isolation.** An error in an add-in's `entry` disables that add-in only, and the error is shown in the Add-in Manager.
@@ -4053,9 +4053,9 @@ key_id = "minisign:<publisher public key>"     # signature file: reviera-addin.t
 - An add-in that registered updaters which made changes in the active project shows a "used by this project" marker (from `updaters_used`, §2.13.5), and disabling it warns that data it maintains may become out of date.
 
 **Behaviour & rules.**
-- **Packaging.** `.revieraaddin` is a ZIP of the add-in folder. *Install from file* verifies the manifest and the optional signature, shows the requested trust level and licence, then extracts the archive to the per-user location.
+- **Packaging.** `.rivieraaddin` is a ZIP of the add-in folder. *Install from file* verifies the manifest and the optional signature, shows the requested trust level and licence, then extracts the archive to the per-user location.
 - **Registry (P2).** An optional public registry is an index of add-ins: a static Git-hosted JSON index of package URLs and checksums, which anyone can mirror. It only accepts add-ins whose licence is compatible and whose source is public, as TECH_STACK §4.2 requires. Each entry records the SPDX expression, the source URL, checksums and signatures. The application can browse, install and update from configured registries.
-- **Developer tools.** `reviera addin new <id>` creates a template add-in with a manifest, `LICENSE` (GPL-3.0-or-later by default), tests and type stubs. `reviera addin pack` validates and packs. `reviera addin test` runs tests headless (§2.11.7).
+- **Developer tools.** `riviera addin new <id>` creates a template add-in with a manifest, `LICENSE` (GPL-3.0-or-later by default), tests and type stubs. `riviera addin pack` validates and packs. `riviera addin test` runs tests headless (§2.11.7).
 
 **Commands.** `addin.list() -> addin[]` · `addin.enable(id, on)` · `addin.reload(id)` · `addin.install(path_or_registry_id) -> id` · `addin.uninstall(id)` · `addin.update(id)` · `addin.set_override(id, on)` · `addin.trust.grant(id, level)` · `addin.trust.revoke(id)` · `addin.manage()` (opens the Add-in Manager)
 
@@ -4069,7 +4069,7 @@ key_id = "minisign:<publisher public key>"     # signature file: reviera-addin.t
 
 ## 2.15 Visual programming (future)
 
-### 2.15.1 Reviera Graph
+### 2.15.1 Riviera Graph
 **ID:** DM-VPL-001 · **Priority:** P2 · **Ref:** research/05 §13.5, §13.6; screenshots/platform/dynamo_interface_library_canvas.jpg, screenshots/platform/dynamo_revit_node_library.jpg, screenshots/platform/dynamo_documentation_browser_2026.png
 
 **Purpose.** A node-based visual programming environment for users who do not write code. It is built on the command registry and Lua, and does not need a separate runtime.
@@ -4153,7 +4153,7 @@ key_id = "minisign:<publisher public key>"     # signature file: reviera-addin.t
 ### 2.16.1 Overview
 **ID:** DM-MCP-001 · **Priority:** P0 · **Ref:** research/05 §12.3 (AI assistant using MCP tool calls), §16.11; TECH_STACK §3.6
 
-**Purpose.** Every Reviera operation is available to AI agents through the Model Context Protocol. This is achieved by construction, from the command registry.
+**Purpose.** Every Riviera operation is available to AI agents through the Model Context Protocol. This is achieved by construction, from the command registry.
 
 **Behaviour & rules.**
 - The MCP server is built into the application with the official Rust MCP SDK (`rmcp`). It follows the current published MCP specification (protocol version negotiated at initialisation). The supported revision is listed in the release notes.
@@ -4165,12 +4165,12 @@ key_id = "minisign:<publisher public key>"     # signature file: reviera-addin.t
 **ID:** DM-MCP-002 · **Priority:** P0 (stdio) / P1 (streamable HTTP) · **Ref:** TECH_STACK §3.6
 
 **Behaviour & rules.**
-- **stdio.** `reviera --mcp-stdio [model.ifc]` runs Reviera headless (§2.11.7) as an MCP server on stdin/stdout, for local agents that start it as a sub-process. Trust follows the user who started it. The permission level comes from a command-line flag (default `read_only`).
+- **stdio.** `riviera --mcp-stdio [model.ifc]` runs Riviera headless (§2.11.7) as an MCP server on stdin/stdout, for local agents that start it as a sub-process. Trust follows the user who started it. The permission level comes from a command-line flag (default `read_only`).
 - **Streamable HTTP** (when the UI is running). The server listens on `127.0.0.1` (default port 47800, configurable). Binding to other interfaces requires TLS and an explicit setting.
   - **Authentication**: bearer tokens created in Manage › AI Agents › *New client token*. Each token has a name, a permission level, an optional expiry and an optional document scope. Tokens are stored hashed. Remote deployments may use OAuth 2.1 authorisation as the MCP specification describes (P2).
   - The `Origin` header is checked to prevent DNS rebinding attacks. CORS is closed by default.
-- **Local bridge** (when the UI is running; UI-AGENT-004). The window listens on a private endpoint (a Unix-domain socket with mode 0600 in the user's runtime directory; a named pipe restricted to the user on Windows), never a network port. `reviera mcp-bridge` is a stdio MCP server process that relays to it, so agents that only start stdio servers reach the running window's model. Each connection must first present a one-time per-session secret the window issued (in the bridge's environment); a wrong or revoked secret is refused and logged. A session's permission level is the one the window gave it.
-  *Built (2026-10-20):* `reviera_mcp::bridge::Endpoint` (Unix socket mode 0600 in a 0700 directory; a named pipe that rejects remote clients on Windows), the handshake `REVIERA-MCP <secret>` answered `OK` or `ERR unauthorised` (counted, logged to stderr), sessions issued and revoked by the window with their own configuration (name, permission, toolsets, and an approver: destructive calls in confirm mode wait for the window's answer instead of returning a preview token); `reviera mcp-bridge [--session-file PATH]`; the window serves the calls on its UI thread through `AppHandle::external`. Not yet: the AI Agents panel, sessions on the HTTP transport.
+- **Local bridge** (when the UI is running; UI-AGENT-004). The window listens on a private endpoint (a Unix-domain socket with mode 0600 in the user's runtime directory; a named pipe restricted to the user on Windows), never a network port. `riviera mcp-bridge` is a stdio MCP server process that relays to it, so agents that only start stdio servers reach the running window's model. Each connection must first present a one-time per-session secret the window issued (in the bridge's environment); a wrong or revoked secret is refused and logged. A session's permission level is the one the window gave it.
+  *Built (2026-10-20):* `riviera_mcp::bridge::Endpoint` (Unix socket mode 0600 in a 0700 directory; a named pipe that rejects remote clients on Windows), the handshake `RIVIERA-MCP <secret>` answered `OK` or `ERR unauthorised` (counted, logged to stderr), sessions issued and revoked by the window with their own configuration (name, permission, toolsets, and an approver: destructive calls in confirm mode wait for the window's answer instead of returning a preview token); `riviera mcp-bridge [--session-file PATH]`; the window serves the calls on its UI thread through `AppHandle::external`. Not yet: the AI Agents panel, sessions on the HTTP transport.
 - **Status UI.** An *AI Agents* panel shows connected clients, their permission levels, active sessions, recent tool calls (from the journal), and a **Disconnect** / **Revoke** button for each one. A status-bar icon shows when an agent is connected, and pulses while an agent is running a tool.
 
 **Commands.** `mcp.start(transport, options)` · `mcp.stop()` · `mcp.token.create(name, level, expiry?, document_scope?) -> token` · `mcp.token.revoke(token_id)` · `mcp.sessions() -> session[]` · `mcp.session.disconnect(session_id)`
@@ -4227,7 +4227,7 @@ key_id = "minisign:<publisher public key>"     # signature file: reviera-addin.t
 - [ ] `preview("element.delete", …)` returns the dependents that would be deleted, and leaves the model unchanged (same model version).
 - [x] `get_view_image` returns a PNG that matches the view's current state after the agent's last transaction.
 
-*Built (2026-10-21), `get_view_image`:* a session tool (read_only) `get_view_image(view_id?, max_size?, gizmos?)` returning MCP image content (`image/png`, base64) and a text line `{view, width, height, source}`; the active view when `view_id` (id or GlobalId) is omitted; `max_size` is the longest side (1024 by default, 64–4096). From the agent terminal (the window's bridge, UI-AGENT-004) the request is queued on the application and answered by the window after the agents' calls of that tick have run and the scene has refreshed: the view as the user sees it (its camera, plan, section or sheet graphics, annotation, selection highlight, section box), drawn into an offscreen copy of its frame, without the view cube and other controls unless `gizmos`, halved until it fits `max_size`; a view not open in a tab is rendered offscreen. Headless (`reviera --mcp-stdio`): plans (plan graphics and annotation, from their camera or from above fitted to the drawing) and 3D views (their camera, or a south-east isometric of the whole model) are rendered offscreen at `max_size` × ¾; sections, elevations, sheets and schedules are refused there with a hint to open them in the window; no graphics adapter is the error `view_image.gpu`. Not yet: `width`/`height` and `options` (the size is `max_size`), images in `preview`, the image resource.
+*Built (2026-10-21), `get_view_image`:* a session tool (read_only) `get_view_image(view_id?, max_size?, gizmos?)` returning MCP image content (`image/png`, base64) and a text line `{view, width, height, source}`; the active view when `view_id` (id or GlobalId) is omitted; `max_size` is the longest side (1024 by default, 64–4096). From the agent terminal (the window's bridge, UI-AGENT-004) the request is queued on the application and answered by the window after the agents' calls of that tick have run and the scene has refreshed: the view as the user sees it (its camera, plan, section or sheet graphics, annotation, selection highlight, section box), drawn into an offscreen copy of its frame, without the view cube and other controls unless `gizmos`, halved until it fits `max_size`; a view not open in a tab is rendered offscreen. Headless (`riviera --mcp-stdio`): plans (plan graphics and annotation, from their camera or from above fitted to the drawing) and 3D views (their camera, or a south-east isometric of the whole model) are rendered offscreen at `max_size` × ¾; sections, elevations, sheets and schedules are refused there with a hint to open them in the window; no graphics adapter is the error `view_image.gpu`. Not yet: `width`/`height` and `options` (the size is `max_size`), images in `preview`, the image resource.
 
 ### 2.16.5 Permissions and safety
 **ID:** DM-MCP-005 · **Priority:** P0 · **Ref:** TECH_STACK §3.6
@@ -4255,36 +4255,36 @@ key_id = "minisign:<publisher public key>"     # signature file: reviera-addin.t
 ### 2.16.6 Resource catalogue
 **ID:** DM-MCP-006 · **Priority:** P0 (element, type, view, project, categories, commands) / P1 (others) · **Ref:** TECH_STACK §3.6
 
-**Behaviour & rules.** Resources are read-only JSON (or other stated MIME types). Resource templates use RFC 6570 URI templates. `{doc}` defaults to the active document when omitted (`reviera://element/{id}` = `reviera://doc/active/element/{id}`).
+**Behaviour & rules.** Resources are read-only JSON (or other stated MIME types). Resource templates use RFC 6570 URI templates. `{doc}` defaults to the active document when omitted (`riviera://element/{id}` = `riviera://doc/active/element/{id}`).
 
 | URI template | MIME | Content |
 |---|---|---|
-| `reviera://documents` | application/json | Open documents (ID, title, path or BIMserver project, kind, schema, mode) |
-| `reviera://doc/{doc}/project` | application/json | Project information, units summary, location, phases, current phase |
-| `reviera://doc/{doc}/element/{id_or_guid}` | application/json | Element summary (as `get_element`) |
-| `reviera://doc/{doc}/element/{id_or_guid}/geometry{?detail,format}` | model/gltf-binary or application/json | The element's geometry (glTF, or a JSON B-rep summary) |
-| `reviera://doc/{doc}/type/{id_or_guid}` | application/json | Type with parameters and instance count |
-| `reviera://doc/{doc}/family/{id_or_guid}` | application/json | Family summary, types and parameters (definitions, with formulas when allowed) |
-| `reviera://doc/{doc}/categories` | application/json | Categories used in the model, with counts and subcategories |
-| `reviera://doc/{doc}/levels`, `…/grids` | application/json | Datums with elevations and positions |
-| `reviera://doc/{doc}/views`, `…/view/{id}` | application/json | View list, or one view's definition (type, scale, level, template, crop, filters) |
-| `reviera://doc/{doc}/view/{id}/image{?w,h}` | image/png | Rendered view image |
-| `reviera://doc/{doc}/sheets`, `…/sheet/{id}` | application/json | Sheets and placed viewports |
-| `reviera://doc/{doc}/schedule/{id}{?format}` | application/json or text/csv | Schedule data |
-| `reviera://doc/{doc}/parameters` | application/json | Parameter catalogue: built-in, project, shared and global definitions with bindings |
-| `reviera://doc/{doc}/materials` | application/json | Materials and assets (summaries) |
-| `reviera://doc/{doc}/warnings` | application/json | Stored warnings |
-| `reviera://doc/{doc}/selection` | application/json | Current selection (subscribable) |
-| `reviera://doc/{doc}/history` | application/json | Undo history with origins |
-| `reviera://commands`, `reviera://command/{name}` | application/json | The registry (summaries), or one definition with its schemas |
-| `reviera://units` | application/json | Data types and unit catalogue (§2.9.4, §2.9.5) |
-| `reviera://docs/{topic}` | text/markdown | Built-in documentation pages (API reference, how-tos) |
+| `riviera://documents` | application/json | Open documents (ID, title, path or BIMserver project, kind, schema, mode) |
+| `riviera://doc/{doc}/project` | application/json | Project information, units summary, location, phases, current phase |
+| `riviera://doc/{doc}/element/{id_or_guid}` | application/json | Element summary (as `get_element`) |
+| `riviera://doc/{doc}/element/{id_or_guid}/geometry{?detail,format}` | model/gltf-binary or application/json | The element's geometry (glTF, or a JSON B-rep summary) |
+| `riviera://doc/{doc}/type/{id_or_guid}` | application/json | Type with parameters and instance count |
+| `riviera://doc/{doc}/family/{id_or_guid}` | application/json | Family summary, types and parameters (definitions, with formulas when allowed) |
+| `riviera://doc/{doc}/categories` | application/json | Categories used in the model, with counts and subcategories |
+| `riviera://doc/{doc}/levels`, `…/grids` | application/json | Datums with elevations and positions |
+| `riviera://doc/{doc}/views`, `…/view/{id}` | application/json | View list, or one view's definition (type, scale, level, template, crop, filters) |
+| `riviera://doc/{doc}/view/{id}/image{?w,h}` | image/png | Rendered view image |
+| `riviera://doc/{doc}/sheets`, `…/sheet/{id}` | application/json | Sheets and placed viewports |
+| `riviera://doc/{doc}/schedule/{id}{?format}` | application/json or text/csv | Schedule data |
+| `riviera://doc/{doc}/parameters` | application/json | Parameter catalogue: built-in, project, shared and global definitions with bindings |
+| `riviera://doc/{doc}/materials` | application/json | Materials and assets (summaries) |
+| `riviera://doc/{doc}/warnings` | application/json | Stored warnings |
+| `riviera://doc/{doc}/selection` | application/json | Current selection (subscribable) |
+| `riviera://doc/{doc}/history` | application/json | Undo history with origins |
+| `riviera://commands`, `riviera://command/{name}` | application/json | The registry (summaries), or one definition with its schemas |
+| `riviera://units` | application/json | Data types and unit catalogue (§2.9.4, §2.9.5) |
+| `riviera://docs/{topic}` | text/markdown | Built-in documentation pages (API reference, how-tos) |
 
 - **Subscriptions.** Clients can subscribe to `element/{id}`, `selection`, `warnings` and `history`. The server sends `notifications/resources/updated` after commits that affect them (coalesced, at most 5 per second per resource). `notifications/resources/list_changed` is sent when documents open or close.
 - Resources never include credentials. They include RXD content only as summarised fields, never raw RXD carrier data.
 
 **Acceptance criteria.**
-- [ ] Reading `reviera://element/{guid}` for a door returns its category, type, host wall GUID, level and all parameters with display values in project units.
+- [ ] Reading `riviera://element/{guid}` for a door returns its category, type, host wall GUID, level and all parameters with display values in project units.
 - [ ] A client subscribed to `selection` receives an update within 200 ms of the user changing the selection.
 
 ### 2.16.7 Prompts
@@ -4310,35 +4310,35 @@ key_id = "minisign:<publisher public key>"     # signature file: reviera-addin.t
 
 ## 2.17 Remote computation contract
 
-Reviera shall have a foundational subsystem, built on one general contract, that abstracts calculation workloads from where and how they run: it runs calculation runs, as batch jobs or as real-time sessions (DM-RPC-010), against **model distillations** in another process, on this machine, on a more powerful machine on the LAN, or on cloud compute. Analysis is its first user (chapter 4 §4.0.2a), but the contract is not tied to analysis. Rendering, tessellation of large models, batch export, point clouds, project-wide booleans and clash runs, design-space exploration (§2.15.3), and use cases not yet known are all **job kinds** on the same contract. Each job sends only an extract of the model that the calculation needs, never the model, so a job is small enough to send across a network.
+Riviera shall have a foundational subsystem, built on one general contract, that abstracts calculation workloads from where and how they run: it runs calculation runs, as batch jobs or as real-time sessions (DM-RPC-010), against **model distillations** in another process, on this machine, on a more powerful machine on the LAN, or on cloud compute. Analysis is its first user (chapter 4 §4.0.2a), but the contract is not tied to analysis. Rendering, tessellation of large models, batch export, point clouds, project-wide booleans and clash runs, design-space exploration (§2.15.3), and use cases not yet known are all **job kinds** on the same contract. Each job sends only an extract of the model that the calculation needs, never the model, so a job is small enough to send across a network.
 
 **Terms.**
 
 | Term | Meaning |
 |------|---------|
 | **Job kind** | A named, versioned kind of calculation run (for example `analysis.structural`, `render.still`, `export.pdf_set`), declared by a manifest (DM-RPC-002). |
-| **Distiller** | A deterministic function in Reviera's process that turns a model snapshot, a scope, a detail level and options into a distillation (DM-RPC-003). |
-| **Distillation** | The extract a job sends: content-addressed blobs and a key map that stays in Reviera. |
+| **Distiller** | A deterministic function in Riviera's process that turns a model snapshot, a scope, a detail level and options into a distillation (DM-RPC-003). |
+| **Distillation** | The extract a job sends: content-addressed blobs and a key map that stays in Riviera. |
 | **Runner** | The program that performs a job kind; a separate process, started on demand (DM-RPC-004). |
 | **Host** | Where runners run: this machine, a paired machine on the LAN (DM-RPC-005), or a cloud cluster (DM-RPC-006). |
-| **Result applier** | The function in Reviera's process that takes a job's output back into the model: parameters, result packages, files, view overlays. |
+| **Result applier** | The function in Riviera's process that takes a job's output back into the model: parameters, result packages, files, view overlays. |
 | **Job set** | Many variants of one job submitted together (DM-RPC-007). |
 | **Session** | A long-lived, stateful simulation that accepts scenario inputs and streams state frames in real time until closed (DM-RPC-010). |
 
 ### 2.17.1 Contract and protocol
-**ID:** DM-RPC-001 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Reviera-originated design
+**ID:** DM-RPC-001 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Riviera-originated design
 
-**Purpose.** One versioned RPC contract between Reviera and any runner or host, whatever the job kind.
+**Purpose.** One versioned RPC contract between Riviera and any runner or host, whatever the job kind.
 
 **Behaviour & rules.**
-- The contract is the gRPC package **`reviera.compute.v1`**, defined in `.proto` files published with the specification. It changes only by adding fields; a breaking change gets a new package (`v2`), and a host may serve several versions. Reviera is the client; a runner, or a host that forwards to its runners, is the server.
+- The contract is the gRPC package **`reviera.compute.v1`**, defined in `.proto` files published with the specification. It changes only by adding fields; a breaking change gets a new package (`v2`), and a host may serve several versions. Riviera is the client; a runner, or a host that forwards to its runners, is the server.
 - An **HTTPS/JSON binding** carries the same operations for Web services and environments without gRPC: `POST /blobs/missing`, `PUT /blobs/{sha256}`, `POST /jobs`, `GET /jobs/{id}` (with a server-sent event stream for progress), `GET /jobs/{id}/results`, `DELETE /jobs/{id}`, described in an OpenAPI document published with the specification.
-- **Job-kind messages** live in their own packages beside the contract: `reviera.analysis.v1` (chapter 4), `reviera.render.v1`, `reviera.export.v1`, and any package a job kind's manifest names. `SubmitJob` carries the kind's options as a typed message (`google.protobuf.Any`), so the contract never changes for a new kind.
+- **Job-kind messages** live in their own packages beside the contract: `reviera.analysis.v1` (chapter 4), `riviera.render.v1`, `riviera.export.v1`, and any package a job kind's manifest names. `SubmitJob` carries the kind's options as a typed message (`google.protobuf.Any`), so the contract never changes for a new kind.
 - **Idempotent submission:** every job has a client job key; submitting the same key twice returns the existing job.
 - **Errors** carry a gRPC status and a reason code: `invalid_input`, `unsupported_kind`, `version_mismatch`, `too_large`, `limit_exceeded`, `memory_limit`, `preempted`, `cancelled`, `runner_failed`, `unauthorised`, `negotiation_failed`, with a message and, for runner failures, the runner's last output.
 - **Negotiation is part of the contract.** Compression and encryption are chosen by negotiation, so new techniques are added without changing the contract. Every technique has a registered identifier (for example `zstd-dict-v1`, `aead-aes256gcm`, `kem-x25519-mlkem768`) in a registry published with the specification, which only grows. `Negotiate` exchanges each side's supported identifiers in order of preference, with minimum acceptable versions, and returns the session's choice: the strongest option both sides support, never one either side has marked as deprecated or below its minimum. Every blob and result header records the identifiers used to produce it, so any party can read data written with older choices while new data uses newer ones. A side that cannot agree on an acceptable option fails with `negotiation_failed` naming the category, instead of falling back to something weaker; a client never downgrades because a server asked it to. Administrators set organisation policy (allowed, preferred and minimum identifiers) on hosts and clients.
 - **Encryption, negotiated in layers.** *Transport*: TLS 1.3 at least, preferring hybrid post-quantum key exchange (for example X25519 with ML-KEM-768) where both sides support it; local sockets rely on owner-only permissions and the one-time token. *Content*: blobs and results bound for a LAN or cloud host are also encrypted end to end, independently of TLS, so a gateway, object store or operator that relays or stores them cannot read them. Each job has fresh content keys used with a negotiated AEAD cipher (for example AES-256-GCM or ChaCha20-Poly1305); keys are wrapped for the job's runners with a negotiated key-encapsulation scheme (HPKE, with a hybrid post-quantum KEM preferred) using keys the host's workers publish in `Describe`, and results come back wrapped for the client. *Integrity*: blob names are SHA-256 of the uncompressed plaintext (the hash algorithm is itself negotiable), and result manifests are signed by the runner with a negotiated signature scheme (for example Ed25519, with ML-DSA as it becomes available), so provenance can be verified. Content encryption is on by default for remote and cloud hosts and Web services, and may be off for local runners.
-- **Compression on the wire.** Model transfer uses the strongest codecs available, chosen by the negotiation above; compression is applied before encryption. The baseline is **zstd** (long-distance matching, high levels for uploads) with **trained dictionaries** per filter profile and schema, shipped with Reviera and identified by hash, because IFC text from one profile repeats the same entity names and structures. On top of it: **content-defined chunking** (for example FastCDC) inside large blobs, so an edit moves only the chunks it touches even within one storey; **delta compression** of a changed blob against the version the server already holds (zstd patch-from), when `HasBlobs` reports the earlier hash; **geometry codecs** for meshes produced by transforms (for example meshoptimizer or Draco encoding of vertex and index buffers); and **byte shuffling** before zstd for large numeric arrays (results, fields, sensor grids). Already-compressed blobs are not compressed again at the gRPC or HTTP layer. Format-aware compressors (for example OpenZL) are candidates to evaluate as negotiated codecs [Suggestion]. Compression runs on the worker pool and never blocks the UI.
+- **Compression on the wire.** Model transfer uses the strongest codecs available, chosen by the negotiation above; compression is applied before encryption. The baseline is **zstd** (long-distance matching, high levels for uploads) with **trained dictionaries** per filter profile and schema, shipped with Riviera and identified by hash, because IFC text from one profile repeats the same entity names and structures. On top of it: **content-defined chunking** (for example FastCDC) inside large blobs, so an edit moves only the chunks it touches even within one storey; **delta compression** of a changed blob against the version the server already holds (zstd patch-from), when `HasBlobs` reports the earlier hash; **geometry codecs** for meshes produced by transforms (for example meshoptimizer or Draco encoding of vertex and index buffers); and **byte shuffling** before zstd for large numeric arrays (results, fields, sensor grids). Already-compressed blobs are not compressed again at the gRPC or HTTP layer. Format-aware compressors (for example OpenZL) are candidates to evaluate as negotiated codecs [Suggestion]. Compression runs on the worker pool and never blocks the UI.
 - **Provenance:** every result carries a manifest naming the job kind and version, the runner and its version, the distiller and its version, the detail level, the model snapshot hash, the input blob list, the host, and the timings. A result can always say exactly what it was computed from.
 
 | RPC | Kind | Purpose |
@@ -4365,7 +4365,7 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 - `compute.cancel(job_id) -> ()`
 - `compute.results(job_id, path?) -> {manifest, files[]}`
 
-*Built (2026-10-16), milestone 1:* the contract as `.proto` files under `schemas/compute/` (MIT): `reviera/compute/v1/compute.proto` with every RPC of the table except the session RPCs, `reviera/analysis/v1/analysis.proto` (`ClashOptions`, `MeshSet`, `ClashExclusions`, `ClashResult`), `reviera/testing/v1/testing.proto` (`test.fault`), and the technique registry `registry/techniques.json` (`identity-v1`, `zstd-v1`, `sha256-v1`, `none-local-v1`). The MIT crate `reviera-compute-proto` (`clients/compute/rust`) compiles them with protox (no `protoc` needed) and tonic, and provides negotiation, blob hashing, codecs, chunking and checked reassembly, the local transport (a Unix socket with owner-only permissions, loopback TCP elsewhere, a bearer token on every call, reason codes in the `reviera-reason` trailer) and a runner toolkit. Not built yet: the HTTPS/JSON binding, content encryption and signatures (only `none-local-v1`, local sockets), trained dictionaries, content-defined chunking inside blobs, deltas.
+*Built (2026-10-16), milestone 1:* the contract as `.proto` files under `schemas/compute/` (MIT): `reviera/compute/v1/compute.proto` with every RPC of the table except the session RPCs, `reviera/analysis/v1/analysis.proto` (`ClashOptions`, `MeshSet`, `ClashExclusions`, `ClashResult`), `reviera/testing/v1/testing.proto` (`test.fault`), and the technique registry `registry/techniques.json` (`identity-v1`, `zstd-v1`, `sha256-v1`, `none-local-v1`). The MIT crate `riviera-compute-proto` (`clients/compute/rust`) compiles them with protox (no `protoc` needed) and tonic, and provides negotiation, blob hashing, codecs, chunking and checked reassembly, the local transport (a Unix socket with owner-only permissions, loopback TCP elsewhere, a bearer token on every call, reason codes in the `reviera-reason` trailer) and a runner toolkit. Not built yet: the HTTPS/JSON binding, content encryption and signatures (only `none-local-v1`, local sockets), trained dictionaries, content-defined chunking inside blobs, deltas.
 
 **Acceptance criteria.**
 - [ ] A job kind added after release (a test kind with its own options package) runs through `compute.submit` with no change to `reviera.compute.v1`.
@@ -4378,23 +4378,23 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 - [ ] On a cloud host, the blobs in object storage cannot be decrypted without the job's wrapped keys, and a tampered result manifest fails signature verification.
 
 ### 2.17.2 Job kinds and their extension
-**ID:** DM-RPC-002 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Reviera-originated design
+**ID:** DM-RPC-002 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Riviera-originated design
 
-**Purpose.** Any eventual use case can be added as a job kind, by Reviera or by an add-in, without changing the contract.
+**Purpose.** Any eventual use case can be added as a job kind, by Riviera or by an add-in, without changing the contract.
 
 **Behaviour & rules.**
 - A job kind is declared by a JSON manifest: its name and version; its options and result schemas (a protobuf package, or JSON Schema for the HTTPS binding); its **distillers** (DM-RPC-003): a filter profile, plus any named transforms; its **result applier**; its **runner** (a command line, relative to the kind's folder, and the platforms it supports, or a container image for hosts that run containers); resource hints (cores, memory, GPU, typical duration per unit of distillation); whether it supports checkpoints; and the SPDX licences of each part.
-- **Licence boundary.** Runners and hosted services are separate programs reached over the published contract, so Reviera can connect to a runner or service whatever its licence, including proprietary ones, and a runner's author owes nothing to Reviera's licence for implementing the contract (TECH_STACK §4.2). To keep that boundary sound, the contract stays arm's-length: it carries distillations in documented formats, never Reviera's internal data structures; a runner needs none of Reviera's code; and the contract files, technique registry and runner skeletons are published under MIT, as every interface the project defines is (TECH_STACK §4.0). A job kind's manifest records each runner's licence, which the Compute Jobs panel shows; organisations can restrict which licences their hosts run.
-- Filter profiles are data. Transforms and result appliers run in Reviera's process, so they are Rust code in Reviera or Lua in an add-in (§2.14) and must pass the GPL-compatible licence check (TECH_STACK §4.2). Runners are separate programs and are never linked into Reviera; their licences are checked before an official bundle ships one.
+- **Licence boundary.** Runners and hosted services are separate programs reached over the published contract, so Riviera can connect to a runner or service whatever its licence, including proprietary ones, and a runner's author owes nothing to Riviera's licence for implementing the contract (TECH_STACK §4.2). To keep that boundary sound, the contract stays arm's-length: it carries distillations in documented formats, never Riviera's internal data structures; a runner needs none of Riviera's code; and the contract files, technique registry and runner skeletons are published under MIT, as every interface the project defines is (TECH_STACK §4.0). A job kind's manifest records each runner's licence, which the Compute Jobs panel shows; organisations can restrict which licences their hosts run.
+- Filter profiles are data. Transforms and result appliers run in Riviera's process, so they are Rust code in Riviera or Lua in an add-in (§2.14) and must pass the GPL-compatible licence check (TECH_STACK §4.2). Runners are separate programs and are never linked into Riviera; their licences are checked before an official bundle ships one.
 - **Built-in job kinds:** `analysis.<family>` for each batch analysis family (chapter 4 §4.0.2a); `render.still`, `render.panorama`, `render.walkthrough` (chapter 7); `tessellate.ifc` for large models and links; `export.pdf_set`, `export.ifc`, `export.cobie`, `export.dwg`; `pointcloud.index`; `model.boolean_batch` and `model.clash_batch` for project-wide booleans, overlap and clash runs started as a batch (ARC-MOD-028, ARC-MOD-030, ANA-CLASH-001).
-- Interactive work never depends on a job: editing, regeneration, live checks and viewport drawing run in Reviera's process.
+- Interactive work never depends on a job: editing, regeneration, live checks and viewport drawing run in Riviera's process.
 - `compute.register_kind` validates a manifest and refuses one with a missing field, an unknown schema, or an in-process part outside the licence allow-list, naming the field.
 
 **Commands.**
 - `compute.kinds() -> kinds[]`
 - `compute.register_kind(manifest_path) -> kind`
 
-*Built (2026-10-16), milestone 1:* runners describe their kinds with `--describe` and are found by the host beside its program or through `REVIERA_COMPUTE_RUNNERS`; the JSON job-kind manifest and `compute.register_kind` are not built yet. The built-in runner `reviera-analysis-builtin` serves `analysis.clash` (the project-wide clash test, ANA-CLASH-001, on the overlap engine of ARC-MOD-030) and `test.fault` (delays, failures, crashes, memory runaways and checkpoints, for testing). Commands: `compute.kinds`, `compute.distill`, `compute.submit`, `compute.status`, `compute.results`, `compute.cancel`, `compute.jobs`, `compute.reattach`, `compute.forget_job`.
+*Built (2026-10-16), milestone 1:* runners describe their kinds with `--describe` and are found by the host beside its program or through `RIVIERA_COMPUTE_RUNNERS`; the JSON job-kind manifest and `compute.register_kind` are not built yet. The built-in runner `riviera-analysis-builtin` serves `analysis.clash` (the project-wide clash test, ANA-CLASH-001, on the overlap engine of ARC-MOD-030) and `test.fault` (delays, failures, crashes, memory runaways and checkpoints, for testing). Commands: `compute.kinds`, `compute.distill`, `compute.submit`, `compute.status`, `compute.results`, `compute.cancel`, `compute.jobs`, `compute.reattach`, `compute.forget_job`.
 
 **Acceptance criteria.**
 - [ ] An add-in that registers a new job kind with a Lua distiller and applier and a Python runner can run jobs on a local runner and on a paired host.
@@ -4402,17 +4402,17 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 - [ ] A runner under a proprietary licence, built only from the published `.proto` files and skeleton, registers and runs jobs; its licence is shown in the Compute Jobs panel.
 
 ### 2.17.3 Model distillations
-**ID:** DM-RPC-003 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Reviera-originated design
+**ID:** DM-RPC-003 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Riviera-originated design
 
 **Purpose.** A job sends an extract of only what its calculation needs, at the level of detail it needs. That makes sending the relevant details to powerful remote compute practical, and keeps the rest of the model at home.
 
 **Behaviour & rules.**
-- **A distillation is mostly a filtered IFC model.** Reviera's model is IFC, so a distiller is first a **filter profile**: a declarative JSON description of what to keep, applied in Reviera's process. A profile names the IFC entity classes to keep (with subtypes and predefined types), the attributes and property sets (and properties within them) to keep, the representation contexts and identifiers to keep (for example `Axis` and `Reference` instead of `Body`), the relationships to follow (aggregation, containment, assignments, materials, structural connections), and the common entities every chunk needs (project, units, contexts, materials, profiles, types). Everything else is dropped. The output is a stripped-down, valid IFC4 subset, much like a model view definition; the IFC4 Structural Analysis View is the model for this, and the structural distiller is that view as a profile.
+- **A distillation is mostly a filtered IFC model.** Riviera's model is IFC, so a distiller is first a **filter profile**: a declarative JSON description of what to keep, applied in Riviera's process. A profile names the IFC entity classes to keep (with subtypes and predefined types), the attributes and property sets (and properties within them) to keep, the representation contexts and identifiers to keep (for example `Axis` and `Reference` instead of `Body`), the relationships to follow (aggregation, containment, assignments, materials, structural connections), and the common entities every chunk needs (project, units, contexts, materials, profiles, types). Everything else is dropped. The output is a stripped-down, valid IFC4 subset, much like a model view definition; the IFC4 Structural Analysis View is the model for this, and the structural distiller is that view as a profile.
 - **Transforms only where needed.** Where an analysis needs a representation the model does not hold, a profile adds a named transform written in Rust or Lua: simplifying or decimating bodies, deriving space-boundary surfaces, building a watertight fluid domain, deriving a network graph. A transform's output is still keyed to the IFC entities it came from. Other formats (gbXML, a Radiance scene, an EPANET network, a mesh) are produced from the filtered IFC by such a transform, never from the full model.
 - Each blob is self-describing: media type and schema identifier (for IFC, the schema and the profile's name and version).
 - **Detail levels:** a distiller offers Coarse, Medium and Fine (for example decimation tolerance, minimum feature size, whether small openings and furniture are kept), defaulting to the coarsest the job kind's guidance accepts.
 - **Deterministic and chunked:** the same model state and options give byte-identical blobs: IFC chunks are written with a stable entity order and stable instance numbering, split by a natural unit (storey, zone, member group, sheet), with the shared entities in a common chunk, so after an edit only the changed chunks are sent.
-- **Mapped back locally:** with *Anonymise* on, GlobalIds in the distillation are replaced by short opaque keys; the map from keys to GlobalIds stays in Reviera, and outputs keyed the same way are attached to the right elements by the result applier.
+- **Mapped back locally:** with *Anonymise* on, GlobalIds in the distillation are replaced by short opaque keys; the map from keys to GlobalIds stays in Riviera, and outputs keyed the same way are attached to the right elements by the result applier.
 - **Minimal metadata:** names, comments, author data and properties the job does not use are left out. *Anonymise* (on by default for remote and cloud hosts and Web services) replaces any remaining names with keys.
 - **Shown before sending:** the submit dialog shows the distillation's size, entity counts and destination, can preview it in a temporary 3D view, and warns when it exceeds the destination's maximum job size.
 - **Recorded:** the distiller's name and version and the detail level go into the job's provenance (DM-RPC-001).
@@ -4423,7 +4423,7 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 - `compute.distill(kind, scope, detail?, anonymise?) -> {distiller, version, blobs[], size_bytes, counts}`
 - `compute.preview_distillation(kind, scope, detail?) -> view_id`
 
-*Built (2026-10-16), milestone 1:* the `clash.bodies` distiller: the bodies of the chosen IFC classes with booleans applied, as `reviera.analysis.v1.MeshSet` chunks of about 2 MB that close at key-defined boundaries (so moving one element re-sends one chunk), under opaque keys derived from GlobalIds, with the excluded pairs (related by design, or accepted) as a separate blob. The key map stays in Reviera's job record. Filter profiles over IFC (IFC4 subsets) are not built yet; the clash distillation is a transform's output, which DM-RPC-003 allows.
+*Built (2026-10-16), milestone 1:* the `clash.bodies` distiller: the bodies of the chosen IFC classes with booleans applied, as `reviera.analysis.v1.MeshSet` chunks of about 2 MB that close at key-defined boundaries (so moving one element re-sends one chunk), under opaque keys derived from GlobalIds, with the excluded pairs (related by design, or accepted) as a separate blob. The key map stays in Riviera's job record. Filter profiles over IFC (IFC4 subsets) are not built yet; the clash distillation is a transform's output, which DM-RPC-003 allows.
 
 **Acceptance criteria.**
 - [ ] Distilling the same model state twice gives byte-identical blobs.
@@ -4433,34 +4433,34 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 - [ ] No blob is sent to a remote destination before consent is given.
 
 ### 2.17.4 Runner lifecycle and isolation
-**ID:** DM-RPC-004 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Reviera-originated design
+**ID:** DM-RPC-004 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Riviera-originated design
 
-**Purpose.** Runners use memory only while they work, and a runner that fails cannot take Reviera or the machine down with it.
+**Purpose.** Runners use memory only while they work, and a runner that fails cannot take Riviera or the machine down with it.
 
 **Behaviour & rules.**
-- **On demand:** a runner process runs only while it has work: *stopped → starting → ready → busy → idle → stopped*. The first job starts it; it stops after an idle timeout (default 120 s; 0 stops it when its last job ends; settable per kind), on request, or when Reviera exits. Opening, editing or viewing results starts no runner. Start-up never blocks the UI: a job waits in *starting*, with progress. A runner that does not answer its health check within 30 s (settable) fails the start with its last output attached.
+- **On demand:** a runner process runs only while it has work: *stopped → starting → ready → busy → idle → stopped*. The first job starts it; it stops after an idle timeout (default 120 s; 0 stops it when its last job ends; settable per kind), on request, or when Riviera exits. Opening, editing or viewing results starts no runner. Start-up never blocks the UI: a job waits in *starting*, with progress. A runner that does not answer its health check within 30 s (settable) fails the start with its last output attached.
 - **Limits enforced by the operating system:** a memory ceiling (default half of physical memory, settable), a CPU share or core limit, and lower scheduling priority; on Linux through a cgroup scope (systemd user scope or cgroup v2) with `setrlimit` as the fallback, on Windows through a Job Object with a memory limit and below-normal priority, on macOS through `setrlimit` and the background QoS class. The same limits apply to each job on a host.
-- **Failures stay contained:** a runner over its memory ceiling is stopped and the job fails with `memory_limit`, never by exhausting the machine. A crash, a hang (no progress or heartbeat within the job's heartbeat interval, default 60 s) or a lost connection fails the job and leaves Reviera running; the next job starts the runner again. The runner's stderr and exit status are attached to the failed job.
+- **Failures stay contained:** a runner over its memory ceiling is stopped and the job fails with `memory_limit`, never by exhausting the machine. A crash, a hang (no progress or heartbeat within the job's heartbeat interval, default 60 s) or a lost connection fails the job and leaves Riviera running; the next job starts the runner again. The runner's stderr and exit status are attached to the failed job.
 
-*Built (2026-10-16), milestone 1:* the local compute host `reviera-compute-host`, started on demand by Reviera in its own session so it outlives Reviera, and exiting when it has no jobs, runners or calls for 120 s. It starts each runner on demand and stops it after 120 s idle; on Linux and other Unix systems under `RLIMIT_DATA` (default half of physical memory), lower priority, and (Linux) exit with the host; a runner that runs out of memory fails its job with `memory_limit`, a crash with `runner_failed` and the runner's last output, a hang after 60 s without events. Runners also exit on their own after 10 minutes without calls. Not built yet: cgroup scopes, Windows Job Objects, macOS QoS.
+*Built (2026-10-16), milestone 1:* the local compute host `riviera-compute-host`, started on demand by Riviera in its own session so it outlives Riviera, and exiting when it has no jobs, runners or calls for 120 s. It starts each runner on demand and stops it after 120 s idle; on Linux and other Unix systems under `RLIMIT_DATA` (default half of physical memory), lower priority, and (Linux) exit with the host; a runner that runs out of memory fails its job with `memory_limit`, a crash with `runner_failed` and the runner's last output, a hang after 60 s without events. Runners also exit on their own after 10 minutes without calls. Not built yet: cgroup scopes, Windows Job Objects, macOS QoS.
 
 **Acceptance criteria.**
 - [ ] With a model open and no job running, no runner process exists, and none is started by opening, editing or viewing results.
 - [ ] After a job, its runner exits within the idle timeout plus 15 s; with the timeout set to 0, within 15 s of the job ending.
-- [ ] A runner with a 512 MB ceiling that allocates past it is stopped; its job fails with `memory_limit`, and Reviera's own memory use is unchanged.
-- [ ] Killing a runner during a job fails that job with the exit status attached; Reviera keeps running, and the next job starts the runner again and succeeds.
+- [ ] A runner with a 512 MB ceiling that allocates past it is stopped; its job fails with `memory_limit`, and Riviera's own memory use is unchanged.
+- [ ] Killing a runner during a job fails that job with the exit status attached; Riviera keeps running, and the next job starts the runner again and succeeds.
 
 ### 2.17.5 Compute hosts on the LAN
-**ID:** DM-RPC-005 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Reviera-originated design
+**ID:** DM-RPC-005 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Riviera-originated design
 
 **Purpose.** Send heavy jobs to a more powerful machine on the local network.
 
 **Behaviour & rules.**
-- `reviera-compute-host` is a small service that runs on another machine and starts runners there on demand, with the lifecycle and limits of DM-RPC-004.
-- Hosts advertise themselves by DNS-SD (`_reviera-compute._tcp`) and can be added by address.
-- **Pairing:** the host shows a six-digit code; entering it in Reviera pins the host's TLS certificate fingerprint and issues a per-client token, kept in the operating system's credential store. All traffic is TLS. A host refuses unpaired clients, and can be limited to listed job kinds and a maximum job size.
+- `riviera-compute-host` is a small service that runs on another machine and starts runners there on demand, with the lifecycle and limits of DM-RPC-004.
+- Hosts advertise themselves by DNS-SD (`_riviera-compute._tcp`) and can be added by address.
+- **Pairing:** the host shows a six-digit code; entering it in Riviera pins the host's TLS certificate fingerprint and issues a per-client token, kept in the operating system's credential store. All traffic is TLS. A host refuses unpaired clients, and can be limited to listed job kinds and a maximum job size.
 - A host advertises its job kinds, runners, cores, memory, GPUs and queue. Each job kind can be set to run *Local*, *On host …* or *Best available* (the least-loaded paired host that has what the job needs, else local).
-- A job on a host survives the client disconnecting, and Reviera reattaches to it through the job registry (DM-RPC-009). If a host is unreachable when a job starts, Reviera offers to run it locally.
+- A job on a host survives the client disconnecting, and Riviera reattaches to it through the job registry (DM-RPC-009). If a host is unreachable when a job starts, Riviera offers to run it locally.
 
 **Commands.**
 - `compute_host.discover(timeout_s?) -> hosts[]`
@@ -4476,20 +4476,20 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 - [ ] A 200-sheet PDF export set to *Best available* runs on a paired host, and the files arrive in the chosen folder; with no host reachable it is offered locally.
 
 ### 2.17.6 Cloud compute
-**ID:** DM-RPC-006 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Reviera-originated design
+**ID:** DM-RPC-006 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Riviera-originated design
 
-**Purpose.** Run the most rigorous and largest jobs on elastic cloud compute instead of the workstation, without tying Reviera to a cloud vendor.
+**Purpose.** Run the most rigorous and largest jobs on elastic cloud compute instead of the workstation, without tying Riviera to a cloud vendor.
 
 **Behaviour & rules.**
-- `reviera-compute-host` also runs as a **cloud cluster**, published as an OCI container image with a **gateway** (the gRPC and HTTPS endpoint, job queue and blob store) and **workers** (runners). Reviera publishes deployment files for Kubernetes and for a single container host. It needs only containers, object storage and an identity provider, from any provider or self-hosted.
+- `riviera-compute-host` also runs as a **cloud cluster**, published as an OCI container image with a **gateway** (the gRPC and HTTPS endpoint, job queue and blob store) and **workers** (runners). Riviera publishes deployment files for Kubernetes and for a single container host. It needs only containers, object storage and an identity provider, from any provider or self-hosted.
 - **Scale to zero:** workers start when jobs are queued and stop when the queue is empty, so a cluster holds no compute when idle; the gateway may also scale to zero where the platform starts it on request. Workers are sized per job from its distillation and the kind's resource hints, and may use pre-emptible capacity for kinds that checkpoint: a pre-empted job resumes from its last checkpoint on another worker.
 - **Connecting:** a cloud host is added by URL; clients sign in with the organisation's OpenID Connect provider or a scoped token; all traffic is TLS.
 - **Data:** only distillations are sent, anonymised by default (DM-RPC-003). Blobs and results are encrypted at rest, kept for a retention period set by the host's administrator (default 7 days), in the region the host is configured for, which the submit dialog shows.
 - **Estimates and budgets:** before submission the host returns an estimate of duration and resources and, where the operator has set prices, of cost. Jobs over a threshold set per user or project ask for confirmation; a project or organisation budget stops new submissions once spent.
-- **Long jobs:** a cloud job may run for hours or days. Reviera can be closed meanwhile; a notification arrives when it finishes, and its results wait on the host until fetched or expired.
+- **Long jobs:** a cloud job may run for hours or days. Riviera can be closed meanwhile; a notification arrives when it finishes, and its results wait on the host until fetched or expired.
 - **Routing by rigour:** each job kind can set where each detail level runs, for example *Coarse: local; Medium: best available; Fine: cloud*.
 - GPL runners in published images are accompanied by their corresponding source, as their licences require.
-- **Hosted calculation services.** Over time a family of cloud-hosted calculation and analysis services is offered on this contract, run on on-demand compute: structural, seismic, energy, daylight, stormwater, CFD and others (chapter 4 §4.15), rendering and large exports. A service is a cloud host (or a set of them) whose job kinds are listed in a catalogue that Reviera reads (`compute.services`): each entry names its job kinds, operator, region, pricing model and licence of its runners. The same service can be run by an organisation itself from the published images, by Reviera's project, or by a third party; Reviera treats them all alike and adds none by default.
+- **Hosted calculation services.** Over time a family of cloud-hosted calculation and analysis services is offered on this contract, run on on-demand compute: structural, seismic, energy, daylight, stormwater, CFD and others (chapter 4 §4.15), rendering and large exports. A service is a cloud host (or a set of them) whose job kinds are listed in a catalogue that Riviera reads (`compute.services`): each entry names its job kinds, operator, region, pricing model and licence of its runners. The same service can be run by an organisation itself from the published images, by Riviera's project, or by a third party; Riviera treats them all alike and adds none by default.
 
 **Commands.**
 - `compute_host.add(url, auth: "oidc"|"token"|"api_key", token?) -> host_id` (an `api_key` host is made by adding a subscription, DM-RPC-011)
@@ -4500,11 +4500,11 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 **Acceptance criteria.**
 - [ ] A cloud host with no queued jobs runs no workers; a submitted job starts a worker sized to it, and workers stop within 5 minutes of the queue emptying.
 - [ ] A job whose estimate exceeds the confirmation threshold is not submitted until confirmed; a spent budget refuses new submissions with a clear message.
-- [ ] Closing Reviera during a cloud job and reopening it later fetches the finished results and attaches them to the right elements.
+- [ ] Closing Riviera during a cloud job and reopening it later fetches the finished results and attaches them to the right elements.
 - [ ] A pre-empted worker's job resumes from its last checkpoint and finishes with the same output.
 
 ### 2.17.7 Job sets and studies
-**ID:** DM-RPC-007 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Reviera-originated design
+**ID:** DM-RPC-007 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Riviera-originated design
 
 **Purpose.** Run many variants of one job together, fanned out across a host's workers: parameter studies, design-space exploration (§2.15.3), batches of renders or exports.
 
@@ -4521,7 +4521,7 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 - [ ] A 20-variant set uploads the base distillation once, runs the variants in parallel on a cloud host, and returns a summary table with one row per variant.
 
 ### 2.17.8 Compute Jobs panel
-**ID:** DM-RPC-008 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Reviera-originated design
+**ID:** DM-RPC-008 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Riviera-originated design
 
 **Purpose.** One place to see and manage every job of every kind, its runner and its host.
 
@@ -4537,15 +4537,15 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 - [ ] `compute.*` and `compute_host.*` give the same results from Lua and MCP as the panel.
 
 ### 2.17.9 Job registry and reconnection
-**ID:** DM-RPC-009 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Reviera-originated design
+**ID:** DM-RPC-009 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Riviera-originated design
 
-**Purpose.** A long-running job is safe from disconnection: the client can go away, because of a network drop, a laptop closing, Reviera quitting or crashing, and come back later to follow the job and collect its results.
+**Purpose.** A long-running job is safe from disconnection: the client can go away, because of a network drop, a laptop closing, Riviera quitting or crashing, and come back later to follow the job and collect its results.
 
 **Behaviour & rules.**
 - **Server registry.** Every server (a local compute host, a LAN host, a cloud gateway) keeps a durable **registry of jobs**, written before `SubmitJob` returns and updated as each job progresses, so it survives the client disconnecting and the server itself restarting (an embedded database on a single host; the cluster's database on a cloud gateway). A record holds the job ID, the client job key, the owner's identity, the project, the kind and version, the state, submission, start and finish times, the host and worker, progress, the last event sequence number, checkpoints, the result manifest hash, and the expiry.
-- **Jobs outlive their client.** A job keeps running when its client disconnects. Local jobs run under the local compute host (started on demand in the user's session, DM-RPC-004), not as children of Reviera, so they survive Reviera closing or crashing; the local host stays up while it has jobs and exits when it is idle and holds no unfetched results. *Cancel local jobs when Reviera exits* is an option, off by default.
+- **Jobs outlive their client.** A job keeps running when its client disconnects. Local jobs run under the local compute host (started on demand in the user's session, DM-RPC-004), not as children of Riviera, so they survive Riviera closing or crashing; the local host stays up while it has jobs and exits when it is idle and holds no unfetched results. *Cancel local jobs when Riviera exits* is an option, off by default.
 - **Host restarts.** When a host restarts, jobs it was running resume from their last checkpoint if their kind supports checkpoints; otherwise they are marked failed with reason `host_restarted` and offered for resubmission. Queued jobs stay queued.
-- **Client registry.** Reviera records every job it submits, with its host, job ID, client job key, kind, scope, snapshot hash and last event sequence number, in the model's RXD document `compute` (saved with the model), and in the user's state for models not yet saved. When Reviera starts or opens a model with outstanding jobs, it reconnects to their hosts, resumes `WatchJob` from the last sequence number, downloads finished results (resuming partial downloads), applies them through the result applier, and acknowledges them with `AckResults`. Results computed from an older snapshot are applied and marked stale (ANA-GEN-001), never silently dropped.
+- **Client registry.** Riviera records every job it submits, with its host, job ID, client job key, kind, scope, snapshot hash and last event sequence number, in the model's RXD document `compute` (saved with the model), and in the user's state for models not yet saved. When Riviera starts or opens a model with outstanding jobs, it reconnects to their hosts, resumes `WatchJob` from the last sequence number, downloads finished results (resuming partial downloads), applies them through the result applier, and acknowledges them with `AckResults`. Results computed from an older snapshot are applied and marked stale (ANA-GEN-001), never silently dropped.
 - **Reconnection.** A lost connection is retried with backoff (1 s to 60 s); the job shows *reconnecting* in the Compute Jobs panel meanwhile. Reattaching works from any machine signed in as the job's owner on a LAN or cloud host, so a job started on one workstation can be collected on another.
 - **Retention and expiry.** Results are kept until acknowledged or until the server's retention ends (24 hours on a LAN host, 7 days on a cloud host, both settable), whichever comes later for unacknowledged results; the panel warns about results nearing expiry. An expired job's record stays in the registry, without results, for 30 days.
 - **Access.** A client sees and reattaches to its owner's jobs only; administrators can list all jobs on their hosts.
@@ -4557,7 +4557,7 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 *Built (2026-10-16), milestone 1:* the host's registry is SQLite (`registry.db` in the host's state directory) with every job and numbered event; `WatchJob` resumes from any sequence number and `GetResults` from any byte offset; `AckResults` releases results; a host restart fails running jobs with `host_restarted` and runs queued ones. The client's record is `client-jobs.json` in the host's state directory (merged between clients) rather than the model's RXD document `compute`; jobs are followed in the background with reconnection and backoff, and `compute.reattach` resumes them after a restart.
 
 **Acceptance criteria.**
-- [ ] Killing Reviera during a 30-minute local job and starting it again 10 minutes later shows the job still running; when it finishes, its results are applied without user action.
+- [ ] Killing Riviera during a 30-minute local job and starting it again 10 minutes later shows the job still running; when it finishes, its results are applied without user action.
 - [ ] Disconnecting the network during a cloud job and reconnecting resumes progress from the last event, with no event shown twice or missed.
 - [ ] Interrupting a 500 MB result download at 60% and reconnecting downloads only the remaining 40%.
 - [ ] Restarting a LAN host during a checkpointing job resumes it from its last checkpoint; a non-checkpointing job is reported as `host_restarted` and offered for resubmission.
@@ -4565,19 +4565,19 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 - [ ] Saving and reopening the model keeps its outstanding jobs, and reopening reconnects to them.
 
 ### 2.17.10 Real-time simulation sessions
-**ID:** DM-RPC-010 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Reviera-originated design
+**ID:** DM-RPC-010 · **Priority:** P2 · **Ref:** owner requirement (2026-10-15); Riviera-originated design
 
-**Purpose.** Run a computation-heavy simulation on powerful compute (a cloud cluster or a LAN host) while Reviera, a game engine or a VR headset shows it live: the user changes scenario data (wind speed and direction, sun position, occupancy, a storm's intensity, a load's position, a building's massing) and sees the simulation respond immediately. A batch job runs to completion and returns a result; a **session** stays open, keeps its state on the server, accepts inputs and streams state frames until it is closed.
+**Purpose.** Run a computation-heavy simulation on powerful compute (a cloud cluster or a LAN host) while Riviera, a game engine or a VR headset shows it live: the user changes scenario data (wind speed and direction, sun position, occupancy, a storm's intensity, a load's position, a building's massing) and sees the simulation respond immediately. A batch job runs to completion and returns a result; a **session** stays open, keeps its state on the server, accepts inputs and streams state frames until it is closed.
 
 **Behaviour & rules.**
 - **Opening.** A job kind declares whether it supports sessions, and with what inputs (typed, ranged scenario parameters), outputs (fields, particles, streamlines, scalar probes, element results) and update rate. `OpenSession` starts one from a distillation (DM-RPC-003), like a job, and returns a session ID; the session is recorded in the job registry (DM-RPC-009). While a session is open its workers stay reserved: a cloud host does not scale them to zero, and the panel shows the running cost.
-- **Inputs.** The controlling client sends **scenario inputs** (parameter changes, typed and validated against the kind's declaration), **model edits** (distillation patches: when the user edits the model during a session, Reviera re-distils only what changed and sends it; a kind that cannot take patches restarts from the new distillation, keeping its scenario state), **controls** (pause, resume, step, reset, run faster or slower than real time, save a checkpoint) and **view hints** (the region and level of detail being looked at, so the server can spend effort there). Each input has a sequence number; the server acknowledges the frame in which it first took effect, so the client can show input-to-response latency.
+- **Inputs.** The controlling client sends **scenario inputs** (parameter changes, typed and validated against the kind's declaration), **model edits** (distillation patches: when the user edits the model during a session, Riviera re-distils only what changed and sends it; a kind that cannot take patches restarts from the new distillation, keeping its scenario state), **controls** (pause, resume, step, reset, run faster or slower than real time, save a checkpoint) and **view hints** (the region and level of detail being looked at, so the server can spend effort there). Each input has a sequence number; the server acknowledges the frame in which it first took effect, so the client can show input-to-response latency.
 - **Frames.** The server streams **state frames**: a full **keyframe** on attach and at intervals, then **delta frames** against the last keyframe. Fields are sent progressively (a coarse version first, refined while the scenario is unchanged) and quantised to the precision the display needs, with negotiated compression (DM-RPC-001). Frames carry simulation time and a sequence number; the client interpolates between frames for smooth display.
 - **Latest wins.** When the network or the client cannot keep up, intermediate frames are dropped, never queued: the client declares its maximum frame rate and bandwidth, the server adapts resolution and rate to them, and a newer frame always replaces an older one. Inputs, by contrast, are delivered reliably and in order.
 - **Real-time transport.** Control and inputs travel on the gRPC bidirectional stream `SessionStream`. Frames may use a faster negotiated transport where both sides support it: unreliable, unordered QUIC datagrams or WebTransport over HTTP/3, which avoid head-of-line blocking, falling back to the gRPC stream. The transport is a negotiated technique like compression and encryption (identifiers such as `rt-grpc-stream-v1`, `rt-quic-datagram-v1`), and frames are end-to-end encrypted in the same way. For clients that cannot render the fields themselves, a kind may offer **server-side rendering**: GPU workers render the view and stream video over a negotiated codec and transport (for example AV1 or H.265 over WebRTC), with the camera pose sent as an input.
-- **Visualisation in Reviera.** Frames are shown in the viewport as live analysis results through Analysis Display Styles (ANA-ADS-001): coloured surfaces, section-plane fields, vectors, streamlines and particles, with a legend, and a scenario panel with the kind's inputs as sliders and fields. Display never blocks editing.
-- **Game engines and VR.** Session frames enter the Render Scene as a **simulation layer** and travel to engines through the Reviera Scene Protocol's field messages (ADV-RSP-001), so the Godot translation layer (ADV-XR-001) shows them on the desktop or in VR, where scenario inputs are on the wrist menu and the user can stand inside the simulated wind or daylight at 1:1 scale. For the lowest latency, an engine bridge may also attach to the session directly as an observer, using the MIT client library (TECH_STACK §4.0), while Reviera remains the controller.
-- **Several viewers.** One client controls a session; others attach as **observers** and receive the same frames. Control can be handed over. Observers may be other Reviera instances, engine bridges or headsets, on any machine allowed to see the session (DM-RPC-009 access rules).
+- **Visualisation in Riviera.** Frames are shown in the viewport as live analysis results through Analysis Display Styles (ANA-ADS-001): coloured surfaces, section-plane fields, vectors, streamlines and particles, with a legend, and a scenario panel with the kind's inputs as sliders and fields. Display never blocks editing.
+- **Game engines and VR.** Session frames enter the Render Scene as a **simulation layer** and travel to engines through the Riviera Scene Protocol's field messages (ADV-RSP-001), so the Godot translation layer (ADV-XR-001) shows them on the desktop or in VR, where scenario inputs are on the wrist menu and the user can stand inside the simulated wind or daylight at 1:1 scale. For the lowest latency, an engine bridge may also attach to the session directly as an observer, using the MIT client library (TECH_STACK §4.0), while Riviera remains the controller.
+- **Several viewers.** One client controls a session; others attach as **observers** and receive the same frames. Control can be handed over. Observers may be other Riviera instances, engine bridges or headsets, on any machine allowed to see the session (DM-RPC-009 access rules).
 - **Disconnects and idling.** A session survives a client disconnecting: it pauses when no controller has been attached for 2 minutes (settable), and after 10 minutes without any client it saves a checkpoint, releases its workers and becomes *suspended*; reattaching resumes it from the checkpoint and sends a keyframe. A suspended session costs only its storage.
 - **Recording and committing.** A session can be recorded (its inputs and keyframes) for replay, and closed with *Commit*: the server writes a result package of the current state, or of a chosen recorded moment, with provenance that includes the input log, and the result applier brings it into the model like a batch result. Closing without committing discards the state.
 - **Examples.** External wind around a massing study, adjusted by direction and speed; interior airflow and comfort as vents are moved; daylight and shadow as the sun is scrubbed through the day and year; a stormwater event played at chosen intensities; crowd movement and evacuation; a structural model under a load the user drags across a floor; replay of a seismic time history with the structure's response.
@@ -4598,15 +4598,15 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 - `compute.sessions(host_id?) -> sessions[]`
 
 **Acceptance criteria.**
-- [ ] On a LAN host, a scenario input to the reference wind session (coarse) is visible in Reviera's viewport within 150 ms at 30 frames per second; on a cloud host in the same region, within 300 ms.
+- [ ] On a LAN host, a scenario input to the reference wind session (coarse) is visible in Riviera's viewport within 150 ms at 30 frames per second; on a cloud host in the same region, within 300 ms.
 - [ ] With the client's bandwidth capped to a quarter of what the session would use, frames arrive at a reduced resolution or rate without stalling, and inputs still take effect in order.
 - [ ] Disconnecting and reattaching receives a keyframe within 1 s and continues; a session left without clients for 10 minutes suspends, releases its workers, and resumes from its checkpoint when reattached.
-- [ ] A Godot bridge in VR shows the same frames as Reviera's viewport, and changing the wind direction from the wrist menu changes the flow in both.
+- [ ] A Godot bridge in VR shows the same frames as Riviera's viewport, and changing the wind direction from the wrist menu changes the flow in both.
 - [ ] Committing a session writes a result package whose provenance includes the input log, and its results attach to the model like a batch result.
 - [ ] `compute.open_session`, `.session_input` and `.session_control` driven from Lua or MCP give the same session behaviour as the scenario panel.
 
 ### 2.17.11 Remote analysis subscriptions
-**ID:** DM-RPC-011 · **Priority:** P2 · **Ref:** owner requirement (2026-10-20); Reviera-originated design
+**ID:** DM-RPC-011 · **Priority:** P2 · **Ref:** owner requirement (2026-10-20); Riviera-originated design
 
 **Purpose.** Let a user (or an organisation) subscribe to a remote analysis service and run jobs on it through the compute contract, by entering the service's secure URL and an API key and secret. *(Owner requirement, 2026-10-20: "Subscription management for running analysis on a remote host via API. Connecting will require the secure service URL and key:secret authentication. We will be starting a separate project to implement the remote analysis server later in development.")* The server is a separate project; this requirement defines the client side and the contract additions that server implements.
 
@@ -4614,13 +4614,13 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 
 **Behaviour & rules.**
 - **Secure URL only.** The URL must be `https://`; TLS 1.2 or newer with the system's certificate store; certificate errors refuse the connection with the reason (a self-hosted service can add its CA under the subscription's *Advanced* section, or pin its certificate's SHA-256). Plain HTTP is refused, except `http://localhost` with an explicit *development* setting.
-- **Key:secret authentication.** The key identifies the subscription; the secret proves it. Reviera sends them only to the subscription's own URL, only over TLS, only to obtain a short-lived **access token** (the contract's `Authenticate` exchange, below): the key and secret go in an HTTP `Authorization: Basic` header to the service's token endpoint, which returns a bearer token and its expiry; every other call carries the bearer token, and Reviera renews it before it expires. The secret is never put in URLs, logs, journals, crash reports, the model, RXD, MCP results or Lua values.
-- **Storage.** The secret is kept in the operating system's keychain (Secret Service on Linux, Keychain on macOS, Credential Manager on Windows) under the subscription's id; the URL, name, key and settings are per-user settings. Where no keychain is available, Reviera says so and keeps the secret for the session only unless the user chooses an encrypted file protected by a passphrase. Administrators may provision subscriptions through the defaults file (URL and key; the secret still entered by the user or supplied by the OS keychain).
-- **Status.** *Test Connection* and *Refresh* call the contract's `GetSubscription`: plan name, state, period start and end, allowance and usage (in the service's units: compute-hours, credits or jobs), job kinds offered, regions, limits (maximum job size, concurrent jobs) and the operator's terms URL. Reviera refreshes the status at start-up (at most daily) and before a submission; it warns 7 days before expiry and when 90 % of the allowance is used.
+- **Key:secret authentication.** The key identifies the subscription; the secret proves it. Riviera sends them only to the subscription's own URL, only over TLS, only to obtain a short-lived **access token** (the contract's `Authenticate` exchange, below): the key and secret go in an HTTP `Authorization: Basic` header to the service's token endpoint, which returns a bearer token and its expiry; every other call carries the bearer token, and Riviera renews it before it expires. The secret is never put in URLs, logs, journals, crash reports, the model, RXD, MCP results or Lua values.
+- **Storage.** The secret is kept in the operating system's keychain (Secret Service on Linux, Keychain on macOS, Credential Manager on Windows) under the subscription's id; the URL, name, key and settings are per-user settings. Where no keychain is available, Riviera says so and keeps the secret for the session only unless the user chooses an encrypted file protected by a passphrase. Administrators may provision subscriptions through the defaults file (URL and key; the secret still entered by the user or supplied by the OS keychain).
+- **Status.** *Test Connection* and *Refresh* call the contract's `GetSubscription`: plan name, state, period start and end, allowance and usage (in the service's units: compute-hours, credits or jobs), job kinds offered, regions, limits (maximum job size, concurrent jobs) and the operator's terms URL. Riviera refreshes the status at start-up (at most daily) and before a submission; it warns 7 days before expiry and when 90 % of the allowance is used.
 - **Use.** Each active subscription is a compute host (DM-RPC-006) with authentication `api_key`: its job kinds appear in the Compute Jobs panel and the submit dialog, with estimates and costs from the service. A default subscription can be set overall and per job kind; a project may name its preferred subscription (stored per user, by subscription name, never with credentials). The consent rules for sending distillations to a remote destination (DM-RPC-003) apply per subscription.
 - **Errors.** The reason codes `unauthorised` (key or secret refused: "The service refused the key; check it or ask your administrator"), `subscription_inactive` (suspended or expired, with the date), `quota_exceeded` (with the allowance and reset date) and `unsupported_kind` are shown in the panel and the job list; nothing is retried with the same credentials after `unauthorised`.
 - **Removal.** *Remove* deletes the keychain entry and the settings; jobs already on the service keep running there and stay listed until fetched or expired, but can only be fetched after the subscription is added again.
-- **Nothing by default.** Reviera ships with no subscription and makes no connection until the user adds one.
+- **Nothing by default.** Riviera ships with no subscription and makes no connection until the user adds one.
 
 **Contract additions** (MIT, in `schemas/compute/` and `clients/compute`, for the separate server project):
 - `Authenticate` (HTTPS `POST /v1/auth/token` with Basic `key:secret`; gRPC unary with the same credentials in metadata) → `{access_token, expires_at, subscription_id}`.
@@ -4638,9 +4638,9 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 - [x] Every call after authentication carries a bearer token, never the secret; a token near expiry is renewed without the user noticing.
 - [ ] A suspended subscription's job kinds are greyed out in the submit dialog with the reason; a quota-exceeded submission is refused with the allowance and reset date.
 
-*Built (2026-10-20), the client:* Analyze › Remote Analysis (also Manage › Settings and the File menu; there is no Options dialog yet) lists the subscriptions with name, URL, status, plan, usage, period end and default, and under the list the selected one's message, warnings, remaining allowance, job kinds, limits, defaults, where its secret is kept, when it was checked and the terms URL; Add…, Edit…, Remove (asks first), Test Connection, Refresh and Set as Default (overall or for one of its job kinds). Add and Edit take the name, URL, key and secret (masked; `key:secret` in the key field also works; Edit never shows the stored secret and keeps it when the field is empty) and Advanced settings: a CA file, a SHA-256 pin, and *Development* to allow `http://localhost`; a failed test shows the reason and the form comes back with its values. The client is `reviera_compute_proto::subscription` (MIT, the `subscription` feature): reqwest with rustls on *ring* (TLS 1.2 and 1.3), the system's certificates through rustls-platform-verifier plus the extra CA, or with a pin only the pinned certificate (its signatures still checked); redirects are not followed; the key and secret go only to `POST /v1/auth/token` as Basic credentials; the bearer token is renewed when less than 60 s remain, and a token the service rejects is renewed once. `Authenticate` and `GetSubscription` are in `schemas/compute/reviera/compute/v1/subscription.proto` with their HTTPS binding (JSON bodies, RFC 3339 times, `expires_in` also accepted, error bodies `{reason, message, …}`; 401, 403 and 429 map to `unauthorised`, `subscription_inactive` and `quota_exceeded` when no reason is given). Settings are `remote-analysis.json` in the per-user settings folder (URL, name, key, CA, pin, the last status); secrets are in the OS keychain under `org.bimreviera.remote-analysis` (the subscription id as the account), else in memory for the session (`secret_storage: session`; a later session shows *Secret needed*). Statuses: Active, Trial, Suspended, Expired, Key refused, Unreachable, Secret needed, Not checked; warnings 7 days before the period ends and at 90 % of the allowance. `subscription.status` with `refresh` does not try a refused key again until it is changed or tested. Error codes are `subscription.<reason>`. The five credential commands refuse MCP callers and are not listed to agents (`subscription.list` and `.status` are). Not yet: subscriptions as compute hosts (job kinds in the Compute Jobs panel and submit dialog, estimates and costs, consent per subscription, greying out a suspended subscription's kinds, refusing over-quota submissions), the start-up refresh (at most daily) and the check before a submission, the encrypted secrets file where there is no keychain, subscriptions provisioned through the defaults file, a project's preferred subscription, the gRPC form of the two calls (only the HTTPS binding is used).
+*Built (2026-10-20), the client:* Analyze › Remote Analysis (also Manage › Settings and the File menu; there is no Options dialog yet) lists the subscriptions with name, URL, status, plan, usage, period end and default, and under the list the selected one's message, warnings, remaining allowance, job kinds, limits, defaults, where its secret is kept, when it was checked and the terms URL; Add…, Edit…, Remove (asks first), Test Connection, Refresh and Set as Default (overall or for one of its job kinds). Add and Edit take the name, URL, key and secret (masked; `key:secret` in the key field also works; Edit never shows the stored secret and keeps it when the field is empty) and Advanced settings: a CA file, a SHA-256 pin, and *Development* to allow `http://localhost`; a failed test shows the reason and the form comes back with its values. The client is `riviera_compute_proto::subscription` (MIT, the `subscription` feature): reqwest with rustls on *ring* (TLS 1.2 and 1.3), the system's certificates through rustls-platform-verifier plus the extra CA, or with a pin only the pinned certificate (its signatures still checked); redirects are not followed; the key and secret go only to `POST /v1/auth/token` as Basic credentials; the bearer token is renewed when less than 60 s remain, and a token the service rejects is renewed once. `Authenticate` and `GetSubscription` are in `schemas/compute/reviera/compute/v1/subscription.proto` with their HTTPS binding (JSON bodies, RFC 3339 times, `expires_in` also accepted, error bodies `{reason, message, …}`; 401, 403 and 429 map to `unauthorised`, `subscription_inactive` and `quota_exceeded` when no reason is given). Settings are `remote-analysis.json` in the per-user settings folder (URL, name, key, CA, pin, the last status); secrets are in the OS keychain under `org.bimriviera.remote-analysis` (the subscription id as the account), else in memory for the session (`secret_storage: session`; a later session shows *Secret needed*). Statuses: Active, Trial, Suspended, Expired, Key refused, Unreachable, Secret needed, Not checked; warnings 7 days before the period ends and at 90 % of the allowance. `subscription.status` with `refresh` does not try a refused key again until it is changed or tested. Error codes are `subscription.<reason>`. The five credential commands refuse MCP callers and are not listed to agents (`subscription.list` and `.status` are). Not yet: subscriptions as compute hosts (job kinds in the Compute Jobs panel and submit dialog, estimates and costs, consent per subscription, greying out a suspended subscription's kinds, refusing over-quota submissions), the start-up refresh (at most daily) and the check before a submission, the encrypted secrets file where there is no keychain, subscriptions provisioned through the defaults file, a project's preferred subscription, the gRPC form of the two calls (only the HTTPS binding is used).
 
-**Packaging.** Reviera bundles `reviera-compute-host` beside `reviera` for local runners; the host is also packaged on its own and as a container image for LAN and cloud hosts. Built-in runners ship as separate executables. Reviera ships a Rust runner skeleton and a Python one, so a new job kind's runner can be written in any language with a gRPC library.
+**Packaging.** Riviera bundles `riviera-compute-host` beside `riviera` for local runners; the host is also packaged on its own and as a container image for LAN and cloud hosts. Built-in runners ship as separate executables. Riviera ships a Rust runner skeleton and a Python one, so a new job kind's runner can be written in any language with a gRPC library.
 
 ---
 
@@ -4649,12 +4649,12 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 > **Owner requirement (2026-10-30):** "Add a performance profiler that can be enabled to detect performance problems when working with large models and data sets." — "New requirement, development support for performance optimization." — "Goal is gather real-time metrics to identify slowdowns using the software and present a report for development to investigate improvements."
 
 ### 2.18.1 Built-in performance profiler
-**ID:** DM-PERF-001 · **Priority:** P1 · **Ref:** owner requirement (2026-10-30); NFR-PERF-001 … 004 (Ch 0); Reviera-originated design
+**ID:** DM-PERF-001 · **Priority:** P1 · **Ref:** owner requirement (2026-10-30); NFR-PERF-001 … 004 (Ch 0); Riviera-originated design
 
-**Purpose.** Gather **real-time metrics** while Reviera is used on large models and data sets, so slowdowns are seen as they happen, and present a **report for development** that says where the time went, so improvements can be investigated and measured against the performance targets (NFR-PERF-001 … 004). Users can attach the report to an issue.
+**Purpose.** Gather **real-time metrics** while Riviera is used on large models and data sets, so slowdowns are seen as they happen, and present a **report for development** that says where the time went, so improvements can be investigated and measured against the performance targets (NFR-PERF-001 … 004). Users can attach the report to an issue.
 
 **Behaviour & rules.**
-- **Off by default, nearly free when off.** The profiler is switched on by `profiler.start`, by Manage › Performance Profiler, or for a whole session by the environment variable `REVIERA_PROFILE=1` (also `REVIERA_PROFILE_SLOW_MS`). While off, an instrumented operation costs one atomic read; nothing is recorded or allocated.
+- **Off by default, nearly free when off.** The profiler is switched on by `profiler.start`, by Manage › Performance Profiler, or for a whole session by the environment variable `RIVIERA_PROFILE=1` (also `RIVIERA_PROFILE_SLOW_MS`). While off, an instrumented operation costs one atomic read; nothing is recorded or allocated.
 - **Scopes.** The code is instrumented with named, nested timing scopes on the operations that grow with model size: every command (by name; document commands, application commands, MCP and Lua calls alike), transaction commit and change diff, geometry regeneration of recipe elements (`bodies`), render-scene builds, IFC open (read, tessellation) and save (IFC write, RXD encoding), the live store's journal writes, three-way merges, BIMserver calls, and the viewport's frame rendering. A scope records its wall time, its **self time** (less the time of the scopes nested in it), its thread and, where useful, a short detail (the command's name, an element count).
 - **Counters** record sizes alongside the times (elements regenerated, triangles in a scene, bytes written, elements merged), so a slow operation can be related to the data it handled.
 - **Statistics** per scope name: calls, total, self total, mean, median, 95th percentile, maximum. Durations are kept per name up to a cap (default 100 000) for the percentiles; beyond it they are sampled.
@@ -4679,16 +4679,16 @@ Reviera shall have a foundational subsystem, built on one general contract, that
 - [ ] While the profiler runs, orbiting a large model shows its frame time in the live view within a second, and a slow command appears there as it finishes.
 - [x] The exported report names the heaviest call path of a slow command (for example the regeneration inside it) with its share of the time.
 
-*Built (2026-10-30):* `reviera_core::profiler` (a scope reads one relaxed atomic flag while off); scopes on every command (`command:<name>`, in `App::execute`: document and application commands, so Lua and MCP calls too), `commit`, `regenerate` (with the model's element count), `render scene`, `tessellate IFC`, `IFC open` and `IFC read`, `IFC save`, `live store write` (with its batch size), `merge` (elements compared), `bimserver call` and `frame` (each viewport draw). Per-scope statistics with median and p95 over up to 100 000 kept durations, call paths joined by ` › `, the slow list, counters, the live metrics (the last 120 frames, the last 30 top-level operations, the resident set size on Linux) and the 200 000-event timeline. Commands as specified (`profiler.live` adds the active model's elements and IFC entities). Manage › Settings › **Performance Profiler** (also the File menu): the live window refreshed every second (Start/Stop, slow threshold, live line, latest operations, hottest scopes, heaviest paths; Reset, Export Report…, Export Trace…), a new slow operation shown on the status bar; help page *Performance profiler*. Not yet: memory on Windows and macOS, triangle counts in the report, per-element-kind regeneration scopes, the sortable columns, *Copy Report*, and measuring the off-state overhead against the 1 % criterion.
+*Built (2026-10-30):* `riviera_core::profiler` (a scope reads one relaxed atomic flag while off); scopes on every command (`command:<name>`, in `App::execute`: document and application commands, so Lua and MCP calls too), `commit`, `regenerate` (with the model's element count), `render scene`, `tessellate IFC`, `IFC open` and `IFC read`, `IFC save`, `live store write` (with its batch size), `merge` (elements compared), `bimserver call` and `frame` (each viewport draw). Per-scope statistics with median and p95 over up to 100 000 kept durations, call paths joined by ` › `, the slow list, counters, the live metrics (the last 120 frames, the last 30 top-level operations, the resident set size on Linux) and the 200 000-event timeline. Commands as specified (`profiler.live` adds the active model's elements and IFC entities). Manage › Settings › **Performance Profiler** (also the File menu): the live window refreshed every second (Start/Stop, slow threshold, live line, latest operations, hottest scopes, heaviest paths; Reset, Export Report…, Export Trace…), a new slow operation shown on the status bar; help page *Performance profiler*. Not yet: memory on Windows and macOS, triangle counts in the report, per-element-kind regeneration scopes, the sortable columns, *Copy Report*, and measuring the off-state overhead against the 1 % criterion.
 
 
 ## Appendix A — Reference evolution (release history and version notes)
 
 **Ref:** research/05 §14, §15, §13.1, §11.2 · screenshots/platform/wall_tool_ribbon_no_options_bar_2027.png, screenshots/platform/autodesk_assistant_2027.png
 
-The reference product releases once a year, each spring, with point updates during the year. Its file format changes with each yearly release, and older versions cannot read newer files. The table summarises what each release added in the areas this chapter covers (and some others), and what that means for Reviera's priorities. This summary is informative. It guides priorities, and is not a feature list to copy.
+The reference product releases once a year, each spring, with point updates during the year. Its file format changes with each yearly release, and older versions cannot read newer files. The table summarises what each release added in the areas this chapter covers (and some others), and what that means for Riviera's priorities. This summary is informative. It guides priorities, and is not a feature list to copy.
 
-| Reference release | Notable additions (summarised) | Implication for Reviera |
+| Reference release | Notable additions (summarised) | Implication for Riviera |
 |---|---|---|
 | 2020 (Apr 2019) | PDF and image underlays with snapping; elliptical walls; egress path analysis; double fill patterns; multiline text and image parameters; visual programming installed by default; internal origin made visible | Double fill patterns, image and multiline parameters, and PDF underlay snapping are now baseline expectations (DM-PAT-001, DM-PARAM-004, DM-IMP-004). Internal origin, base point and survey point are P0 (DM-LOC-001). |
 | 2021 (Apr 2020) | Slanted walls; generative design studies; real-time realistic views; 3D rebar; systems analysis; tags rotating with elements | Design-space exploration is P2 and runs locally (DM-VPL-003). |
@@ -4697,24 +4697,24 @@ The reference product releases once a year, each spring, with point updates duri
 | 2024 (Apr 2023) | Toposolid; dark theme; Project Browser search; one simplified default template; 2D draw order in 3D families; relocatable collaboration cache | Draw order in families (DM-FED-007), and a small set of shipped templates (DM-TMPL-001). |
 | 2025 (Apr 2024) | Move to a new .NET runtime (add-ins rebuilt); sheet collections; family arrays of 0 or 1 elements; mullion profiles with several loops; macros edited in an external code editor; bulk export of several formats | Arrays with count 0/1 (DM-FED-004), multi-loop profiles (DM-FSPEC-003), an external editor and language server for scripts (DM-LUA-008), and bulk export (DM-EXP-013). A stable, semver-versioned Lua API (DM-LUA-011) avoids forced rebuilds. |
 | 2026 (Apr 2025) | GPU-accelerated graphics (preview); shared parameters on view markers; title-block "As indicated" override; sheet-collection parameters; compound structures without a core; add-in dependency isolation and add-in manager settings; built-in add-in manager UI | Per-add-in environments and an Add-in Manager from v1 (DM-LUA-001, DM-ADDIN-003). Cores are optional in layered types (§2.3.8). |
-| 2027 (7 Apr 2026) | Rule-based numbering; built-in AI assistant (preview) that calls MCP tools; Options Bar removed (options moved into the contextual ribbon and Properties); walls hosted on walls; multi-category tags as defaults; tag leader control; carbon asset on materials; IFC property-mapping dialog; extended properties from external data; new .NET runtime; Windows 11 only | Confirms the direction of several Reviera design choices: MCP as a first-class interface (§2.16, P0), no Options Bar (UI chapter), a carbon asset (DM-MAT-005), a property-mapping UI (DM-FILE-004), and walls as hosts (§2.6.1). Extended properties get an open provider API (DM-PARAM-005). |
+| 2027 (7 Apr 2026) | Rule-based numbering; built-in AI assistant (preview) that calls MCP tools; Options Bar removed (options moved into the contextual ribbon and Properties); walls hosted on walls; multi-category tags as defaults; tag leader control; carbon asset on materials; IFC property-mapping dialog; extended properties from external data; new .NET runtime; Windows 11 only | Confirms the direction of several Riviera design choices: MCP as a first-class interface (§2.16, P0), no Options Bar (UI chapter), a carbon asset (DM-MAT-005), a property-mapping UI (DM-FILE-004), and walls as hosts (§2.6.1). Extended properties get an open provider API (DM-PARAM-005). |
 | 2027.1 (Jun 2026) | Rotatable custom fill patterns; AI assistant reliability (MCP tool calls logged in journals); ambient shadows | Pattern rotation (DM-PAT-001); every MCP call is logged in the session journal (DM-TXN-003, DM-MCP-005). |
 | 2027.2 (Jul 2026) | Tag by example; view-title snapping; incremental model open option | Partial and incremental open (DM-FILE-001, P1/P2). |
 
-**Version and platform notes that shape Reviera:**
-1. **One-way upgrades.** Each yearly release changes the native format. There is no "save as previous version", and families must be upgraded too. → Reviera uses IFC plus a semver-versioned RXD, with a documented compatibility promise and save-to-previous (DM-MIG-001).
+**Version and platform notes that shape Riviera:**
+1. **One-way upgrades.** Each yearly release changes the native format. There is no "save as previous version", and families must be upgraded too. → Riviera uses IFC plus a semver-versioned RXD, with a documented compatibility promise and save-to-previous (DM-MIG-001).
 2. **Mostly single-threaded regeneration** (the reference's own hardware guidance favours high single-core clock speed). → Parallel regeneration is a core differentiator (DM-REGEN-003).
 3. **Runtime churn for extensions.** The reference changed .NET runtimes in 2025 and again in 2027, so add-ins had to be rebuilt each time. → The Lua API is versioned separately from the application (DM-LUA-011). Lua add-ins need no compilation.
-4. **Late add-in isolation and security moves.** Dependency isolation arrived in 2026, and all-user add-ins moved to a protected program folder in 2027. → Reviera has isolated environments, admin-only system add-in folders, trust levels and signing from v1 (DM-LUA-007, DM-ADDIN-002).
-5. **Windows-only, Windows 11 only from 2027.** → Reviera targets Windows 10 and later, macOS 10.12 and later, and current Linux distributions through Flatpak (TECH_STACK §5.4).
-6. **Product tiers.** The reference's lower-cost tier lacks the API, macros, visual programming, the conceptual massing environment and IFC import. → Reviera has no feature tiers. Everything in this chapter is available to every user.
+4. **Late add-in isolation and security moves.** Dependency isolation arrived in 2026, and all-user add-ins moved to a protected program folder in 2027. → Riviera has isolated environments, admin-only system add-in folders, trust levels and signing from v1 (DM-LUA-007, DM-ADDIN-002).
+5. **Windows-only, Windows 11 only from 2027.** → Riviera targets Windows 10 and later, macOS 10.12 and later, and current Linux distributions through Flatpak (TECH_STACK §5.4).
+6. **Product tiers.** The reference's lower-cost tier lacks the API, macros, visual programming, the conceptual massing environment and IFC import. → Riviera has no feature tiers. Everything in this chapter is available to every user.
 7. **Vendor cloud services** (cloud parameters, cloud worksharing, content libraries, issue tracking, AI assistant service) → P3. Open alternatives are noted where they exist: parameter libraries over git/HTTPS (DM-SPAR-001), BIMserver (COL), BCF (DM-IMP-011), and MCP with any agent (§2.16).
 
 ---
 
 ## Command catalog
 
-All commands defined in this chapter. Every command in this table is also a Lua function (`reviera.<name>`) and an MCP tool (§2.16.3), unless noted. "Undoable = No" covers read-only, file, preference and session operations. `txn.*` are transaction primitives used by Lua and MCP, not stand-alone tools.
+All commands defined in this chapter. Every command in this table is also a Lua function (`riviera.<name>`) and an MCP tool (§2.16.3), unless noted. "Undoable = No" covers read-only, file, preference and session operations. `txn.*` are transaction primitives used by Lua and MCP, not stand-alone tools.
 
 | Command | Parameters | Returns | Undoable | Req ID |
 |---|---|---|---|---|
@@ -5190,7 +5190,7 @@ All commands defined in this chapter. Every command in this table is also a Lua 
 |---|---|---|
 | Q-DM-01 | Should add-ins be able to define new categories? | Not in v1. Use `cat.generic_models` with `ObjectType`, or a registry extension in v2 once IFC mapping rules for custom categories are agreed. A v2 design would let an add-in register `addin.<namespace>.<key>` categories that must name an IFC class and `PredefinedType` (usually `USERDEFINED` plus `ObjectType`), default object styles and behaviour flags; projects using them would still open without the add-in, falling back to Generic Models. *Deferred to the post-Alpha/POC review (owner, 2026-10-12).* |
 | Q-DM-02 | Roofs: always `IfcRoof` with `IfcSlab` parts, or a single `IfcSlab ROOF` for one-face roofs? | Default to `IfcRoof` aggregate (more consistent); make the simple form an export option. Check with downstream tools. Test plan: export both forms from five roof shapes (flat, mono-pitch, gable, hip, freeform), open them in at least three viewers and two quantity take-off tools, and record which form gives correct areas and classification. Decide before P1 roof work starts. |
-| Q-DM-03 | Property-set naming for built-in parameters that have no buildingSMART home (group-named sets such as `Identity Data`), and the default set for user parameters (`<Project> Parameters` / `<Category> Parameters`). | Needs owner confirmation. The alternative is one vendor-neutral set name (for example `Common`). Must align with `02a`, which owns the `Reviera_*` names. Criteria: names must not collide with buildingSMART `Pset_`/`Qto_` prefixes, must be stable across languages (not localised group names), and must be readable in third-party schedules. A sample file with both conventions will be reviewed with two downstream users. |
+| Q-DM-03 | Property-set naming for built-in parameters that have no buildingSMART home (group-named sets such as `Identity Data`), and the default set for user parameters (`<Project> Parameters` / `<Category> Parameters`). | Needs owner confirmation. The alternative is one vendor-neutral set name (for example `Common`). Must align with `02a`, which owns the `Riviera_*` names. Criteria: names must not collide with buildingSMART `Pset_`/`Qto_` prefixes, must be stable across languages (not localised group names), and must be readable in third-party schedules. A sample file with both conventions will be reviewed with two downstream users. |
 | Q-DM-04 | Is `IfcProjectLibrary` declared by `IfcProject` (families inside a project) accepted by the buildingSMART validation service and by common viewers? | Test with sample files before P1. Fallback: declare types directly on `IfcProject` and keep the family grouping in RXD only. Test: a project with three families as `IfcProjectLibrary` objects, validated by the buildingSMART validation service and opened in at least three viewers and BIMserver. If any rejects or loses the types, use the fallback and record the finding in `02a`. |
 | Q-DM-05 | Detail-level geometry in extra sub-contexts (`Body-Coarse`/`Body-Medium`): do other tools ignore them safely? | Test with at least three viewers. Fallback: keep Coarse/Medium in RXD as recipes only. Also check file-size impact on a 50 MB model (extra maps for families with detail-level variants) and whether BIMserver stores the extra sub-contexts. Decide before the P1 Family Editor milestone. |
 | Q-DM-06 | Sizes of embedded RXD documents in BIMserver (large `IfcText` values) and their effect on server performance. | Measure with a 100-sheet project. `02a` defines chunking. COL owns BIMserver specifics. Measurements to record: check-in time, server storage, download time and query speed with embedded RXD versus the external carrier, at 10, 100 and 500 sheets. If embedded documents slow the server noticeably, the BIMserver default carrier becomes external. |
@@ -5202,7 +5202,7 @@ All commands defined in this chapter. Every command in this table is also a Lua 
 | Q-DM-12 | LuaJIT on ARM64 macOS, and LuaJIT memory limits through `mlua`. | Validate per platform. Fall back to interpreter mode and to memory monitoring (DM-LUA-001, DM-LUA-007). The CI matrix runs the Lua test suite with JIT on and off on Windows x64, Linux x64 and arm64, and macOS arm64; any platform with failures ships with the JIT off until fixed. |
 ### Intentional deviations from the reference
 
-| Area | Reference behaviour | Reviera behaviour | Reason |
+| Area | Reference behaviour | Riviera behaviour | Reason |
 |---|---|---|---|
 | Native format | Proprietary compound file, one-way yearly upgrades | A single valid IFC file, with RXD embedded as standard property sets (or an optional sidecar); semver RXD; save to previous version | Openness, longevity, version-control friendliness (§2.1, DM-MIG-001) |
 | Internal units | Decimal feet | SI (metres, radians, …) | Matches IFC, and avoids conversion error (DM-UNIT-001) |
@@ -5247,7 +5247,7 @@ All commands defined in this chapter. Every command in this table is also a Lua 
 | §15 System requirements, licensing, product variants | Appendix A (version notes), §2.6.4 |
 | §16 Implications (recommendations 1–12) | §2.1, §2.5, §2.6, §2.7, §2.8, §2.9, §2.10, §2.11.8, §2.12–§2.16 |
 
-**Screenshots referenced (internal reference only, never Reviera assets):** `screenshots/platform/` — `family_types_dialog_parameter_groups.png`, `family_types_cabinet_variations_2026.png`, `reporting_parameters_angles_2026.png`, `formula_driven_sunshade_family_2026.png`, `edit_label_dialog_2026.png`, `adaptive_component_repetition_2026.png`, `conceptual_divided_surface_patterned_2026.png`, `conceptual_uv_grid_2026.png`, `edit_shared_parameters_dialog.png`, `parameter_properties_shared_project_parameter.png`, `project_units_dialog.png`, `manage_tab_settings_panel.png`, `manage_tab_visual_programming_panel.jpg`, `location_and_site_dialog_2026.png`, `material_browser_appearance_tab_2026.png`, `material_browser_physical_asset_annotated_2026.png`, `material_carbon_information_2027.png`, `ifc_property_mapping_2027.png`, `macro_manager_and_vscode_2026.png`, `macro_vscode_editor_2026.png`, `dynamo_interface_library_canvas.jpg`, `dynamo_revit_node_library.jpg`, `dynamo_documentation_browser_2026.png`, `dynamo_player_inputs_2026.png`, `wall_tool_ribbon_no_options_bar_2027.png`, `autodesk_assistant_2027.png`.
+**Screenshots referenced (internal reference only, never Riviera assets):** `screenshots/platform/` — `family_types_dialog_parameter_groups.png`, `family_types_cabinet_variations_2026.png`, `reporting_parameters_angles_2026.png`, `formula_driven_sunshade_family_2026.png`, `edit_label_dialog_2026.png`, `adaptive_component_repetition_2026.png`, `conceptual_divided_surface_patterned_2026.png`, `conceptual_uv_grid_2026.png`, `edit_shared_parameters_dialog.png`, `parameter_properties_shared_project_parameter.png`, `project_units_dialog.png`, `manage_tab_settings_panel.png`, `manage_tab_visual_programming_panel.jpg`, `location_and_site_dialog_2026.png`, `material_browser_appearance_tab_2026.png`, `material_browser_physical_asset_annotated_2026.png`, `material_carbon_information_2027.png`, `ifc_property_mapping_2027.png`, `macro_manager_and_vscode_2026.png`, `macro_vscode_editor_2026.png`, `dynamo_interface_library_canvas.jpg`, `dynamo_revit_node_library.jpg`, `dynamo_documentation_browser_2026.png`, `dynamo_player_inputs_2026.png`, `wall_tool_ribbon_no_options_bar_2027.png`, `autodesk_assistant_2027.png`.
 
 **Web sources (public pages, accessed 2026-10-12; logged in the chapter's sources file):**
 

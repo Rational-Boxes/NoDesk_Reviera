@@ -1,21 +1,21 @@
 # Chapter 1 — User Interface Shell
 
-**Area code:** UI · **Status:** Draft 1 · **Date:** 2026-10-12 · **Licence of this document:** GPL-3.0-or-later (as part of the Reviera source tree)
-**Primary source:** `research/01_ui_shell.md` (cited below as `research/01 §n`). Screenshots under `screenshots/ui/` are internal reference only and are never shipped as Reviera assets.
+**Area code:** UI · **Status:** Draft 1 · **Date:** 2026-10-12 · **Licence of this document:** GPL-3.0-or-later (as part of the Riviera source tree)
+**Primary source:** `research/01_ui_shell.md` (cited below as `research/01 §n`). Screenshots under `screenshots/ui/` are internal reference only and are never shipped as Riviera assets.
 
 ---
 
 ## 1.0 About this chapter
 
 ### 1.0.1 Scope
-This chapter specifies the application shell of Reviera: every window region, palette, toolbar, menu, in-canvas control and interaction convention that a user meets before and while editing a model. It also specifies how the shell is built on wxWidgets, how every visible control is bound to the single command registry, how UI state is exposed to Lua and MCP, the built-in AI agent pane, the BIMserver-mode user interface, accessibility, HiDPI and persistence.
+This chapter specifies the application shell of Riviera: every window region, palette, toolbar, menu, in-canvas control and interaction convention that a user meets before and while editing a model. It also specifies how the shell is built on wxWidgets, how every visible control is bound to the single command registry, how UI state is exposed to Lua and MCP, the built-in AI agent pane, the BIMserver-mode user interface, accessibility, HiDPI and persistence.
 
 The chapter **does not** specify the modelling behaviour behind the tools that appear in the ribbon. Each tool in the ribbon catalog (§1.8) names its owning chapter by area code and the command it invokes. The owning chapter is authoritative for that command's parameters, rules and IFC mapping.
 
 | Owner code | Owning chapter |
 |---|---|
 | UI | Chapter 1 (this chapter) |
-| DM | Chapter 2 — Data model, families, parameters, project setup, file I/O, Reviera Extension Data (RXD), extensibility (Lua, add-ins, MCP) |
+| DM | Chapter 2 — Data model, families, parameters, project setup, file I/O, Riviera Extension Data (RXD), extensibility (Lua, add-ins, MCP) |
 | ARC | Chapter 3 — Architectural modelling and modify tools (includes datums, work planes, sketching, generic modify tools) |
 | STR | Chapter 4 — Structure, steel, concrete/precast |
 | MEP | Chapter 4 — Mechanical, electrical, plumbing, fabrication |
@@ -25,7 +25,7 @@ The chapter **does not** specify the modelling behaviour behind the tools that a
 
 ### 1.0.2 Terminology used in this chapter
 
-| Term | Meaning in Reviera |
+| Term | Meaning in Riviera |
 |---|---|
 | **Shell** | The main application frame and everything in it except the content drawn inside a view. |
 | **Command** | A typed, registered operation (§1.1.1). The only way the shell changes the model or the application state. |
@@ -35,9 +35,9 @@ The chapter **does not** specify the modelling behaviour behind the tools that a
 | **Contextual tab** | A ribbon tab that exists only while a given context holds (§1.9). |
 | **Pane** | A dockable window managed by the docking manager (Properties, Project Browser, System Browser, Agent, …). |
 | **View window** | A dockable document window that displays one view, sheet or schedule. |
-| **Orientation Cube** | Reviera's 3D orientation widget (functional counterpart of the reference's cube widget). |
-| **Navigation Wheel** | Reviera's cursor-following radial navigation menu (functional counterpart of the reference's wheel menus). |
-| **Command Search** | Reviera's search box for commands, help, views and files (counterpart of the reference's title-bar help search). |
+| **Orientation Cube** | Riviera's 3D orientation widget (functional counterpart of the reference's cube widget). |
+| **Navigation Wheel** | Riviera's cursor-following radial navigation menu (functional counterpart of the reference's wheel menus). |
+| **Command Search** | Riviera's search box for commands, help, views and files (counterpart of the reference's title-bar help search). |
 | **Theme token** | A named colour or metric (for example `canvas.selection`) used by all drawing code instead of literal colours. |
 
 ### 1.0.3 Design principles
@@ -46,7 +46,7 @@ The chapter **does not** specify the modelling behaviour behind the tools that a
 3. **Tool options are data.** Options for an active tool are a declarative descriptor rendered by the shell into contextual ribbon panels and the Properties palette (§1.10). There is no separate Options Bar.
 4. **Never block the UI thread.** All model work runs on the core's worker pool through the command queue; the shell remains responsive and shows progress (TECH_STACK §3.3).
 5. **Keyboard first, mouse friendly.** Every command is reachable without a mouse (key sequence, keytips or Command Search); every key action has a visible equivalent.
-6. **Own look.** Reviera uses its own icon set, colours and wording. No reference artwork is used.
+6. **Own look.** Riviera uses its own icon set, colours and wording. No reference artwork is used.
 7. **Mode-agnostic shell.** Local and BIMserver modes share the same shell; mode-specific elements appear only where behaviour differs (§1.32).
 
 ---
@@ -140,7 +140,7 @@ The chapter **does not** specify the modelling behaviour behind the tools that a
 
 **Acceptance criteria.**
 - [ ] The wall placement tool shows Height/Depth, top constraint, Location Line, Chain, Offset and Radius in a contextual panel, and the same values in the Properties "Tool Options" group; changing one updates the other.
-- [ ] Restarting Reviera keeps the last-used wall Location Line.
+- [ ] Restarting Riviera keeps the last-used wall Location Line.
 
 ### 1.1.5 wxWidgets realisation
 **ID:** UI-ARCH-005 · **Priority:** P0 · **Ref:** TECH_STACK §3.4; research/01 §1, §27
@@ -155,7 +155,7 @@ The chapter **does not** specify the modelling behaviour behind the tools that a
 | Quick Access Toolbar | `wxAuiToolBar` in a slim strip directly above the ribbon (default) or below it | Customise drop-down; split buttons with history |
 | Command Search / help | `wxSearchCtrl` at the right of the QAT strip; results in a `wxPopupTransientWindow` hosting a virtual `wxDataViewCtrl` | Fuzzy matcher over the registry |
 | File menu | Custom-drawn "File" button at the left of the ribbon tab row opening a full-height `wxPopupTransientWindow` with a two-column layout; on macOS the native `wxMenuBar` also exposes File, Edit, View, Window and Help | Split items, right pane switching |
-| Ribbon | `wxRibbonBar` with `wxRibbonPage`, `wxRibbonPanel`, `wxRibbonButtonBar`, `wxRibbonToolBar`, `wxRibbonGallery`; a Reviera `wxRibbonArtProvider` subclass drawing from theme tokens | Contextual pages (show/hide pages plus page highlight), slide-out pinning, panel floating, Ctrl-drag tab reorder, four minimise modes, keytips, embedded option controls |
+| Ribbon | `wxRibbonBar` with `wxRibbonPage`, `wxRibbonPanel`, `wxRibbonButtonBar`, `wxRibbonToolBar`, `wxRibbonGallery`; a Riviera `wxRibbonArtProvider` subclass drawing from theme tokens | Contextual pages (show/hide pages plus page highlight), slide-out pinning, panel floating, Ctrl-drag tab reorder, four minimise modes, keytips, embedded option controls |
 | Dialog launchers | `wxRIBBON_PANEL_EXT_BUTTON` on `wxRibbonPanel` | Binding to command ids |
 | Contextual tabs | Pre-created hidden `wxRibbonPage`s shown with `ShowPage` and marked with `AddPageHighlight`; generated content per context | Context-driven rebuild and caching |
 | Dockable panes | `wxAuiManager` + `wxAuiPaneInfo` (Properties, Project Browser, System Browser, Agent, Notifications, Server, Lua Console, add-in panes) | Grouping panes as tabs, persistence keyed by monitor layout |
@@ -173,7 +173,7 @@ The chapter **does not** specify the modelling behaviour behind the tools that a
 | Options dialog | `wxDialog` with a `wxTreebook` and a search box filtering pages | Per-setting lock indicator |
 | Notifications | In-app toasts in a custom `wxPopupWindow` stack, plus `wxNotificationMessage` for OS notifications when the app is not focused | Notification centre pane |
 | Agent pane | AUI pane with a `wxHtmlWindow` transcript and multi-line `wxTextCtrl` input | Tool-call cards, approval buttons |
-| Themes | `wxApp::SetAppearance` (light/dark/system) on platforms that support it; `MSWEnableDarkMode` on Windows; Reviera art providers read theme tokens | Canvas theme is independent and handled by the renderer |
+| Themes | `wxApp::SetAppearance` (light/dark/system) on platforms that support it; `MSWEnableDarkMode` on Windows; Riviera art providers read theme tokens | Canvas theme is independent and handled by the renderer |
 | Icons | `wxBitmapBundle::FromSVG` for every icon | Icon theme packs (light/dark/high-contrast) |
 | Accessibility | Native controls rely on platform accessibility; custom-drawn controls implement `wxAccessible` (Windows) and platform equivalents through the binding layer | See §1.33 |
 
@@ -226,7 +226,7 @@ The chapter **does not** specify the modelling behaviour behind the tools that a
 
 | Zone | Contents | Realisation |
 |---|---|---|
-| Native title bar | Platform window decorations; window title `<model name>[*] — <view type>: <view name> — Reviera`; `*` marks unsaved changes; in BIMserver mode the title adds `@ <server>/<project> r<revision>` | `wxFrame` title |
+| Native title bar | Platform window decorations; window title `<model name>[*] — <view type>: <view name> — Riviera`; `*` marks unsaved changes; in BIMserver mode the title adds `@ <server>/<project> r<revision>` | `wxFrame` title |
 | QAT strip | Home button, Quick Access Toolbar (§1.5), document title area (optional), right side: Command Search (§1.6), server connection indicator (BIMserver mode), Agent pane toggle, Help menu | `wxAuiToolBar` |
 | Ribbon tab row | File button, permanent tabs, add-in tabs, contextual tabs (accent coloured), ribbon state controls at the far right | `wxRibbonBar` |
 | Ribbon panel area | Panels and tools of the active tab; panel titles along the bottom with slide-out arrows and dialog launchers | `wxRibbonBar` |
@@ -248,7 +248,7 @@ The chapter **does not** specify the modelling behaviour behind the tools that a
 
 ---
 
-## 1.3 Reviera Home
+## 1.3 Riviera Home
 
 ### 1.3.1 Home screen
 **ID:** UI-HOME-001 · **Priority:** P0 · **Ref:** research/01 §2, §2.1, §2.2 · `screenshots/ui/home_classic.png`, `screenshots/ui/home_new_recent.png`, `screenshots/ui/home_new_projects.png`
@@ -256,7 +256,7 @@ The chapter **does not** specify the modelling behaviour behind the tools that a
 **Purpose.** Provide a start page for opening and creating models and families, and a place to return to between tasks.
 
 **Workflow.**
-1. Reviera starts and shows Home in place of the ribbon and view area.
+1. Riviera starts and shows Home in place of the ribbon and view area.
 2. The user opens a recent item, browses for a file, creates a new model from a template, or connects to a BIMserver project.
 3. Home closes and the ribbon and views appear. **Ctrl+D** or the QAT Home button returns to Home; the back arrow (or Ctrl+D again, or Esc) returns to the active model.
 
@@ -272,10 +272,10 @@ The chapter **does not** specify the modelling behaviour behind the tools that a
   - Search box filtering by name and location; Filter flyout by modified date (All / Today / Last 7 days / Last 30 days / Last 90 days) and kind (Models / Families / Templates).
   - Pin (keeps an item at the top and exempt from list truncation), Remove from list, Open containing folder, Open read-only (Local mode) and Open revision… (server items).
   - Missing files are shown greyed with a "Locate…" action.
-- **Thumbnail source**: the preview image that Reviera stores with the model's Reviera Extension Data at save (Ch. 2); when absent, a generic kind icon. Server items use a per-user local thumbnail cache.
+- **Thumbnail source**: the preview image that Riviera stores with the model's Riviera Extension Data at save (Ch. 2); when absent, a generic kind icon. Server items use a per-user local thumbnail cache.
 
 **Behaviour & rules.**
-- Home is shown at start-up unless the user launched Reviera with a file argument or chose "Reopen last session" in Options (UI-PREF-002).
+- Home is shown at start-up unless the user launched Riviera with a file argument or chose "Reopen last session" in Options (UI-PREF-002).
 - The Recent list holds up to 50 items by default (configurable 0–200; 0 hides the list). It is stored per user, never inside a model.
 - While Home is visible, keyboard shortcuts for model commands are inactive except reserved file shortcuts (Ctrl+N, Ctrl+O) and Ctrl+D.
 - Home uses only local data plus configured servers; it never contacts any service the user has not configured.
@@ -284,7 +284,7 @@ The chapter **does not** specify the modelling behaviour behind the tools that a
 **Commands.** `ui.home.show()`, `ui.home.hide()`, `ui.home.toggle()`, `ui.recent.list(kind?) -> [RecentItem]`, `ui.recent.pin(path_or_uri, pinned)`, `ui.recent.remove(path_or_uri)`, `ui.recent.clear()`.
 
 **Acceptance criteria.**
-- [ ] Starting Reviera with no arguments shows Home; Ctrl+D with a model open toggles between Home and the model.
+- [ ] Starting Riviera with no arguments shows Home; Ctrl+D with a model open toggles between Home and the model.
 - [ ] A pinned item remains at the top after 60 other files are opened.
 - [ ] Filtering by "Families" and "Last 7 days" shows only families modified in the last week.
 - [ ] A recent server project opens through the server login flow if no valid session token exists.
@@ -308,37 +308,37 @@ The chapter **does not** specify the modelling behaviour behind the tools that a
 |---|---|---|---|---|
 | New | New Model dialog | Model; Family; Conceptual Mass Family; Title Block; Annotation Symbol; Model Template | `file.new(kind, template?)` (DM) | P0 (mass/title block/symbol P1) |
 | Open | Open dialog | Model (IFC/IFCZIP); Family; From Server…; Sample Files; IFC open options… | `file.open(path, options?)`, `family_doc.open`, `bimserver.open` (COL), `cde.select_documents` (*From CDE…*, COL), `file.ifc_open_options` (DM) | P0 (server P1, CDE P2) |
-| Save | Save (writes the model using its current RXD carrier: embedded, or `.ifc` + `.reviera` sidecar written atomically) | — | `file.save(document_id? (default: active)) -> status` (DM) | P0 |
+| Save | Save (writes the model using its current RXD carrier: embedded, or `.ifc` + `.riviera` sidecar written atomically) | — | `file.save(document_id? (default: active)) -> status` (DM) | P0 |
 | Save As | Save As dialog with an **Options…** button (RXD carrier, below) | Model; Family; Template; Library ▸ Family / Group / View | `file.save_as(document_id? (default: active), path, kind?, format?: ifc\|ifczip, carrier?: embedded\|external_file\|external_dir\|bundle) -> status`, `family.save_as`, `group.save`, `view.save_to_library` (DM) | P0 (library P1) |
-| Export | — | CAD ▸ DWG, DXF, DGN, SAT, STL; Images & Animations ▸ Image, Walkthrough, Sun Study; Reports ▸ Schedule, Room/Area Report; PDF; OBJ; FBX; glTF; gbXML; Family Types; Database (ODBC/SQLite); IFC ▸ (with Reviera data, Clean IFC (strip Reviera data), another schema or MVD); BCF; Export options ▸ (CAD export setups, IFC export setups) | `export.*` (DOC/DM) | PDF P0; CAD, image, schedule P1; others P2 |
+| Export | — | CAD ▸ DWG, DXF, DGN, SAT, STL; Images & Animations ▸ Image, Walkthrough, Sun Study; Reports ▸ Schedule, Room/Area Report; PDF; OBJ; FBX; glTF; gbXML; Family Types; Database (ODBC/SQLite); IFC ▸ (with Riviera data, Clean IFC (strip Riviera data), another schema or MVD); BCF; Export options ▸ (CAD export setups, IFC export setups) | `export.*` (DOC/DM) | PDF P0; CAD, image, schedule P1; others P2 |
 | Print | Print dialog | Print; Print Preview; Print Setup; Batch Print | `print.*` (DOC) | P0 (batch P2) |
 | Server | — (only shown when BIMserver features are enabled) | Connect…; Publish to Server…; Check In…; Get Latest; Sync; Export Local Copy…; Disconnect | `server.*` (COL) | P1 |
 | Close | Close active model (*built: File › Close Model, Ctrl+Shift+W (Ctrl+W closes the view), asking to save changes*) | — | `file.close()` (DM) | P0 |
 
 - **Right pane, default content**: **Recent Documents** with a sort control (Most recent first, By name, By size, By kind) and pins; a toggle switches to **Open Documents**, which lists every open view of every open model; clicking a view activates it (`view.activate`).
-- **Footer**: **Options** (`ui.options.open`) and **Exit Reviera** (`app.exit`).
+- **Footer**: **Options** (`ui.options.open`) and **Exit Riviera** (`app.exit`).
 
 **Behaviour & rules.**
 - File is not a ribbon page; it cannot be reordered or hidden.
 - Items are disabled when unavailable (for example Save with no model open; Check In when not connected).
-- **Reviera Extension Data (RXD) handling (Local mode).** Reviera-specific project data that plain IFC cannot express (Reviera Extension Data, "RXD"; format defined in `02a_extension_data_format.md`, Ch. 2) is **embedded in the IFC file as property sets by default**, so a model is normally one `.ifc` file. An external sidecar `<name>.reviera` is an optional alternative carrier. The shell behaves as follows:
+- **Riviera Extension Data (RXD) handling (Local mode).** Riviera-specific project data that plain IFC cannot express (Riviera Extension Data, "RXD"; format defined in `02a_extension_data_format.md`, Ch. 2) is **embedded in the IFC file as property sets by default**, so a model is normally one `.ifc` file. An external sidecar `<name>.riviera` is an optional alternative carrier. The shell behaves as follows:
   - **Save As options** (Options… button in the Save As dialog, also in Options › File Locations as the default for new models):
-    - **RXD carrier**: ( ) *Embed Reviera data in the IFC (recommended)* — default; ( ) *Write separate sidecar file* — writes `<name>.ifc` plus `<name>.reviera`.
+    - **RXD carrier**: ( ) *Embed Riviera data in the IFC (recommended)* — default; ( ) *Write separate sidecar file* — writes `<name>.ifc` plus `<name>.riviera`.
     - The chosen carrier is remembered for the model and used by subsequent **Save**. With the sidecar carrier, Save writes both files as one atomic operation (both written to temporary files, then both replaced); if either write fails, neither original is replaced and an error dialog names the failing file.
-  - **Export clean IFC** (File › Export › IFC › *Clean IFC (strip Reviera data)*, `export.ifc(strip_rxd=true, path, schema?)`, P0): writes a copy without any RXD property sets or entities, for exchange with tools that dislike unknown property sets. It never changes the open model's path or carrier, and the dialog states that parametric intent (constraints, sketches, view definitions and similar) will not be in the copy.
-  - **Open**: RXD embedded in the IFC is read automatically. When the model uses the sidecar carrier, opening `<name>.ifc` also reads `<name>.reviera` when present; selecting a `.reviera` file in the Open dialog opens its paired IFC.
-  - **RXD missing** (a foreign IFC with no RXD, or an expected sidecar not found): the model opens with default UI and documentation settings and a **non-blocking notice** in the notification area: "This model has no Reviera data; defaults are in use. It will be added when you save." For a missing sidecar the notice also offers "Locate data file…" (`file.locate_rxd`).
-  - **RXD stale** (RXD records refer to GlobalIds that no longer exist, or its recorded model fingerprint differs, for example after the IFC was edited in another tool): Reviera opens the model, reconciles automatically by GlobalId (Ch. 2 rules), and shows a **reconciliation report** — a notice that opens a dialog listing what was kept, what was re-attached, what was dropped as orphaned (with element and record identifiers), and what was reset to defaults. The report offers **Keep reconciled data** (default; takes effect on next Save), **Discard Reviera data and use defaults**, and **Save report…** (text/CSV). When reconciliation would drop more than a threshold (default 10 % of records) the report opens automatically as a modal dialog instead of a notice.
+  - **Export clean IFC** (File › Export › IFC › *Clean IFC (strip Riviera data)*, `export.ifc(strip_rxd=true, path, schema?)`, P0): writes a copy without any RXD property sets or entities, for exchange with tools that dislike unknown property sets. It never changes the open model's path or carrier, and the dialog states that parametric intent (constraints, sketches, view definitions and similar) will not be in the copy.
+  - **Open**: RXD embedded in the IFC is read automatically. When the model uses the sidecar carrier, opening `<name>.ifc` also reads `<name>.riviera` when present; selecting a `.riviera` file in the Open dialog opens its paired IFC.
+  - **RXD missing** (a foreign IFC with no RXD, or an expected sidecar not found): the model opens with default UI and documentation settings and a **non-blocking notice** in the notification area: "This model has no Riviera data; defaults are in use. It will be added when you save." For a missing sidecar the notice also offers "Locate data file…" (`file.locate_rxd`).
+  - **RXD stale** (RXD records refer to GlobalIds that no longer exist, or its recorded model fingerprint differs, for example after the IFC was edited in another tool): Riviera opens the model, reconciles automatically by GlobalId (Ch. 2 rules), and shows a **reconciliation report** — a notice that opens a dialog listing what was kept, what was re-attached, what was dropped as orphaned (with element and record identifiers), and what was reset to defaults. The report offers **Keep reconciled data** (default; takes effect on next Save), **Discard Riviera data and use defaults**, and **Save report…** (text/CSV). When reconciliation would drop more than a threshold (default 10 % of records) the report opens automatically as a modal dialog instead of a notice.
   - Project-scoped UI data (open views and their tab/tile arrangement, Project Browser state, selection sets, browser organisation schemes) are **RXD documents** stored with the model through whichever carrier it uses (§1.29). Per-user preferences are never written into RXD.
 - Closing a model with unsaved changes prompts Save / Don't Save / Cancel; in BIMserver mode a further prompt offers Check In when there are local changes not checked in.
-- On macOS the same items are mirrored in the native menu bar's File menu; Options appears as the application "Settings…" item and Exit as "Quit Reviera".
+- On macOS the same items are mirrored in the native menu bar's File menu; Options appears as the application "Settings…" item and Exit as "Quit Riviera".
 
 **Acceptance criteria.**
 - [ ] Clicking the main area of Open shows the Open dialog; clicking its arrow shows the Open sub-items without opening a dialog.
 - [ ] The Open Documents list contains every view window, including ones floated on a second monitor, and activating one brings its frame to front.
 - [ ] Every item in the table is reachable with keytips (§1.25.3).
 - [ ] A new model saved with default options produces a single `.ifc` file that reopens with its open views, browser state and selection sets restored.
-- [ ] Choosing "Write separate sidecar file" produces `.ifc` + `.reviera`; killing the process during a later Save leaves both previous files intact and mutually consistent.
+- [ ] Choosing "Write separate sidecar file" produces `.ifc` + `.riviera`; killing the process during a later Save leaves both previous files intact and mutually consistent.
 - [ ] Export clean IFC produces a file containing no RXD property sets, and the open model's carrier and path are unchanged.
 - [ ] Opening a foreign IFC without RXD shows the defaults notice and no modal dialog.
 - [ ] Opening a model whose RXD references 5 deleted GlobalIds shows a reconciliation report listing those 5 records as orphaned.
@@ -422,17 +422,17 @@ The chapter **does not** specify the modelling behaviour behind the tools that a
 **ID:** UI-HELP-001 · **Priority:** P0 · **Ref:** research/01 §5
 
 **Behaviour & rules.**
-- A **Help** button at the right of the QAT strip opens the offline manual. Its drop-down lists: Manual, What's New, Keyboard Shortcut Reference (generated from the live shortcut map), Lua API Reference (generated from the registry), MCP Tool Reference (generated), Report a Problem, Community, Check for Updates (only if enabled), About Reviera.
+- A **Help** button at the right of the QAT strip opens the offline manual. Its drop-down lists: Manual, What's New, Keyboard Shortcut Reference (generated from the live shortcut map), Lua API Reference (generated from the registry), MCP Tool Reference (generated), Report a Problem, Community, Check for Updates (only if enabled), About Riviera.
 - **F1** opens context help: for the tool under the cursor when its tooltip is visible, for the active dialog, or for the active tool session. Help topics are looked up by `help_topic` in the command descriptor or by dialog id.
-- **About Reviera** shows version, build hash, licence (GPL-3.0-or-later) with the full text, third-party component licences, and where to obtain the corresponding source code (TECH_STACK §4.2 distribution duty).
+- **About Riviera** shows version, build hash, licence (GPL-3.0-or-later) with the full text, third-party component licences, and where to obtain the corresponding source code (TECH_STACK §4.2 distribution duty).
 
 **Acceptance criteria.**
 - [ ] F1 while hovering the Wall button with its tooltip shown opens the wall help topic.
 - [ ] About shows the GPL text and a list of third-party licences that matches the build's dependency manifest.
 
-*Built (2026-10-14):* the **Help** menu with *Reviera Help* (F1) and *About BIM Reviera*. Help opens as a tab beside the views (a webview: WebKitGTK, WebView2 or WKWebView): a landing page with Getting started, Navigating, Selecting and modifying, Model settings and Scripting sections, and the **sample models** from the samples folder's `samples.json`, each with an *Open* link that opens a fresh copy of it (so the sample stays as shipped). Links `reviera:sample/<name>` and `reviera:action/<id>` reach the application; web links open in the system browser. *(Owner request, 2026-10-14: "Add the start of the help menu. Seed a landing hypertext help view. Help will be an inline tab/document-window. The help landing will link to the examples with a link that opens each sample file.")* Not yet: the manual's other pages, context help for the tool under the cursor, the generated references, and About's licence texts.
+*Built (2026-10-14):* the **Help** menu with *Riviera Help* (F1) and *About BIM Riviera*. Help opens as a tab beside the views (a webview: WebKitGTK, WebView2 or WKWebView): a landing page with Getting started, Navigating, Selecting and modifying, Model settings and Scripting sections, and the **sample models** from the samples folder's `samples.json`, each with an *Open* link that opens a fresh copy of it (so the sample stays as shipped). Links `riviera:sample/<name>` and `riviera:action/<id>` reach the application; web links open in the system browser. *(Owner request, 2026-10-14: "Add the start of the help menu. Seed a landing hypertext help view. Help will be an inline tab/document-window. The help landing will link to the examples with a link that opens each sample file.")* Not yet: the manual's other pages, context help for the tool under the cursor, the generated references, and About's licence texts.
 
-*Built (2026-10-26), sample sets in Help:* the landing page lists the samples under the ribbon tab whose tools they show — Architecture, Structure, **Systems** (office air system, washroom plumbing and sprinklers, office electrical and lighting) and **Sustainability** (energy house, daylight studios), View, Modify — each card with **Walkthrough** and **Open**. *Walkthrough* (`reviera:help/walkthrough-<name>`) shows the sample's `<name>.md` as a help page (Markdown by pulldown-cmark; headings get ids, links to another sample's `.md` go to its walkthrough) with a link to open it. *Open* copies the sample with its `<name>.resources` folder (its weather file), so an opened copy runs the energy and daylight tools at once. A *Help › Data Sources* page lists the online services' credits; the *Energy, daylight and carbon* page (Sustainability) and the MEP page link their samples and walkthroughs. A test opens the MEP and sustainability samples from their saved files and checks each shows its feature, running the analyses (`tests/sample_analyses.rs`). *(Owner, 2026-10-26: "build some sample cases with simple structures illustrating each of the recent feature additions for MEP and Sustainability"; "Having full example sets in the help is a priority item, demonstrations of the feature coverage.")* Not yet: walkthrough pages in the HTML-window fallback styled like the others.
+*Built (2026-10-26), sample sets in Help:* the landing page lists the samples under the ribbon tab whose tools they show — Architecture, Structure, **Systems** (office air system, washroom plumbing and sprinklers, office electrical and lighting) and **Sustainability** (energy house, daylight studios), View, Modify — each card with **Walkthrough** and **Open**. *Walkthrough* (`riviera:help/walkthrough-<name>`) shows the sample's `<name>.md` as a help page (Markdown by pulldown-cmark; headings get ids, links to another sample's `.md` go to its walkthrough) with a link to open it. *Open* copies the sample with its `<name>.resources` folder (its weather file), so an opened copy runs the energy and daylight tools at once. A *Help › Data Sources* page lists the online services' credits; the *Energy, daylight and carbon* page (Sustainability) and the MEP page link their samples and walkthroughs. A test opens the MEP and sustainability samples from their saved files and checks each shows its feature, running the analyses (`tests/sample_analyses.rs`). *(Owner, 2026-10-26: "build some sample cases with simple structures illustrating each of the recent feature additions for MEP and Sustainability"; "Having full example sets in the help is a priority item, demonstrations of the feature coverage.")* Not yet: walkthrough pages in the HTML-window fallback styled like the others.
 
 *Built (2026-10-26), a sample for every ribbon tab:* **Steel connection detailing** (Steel), **Reinforced and precast concrete** (Concrete), **Fire protection** (Systems), **Analysis tools** (Analyze), **Massing and site** (Massing & Site), **Annotated plan** (Annotate), **Views and inspection** (View), **Managed project** (Manage) and **Editing tools** (Modify), each a small model showing its tab's tools side by side and labelled, with its walkthrough. The corpus test fails a sample that has no walkthrough (a titled `<name>.md` naming its script); `tests/sample_features.rs` and `tests/sample_analyses.rs` check each shows its features from its saved file (the canopy's structural analysis among them). Building them corrected: custom connections could not be saved (`@Name` set as a parameter); hand bolt patterns drew their heads inside the first ply; overlap checks took parts against their own element, masses against what is modelled in and on them, and a precast piece's parts, bars, fabric and anchors against each other; a graded region left the existing toposolid shown (it is now hidden, kept for cut and fill); the starter smoke detector and manual call point had power connectors, not fire alarm ones. *(Owner, 2026-10-26: "Add Annotate and Manage samples too", "Add a View sample too", "Add a Modify sample too", "Add a Systems fire protection sample too", "Add an Analyze sample too", "Make sure that manual reproduction documents exist for the samples as well.")* Not yet, found while building them (fixed the same day: the elevations' hidden edges, DOC-VIEW-004; bars as swept disks, STR-RBR-004; openings deducted from area loads, STR-LOAD-001): temporary hide/isolate is not saved per view (`view.get` and BCF viewpoint files followed, COL-BCF-003); excluded and intermediate parts are still written to the IFC as entities, where Help says excluded parts are left out (to check whether they carry geometry); window gaps listed in each walkthrough.
 
@@ -578,7 +578,7 @@ The chapter **does not** specify the modelling behaviour behind the tools that a
 - **Ctrl+`** activates the first contextual tab when one exists.
 - Tab activation from the keyboard never changes the selection.
 - **Settings keys.** `ui.ribbon.activate_contextual_on_selection` (bool, default true), `ui.ribbon.after_clear.model` and `ui.ribbon.after_clear.family` (`stay_on_modify` | `return_to_previous`, default `return_to_previous`). All three are on Options › User Interface (UI-PREF-002) and can be part of a scenario's preference overlay (UI-SCEN-001).
-- **"Previous tab"** is the last permanent tab that was active before the contextual tab took focus. If that tab has since been hidden (by discipline filtering or the user), Reviera returns to Modify instead.
+- **"Previous tab"** is the last permanent tab that was active before the contextual tab took focus. If that tab has since been hidden (by discipline filtering or the user), Riviera returns to Modify instead.
 - **Tool start from a ribbon button** keeps the user on the tab the tool came from while the tool's contextual tab is shown, unless the tool's option panels exist only on the contextual tab; then the contextual tab is activated whatever the setting, so the options can be seen.
 - **Changing selection category** (for example from walls to doors) while a contextual tab is active keeps the contextual tab active; its content is replaced (§1.9.1).
 - **Tool chaining.** After `tool.repeat_last` or Create Similar, the tab-switching rules apply as for a fresh tool start.
@@ -648,12 +648,12 @@ The chapter **does not** specify the modelling behaviour behind the tools that a
 ### 1.8.1 Catalog conventions
 **ID:** UI-RIBCAT-001 · **Priority:** P0 · **Ref:** research/01 §7 · `screenshots/ui/ui_overview_annotated.png`, `screenshots/ui/ribbon_insert_tab_legacy.png`, `screenshots/ui/view_tab_windows_panel_canvas_theme.png`
 
-**Purpose.** Define Reviera's default ribbon: its tabs, panels and tools, with the command each tool invokes and the owning chapter.
+**Purpose.** Define Riviera's default ribbon: its tabs, panels and tools, with the command each tool invokes and the owning chapter.
 
 **Rules.**
-- The ribbon default layout is a data file (`ribbon-default.toml`) shipped with Reviera and generated/validated against the registry at build time; a tool referencing an unknown command fails the build.
+- The ribbon default layout is a data file (`ribbon-default.toml`) shipped with Riviera and generated/validated against the registry at build time; a tool referencing an unknown command fails the build.
 - The tables below are normative for **grouping and placement**. Command ids for non-UI owners are the binding names the ribbon uses; if an owning chapter defines a different name, the owning chapter wins and this table is updated (tracked in §1.35).
-- Column meanings: **Kind**: L large, S small, I icon-only, Sp split member, Dd drop-down member, T toggle, G gallery, Dl dialog launcher, So slide-out item. **Keys**: Reviera default key sequence (§1.26.5). **Pri**: the tool's priority tier. P3 rows are listed only to record the decision not to ship them, with the open alternative.
+- Column meanings: **Kind**: L large, S small, I icon-only, Sp split member, Dd drop-down member, T toggle, G gallery, Dl dialog launcher, So slide-out item. **Keys**: Riviera default key sequence (§1.26.5). **Pri**: the tool's priority tier. P3 rows are listed only to record the decision not to ship them, with the open alternative.
 - Command arguments in braces (for example `wall.create{structural}`) mean "the same command with that preset argument".
 - Default tab order: **File · Architecture · Structure · Steel · Concrete · Systems · Insert · Annotate · Analyze · Massing & Site · Collaborate · View · Manage · Add-Ins · Modify**, then add-in tabs (after Add-Ins), then contextual tabs.
 
@@ -796,7 +796,7 @@ Reinforcement tools are on the Concrete tab (§1.8.6).
 ### 1.8.6 Concrete tab (reinforcement and precast)
 **ID:** UI-RIBCAT-013 · **Priority:** P2 · **Ref:** research/01 §7.2 (Reinforcement), §7.4, [2027] Concrete Detailing note in §7
 
-Reviera gathers cast-in-place reinforcement and precast tools on one tab from the start (see §1.35).
+Riviera gathers cast-in-place reinforcement and precast tools on one tab from the start (see §1.35).
 
 | Panel | Tool | Kind | Command | Owner | Keys | Pri |
 |---|---|---|---|---|---|---|
@@ -1347,11 +1347,11 @@ The following context panels are part of the default layout. Owners are authorit
 **Purpose.** Present the options of the active tool without a separate Options Bar row.
 
 **Behaviour & rules.**
-- Reviera has **no Options Bar**. Tool options (UI-ARCH-004) are rendered as:
+- Riviera has **no Options Bar**. Tool options (UI-ARCH-004) are rendered as:
   1. **Contextual ribbon panels**, grouped by the option's `group` attribute (for example Placement, Constraint, Levels, Location). Controls are embedded wx controls sized for one-line use.
   2. A **Tool Options** category at the top of the Properties palette, always expanded while a tool is active.
 - The two renderings are views of the same data; editing either updates the other immediately.
-- Options with keyboard relevance are reachable by keytips (for example Alt, then the option's keytip) and by **Tab focus cycling** from the canvas into the first option control with **Ctrl+Shift+O** (Reviera addition, returns to canvas on Enter or Esc).
+- Options with keyboard relevance are reachable by keytips (for example Alt, then the option's keytip) and by **Tab focus cycling** from the canvas into the first option control with **Ctrl+Shift+O** (Riviera addition, returns to canvas on Enter or Esc).
 - A user preference "Show tool options in a strip below the ribbon" (P2) renders the same options as a single row for users who prefer that arrangement; it is off by default.
 - Lua and MCP read and write tool options with `tool.get_options` / `tool.set_option`.
 
@@ -1403,7 +1403,7 @@ The following context panels are part of the default layout. Owners are authorit
 - **Sorting**: in group order, project-defined parameters appear after built-in ones within each group, alphabetically by default (preference: creation order).
 - The palette is modeless and dockable (§1.15); hidden with PP, Ctrl+1, or View › User Interface.
 
-**Data (IFC mapping).** The palette displays and edits parameters as defined in Ch. 2 (property sets, quantities, and Reviera Extension Data). It adds no persistent data of its own.
+**Data (IFC mapping).** The palette displays and edits parameters as defined in Ch. 2 (property sets, quantities, and Riviera Extension Data). It adds no persistent data of its own.
 
 **Commands.** `ui.properties.get(target?) -> PropertyGridModel` (groups, rows, value, display string, editable flag, reason), `ui.properties.set_filter(category|view)`, `ui.properties.apply()`, `ui.properties.revert()`. Property writes are performed by `element.set_param(ids, {name: value})` (Ch. 2).
 
@@ -1578,7 +1578,7 @@ The following context panels are part of the default layout. Owners are authorit
 - Double-click on an element zooms the active view to it.
 
 **Behaviour & rules.**
-- The tree reflects the current model: Reviera elements are placed by their own data (a wall under its base level, a door under its host wall, a floor or ceiling under its level, a grid line under its grid system); elements read from IFC are placed by the file's spatial containment, aggregation, voiding and filling relationships.
+- The tree reflects the current model: Riviera elements are placed by their own data (a wall under its base level, a door under its host wall, a floor or ceiling under its level, a grid line under its grid system); elements read from IFC are placed by the file's spatial containment, aggregation, voiding and filling relationships.
 - The tree updates after each committed transaction, keeping expansion and scroll position.
 - Hiding a storey node hides everything below it, and so on for every node: the tree's actions use the *subtree* scope of DOC-GFX-008.
 
@@ -1619,7 +1619,7 @@ The following context panels are part of the default layout. Owners are authorit
 
 **Behaviour & rules.**
 - View › Windows › **User Interface** lists check boxes for: Orientation Cube, Navigation Bar, Project Browser, System Browser, Properties, Status Bar, Status Bar – Worksets, Status Bar – Design Options, Agent, Notifications, Lua Console, plus discipline panes (Fabrication Parts, P&ID Modeler, Reconcile Hosting) and add-in panes.
-- **Full-screen** (Reviera addition, P1, **F11**): the main window goes OS full-screen and all chrome is hidden (menu bar, ribbon including its tab row, QAT, panes, status bar, View Control Bar and view tabs); only the canvas remains. *(Owner requirement, 2026-10-20, CIRCLE_MENU_FULL_SCREEN.md: "Option to go full-screen on F11. When in full-screen pushing the mouse pointer against the top will show the menu and ribbon menus, and the exit full-screen button. Pushing against the bottom of the screen cause the palette menus to appear and clicking on the model dismisses the panels.")*
+- **Full-screen** (Riviera addition, P1, **F11**): the main window goes OS full-screen and all chrome is hidden (menu bar, ribbon including its tab row, QAT, panes, status bar, View Control Bar and view tabs); only the canvas remains. *(Owner requirement, 2026-10-20, CIRCLE_MENU_FULL_SCREEN.md: "Option to go full-screen on F11. When in full-screen pushing the mouse pointer against the top will show the menu and ribbon menus, and the exit full-screen button. Pushing against the bottom of the screen cause the palette menus to appear and clicking on the model dismisses the panels.")*
 - **Focus mode** (**Ctrl+Shift+F11**) is the same chrome-free state and the same edge reveals without OS full-screen: the window keeps its size and the desktop's title bar. Focus mode and full-screen are one mode with two window states; switching between them (F11 while in focus mode, or the reverse) keeps the hidden state and changes only the window.
 - **Top-edge reveal.** Pushing the pointer against the top edge of the screen (or window, in focus mode) for 150 ms (the dwell, adjustable in Options › User Interface) slides in the menu bar and the ribbon over the canvas, with an **Exit full-screen** button at the right end of the tab row. The overlay stays while the pointer is over it or a ribbon menu or dialog it opened is open; it hides 600 ms after the pointer leaves it, or at once when the pointer clicks the model. Starting a tool from it hides it, and the tool's options appear in the floating options strip.
 - **Bottom-edge reveal.** Pushing against the bottom edge slides in all the panes that were visible before full-screen (Properties, Project Browser, System Browser, Agent, Lua Console, discipline and add-in panes) together with the status bar, as one overlay over the lower part of the canvas, in their docked arrangement compressed to a strip of up to 40 % of the canvas height (the height is draggable and remembered for the session). The canvas does not resize. A click on the model, a left click in the canvas outside the overlay, or Esc dismisses it; editing a pane value does not.
@@ -1699,7 +1699,7 @@ The following context panels are part of the default layout. Owners are authorit
 **Behaviour & rules.**
 - Dragging a tab outside the main window (or choosing Float / Move to New Window) creates a **secondary frame** containing its own tab area, View Control Bar, Orientation Cube and Navigation Bar. Further tabs can be dropped into it.
 - Secondary frames have no ribbon; keyboard shortcuts and the main ribbon act on whichever view window has focus.
-- Secondary frames appear in the operating system's window list and task switcher as "Reviera — <view name>".
+- Secondary frames appear in the operating system's window list and task switcher as "Riviera — <view name>".
 - **Dock to Main Window** (tab menu) returns a view to the main frame.
 - Each frame handles its own DPI (§1.33.3). Moving a frame between monitors with different scale factors re-lays it out without restarting.
 - Layout persistence records each floating frame's monitor and rectangle; if that monitor is missing at restore, the frame is placed on the primary monitor at the same relative position, clamped to be fully visible.
@@ -1737,7 +1737,7 @@ The following context panels are part of the default layout. Owners are authorit
 **Behaviour & rules.**
 - Canvas colours are theme tokens (§1.28): `canvas.background`, `canvas.selection` (with "semi-transparent" flag), `canvas.preselection`, `canvas.alert`, `canvas.calculating`, `canvas.editing_dimmed`, `canvas.reveal_hidden`, `canvas.temp_mode_border`, `canvas.temp_view_props_border`, `canvas.reveal_constraints_border`, `canvas.displacement_border`.
 - With a dark background, linework drawn in black (or near-black, luminance < 15 %) is displayed in the inverse colour; other colours are kept unless the user enables "adapt colours to background" (P1).
-- **Mode indicators**: whenever a view is in a temporary state, Reviera draws a coloured **frame** inside the view border **and** a text label in the top-left corner naming the state(s), so colour is never the only signal:
+- **Mode indicators**: whenever a view is in a temporary state, Riviera draws a coloured **frame** inside the view border **and** a text label in the top-left corner naming the state(s), so colour is never the only signal:
 
 | State | Border token | Label text |
 |---|---|---|
@@ -1810,10 +1810,10 @@ The following context panels are part of the default layout. Owners are authorit
 **Behaviour & rules.**
 - **Middle-drag** pans; **wheel** zooms about the cursor; **double-click middle** zooms to fit.
 - **Shift + middle-drag** (3D) orbits about the pivot: the selection's centre if something is selected, else the point of the model under the cursor where the drag starts (the first visible surface the ray meets), else the model's visible extents centre, else a user-defined centre set with **Define Centre of Rotation** (R3, right-click in 3D).
-- **Ctrl + Shift + middle-drag** (3D, Reviera addition) looks around from the eye point in perspective views.
+- **Ctrl + Shift + middle-drag** (3D, Riviera addition) looks around from the eye point in perspective views.
 - **F8** starts orbit with the left button until Esc (for users without a middle button). A preference offers **left-button navigation profile** for trackpads: Alt+drag orbit, Alt+Ctrl+drag pan (P1).
 - Trackpads: two-finger scroll pans, pinch zooms, Shift+two-finger scroll orbits in 3D (P1).
-- Zoom commands: Zoom In Region (ZR), Zoom Out 2× (ZO), Zoom to Fit (ZF), Zoom All to Fit (ZA), Zoom Sheet Size (ZS), Previous Pan/Zoom (ZP), Next Pan/Zoom (ZN, Reviera addition).
+- Zoom commands: Zoom In Region (ZR), Zoom Out 2× (ZO), Zoom to Fit (ZF), Zoom All to Fit (ZA), Zoom Sheet Size (ZS), Previous Pan/Zoom (ZP), Next Pan/Zoom (ZN, Riviera addition).
 - Each view keeps a navigation history of up to 50 states for Previous/Next.
 - **3D mice** (6-DoF devices) are supported through the open device protocol available on each platform (for example spacenavd on Linux) with modes 2D, Object, Walk and Fly (P2).
 - Navigation does **not** create undo entries and does **not** mark the model modified. The latest camera of each view is kept as view state: it goes to the live store at once (Ch. 2b), and is written to the RXD document `views/state` (latest camera and Home per view, by view id) along with the next save that happens for any other reason. A view's saved camera in `views/<viewId>` changes only through edits such as `view.set_camera`; when it changes after the latest navigation, the saved camera wins. Closing a model whose only changes are navigation does not prompt to save. An explicit `view.set_camera` call (from a script, an agent, or *Save Orientation*) is an ordinary undoable edit that marks the model modified. In BIMserver mode, navigation never causes a check-in, and the default 3D view is per user.
@@ -1831,7 +1831,7 @@ The following context panels are part of the default layout. Owners are authorit
 **Behaviour & rules.**
 - Shown in a corner of 3D views (default top-right). Semi-transparent when idle (configurable inactive opacity), opaque on hover.
 - Clicking any of its 26 regions (6 faces, 12 edges, 8 corners) animates to that orientation; dragging orbits freely; in face views, roll arrows rotate 90° and adjacent-face arrows step to neighbouring faces.
-- A **projection button** (Reviera addition, owner request) shows the current projection, PERSP or ISO, and switches between perspective and isometric (parallel) projection with one click. The same toggle is in the View menu and in the right-click menu, and has the keyboard sequence PI.
+- A **projection button** (Riviera addition, owner request) shows the current projection, PERSP or ISO, and switches between perspective and isometric (parallel) projection with one click. The same toggle is in the View menu and in the right-click menu, and has the keyboard sequence PI.
 - A **Home** button returns to the view's home orientation; a **compass ring** below shows N/E/S/W (project north or true north per view setting); clicking a letter faces that direction; dragging the ring rotates about the vertical axis.
 - Right-click menu: Go Home; Save View (creates a named 3D view, DOC); Lock to Selection; Perspective / Orthographic; Set Current View as Home; Set Front to View ▸; Reset Front; Show Compass; Orient to View ▸ (any plan, elevation, section or 3D view; adds a section box when orienting to a plan or section); Orient to Direction ▸ (N, S, E, W, NE, NW, SE, SW, Top, Bottom); Orient to a Plane…; Help; Options….
 - Face labels use the project's localisation; their content is generated text, not artwork.
@@ -1877,7 +1877,7 @@ The following context panels are part of the default layout. Owners are authorit
 - **Rewind** shows a strip of thumbnails of earlier view states; dragging along it restores any of them.
 - Wheel right-click menu: switch wheel; Fit to Window; Restore Original Centre; Level Camera; Increase/Decrease Walk Speed; Orient to View; Orient to a Plane; Undo View Orientation Changes; Save View; Increase/Decrease Focal Length; Move/Re-centre Crop Boundary; Help; Options; Close Wheel.
 - Options (§1.27): text visibility (messages, tooltips, cursor text); big and mini size and opacity; invert look vertical axis; walk parallel to ground; walk speed factor; zoom by one step per click; keep scene upright when orbiting.
-- The wheel is drawn by the overlay pass in Reviera's own visual design; it shall not reproduce reference artwork.
+- The wheel is drawn by the overlay pass in Riviera's own visual design; it shall not reproduce reference artwork.
 
 **Acceptance criteria.**
 - [ ] Shift+W (or the Navigation Bar) opens the Full wheel at the cursor; dragging the Orbit wedge orbits; releasing ends the tool with the wheel still shown; Esc closes it.
@@ -1954,11 +1954,11 @@ The following context panels are part of the default layout. Owners are authorit
 | Tab to a chain, click | Select the whole chain (follows the smallest turning angle at junctions with more than two members) |
 | SA, or right-click › Select All Instances ▸ Visible in View / In Entire Project | All instances of the selected types (in a design option: within the active option) |
 | Ctrl+Left, or right-click › Select Previous | Restore the previous selection |
-| Ctrl+A (Reviera addition) | Select all selectable elements visible in the active view, honouring the selection toggles |
+| Ctrl+A (Riviera addition) | Select all selectable elements visible in the active view, honouring the selection toggles |
 | Esc | Clear |
 
 - Box selection honours the selection option toggles (§1.21.4) and design-option/editability filters.
-- **Reviera: boxes in 3D views.** In a 3D view a left drag orbits (§1.24), so a box there starts with Ctrl (add) or Shift (remove) held. In plans a left drag that starts away from a selected element boxes; the middle and right buttons pan. Only what the view shows is boxed: its view range, section box, slices and hidden elements.
+- **Riviera: boxes in 3D views.** In a 3D view a left drag orbits (§1.24), so a box there starts with Ctrl (add) or Shift (remove) held. In plans a left drag that starts away from a selected element boxes; the middle and right buttons pan. Only what the view shows is boxed: its view range, section box, slices and hidden elements.
 - *Built (2026-10-14):* Ctrl+click, Shift+click, window and crossing boxes (with Ctrl/Shift in 3D), Esc; the box picks model elements, not annotation. Not yet: Tab chains, Select All Instances, Select Previous, Ctrl+A, `selection.box`, the + and − cursors.
 - Tools that need several picks (for example "pick walls" modes) use an **add/remove picking mode** with Finish and Cancel on the contextual tab.
 
@@ -2025,7 +2025,7 @@ The following context panels are part of the default layout. Owners are authorit
 
 
 ### 1.21.6 Quick modify menu (middle click)
-**ID:** UI-SEL-006 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); Reviera's own design (Appendix A.2a)
+**ID:** UI-SEL-006 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); Riviera's own design (Appendix A.2a)
 
 **Purpose.** A short menu of the commonest modify actions at the cursor, without travelling to the ribbon. *(Owner request, 2026-10-14: "a center-click action menu on model objects to bring up a quick modify menu. When two model objects selected test if they overlap and the center-click menu will include CSG operations.")*
 
@@ -2044,13 +2044,13 @@ The following context panels are part of the default layout. Owners are authorit
 - [ ] Selecting a desk, its chair and its lamp, then middle-clicking one of them and choosing Create Component…, saves an IFC component of the three into the library folder used last, and the three become one placed copy of it.
 
 ### 1.21.7 Radial menu (experimental)
-**ID:** UI-SEL-007 · **Priority:** P2 · **Ref:** owner requirement (2026-10-20, CIRCLE_MENU_FULL_SCREEN.md); Reviera's own design
+**ID:** UI-SEL-007 · **Priority:** P2 · **Ref:** owner requirement (2026-10-20, CIRCLE_MENU_FULL_SCREEN.md); Riviera's own design
 
 **Purpose.** A ring menu at the pointer as an alternative presentation of the middle-click menu, reaching every ribbon tool by direction rather than by travelling to the ribbon. *(Owner requirement, 2026-10-20: "Center click radial menu. … The radial menu is a ring around the mouse pointer with a maximum of 8 items. A left click dismisses the menu. When the mouse pointer touches a menu item, it re-centers and the ring updates to the next tier of menus. Center click on an element presents the same menus as currently. Center click on the background opens a menu set that mirrors the main menu and ribbon items. Make the radial menu a user controllable application feature, it is experimental.")*
 
 **Behaviour & rules.**
 - **Experimental and off by default.** Options › User Interface › Experimental › **Radial menu** (§1.27.2) turns it on. Off, the middle click opens the popup of UI-SEL-006 as before. The setting is per user and takes effect at once.
-- **Opening.** A middle click (press and release without moving; a middle drag still pans) opens the ring centred on the pointer. The pointer is never moved: where the pointer is too close to the canvas edge for the ring to fit, the ring is drawn whole, shifted inside the canvas, and its centre dead zone is where it is drawn. The ring is drawn by Reviera over the canvas (not a native menu), so it looks the same on every platform and under Wayland.
+- **Opening.** A middle click (press and release without moving; a middle drag still pans) opens the ring centred on the pointer. The pointer is never moved: where the pointer is too close to the canvas edge for the ring to fit, the ring is drawn whole, shifted inside the canvas, and its centre dead zone is where it is drawn. The ring is drawn by Riviera over the canvas (not a native menu), so it looks the same on every platform and under Wayland.
 - **Layout.** At most 8 wedges per tier, the first at the top, then clockwise. Each wedge shows its icon and a short label; the selected element's name or count is in the centre. A tier with more than 8 items shows 7 and a **More…** wedge (bottom) that opens the rest as the next tier. Disabled items are shown dimmed and cannot be entered or run.
 - **Moving through tiers.** The pointer touching a wedge that has a submenu (crossing into the wedge's ring band) makes it the active tier: the ring re-centres on the pointer and shows that wedge's items, with the path (e.g. *Architecture › Build › Wall*) in a breadcrumb above the ring. Moving the pointer back into the centre dead zone (after it has left it) returns to the previous tier, re-centring that tier on the pointer. Wedges have a hysteresis of 4 px so jitter on a boundary does not flip tiers.
 - **Leaf items.** Touching a leaf wedge only highlights it and shows its tooltip; a **left click** on the highlighted wedge runs it, through the same command as its ribbon button. A left click anywhere else (on the model or the centre), Esc, or a right click dismisses the ring without running anything. Keyboard: arrow keys move between wedges, Enter enters or runs, Backspace goes back a tier.
@@ -2078,7 +2078,7 @@ The following context panels are part of the default layout. Owners are authorit
 **ID:** UI-CTRL-001 · **Priority:** P0 · **Ref:** research/01 §19.1
 
 **Behaviour & rules.**
-- When placing or when one element is selected, Reviera shows **temporary dimensions** from the element to the nearest perpendicular references (walls, grids, levels, reference planes) according to the reference preferences in Manage › Additional Settings › Temporary Dimensions (walls: centreline / faces / core centre / core faces; doors and windows: centreline / opening edges).
+- When placing or when one element is selected, Riviera shows **temporary dimensions** from the element to the nearest perpendicular references (walls, grids, levels, reference planes) according to the reference preferences in Manage › Additional Settings › Temporary Dimensions (walls: centreline / faces / core centre / core faces; doors and windows: centreline / opening edges).
 - **Clicking a value** opens an in-canvas editor; entering a new value moves or resizes the element accordingly (one undo step). Unit expressions are accepted as in the Properties palette.
 - **Witness-line grips** can be dragged to another reference, or clicked repeatedly to cycle the reference on that element (Edit Witness Lines, EW).
 - A **make-permanent** control under each value converts it into a permanent dimension (DOC `dim.create_aligned`).
@@ -2103,7 +2103,7 @@ The following context panels are part of the default layout. Owners are authorit
 - **Edge handles**: Tab over an edge in elevation/3D picks the whole edge.
 - **Dimension text grip**: drags the text of a dimension away from its line.
 - **Rotation handle**: a draggable rotation grip with a movable, snapping centre (used by rotate-capable elements and the Rotate tool).
-- All grips are drawn in Reviera's own glyph style at a minimum hit target of 8 logical pixels (larger with the accessibility preference, §1.33).
+- All grips are drawn in Riviera's own glyph style at a minimum hit target of 8 logical pixels (larger with the accessibility preference, §1.33).
 - Dragging produces a live preview; release submits one command and one undo step. Esc during the drag cancels.
 
 **Acceptance criteria.**
@@ -2255,12 +2255,12 @@ The following context panels are part of the default layout. Owners are authorit
 **ID:** UI-TIP-001 · **Priority:** P0 · **Ref:** research/01 §22 · `screenshots/ui/tooltip_ribbon.png`
 
 **Behaviour & rules.**
-- Two stages: after a short hover, the **brief** tooltip shows the label, the first-stage description and the first assigned shortcut in brackets (for example "Wall (WA)"). After continued hover, the **extended** tooltip adds the extended description, an optional illustration from Reviera's own help assets, the ribbon path, all shortcuts and "Press F1 for help".
+- Two stages: after a short hover, the **brief** tooltip shows the label, the first-stage description and the first assigned shortcut in brackets (for example "Wall (WA)"). After continued hover, the **extended** tooltip adds the extended description, an optional illustration from Riviera's own help assets, the ribbon path, all shortcuts and "Press F1 for help".
 - Disabled tools show the unavailability reason in the brief tooltip.
 - **Tooltip assistance** level (Options › User Interface): **None** (no tooltips; F1 still works on focused controls), **Minimal** (brief only), **Normal** (default; brief then extended), **High** (both immediately).
 - Tooltips are also delivered as accessible descriptions of the control (§1.33).
 - **Timing** (Normal level): brief tooltip after 400 ms of hover; extended after a further 1 200 ms. Moving to an adjacent control while a tooltip is shown replaces it after 100 ms (no new delay). The tooltip hides on pointer exit, key press, click or after 20 s. At High, both stages appear together after 100 ms. Delays are settings keys `ui.tooltips.delay_brief_ms` and `ui.tooltips.delay_extended_ms` (range 0–5 000 ms) under the level key `ui.tooltips.level` (`none` | `minimal` | `normal` | `high`).
-- **Content source.** All text comes from the command descriptor (UI-ARCH-001): `label` / `label_long`, `tooltip`, `tooltip_extended`, `default_shortcuts` and the user's actual bindings, `ribbon_paths`. Illustrations are Reviera's own SVG or animated assets referenced by `tooltip_extended`; no video is streamed from the network.
+- **Content source.** All text comes from the command descriptor (UI-ARCH-001): `label` / `label_long`, `tooltip`, `tooltip_extended`, `default_shortcuts` and the user's actual bindings, `ribbon_paths`. Illustrations are Riviera's own SVG or animated assets referenced by `tooltip_extended`; no video is streamed from the network.
 - **Split buttons** show the tooltip of the member under the pointer; for the main part, the last-used member.
 - **Add-in tools** show the add-in's name as a final line ("From add-in: Survey Tools").
 - **Placement.** Below the control, clamped to the monitor's work area; never covering the control itself. Tooltips follow the UI theme and font scale.
@@ -2295,10 +2295,10 @@ The following context panels are part of the default layout. Owners are authorit
 **ID:** UI-TIP-003 · **Priority:** P0 · **Ref:** research/01 §22 · `screenshots/ui/keytips.png`
 
 **Behaviour & rules.**
-- Pressing and releasing **Alt** (or **F10**) overlays letter badges on File, QAT items, ribbon tabs and (on Reviera addition) the pane captions. Typing a badge opens that tab and shows badges for its tools; typing a tool's badge runs it or opens its menu; Esc steps back one level; any mouse click hides badges.
+- Pressing and releasing **Alt** (or **F10**) overlays letter badges on File, QAT items, ribbon tabs and (on Riviera addition) the pane captions. Typing a badge opens that tab and shows badges for its tools; typing a tool's badge runs it or opens its menu; Esc steps back one level; any mouse click hides badges.
 - Keytips are generated: each tab/tool may declare a preferred keytip; conflicts are resolved automatically by adding a second letter. Localised builds generate keytips from localised labels.
 - While keytips are visible, key-sequence shortcuts are suspended.
-- **Levels.** Level 1: File (`F`), QAT items (digits `1`–`9`, then `01`–`09` for items 10–18), ribbon tabs, contextual tabs and (Reviera addition) pane captions. Level 2: the tools of the chosen tab, including embedded option controls and dialog launchers. Level 3: members of a split or drop-down button, or items of a collapsed panel or slide-out.
+- **Levels.** Level 1: File (`F`), QAT items (digits `1`–`9`, then `01`–`09` for items 10–18), ribbon tabs, contextual tabs and (Riviera addition) pane captions. Level 2: the tools of the chosen tab, including embedded option controls and dialog launchers. Level 3: members of a split or drop-down button, or items of a collapsed panel or slide-out.
 - **Generation.** A tool's keytip is its declared preference if free at that level; otherwise the first letter of the label, then the first letters of following words, then two-letter combinations from the label, then a two-character code. Assignments are stable: they depend only on the ribbon content, not on the order in which panels were loaded, so a user learns them once. Two-character keytips wait for the second key without a timeout.
 - **Collapsed and hidden content.** Collapsed panels (UI-RIB-002) get a panel keytip that opens the popup and continues at level 3. Tools hidden by discipline filtering (UI-RIB-007) get no keytip.
 - **Badges.** Drawn in UI theme colours at the bottom centre of each control, at least 16 logical pixels high; disabled tools show dimmed badges that do nothing when typed.
@@ -2327,7 +2327,7 @@ The following context panels are part of the default layout. Owners are authorit
   1. **Key sequence**: 1 to 5 alphanumeric keys (letters, digits and `/`, `;`, `,`, `.`) typed without modifiers while the canvas, ribbon or a non-text pane has focus.
   2. **Chord**: one key with modifiers (Ctrl, Shift, Alt in combination; Alt alone with a letter is reserved for keytips; on macOS Ctrl maps to Cmd for reserved chords, while sequences are unaffected).
 - A command may have several bindings; a binding may be assigned to several commands (resolved by the status bar, §1.26.4).
-- **Execution rule for sequences**: a typed sequence runs as soon as it matches a binding and is not a prefix of any longer binding; if it is also a prefix of a longer binding, Reviera waits for the next key up to the **sequence timeout** (default 800 ms, configurable 300–3000 ms) and then runs the shorter match; Space runs the displayed match at once; Esc or Backspace edits/cancels the buffer.
+- **Execution rule for sequences**: a typed sequence runs as soon as it matches a binding and is not a prefix of any longer binding; if it is also a prefix of a longer binding, Riviera waits for the next key up to the **sequence timeout** (default 800 ms, configurable 300–3000 ms) and then runs the shorter match; Space runs the displayed match at once; Esc or Backspace edits/cancels the buffer.
 - Sequences are inactive while a text field has focus; chords stay active unless the focused control consumes them (for example Ctrl+C in a text field copies text).
 - **Context scopes**: a binding may be scoped to a context (for example `text_editor`, `sketch_mode`, `schedule_view`, `rebar_placement`); scoped bindings take precedence in their scope and do not conflict with global ones.
 - Shortcuts are stored per user in `shortcuts.toml` (§1.29) as a list of `{command, keys, scope}` entries and can be exported and imported in that format.
@@ -2370,7 +2370,7 @@ These bindings are fixed and cannot be reassigned (Ctrl reads Cmd on macOS):
 | Ctrl+A | Select all visible (canvas) | `selection.select_all_visible` |
 | Ctrl+F | Project Browser search | `browser.search` (focus) |
 | Ctrl+K | Command Search | `ui.command_search` (focus) |
-| Ctrl+D | Toggle Reviera Home | `ui.home.toggle` |
+| Ctrl+D | Toggle Riviera Home | `ui.home.toggle` |
 | Ctrl+Left | Select Previous | `selection.previous` |
 | Ctrl+Tab / Ctrl+Shift+Tab | Next / previous view window | `window.next` |
 | Ctrl+` | Activate first contextual tab | `ui.ribbon.activate_contextual` |
@@ -2398,7 +2398,7 @@ These bindings are fixed and cannot be reassigned (Ctrl reads Cmd on macOS):
 
 **Behaviour & rules.**
 - While a sequence is being typed, the status bar prompt shows the typed keys and the first matching command; **Down/Right** cycle to the next match, **Up/Left** to the previous; **Space** runs the shown match without typing further keys.
-- When a completed sequence is bound to several commands, Reviera does not run any: the status bar lists the candidates and the user picks with arrows and Space (or Enter).
+- When a completed sequence is bound to several commands, Riviera does not run any: the status bar lists the candidates and the user picks with arrows and Space (or Enter).
 - This applies to sequences only, not chords.
 - **Display format.** The prompt area shows `Keys: CO › Copy (CO) — 3 more`; while cycling, the shown command, its full sequence and its availability. Unavailable matches (for example a tool that needs a selection) are listed in grey and are skipped by Space, which then runs the next available match.
 - **Ordering of matches.** Exact matches first, then longer sequences in alphabetical order of their keys; within the same keys, scoped bindings for the current context before global ones (UI-KEY-001).
@@ -2416,14 +2416,14 @@ These bindings are fixed and cannot be reassigned (Ctrl reads Cmd on macOS):
 - [ ] Typing a key that matches nothing shows "No command for …" and leaves the buffer unchanged.
 - [ ] `ui.shortcuts.resolve("WA")` returns the wall command as an exact match.
 
-### 1.26.5 Reviera default shortcut map
+### 1.26.5 Riviera default shortcut map
 **ID:** UI-KEY-005 · **Priority:** P0 · **Ref:** research/01 §23.5, §20
 
-**Purpose.** Provide a default map that is efficient and familiar to users of two-letter mnemonic schemes, defined by Reviera's command ids.
+**Purpose.** Provide a default map that is efficient and familiar to users of two-letter mnemonic schemes, defined by Riviera's command ids.
 
 **Rules applied in building the map.**
-- Two-letter mnemonics are used where they are widely known in the industry so that users can transfer muscle memory; Reviera's map is maintained as its own data file (`shortcuts-default.toml`) keyed by Reviera command ids.
-- **No default sequence is bound to two commands.** Where traditional mnemonics collide, Reviera gives the sequence to one command (the more frequent) and leaves the other unbound: `RC` → Repeat Last Command (coping removal has none); `RG` → Remove from Group (render gallery has none); `PC` → Check Pipe Systems (point-cloud snap override moves to `SY`); `SZ` → Close-loop snap (system-zone sketch has none); `SE` → Endpoint snap (Section has none); `ME` → Mechanical Equipment (Measure has none); `ST` → Tangent snap (Stair has none).
+- Two-letter mnemonics are used where they are widely known in the industry so that users can transfer muscle memory; Riviera's map is maintained as its own data file (`shortcuts-default.toml`) keyed by Riviera command ids.
+- **No default sequence is bound to two commands.** Where traditional mnemonics collide, Riviera gives the sequence to one command (the more frequent) and leaves the other unbound: `RC` → Repeat Last Command (coping removal has none); `RG` → Remove from Group (render gallery has none); `PC` → Check Pipe Systems (point-cloud snap override moves to `SY`); `SZ` → Close-loop snap (system-zone sketch has none); `SE` → Endpoint snap (Section has none); `ME` → Mechanical Equipment (Measure has none); `ST` → Tangent snap (Stair has none).
 - Additions not found in the traditional scheme: `3D` default 3D view, `ZN` next pan/zoom, `CI` check in, `FL` floor, Ctrl+K Command Search, Ctrl+J Agent pane, Ctrl+Shift+L Lua Console, Ctrl+Shift+O focus tool options, F11 full-screen, Ctrl+Shift+F11 focus mode, Ctrl+Alt+T background tasks, Ctrl+A select all visible.
 - Scoped bindings (text editor, rebar placement) apply only in their scope.
 
@@ -2634,16 +2634,16 @@ These bindings are fixed and cannot be reassigned (Ctrl reads Cmd on macOS):
 - Two **independent axes**:
   1. **UI theme**: Light, Dark, or Follow system (default). Covers the ribbon, QAT, panes, status bar, View Control Bar, view tabs, **and all dialogs** (no dialog is exempt).
   2. **Canvas scheme**: Light (light background, dark linework) or Dark (dark background, light linework). Toggled with View › Windows › Canvas Theme or CA.
-- All colours come from **theme tokens** defined in theme files (`themes/<name>.toml`) shipped with Reviera; users may add custom theme files. Token groups: `ui.*` (window, panel, text, accent, focus ring, disabled), `ribbon.*` (tab, active tab, contextual accent, panel title), `canvas.*` (§1.17.2), `gizmo.*`, `status.*` (info, warning, error, success).
-- **Platform realisation**: on Windows, wxWidgets dark mode support (`MSWEnableDarkMode` / `wxApp::SetAppearance`); on macOS, the app appearance is set to light, dark or system; on Linux/GTK, Reviera requests the GTK dark or light variant at start-up and follows `prefers-color-scheme` portal changes when "Follow system" is chosen. Custom-drawn controls (ribbon art provider, overlays, status bar) read tokens and repaint on theme change.
+- All colours come from **theme tokens** defined in theme files (`themes/<name>.toml`) shipped with Riviera; users may add custom theme files. Token groups: `ui.*` (window, panel, text, accent, focus ring, disabled), `ribbon.*` (tab, active tab, contextual accent, panel title), `canvas.*` (§1.17.2), `gizmo.*`, `status.*` (info, warning, error, success).
+- **Platform realisation**: on Windows, wxWidgets dark mode support (`MSWEnableDarkMode` / `wxApp::SetAppearance`); on macOS, the app appearance is set to light, dark or system; on Linux/GTK, Riviera requests the GTK dark or light variant at start-up and follows `prefers-color-scheme` portal changes when "Follow system" is chosen. Custom-drawn controls (ribbon art provider, overlays, status bar) read tokens and repaint on theme change.
 - Switching themes takes effect immediately without restart; icon bundles switch to the matching variant (light-on-dark or dark-on-light).
-- A **High contrast** theme pair (light and dark) is shipped (§1.33); when the operating system's high-contrast mode is on and the theme is Follow system, Reviera uses it.
+- A **High contrast** theme pair (light and dark) is shipped (§1.33); when the operating system's high-contrast mode is on and the theme is Follow system, Riviera uses it.
 - Contextual tab accent, selection and pre-selection colours meet contrast requirements against both canvas schemes (§1.33.2).
 
 **Commands.** `ui.theme.get() -> {ui, canvas, effective_ui}`, `ui.theme.set(ui: light|dark|system|<custom>)`, `ui.canvas_theme.set(light|dark)`, `ui.canvas_theme.toggle()`, `ui.theme.list() -> [name]`.
 
 **Acceptance criteria.**
-- [ ] With Follow system, changing the OS appearance switches Reviera's UI theme within 2 seconds without restart.
+- [ ] With Follow system, changing the OS appearance switches Riviera's UI theme within 2 seconds without restart.
 - [ ] Dark UI with Light canvas and Light UI with Dark canvas both work; every dialog follows the UI theme.
 - [ ] A custom theme file overriding `ribbon.contextual` changes the contextual tab colour.
 
@@ -2655,7 +2655,7 @@ These bindings are fixed and cannot be reassigned (Ctrl reads Cmd on macOS):
 **ID:** UI-PERSIST-001 · **Priority:** P0 · **Ref:** research/01 §26, §6.5, §4
 
 **Behaviour & rules.**
-- Per-user configuration lives in the platform configuration directory: Linux `$XDG_CONFIG_HOME/reviera/` (default `~/.config/reviera/`), Windows `%APPDATA%\Reviera\`, macOS `~/Library/Application Support/Reviera/`. Caches (thumbnails, server working copies, agent transcripts) live in the platform cache/data directory.
+- Per-user configuration lives in the platform configuration directory: Linux `$XDG_CONFIG_HOME/riviera/` (default `~/.config/riviera/`), Windows `%APPDATA%\Riviera\`, macOS `~/Library/Application Support/Riviera/`. Caches (thumbnails, server working copies, agent transcripts) live in the platform cache/data directory.
 - Files (all human-readable TOML, versioned with a `schema_version` key and migrated forward automatically):
 
 | File | Contents | Reset command |
@@ -2679,7 +2679,7 @@ These bindings are fixed and cannot be reassigned (Ctrl reads Cmd on macOS):
 **ID:** UI-PERSIST-002 · **Priority:** P0 · **Ref:** research/01 §26 (per-model row); TECH_STACK §3.7.3
 
 **Behaviour & rules.**
-- Project-scoped UI data are **Reviera Extension Data documents** stored with the model through its RXD carrier (embedded in the IFC by default, or the optional sidecar; Ch. 2 and `02a_extension_data_format.md`):
+- Project-scoped UI data are **Riviera Extension Data documents** stored with the model through its RXD carrier (embedded in the IFC by default, or the optional sidecar; Ch. 2 and `02a_extension_data_format.md`):
   - **UI document**: starting view (Ch. 5 command), last session's open views with their tab/tile/split arrangement and per-view navigation state (when "Save view arrangement with model" is on, default on in Local mode), saved selection sets (§1.21.3).
   - **Browser document**: Project Browser expansion state and active tab, browser organisation scheme definitions and project-default active scheme (§1.13).
 - In **BIMserver mode**, the open-view arrangement and browser expansion state are kept **per user in the local working-copy cache**, not checked in, so users do not overwrite each other's layouts; selection sets, organisation schemes and the starting view are checked in as model data.
@@ -2696,7 +2696,7 @@ These bindings are fixed and cannot be reassigned (Ctrl reads Cmd on macOS):
 **ID:** UI-PERSIST-003 · **Priority:** P1 · **Ref:** research/01 §26 (all-users template), §6.7 (locked disciplines)
 
 **Behaviour & rules.**
-- A system-wide defaults directory (Linux `/etc/reviera/`, Windows `%PROGRAMDATA%\Reviera\`, macOS `/Library/Application Support/Reviera/`) may contain `settings.toml`, `ui-state.toml`, `shortcuts.toml` and `layout.toml` used as defaults for new user profiles, and a `locked` list of setting keys users cannot change.
+- A system-wide defaults directory (Linux `/etc/riviera/`, Windows `%PROGRAMDATA%\Riviera\`, macOS `/Library/Application Support/Riviera/`) may contain `settings.toml`, `ui-state.toml`, `shortcuts.toml` and `layout.toml` used as defaults for new user profiles, and a `locked` list of setting keys users cannot change.
 - Locked settings apply to Lua and MCP too.
 - **Directory contents.**
 
@@ -2708,10 +2708,10 @@ These bindings are fixed and cannot be reassigned (Ctrl reads Cmd on macOS):
 | `themes/` | Extra theme files offered to every user (§1.28) |
 
 - **Override order**, highest first: locked administrator value → scenario overlay (UI-SCEN-001) → user value → administrator seed → built-in default. A scenario that lists a locked key is shown as "not applied" for that key.
-- **Existing profiles.** At each launch Reviera re-reads `locked.toml`; locked keys take the administrator value for the session without overwriting the user's stored value, so unlocking later restores the user's own choice.
+- **Existing profiles.** At each launch Riviera re-reads `locked.toml`; locked keys take the administrator value for the session without overwriting the user's stored value, so unlocking later restores the user's own choice.
 - **Visibility.** Locked settings show a lock icon and the note "Managed by administrator" in Options; `ui.options.list` reports `locked: true`; `ui.options.set` on a locked key returns the error `setting_locked` and changes nothing.
-- **Errors.** A malformed defaults file is ignored with a notice to the user and a log entry naming the file and line; Reviera then starts with built-in defaults for the affected store and still applies any valid `locked.toml`.
-- **Read-only location.** Reviera never writes to the defaults directory; it only reads it.
+- **Errors.** A malformed defaults file is ignored with a notice to the user and a log entry naming the file and line; Riviera then starts with built-in defaults for the affected store and still applies any valid `locked.toml`.
+- **Read-only location.** Riviera never writes to the defaults directory; it only reads it.
 
 **Acceptance criteria.**
 - [ ] A locked `ui.disciplines` setting is enforced for a new and an existing user profile.
@@ -2727,7 +2727,7 @@ These bindings are fixed and cannot be reassigned (Ctrl reads Cmd on macOS):
 > - **view bookmarks** (§1.29.5): where in the model they work
 >
 > All three are personal by default, portable between machines, switchable on demand or by context, and fully scriptable through Lua and MCP. Projects may only *recommend*; they never impose.
-**Owner directive (2026-10-12).** The UI shall support *bookmarked* layouts and personal preferences for UI layout choices. This is a Reviera addition: the reference product keeps one UI state per user, with no named layouts.
+**Owner directive (2026-10-12).** The UI shall support *bookmarked* layouts and personal preferences for UI layout choices. This is a Riviera addition: the reference product keeps one UI state per user, with no named layouts.
 
 #### UI-LAYOUT-001 — Saving and applying layout bookmarks
 **ID:** UI-LAYOUT-001 · **Priority:** P1 · **Ref:** Owner directive 2026-10-12; research/01 §13 (docking), §26 (UI persistence)
@@ -2767,7 +2767,7 @@ These bindings are fixed and cannot be reassigned (Ctrl reads Cmd on macOS):
 - **Add-in panes** that a bookmark mentions but that aren't installed are skipped silently, and their state is kept for later. Panes that appeared after the bookmark was saved keep their current state.
 - **The status-bar chip** shows the active bookmark's name. It shows *"<name> (modified)"* once the user changes the arrangement afterwards, and the chip's menu then offers **Update** or **Save as new**.
 
-**Data.** Per user, one TOML file per bookmark in `<config>/reviera/layouts/<slug>.toml`, holding:
+**Data.** Per user, one TOML file per bookmark in `<config>/riviera/layouts/<slug>.toml`, holding:
 - `schema_version`, `name`, `icon_color`, `slot` and `parts`
 - per-part data: the AUI perspective string, a ribbon state table, a QAT list, visibility flags and appearance keys
 - a `[displays.<fingerprint>]` table for each monitor setup it was saved on (UI-LAYOUT-003)
@@ -2824,7 +2824,7 @@ These files are never stored in RXD or in the model. The one exception is UI-LAY
   - The **Manage layouts** dialog lists the built-in, organisation and personal layouts in three groups, with a preview of each: a diagram of pane positions drawn from the saved data, not a screenshot.
   - Settings the administrator has locked (§1.29.3) are applied whatever the bookmark says. The dialog shows which parts were overridden.
 - **Ask at launch.** The Home screen shows a "Choose a layout" strip above Recent with one button per layout (built-in, organisation, personal), preselecting the last used; choosing nothing and opening a model uses the last used one.
-- **Missing startup layout.** If the startup layout has been deleted or its organisation file removed, Reviera falls back to *Last used* and shows a notice.
+- **Missing startup layout.** If the startup layout has been deleted or its organisation file removed, Riviera falls back to *Last used* and shows a notice.
 
 **Commands.** `ui.layout.duplicate(layout_id, name) -> layout_id` (any group; the copy is personal), `ui.layout.set_startup(last_used | layout_id | ask) -> status`, `ui.layout.list(group?)` (UI-LAYOUT-001).
 
@@ -2837,12 +2837,12 @@ These files are never stored in RXD or in the model. The one exception is UI-LAY
 
 - **Variants per display setup.** A bookmark keeps one variant per **monitor configuration fingerprint**: the count, arrangement, resolution and scale of the monitors.
   - Applying the bookmark uses the variant that matches the current displays exactly, if there is one.
-  - Otherwise Reviera **adapts the nearest variant**:
+  - Otherwise Riviera **adapts the nearest variant**:
     - Floating frames are mapped to the monitor in the same relative position.
     - Frames whose monitor no longer exists are docked into the right dock group, keeping their tab order.
     - Sizes are scaled by the DPI ratio and clamped to the work area.
   - A notice offers **Save a variant for this display setup**.
-- **Display changes while running.** When the monitor setup changes during a session (a laptop docked or undocked, a monitor unplugged), Reviera keeps windows on screen at once. It then re-applies the active bookmark's matching variant if one exists, or offers to save one.
+- **Display changes while running.** When the monitor setup changes during a session (a laptop docked or undocked, a monitor unplugged), Riviera keeps windows on screen at once. It then re-applies the active bookmark's matching variant if one exists, or offers to save one.
 - **No window off screen.** After any apply, every frame must be at least 80 % visible on some monitor.
 - **Fingerprint.** A hash of the sorted list of (monitor position relative to the primary, resolution, scale factor). Monitor names and serial numbers are not used, so swapping one monitor for an identical model matches.
 - **Variant management.** *Save a variant for this display setup* stores the current arrangement as an extra variant of the active bookmark; Manage layouts lists the variants with *Delete variant*. A bookmark keeps at most 8 variants; saving a ninth replaces the least recently used one after a confirmation.
@@ -2875,13 +2875,13 @@ These files are never stored in RXD or in the model. The one exception is UI-LAY
 #### UI-LAYOUT-005 — Personal preference profile: export, import and sync
 **ID:** UI-LAYOUT-005 · **Priority:** P1 · **Ref:** Owner directive 2026-10-12; §1.29.1
 
-- **Export profile…** writes a `.reviera-profile` file: a ZIP of the user's chosen stores, from `settings.toml`, `ui-state.toml`, `shortcuts.toml`, `layouts/*.toml` and `layout.toml`. Secrets are never included (`servers.toml` is written without tokens), and machine-specific paths are made relative or dropped.
+- **Export profile…** writes a `.riviera-profile` file: a ZIP of the user's chosen stores, from `settings.toml`, `ui-state.toml`, `shortcuts.toml`, `layouts/*.toml` and `layout.toml`. Secrets are never included (`servers.toml` is written without tokens), and machine-specific paths are made relative or dropped.
 - **Import profile…** previews what will change, then lets the user **merge** (incoming layouts are added and name clashes renamed) or **replace**.
 - **Profile sync folder** (optional preference): the user picks a folder, for example one synced by Nextcloud, Syncthing or a network share. Personal layouts and selected stores are mirrored to it, and changes are picked up at launch and when the window regains focus. Conflicts keep the newer file and save the older one as `<name>.conflict.toml`.
 - **Share a single layout** with *Export layout…* and *Import layout…* (one `.toml` file each), for example to give a colleague a documentation layout.
 - **Import preview dialog.** Lists each incoming store and layout with its action (*Add*, *Replace*, *Rename to "<name> (2)"*, *Skip: newer schema*), and a count of setting keys that would change with a *Show keys* expander. The user can untick individual items. *Import* applies them in one step; nothing is written if the user cancels. Files with a newer `schema_version` than this build understands are skipped and listed.
 - **Clash policy for single layouts** (`on_clash`): `rename` (default; adds " (2)", " (3)", …), `replace`, or `skip`.
-- **Sync folder validation.** The folder must exist and be writable; Reviera writes a small `reviera-sync.toml` marker there. If the folder becomes unavailable (network share offline), syncing pauses with a status-bar notice and resumes when it returns.
+- **Sync folder validation.** The folder must exist and be writable; Riviera writes a small `riviera-sync.toml` marker there. If the folder becomes unavailable (network share offline), syncing pauses with a status-bar notice and resumes when it returns.
 
 **Commands.**
 - `ui.profile.export(path, stores[]) -> status`, `ui.profile.import(path, mode: merge|replace, preview?) -> ChangeSummary` (with `preview = true` nothing is written; the summary lists what would change)
@@ -2985,7 +2985,7 @@ This builds on §1.29.4. A **layout bookmark** stores *where things are*. A **wo
 - optional extras: temporary hide and isolate state, a temporary visual style override, the active workset or design option filter for display, and a selection set reference
 
 **Workflow.**
-1. Choose **Bookmark this view position** (Ctrl+Shift+B, or the right-click menu on a view tab) and give it a name. (Ctrl+D is reserved for Reviera Home, §1.26.3.)
+1. Choose **Bookmark this view position** (Ctrl+Shift+B, or the right-click menu on a view tab) and give it a name. (Ctrl+D is reserved for Riviera Home, §1.26.3.)
 2. Bookmarks appear in a **Bookmarks** tab of the Project Browser, grouped by view, and in the Workspace chip's menu.
 3. Double-click a bookmark (or use command search) to open its view and restore the position.
 
@@ -2995,7 +2995,7 @@ This builds on §1.29.4. A **layout bookmark** stores *where things are*. A **wo
 - **BCF.** A bookmark can be exported as a **BCF viewpoint** (camera, section box, visibility). A BCF viewpoint can be imported as a bookmark (Chapter 6, BCF).
 - **Missing views.** If a bookmark's view no longer exists, the bookmark is shown greyed out, with *Re-target to view…* and *Delete*.
 - **Save dialog.** *Name* (required, 1–80 characters, unique per view; default "<view name> 1", "… 2"), check boxes for the optional extras (off by default), and *Personal* / *Shared with project* (shared needs edit rights in BIMserver mode). Saving is presentation only for personal bookmarks; sharing is an undoable project edit.
-- **Re-target.** *Re-target to view…* offers views of a compatible kind (2D region bookmarks to 2D views, camera bookmarks to 3D views). The stored region or camera is reused as is; if it lies outside the new view's extents, Reviera zooms to fit and reports it.
+- **Re-target.** *Re-target to view…* offers views of a compatible kind (2D region bookmarks to 2D views, camera bookmarks to 3D views). The stored region or camera is reused as is; if it lies outside the new view's extents, Riviera zooms to fit and reports it.
 - **Applying** opens or activates the view (`view.activate`), restores the region or camera without adding an undo entry, and adds one entry to the view's navigation history so Previous Pan/Zoom returns to where the user was. Optional extras are applied as temporary view state (§1.18) and never change the view's saved properties.
 - **BCF mapping.** Export writes one BCF viewpoint with the camera (perspective or orthogonal), the section box as clipping planes, and the visibility of the temporary hide/isolate state as component visibility by IFC GlobalId. Import creates a personal 3D bookmark on the default 3D view, or on a chosen 3D view, and reports elements in the viewpoint that are not in the model. BCF version handling is owned by Ch. 6.
 
@@ -3052,7 +3052,7 @@ This builds on §1.29.4. A **layout bookmark** stores *where things are*. A **wo
   - **Triggers**
 
   It also has **Compare with base**, showing the effective differences.
-- **Storage.** `<config>/reviera/scenarios/<slug>.toml`, which references layouts by id and view bookmarks by id. Organisation scenarios come from the defaults directory and are read-only, with an *Org* badge.
+- **Storage.** `<config>/riviera/scenarios/<slug>.toml`, which references layouts by id and view bookmarks by id. Organisation scenarios come from the defaults directory and are read-only, with an *Org* badge.
 - **Portability.** Scenarios are part of `ui.profile.export` and `ui.profile.import` and of the profile sync folder (UI-LAYOUT-005). They can also be shared one at a time; a scenario's referenced layout is bundled with it on export.
 - **Team-recommended scenarios.** A project can recommend a scenario in the same way as a layout (UI-LAYOUT-006). Its preference overlay is limited to non-personal keys, such as snaps and selection toggles. Appearance, mouse mapping and shortcuts are never pushed by a project.
 - **Editor rules.** Built-in and organisation scenarios open read-only, with *Duplicate to edit*. Edits to a personal scenario are saved when the editor closes or another scenario is selected; *Revert* discards edits since the editor opened. A scenario that is active while edited is re-applied on save. Validation: a unique name (1–64 characters), a slot not used by another scenario (a clash offers to move it), shortcut overlay conflicts shown in red and allowed only after confirmation, preference values checked against each key's type and range.
@@ -3082,7 +3082,7 @@ This builds on §1.29.4. A **layout bookmark** stores *where things are*. A **wo
 **Purpose.** Let scripts and AI agents see and drive what the user sees: active view, selection, open windows, tool state.
 
 **Behaviour & rules.**
-- Every UI command in this chapter is a registry command and therefore available as `reviera.<id>` in Lua and as an MCP tool, unless marked otherwise in the catalog (§1.34).
+- Every UI command in this chapter is a registry command and therefore available as `riviera.<id>` in Lua and as an MCP tool, unless marked otherwise in the catalog (§1.34).
 - UI commands that only change presentation (view activation, zoom, selection, pane visibility) are **not undoable** and do not open model transactions; they run on the UI thread via the command queue and return once applied.
 - MCP permission levels (TECH_STACK §3.6): UI **read** commands (`ui.get_*`, `selection.get`, `window.list`, `ui.screenshot`) require read-only; UI **write** commands that change presentation only (`view.activate`, `selection.set`, `view.zoom*`) are allowed at read-only level by default but can be restricted in Options › AI & MCP ("Agents may change my view and selection": ask / allow / deny); commands that change persistent UI settings (`ui.options.set`, `ui.shortcuts.*`, `ui.ribbon.*`) require full-scripting level.
 
@@ -3118,16 +3118,16 @@ This builds on §1.29.4. A **layout bookmark** stores *where things are*. A **wo
 **ID:** UI-API-003 · **Priority:** P0
 
 **Behaviour & rules.**
-- MCP resources: `reviera://ui/state`, `reviera://ui/active-view`, `reviera://ui/selection`, `reviera://ui/windows`, `reviera://ui/tool`, `reviera://view/{id}/image` (screenshot). Clients may subscribe; Reviera sends resource-updated notifications on change, coalesced to at most 10 per second per resource.
-- Lua scripts subscribe with `reviera.on("selection_changed" | "active_view_changed" | "tool_changed" | "document_opened" | "document_closed" | "theme_changed", fn)`; handlers run on the scripting thread and must not block (long handlers are cut off with a warning per the scripting chapter).
+- MCP resources: `riviera://ui/state`, `riviera://ui/active-view`, `riviera://ui/selection`, `riviera://ui/windows`, `riviera://ui/tool`, `riviera://view/{id}/image` (screenshot). Clients may subscribe; Riviera sends resource-updated notifications on change, coalesced to at most 10 per second per resource.
+- Lua scripts subscribe with `riviera.on("selection_changed" | "active_view_changed" | "tool_changed" | "document_opened" | "document_closed" | "theme_changed", fn)`; handlers run on the scripting thread and must not block (long handlers are cut off with a warning per the scripting chapter).
 - **Resource contents.** Each resource returns JSON of the same shape as the matching query: `ui/state` = `ui.get_state()`, `ui/active-view` = `ui.get_active_view()`, `ui/selection` = `selection.get()`, `ui/windows` = `window.list()`, `ui/tool` = `tool.get_active()`. `view/{id}/image` returns a PNG made with `ui.screenshot(id)` at default size and is regenerated only when read, never pushed.
 - **Coalescing.** Updates within a 100 ms window are merged into one notification that carries the latest snapshot version; a client that reads after the notification always gets the newest state, never an intermediate one.
 - **Event payloads (Lua).** `selection_changed(ids, by_category)`, `active_view_changed(view_id, previous_view_id)`, `tool_changed(command_id | nil, step)`, `document_opened(document_id)`, `document_closed(document_id)`, `theme_changed(ui, canvas)`. Events are delivered in the order they happened; a handler that raises an error is logged and kept subscribed; after 3 consecutive time-outs the handler is unsubscribed with a notice.
-- **Unsubscribing.** `reviera.on` returns a handle with `:off()`; MCP clients unsubscribe per resource. Subscriptions end when the session or script ends.
+- **Unsubscribing.** `riviera.on` returns a handle with `:off()`; MCP clients unsubscribe per resource. Subscriptions end when the session or script ends.
 - **Permissions.** Subscriptions are read access; a client at any MCP level may subscribe. The "Agents may change my view and selection" setting (UI-API-001) restricts only writes; it never blocks reading or subscribing.
 
 **Acceptance criteria.**
-- [ ] A subscribed MCP client receives an update for `reviera://ui/selection` after the user clicks an element.
+- [ ] A subscribed MCP client receives an update for `riviera://ui/selection` after the user clicks an element.
 - [ ] A crossing selection that changes the selection 40 times in one second produces at most 10 notifications, and the last one matches the final selection.
 - [ ] A Lua handler for `active_view_changed` receives the new and previous view ids.
 
@@ -3156,9 +3156,9 @@ This builds on §1.29.4. A **layout bookmark** stores *where things are*. A **wo
 **Behaviour & rules.**
 - `ui.pick.point(prompt, view_id?, snap?: bool) -> Point3 | cancelled`, `ui.pick.elements(prompt, filter?, multiple?: bool) -> [id] | cancelled`, `ui.pick.box(prompt) -> Rect`, `ui.prompt.text(title, label, default?) -> string | cancelled`, `ui.prompt.choice(title, options[]) -> index | cancelled`.
 - Picks show the prompt in the status bar with the requester's name ("Script 'Renumber' asks: pick the first door"); Esc cancels.
-- Over MCP these require an interactive user; they time out (default 120 s) and are refused when Reviera runs headless.
+- Over MCP these require an interactive user; they time out (default 120 s) and are refused when Riviera runs headless.
 - **Pick sessions.** Each call starts a short interactive session with its own contextual tab "Pick for <requester>" holding Finish (for multiple picks), Cancel and the prompt. Only one pick request is active at a time; further requests queue in arrival order and the status bar shows "n pick requests waiting".
-- **Filters.** `filter` accepts category (IFC class or Reviera category key), type id, view-visibility, `editable_only` and a list of allowed ids. Elements that fail the filter cannot be pre-highlighted; the cursor shows a "not allowed" badge over them.
+- **Filters.** `filter` accepts category (IFC class or Riviera category key), type id, view-visibility, `editable_only` and a list of allowed ids. Elements that fail the filter cannot be pre-highlighted; the cursor shows a "not allowed" badge over them.
 - **Point picks** use normal snapping unless `snap = false`; coordinate entry (§1.33.1) works. The returned point is in project coordinates (Ch. 2) and in internal units.
 - **Box picks** follow window/crossing by drag direction and return the rectangle in view coordinates with the view id.
 - **Prompts.** `ui.prompt.text` and `ui.prompt.choice` show small modal dialogs titled with the requester's name; text input is limited to 4 096 characters; choice shows up to 50 options with search when more than 10.
@@ -3192,18 +3192,18 @@ This builds on §1.29.4. A **layout bookmark** stores *where things are*. A **wo
 ### 1.31.1 Purpose and architecture
 **ID:** UI-AGENT-001 · **Priority:** P1 · **Ref:** research/01 §5 ([2027] assistant palette) · `screenshots/ui/revit2027_autodesk_assistant_button.png`, `screenshots/ui/revit2027_autodesk_assistant_panel.png`
 
-**Purpose.** Offer a built-in, open, vendor-neutral AI assistant that works through Reviera's own MCP server, as Reviera's alternative to the reference's proprietary assistant.
+**Purpose.** Offer a built-in, open, vendor-neutral AI assistant that works through Riviera's own MCP server, as Riviera's alternative to the reference's proprietary assistant.
 
 **Behaviour & rules.**
 - The Agent pane is a dockable pane (default: right dock, hidden) toggled with Ctrl+J, the QAT-strip Agent button, or View › User Interface › Agent.
-- It contains a built-in **MCP client** connected to Reviera's own MCP server through an in-process transport, plus optionally to **additional MCP servers** the user configures (for example a document-search server or a company standards server). Each server's tools are namespaced.
+- It contains a built-in **MCP client** connected to Riviera's own MCP server through an in-process transport, plus optionally to **additional MCP servers** the user configures (for example a document-search server or a company standards server). Each server's tools are namespaced.
 - It talks to a **model provider** configured by the user: any provider reachable through a supported chat API, including locally hosted models; no provider is bundled or preconfigured, and nothing is sent anywhere until the user configures one. Keys are stored in the OS keychain.
 - Agent sessions are ordinary MCP sessions: they get the permission level chosen for the pane (default: model-edit with confirmation), and their commands go through the same queue, transactions and undo attribution as any other client (§1.30.6).
 - The pane is optional; builds without networking can omit the provider connectors while keeping the pane for local providers.
 
 **Acceptance criteria.**
 - [ ] With no provider configured, the pane shows a setup page and makes no network connection.
-- [ ] Tools from Reviera's MCP server appear in the agent's tool list exactly as an external MCP client would see them.
+- [ ] Tools from Riviera's MCP server appear in the agent's tool list exactly as an external MCP client would see them.
 
 ### 1.31.2 Conversation UI
 **ID:** UI-AGENT-002 · **Priority:** P1
@@ -3250,32 +3250,32 @@ This builds on §1.29.4. A **layout bookmark** stores *where things are*. A **wo
 - [ ] With retention "never", closing the conversation leaves no transcript on disk.
 
 ### 1.31.4 Agent terminal (external CLI agents)
-**ID:** UI-AGENT-004 · **Priority:** P1 · **Ref:** owner requirement (2026-10-20); Reviera's own design
+**ID:** UI-AGENT-004 · **Priority:** P1 · **Ref:** owner requirement (2026-10-20); Riviera's own design
 
-**Purpose.** Run the command-line AI agents people already use (Claude Code, Gemini CLI, Qwen Code, Codex CLI and others) inside Reviera, in a real terminal, already connected to the model open in the window through Reviera's MCP server. *(Owner requirement, 2026-10-20: "Terminal panel that runs the CLI AI agents (Claude, Gemini, Qwen, etc,) started and connectioned to the MCP provider." Follow-up answers: a stdio bridge to the running window; model-edit with confirmation by default; a general terminal with agent presets; per-session temporary MCP configuration that never changes the user's own agent settings.)*
+**Purpose.** Run the command-line AI agents people already use (Claude Code, Gemini CLI, Qwen Code, Codex CLI and others) inside Riviera, in a real terminal, already connected to the model open in the window through Riviera's MCP server. *(Owner requirement, 2026-10-20: "Terminal panel that runs the CLI AI agents (Claude, Gemini, Qwen, etc,) started and connectioned to the MCP provider." Follow-up answers: a stdio bridge to the running window; model-edit with confirmation by default; a general terminal with agent presets; per-session temporary MCP configuration that never changes the user's own agent settings.)*
 
 **UI.** A dockable **Terminal** pane (default: bottom dock, hidden; View › User Interface › Terminal, `Ctrl+Shift+T`) with a tab per session. The **+** button and its drop-down open a new tab: **Shell** (the user's login shell), one entry per **agent preset**, and *Manage Presets…*. Each tab's caption shows the preset and, for agent tabs, a coloured dot for the MCP session (connected, waiting, disconnected) and its permission level; the tab's context menu has *Permission ›* (Read-only, Edit with confirmation, Edit, Full scripting), *Restart*, *Close*, *Copy*, *Paste*, *Clear Scrollback*.
 
 **Behaviour & rules.**
 - **Terminal.** Each tab runs its process in a pseudo-terminal (POSIX `openpty` on Linux and macOS, ConPTY on Windows) with an xterm-compatible emulator (UTF-8, 256 colours and true colour, the alternate screen, bracketed paste, mouse reporting, cursor styles), so full-screen terminal programs such as the agents' own interfaces work. Scrollback is 10 000 lines (configurable). Copy and paste use the system clipboard; pasting several lines asks first unless the program enabled bracketed paste. The pane follows the UI theme's terminal palette and a monospace font of the UI font size. Resizing the pane resizes the terminal (the program receives the new size).
-- **Agent presets.** A preset is: a name, an executable and arguments, a working directory (the model's folder by default), extra environment variables, and **how the agent takes MCP servers**: a configuration file named on its command line, a configuration file found through an environment variable, or a settings file in a working directory Reviera prepares for the session. Reviera ships presets for Claude Code, Antigravity CLI (which replaced Gemini CLI on 2026-06-18), Qwen Code and Codex CLI, each written from that agent's own published documentation when it is built (recorded in the research log), and the user may add, edit, duplicate or delete presets (stored per user, not in the model). A preset whose executable is not found opens a tab that says so and offers *Edit Preset*; Reviera never installs agents.
-- **Connection (stdio bridge).** Opening an agent tab creates an MCP session for it and writes a temporary configuration, in a directory only the user can read, naming Reviera's bridge as the agent's MCP server: `reviera mcp-bridge --session-file <file>`, where the session file (mode 0600, two lines: the endpoint and the session's secret) keeps the secret off every command line. The bridge is a small stdio process: it relays the agent's MCP messages to the running window over a private local endpoint (a Unix-domain socket in the user's runtime directory with mode 0600 on Linux and macOS; a named pipe restricted to the user on Windows) after presenting the session's one-time secret. No network port is opened. The window serves the session with the same MCP server, tool catalogue, queue, transactions and undo attribution as any other client (DM-MCP-001 … 006): the actor is the preset's name and the tab number.
-- **Never the user's own settings.** Reviera does not change the agents' global or project settings, and removes the session's temporary files when the tab closes or Reviera exits (stale ones from a crash are removed at the next start).
-- **Permission.** Each agent session starts at *Edit with confirmation* (Options › AI & MCP › Terminal agents changes the default): model edits run, and destructive operations (delete, purge, overwrite, check-in) and `execute_lua` wait for approval in a Reviera dialog naming the tab, the tool and a plain-language summary, since the agent's terminal cannot show Reviera's prompt. The level can be changed from the tab's menu; lowering it applies to the next call. Approval dialogs are UI-only; no MCP or Lua call can approve them (as UI-AGENT-003).
+- **Agent presets.** A preset is: a name, an executable and arguments, a working directory (the model's folder by default), extra environment variables, and **how the agent takes MCP servers**: a configuration file named on its command line, a configuration file found through an environment variable, or a settings file in a working directory Riviera prepares for the session. Riviera ships presets for Claude Code, Antigravity CLI (which replaced Gemini CLI on 2026-06-18), Qwen Code and Codex CLI, each written from that agent's own published documentation when it is built (recorded in the research log), and the user may add, edit, duplicate or delete presets (stored per user, not in the model). A preset whose executable is not found opens a tab that says so and offers *Edit Preset*; Riviera never installs agents.
+- **Connection (stdio bridge).** Opening an agent tab creates an MCP session for it and writes a temporary configuration, in a directory only the user can read, naming Riviera's bridge as the agent's MCP server: `riviera mcp-bridge --session-file <file>`, where the session file (mode 0600, two lines: the endpoint and the session's secret) keeps the secret off every command line. The bridge is a small stdio process: it relays the agent's MCP messages to the running window over a private local endpoint (a Unix-domain socket in the user's runtime directory with mode 0600 on Linux and macOS; a named pipe restricted to the user on Windows) after presenting the session's one-time secret. No network port is opened. The window serves the session with the same MCP server, tool catalogue, queue, transactions and undo attribution as any other client (DM-MCP-001 … 006): the actor is the preset's name and the tab number.
+- **Never the user's own settings.** Riviera does not change the agents' global or project settings, and removes the session's temporary files when the tab closes or Riviera exits (stale ones from a crash are removed at the next start).
+- **Permission.** Each agent session starts at *Edit with confirmation* (Options › AI & MCP › Terminal agents changes the default): model edits run, and destructive operations (delete, purge, overwrite, check-in) and `execute_lua` wait for approval in a Riviera dialog naming the tab, the tool and a plain-language summary, since the agent's terminal cannot show Riviera's prompt. The level can be changed from the tab's menu; lowering it applies to the next call. Approval dialogs are UI-only; no MCP or Lua call can approve them (as UI-AGENT-003).
 - **Scope.** A session sees the model of the active view when the tab was opened; *Follow active model* in the tab's menu switches it to whichever model is active.
 - **Lifetime.** Closing a tab ends its process (after asking when it is still running) and revokes its session; a bridge whose secret is revoked or whose window has gone exits with an MCP error. Closing a model with agent sessions on it asks first and disconnects them. Sessions appear in the AI Agents panel (DM-MCP-002) with *Disconnect*.
-- **Keys and accounts.** The agents' own logins and API keys stay the agents' business: Reviera passes no credentials to them and reads none from them.
+- **Keys and accounts.** The agents' own logins and API keys stay the agents' business: Riviera passes no credentials to them and reads none from them.
 - **Flatpak and sandboxes.** In the Flatpak the agents run on the host (`flatpak-spawn --host`), the bridge runs inside the sandbox through the same spawn, and the endpoint lives in the app's runtime directory; the Flatpak's permissions are documented in its notes. Where host programs cannot be started, the pane says so.
 
 **Data.** Presets and the pane's settings are per-user application settings; sessions and their secrets are memory only. Nothing is written to the model or its RXD.
 
-**Commands.** `terminal.open(preset_id?, cwd?) -> tab_id`, `terminal.list() -> tabs[]`, `terminal.close(tab_id)`, `terminal.send_text(tab_id, text)`, `agent_preset.list() -> presets[]`, `agent_preset.set(preset)`, `agent_preset.delete(preset_id)`. These are window commands for Lua and the UI only; they are **not** exposed to MCP, so an agent cannot start other agents or type into terminals. The bridge is `reviera mcp-bridge` (a command-line mode of the application; it takes its endpoint and secret from its environment and refuses to run without them).
+**Commands.** `terminal.open(preset_id?, cwd?) -> tab_id`, `terminal.list() -> tabs[]`, `terminal.close(tab_id)`, `terminal.send_text(tab_id, text)`, `agent_preset.list() -> presets[]`, `agent_preset.set(preset)`, `agent_preset.delete(preset_id)`. These are window commands for Lua and the UI only; they are **not** exposed to MCP, so an agent cannot start other agents or type into terminals. The bridge is `riviera mcp-bridge` (a command-line mode of the application; it takes its endpoint and secret from its environment and refuses to run without them).
 
-*Built (2026-10-20):* View › User Interface › **Terminal** (Ctrl+Shift+T; Window menu) opens a dockable pane below the views with a preset list, *Open* and *Close Tab*, and a tab per session. Each tab runs its program in a pseudo-terminal (`portable-pty`, MIT) with the `vt100` emulator (MIT): 16, 256 and true colours, bold, inverse, the alternate screen, the cursor, application cursor keys, 10 000 lines of scrollback on the wheel, `TERM=xterm-256color`; keys sent as xterm sequences (arrows with modifiers, function keys, Ctrl and Alt combinations); Ctrl+Shift+C copies the screen, Ctrl+Shift+V pastes (bracketed when the program asked; several lines ask first otherwise); resizing resizes the program. A tab whose program ends keeps its output and is marked *(ended)*. Built-in presets: Shell (the user's `$SHELL`, `COMSPEC` on Windows), Claude Code (`claude --mcp-config <session>/mcp.json`), Antigravity CLI (`agy`, started in the session folder with its `.agents/mcp_config.json`, as it reads MCP servers only from the workspace and global files; replaced the Gemini CLI preset on 2026-10-25), Qwen Code (started in the session folder with its `.qwen/settings.json`, as its documentation names no session override), Codex CLI (`-c mcp_servers.reviera.command=…` and `.args=…`), each from the agent's documentation (RESEARCH_LOG, S0835–S0839); the user's own presets in `terminal-presets.json` in the settings folder (same id replaces a built-in). An agent tab gets an MCP session on the window's endpoint (permission model-edit, toolsets core, modeling and documentation, named after the tab), a session folder in the user's runtime directory (`$XDG_RUNTIME_DIR/reviera`, mode 0700) with the session file (mode 0600: the endpoint and the secret) and the agent's configuration, all naming `reviera mcp-bridge --session-file <file>`; the secret appears in no command line or environment. Its calls run on the UI thread from the endpoint's queue (undo and attribution as the user's commands; the views, Properties, browser and Model Tree refresh after them); destructive calls show *"<tab> wants to run <command>. It would leave n added, n changed, n deleted. Allow it?"*, asked with the window free so the terminals keep drawing; *No* returns `approval.rejected`. The session is revoked when its program ends or its tab closes, and the folder is removed; stale folders from a crash are removed at start-up (Linux). In the Flatpak, tabs run on the host through `flatpak-spawn --host` (the Shell preset runs the host's login shell), agents start the bridge as `flatpak run --command=reviera <app id> mcp-bridge …`, and the endpoint and session folders live in the app's runtime directory (`$XDG_RUNTIME_DIR/app/<app id>/reviera`), which the host can reach; the manifest adds `--talk-name=org.freedesktop.Flatpak` for this. Closing Reviera with tabs open asks first and ends them. A program that cannot start says so in its tab, naming where it was looked for. *Finding agents (2026-10-25):* a desktop session's PATH often lacks the folders agents install into, since it is set by shell start-up files the desktop never reads, so a preset's program is looked for on PATH and then in `~/.local/bin` (Claude Code's native installer), `~/.claude/local`, `~/.npm-global/bin`, `~/.bun/bin`, `~/.volta/bin`, `~/.cargo/bin`, `~/.deno/bin`, `~/bin`, nvm's Node versions (newest first), `/usr/local/bin` and `/opt/homebrew/bin`; on Windows each PATHEXT extension is tried on PATH and in `%USERPROFILE%\.local\bin`, `%APPDATA%\npm`, Volta and WinGet links, and a `.cmd` or `.bat` (npm's `claude.cmd`) runs through `cmd.exe /d /c`. The agent gets those folders on its PATH too. In the Flatpak, a program found in the home folder runs by its full path, and every host program runs through `sh -c` adding those folders to the host's PATH. Not yet: the tab context menu (permission level, Restart, Clear Scrollback, *Follow active model*), selecting text with the mouse (Copy takes the whole screen), mouse reporting to programs, *Manage Presets* (presets are edited in the JSON file), the default-permission option, the AI Agents panel listing, `terminal.*` and `agent_preset.*` Lua commands, the endpoint on Windows tested beyond compiling (it cross-compiles).
+*Built (2026-10-20):* View › User Interface › **Terminal** (Ctrl+Shift+T; Window menu) opens a dockable pane below the views with a preset list, *Open* and *Close Tab*, and a tab per session. Each tab runs its program in a pseudo-terminal (`portable-pty`, MIT) with the `vt100` emulator (MIT): 16, 256 and true colours, bold, inverse, the alternate screen, the cursor, application cursor keys, 10 000 lines of scrollback on the wheel, `TERM=xterm-256color`; keys sent as xterm sequences (arrows with modifiers, function keys, Ctrl and Alt combinations); Ctrl+Shift+C copies the screen, Ctrl+Shift+V pastes (bracketed when the program asked; several lines ask first otherwise); resizing resizes the program. A tab whose program ends keeps its output and is marked *(ended)*. Built-in presets: Shell (the user's `$SHELL`, `COMSPEC` on Windows), Claude Code (`claude --mcp-config <session>/mcp.json`), Antigravity CLI (`agy`, started in the session folder with its `.agents/mcp_config.json`, as it reads MCP servers only from the workspace and global files; replaced the Gemini CLI preset on 2026-10-25), Qwen Code (started in the session folder with its `.qwen/settings.json`, as its documentation names no session override), Codex CLI (`-c mcp_servers.riviera.command=…` and `.args=…`), each from the agent's documentation (RESEARCH_LOG, S0835–S0839); the user's own presets in `terminal-presets.json` in the settings folder (same id replaces a built-in). An agent tab gets an MCP session on the window's endpoint (permission model-edit, toolsets core, modeling and documentation, named after the tab), a session folder in the user's runtime directory (`$XDG_RUNTIME_DIR/riviera`, mode 0700) with the session file (mode 0600: the endpoint and the secret) and the agent's configuration, all naming `riviera mcp-bridge --session-file <file>`; the secret appears in no command line or environment. Its calls run on the UI thread from the endpoint's queue (undo and attribution as the user's commands; the views, Properties, browser and Model Tree refresh after them); destructive calls show *"<tab> wants to run <command>. It would leave n added, n changed, n deleted. Allow it?"*, asked with the window free so the terminals keep drawing; *No* returns `approval.rejected`. The session is revoked when its program ends or its tab closes, and the folder is removed; stale folders from a crash are removed at start-up (Linux). In the Flatpak, tabs run on the host through `flatpak-spawn --host` (the Shell preset runs the host's login shell), agents start the bridge as `flatpak run --command=riviera <app id> mcp-bridge …`, and the endpoint and session folders live in the app's runtime directory (`$XDG_RUNTIME_DIR/app/<app id>/riviera`), which the host can reach; the manifest adds `--talk-name=org.freedesktop.Flatpak` for this. Closing Riviera with tabs open asks first and ends them. A program that cannot start says so in its tab, naming where it was looked for. *Finding agents (2026-10-25):* a desktop session's PATH often lacks the folders agents install into, since it is set by shell start-up files the desktop never reads, so a preset's program is looked for on PATH and then in `~/.local/bin` (Claude Code's native installer), `~/.claude/local`, `~/.npm-global/bin`, `~/.bun/bin`, `~/.volta/bin`, `~/.cargo/bin`, `~/.deno/bin`, `~/bin`, nvm's Node versions (newest first), `/usr/local/bin` and `/opt/homebrew/bin`; on Windows each PATHEXT extension is tried on PATH and in `%USERPROFILE%\.local\bin`, `%APPDATA%\npm`, Volta and WinGet links, and a `.cmd` or `.bat` (npm's `claude.cmd`) runs through `cmd.exe /d /c`. The agent gets those folders on its PATH too. In the Flatpak, a program found in the home folder runs by its full path, and every host program runs through `sh -c` adding those folders to the host's PATH. Not yet: the tab context menu (permission level, Restart, Clear Scrollback, *Follow active model*), selecting text with the mouse (Copy takes the whole screen), mouse reporting to programs, *Manage Presets* (presets are edited in the JSON file), the default-permission option, the AI Agents panel listing, `terminal.*` and `agent_preset.*` Lua commands, the endpoint on Windows tested beyond compiling (it cross-compiles).
 
 **Acceptance criteria.**
-- [ ] Opening a Claude Code tab with Claude Code installed starts it in the model's folder, and asking it to list the walls returns the open model's walls through Reviera's MCP tools.
-- [x] The agent's `element.delete` call shows a Reviera approval dialog naming the tab; Reject returns an error to the agent and deletes nothing; the agent's edits undo in the window like any other. *(Built 2026-10-20; tested with a stand-in agent that reads the Claude Code configuration.)*
+- [ ] Opening a Claude Code tab with Claude Code installed starts it in the model's folder, and asking it to list the walls returns the open model's walls through Riviera's MCP tools.
+- [x] The agent's `element.delete` call shows a Riviera approval dialog naming the tab; Reject returns an error to the agent and deletes nothing; the agent's edits undo in the window like any other. *(Built 2026-10-20; tested with a stand-in agent that reads the Claude Code configuration.)*
 - [x] No file in the user's agent settings (for example `~/.claude.json` or `~/.gemini/config/mcp_config.json`) changes when an agent tab is opened and closed. *(Only the session folder is written.)*
 - [x] A process that connects to the endpoint without the session's secret is refused and logged; closing the tab revokes the secret.
 - [ ] A Shell tab runs the user's shell; a full-screen program (for example `vim` or the agent's own interface) draws and resizes correctly.
@@ -3332,7 +3332,7 @@ This builds on §1.29.4. A **layout bookmark** stores *where things are*. A **wo
 **Behaviour & rules.**
 - **Comment validation.** 1–2 000 characters after trimming; the template's placeholders (`{user}`, `{date}`, `{changed_count}`) are filled in before the dialog opens. The last 10 comments are offered in a drop-down.
 - **Change summary** comes from the live store's change sets since the last Get Latest or Check In (Ch. 2b). "Zoom to" activates a view containing the element and selects it without closing the dialog. RXD-only changes (for example a shared view bookmark) are listed under *Project data*.
-- **Get latest first.** When on and newer revisions exist, Reviera runs Get Latest (UI-SRV-004) first; if that produces conflicts, Check In stops at the conflict dialog and resumes after the conflicts are resolved.
+- **Get latest first.** When on and newer revisions exist, Riviera runs Get Latest (UI-SRV-004) first; if that produces conflicts, Check In stops at the conflict dialog and resumes after the conflicts are resolved.
 - **Open edit modes.** Check In is refused while an edit mode or tool session is active ("Finish or cancel <mode> first").
 - **Save first.** The model is saved locally before upload so that a crash during upload leaves a consistent working copy.
 - **Ownership.** With "Relinquish my ownership" ticked, ownership is released only after the server confirms the new revision; on failure the user keeps it.
@@ -3366,7 +3366,7 @@ This builds on §1.29.4. A **layout bookmark** stores *where things are*. A **wo
 
 **Behaviour & rules.**
 - **Connection indicator** in the QAT strip and status bar: Offline (grey), Connected (accent), Syncing (animated, with reduce-motion fallback), Error (warning colour + icon). It shows counts of local changes not checked in and of new server revisions. Clicking opens the Server pane.
-- **Notifications**: new revision events from the server (pushed; polling fallback at the configured interval) show an in-app toast "Revision 42 by Alex: <comment> — Get Latest / Dismiss" and, when Reviera is not focused, an OS notification (preference). Ownership requests, request responses and lock changes also notify.
+- **Notifications**: new revision events from the server (pushed; polling fallback at the configured interval) show an in-app toast "Revision 42 by Alex: <comment> — Get Latest / Dismiss" and, when Riviera is not focused, an OS notification (preference). Ownership requests, request responses and lock changes also notify.
 - All notifications are kept in the **Notifications pane** (with filters, mark read, and actions), and are available via `ui.notifications.list`.
 - Working offline: the indicator shows Offline; Save keeps working locally; Check In and Get Latest are disabled; on reconnect, a notice summarises what changed on the server.
 
@@ -3794,7 +3794,7 @@ All commands defined by this chapter (owner UI). Commands of other chapters that
 
 Notes:
 - `agent.approve` / `agent.reject` are deliberately **UI-only**: an agent must never approve its own tool calls.
-- `agent.*` commands are not exposed over MCP to prevent agents from driving other agents through Reviera.
+- `agent.*` commands are not exposed over MCP to prevent agents from driving other agents through Riviera.
 
 ---
 
@@ -3802,13 +3802,13 @@ Notes:
 
 ### 1.35.1 Intentional deviations
 
-| # | Reference behaviour | Reviera behaviour | Reason |
+| # | Reference behaviour | Riviera behaviour | Reason |
 |---|---|---|---|
 | D1 | Options Bar row below the ribbon (removed in the reference's 2027 release) | No Options Bar; tool options rendered as contextual ribbon panels and a Properties "Tool Options" group from one descriptor; optional strip rendering (P2) | Matches the reference's 2027 direction while keeping one data model; addresses users who prefer a strip |
 | D2 | QAT embedded in a custom-drawn title bar | QAT in a slim strip above the ribbon; native window decorations kept | Cross-platform correctness (Wayland, macOS) and accessibility of native title bars |
 | D3 | Title-bar online-help search box, vendor sign-in and app store | Command Search (commands, views, files, offline help, settings); local user name or server login; no store | Offline-first, no vendor accounts, faster command discovery |
 | D4 | Vendor cloud items (cloud models, cloud rendering, cloud parameters, shared views, insights page, cloud documents on Home) | Not provided (P3). Open alternatives: BIMserver mode, local rendering, shared parameters files, BCF | Vendor-cloud features are out of scope (Ch. 0) |
-| D5 | Proprietary AI assistant palette | Built-in **Agent pane**: MCP client to Reviera's own MCP server, user-chosen model provider (local or hosted), explicit approvals, per-turn undo | Open, vendor-neutral alternative; same command surface as every other client |
+| D5 | Proprietary AI assistant palette | Built-in **Agent pane**: MCP client to Riviera's own MCP server, user-chosen model provider (local or hosted), explicit approvals, per-turn undo | Open, vendor-neutral alternative; same command surface as every other client |
 | D6 | Separate Precast tab plus reinforcement on Structure (later gathered on a Concrete Detailing tab) | One **Concrete** tab from the start | Follows the reference's newest grouping; avoids duplicated tools |
 | D7 | Worksharing central/local files, sync with central | BIMserver connect / check in / get latest / sync; Collaboration Display instead of worksharing display | Collaboration model is BIMserver (TECH_STACK §3.7) |
 | D8 | Some default key sequences bound to two commands | Default map has no global-scope conflicts (RC, RG, PC, SZ resolved; SE, ME, ST kept for snaps/MEP) | Predictable behaviour; users can still create duplicates |
@@ -3817,7 +3817,7 @@ Notes:
 | D11 | Dark theme leaves some dialogs light (fixed late in the reference) | Every dialog follows the UI theme from the first release; high-contrast themes shipped | Consistency and accessibility |
 | D12 | Selection-colour and view-mode states signalled mainly by colour | Mode borders always carry text labels; colour-vision-safe palette option | Accessibility (§1.33.2) |
 | D13 | Macros and visual programming panels | Scripting panel (Script Manager, Lua Console, Script Security, Add-in Manager); node-based programming deferred (P3) | Lua is the scripting platform (TECH_STACK §3.5) |
-| D14 | Project-scoped UI data inside the proprietary model file | Stored as Reviera Extension Data (embedded in the IFC by default, optional sidecar); presentational state kept per user in BIMserver mode | IFC is the source of truth; avoid users overwriting each other's layouts |
+| D14 | Project-scoped UI data inside the proprietary model file | Stored as Riviera Extension Data (embedded in the IFC by default, optional sidecar); presentational state kept per user in BIMserver mode | IFC is the source of truth; avoid users overwriting each other's layouts |
 | D15 | Ctrl+A unused in the canvas | Ctrl+A selects all visible elements in the active view | Common platform expectation |
 | D16 | No coordinate entry | Optional typed coordinate entry for picks (P1) | Keyboard accessibility |
 
@@ -3826,7 +3826,7 @@ Notes:
 | # | Question | Proposed handling |
 |---|---|---|
 | Q1 | ~~Rust↔wxWidgets binding~~ | **Resolved** (owner, 2026-10-12): `wxDragon`, with any extensions kept as clean patches offered upstream (TECH_STACK §3.4). The UI bridge interface (§1.1.5) is kept. |
-| Q2 | `wxRibbonBar` lacks native support for contextual-tab colouring beyond page highlight, slide-out pinning, panel floating and four minimise states | Prototype with a custom art provider; fall back to a Reviera-owned ribbon widget if `wxRibbonBar` cannot be extended cleanly |
+| Q2 | `wxRibbonBar` lacks native support for contextual-tab colouring beyond page highlight, slide-out pinning, panel floating and four minimise states | Prototype with a custom art provider; fall back to a Riviera-owned ribbon widget if `wxRibbonBar` cannot be extended cleanly |
 | Q3 | ~~Command ids for tools owned by Ch. 2–6 in §1.8~~ | **Resolved** (2026-10-12): every ribbon and shortcut command id now matches the owning chapter's catalog; `tools/build_spec.py` checks this. |
 | Q4 | ~~Owner of phasing and design-option commands~~ | **Resolved**: `phase.*` belongs to Ch. 2 (DM), `designoption.*` to Ch. 5 (DOC, §5.11), and `element.demolish` to Ch. 3 (ARC-MOD-024). |
 | Q5 | ~~Clean IFC export and `file.locate_rxd`~~ | **Resolved**: both are defined in Ch. 2a (§4, §13); `export.ifc` has one aligned signature across chapters (Appendix A.2). |
@@ -3838,8 +3838,8 @@ Notes:
 
 ---
 
-- **Deviation: bookmarked layouts (owner directive, 2026-10-12).** The reference keeps one UI state per user. Reviera adds named, partial, display-aware layout bookmarks; built-in, organisation and personal layouts; context-based auto-switching; portable preference profiles; and recommended project layouts (§1.29.4, UI-LAYOUT-001…006).
-- **Deviation: workflow scenarios and view bookmarks (owner directive, 2026-10-12).** Reviera treats the workspace as a high-level, user-owned customisation of how each person works. Scenarios bundle a layout with preference, shortcut and view-bookmark overlays for each work process, and switch on demand or by context (§1.29.5, UI-SCEN-001…004). The reference has no equivalent beyond one global set of options.
+- **Deviation: bookmarked layouts (owner directive, 2026-10-12).** The reference keeps one UI state per user. Riviera adds named, partial, display-aware layout bookmarks; built-in, organisation and personal layouts; context-based auto-switching; portable preference profiles; and recommended project layouts (§1.29.4, UI-LAYOUT-001…006).
+- **Deviation: workflow scenarios and view bookmarks (owner directive, 2026-10-12).** Riviera treats the workspace as a high-level, user-owned customisation of how each person works. Scenarios bundle a layout with preference, shortcut and view-bookmark overlays for each work process, and switch on demand or by context (§1.29.5, UI-SCEN-001…004). The reference has no equivalent beyond one global set of options.
 
 ## 1.36 Traceability
 

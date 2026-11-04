@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 Reviera contributors
+# Copyright (C) 2026 Riviera contributors
 #
 # CMake toolchain for cross-building Windows x86-64 (MinGW-w64, GNU) from Linux, with Fedora's
 # mingw64-* packages (sysroot /usr/x86_64-w64-mingw32/sys-root/mingw).
@@ -19,8 +19,8 @@ set(CMAKE_RC_COMPILER ${TOOLCHAIN_PREFIX}-windres)
 set(CMAKE_FIND_ROOT_PATH /usr/${TOOLCHAIN_PREFIX}/sys-root/mingw /usr/${TOOLCHAIN_PREFIX})
 # The prefix the cross-build installs its own dependencies in (OpenCASCADE, LuaJIT), so they are
 # found as part of the target system (build-cross.sh sets it).
-if(DEFINED ENV{REVIERA_CROSS_PREFIX})
-  list(APPEND CMAKE_FIND_ROOT_PATH $ENV{REVIERA_CROSS_PREFIX})
+if(DEFINED ENV{RIVIERA_CROSS_PREFIX})
+  list(APPEND CMAKE_FIND_ROOT_PATH $ENV{RIVIERA_CROSS_PREFIX})
 endif()
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)

@@ -1,9 +1,9 @@
-BIM Reviera - third-party notices
+BIM Riviera - third-party notices
 ====================================
 
-BIM Reviera is free software under the GNU General Public License, version 3 or (at your
+BIM Riviera is free software under the GNU General Public License, version 3 or (at your
 option) any later version (see COPYING / LICENSE). Its complete source code, including the
-build scripts that produced this package, is at https://github.com/Rational-Boxes/NoDesk_Reviera
+build scripts that produced this package, is at https://github.com/Rational-Boxes/BIM_Riviera
 
 The packages (Flatpak, macOS .app/.dmg, Windows installer and ZIP) contain the following
 third-party software. Every component is distributed under its own licence, all of which allow
@@ -59,17 +59,17 @@ They keep the licences of their projects: zlib (zlib), bzip2 (bzip2 licence), on
 (Apache-2.0), FreeImage (FreeImage Public Licence), Tcl/Tk (BSD-style).
 
 The Flatpak runs on the GNOME 51 runtime (GTK 3, WebKitGTK 4.1, Mesa and others), which is
-installed separately and is not part of the Reviera bundle. On Windows, the help pages use the
+installed separately and is not part of the Riviera bundle. On Windows, the help pages use the
 Microsoft Edge WebView2 runtime that is part of Windows; on macOS, the system WKWebView.
 
 Sample content
 --------------
 
-The sample Component Library (library/, share/reviera/library) contains a Doric column whose
+The sample Component Library (library/, share/riviera/library) contains a Doric column whose
 shaft is "Antike griechische Säule 20220605.stl" by PantheraLeo1359531, dedicated to the public
 domain under CC0 1.0 (no attribution required; credited here as a courtesy).
 https://commons.wikimedia.org/wiki/File:Antike_griechische_S%C3%A4ule_20220605.stl
-It was reduced and given a capital by Reviera's tools (tools/decimate_stl.py,
+It was reduced and given a capital by Riviera's tools (tools/decimate_stl.py,
 tools/make_parthenon_column.py); the library's README has the details.
 
 Rust crates

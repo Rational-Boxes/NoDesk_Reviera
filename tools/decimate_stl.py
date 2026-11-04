@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 Reviera contributors
+# Copyright (C) 2026 Riviera contributors
 """Reduces a binary STL to about a target triangle count by vertex clustering.
 
 Vertices are snapped to a uniform grid, each cell's vertices merged at their mean, and triangles

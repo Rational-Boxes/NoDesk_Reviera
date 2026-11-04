@@ -1,4 +1,4 @@
-# Parthenon-style Doric column for Reviera's sample library.
+# Parthenon-style Doric column for Riviera's sample library.
 # Shaft: CC0, Wikimedia Commons, 'Antike griechische Säule 20220605.stl' by PantheraLeo1359531,
 # reduced and scaled. Capital modelled by tools/make_parthenon_column.py. Metres, Z up.
 mtllib parthenon_column.mtl

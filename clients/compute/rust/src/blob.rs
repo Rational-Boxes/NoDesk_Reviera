@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2026 Reviera contributors
+// Copyright (C) 2026 Riviera contributors
 
 //! Content-addressed blobs: hashing, codecs, chunking for `PutBlobs`, and reassembly with
 //! hash checks.

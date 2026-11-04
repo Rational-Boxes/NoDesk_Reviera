@@ -68,9 +68,9 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `warnings.export` | 2, 6 | identical |
 | `warnings.list` | 2, 6 | identical |
 
-## A.2a Reviera-originated features
+## A.2a Riviera-originated features
 
-138 requirements are Reviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
+138 requirements are Riviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
 
 | Requirement | Ch | Feature |
 |-------------|----|---------|
@@ -131,8 +131,8 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | DM-RPC-011 | 2 | 2.17.11 Remote analysis subscriptions |
 | DM-PERF-001 | 2 | 2.18.1 Built-in performance profiler |
 | DM-RXD-001 | 2a | store non-IFC data only as RXD documents and element data, using the schemas defined in … |
-| DM-RXD-002 | 2a | By default, Reviera shall embed RXD in the IFC file using only `Reviera_*` property sets … |
-| DM-RXD-004 | 2a | support the external carrier (`.reviera` file or folder, `.rvb` bundle) holding identical … |
+| DM-RXD-002 | 2a | By default, Riviera shall embed RXD in the IFC file using only `Riviera_*` property sets … |
+| DM-RXD-004 | 2a | support the external carrier (`.riviera` file or folder, `.rvb` bundle) holding identical … |
 | DM-RXD-005 | 2a | provide *Export clean IFC* and *Export IFC with documentation*. |
 | DM-RXD-006 | 2a | detect external edits (`GeomHash`), dangling references and missing data, and reconcile … |
 | DM-RXD-007 | 2a | Unknown RXD kinds, fields and extension namespaces shall survive a round trip unchanged. |
@@ -143,7 +143,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | DM-LIVE-001 | 2b | keep a live SQLite store (schema §3) for every open project, including untitled ones, and … |
 | DM-LIVE-002 | 2b | Live-store writes shall run on a dedicated writer thread with group commit (default 250 … |
 | DM-LIVE-003 | 2b | With default settings, an application crash shall lose no transaction committed more than … |
-| DM-LIVE-004 | 2b | On startup or project open, Reviera shall detect unclean shutdowns (§6.1) and offer the … |
+| DM-LIVE-004 | 2b | On startup or project open, Riviera shall detect unclean shutdowns (§6.1) and offer the … |
 | DM-LIVE-005 | 2b | Restore shall rebuild the model from the materialised state; if the database is damaged, … |
 | DM-LIVE-006 | 2b | Undo and redo history shall be available after recovery, up to the configured depth. |
 | DM-LIVE-007 | 2b | The live store shall default to a local per-user directory. A store placed on a network … |
@@ -166,7 +166,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | ARC-ROOF-007 | 3 | 3.6.8a Dormers (automated) |
 | ARC-ROOF-008 | 3 | 3.6.8b Arched and vaulted roofs |
 | ARC-ROOF-009 | 3 | 3.6.8c Dome roofs |
-| ARC-GLZ-007 | 3 | 3.6a.7 Reviera types and property sets for glazed enclosures |
+| ARC-GLZ-007 | 3 | 3.6a.7 Riviera types and property sets for glazed enclosures |
 | ARC-GLZ-016 | 3 | Heating pipes laid in the greenhouse |
 | ARC-GLZ-017 | 3 | Pad-and-fan cooling laid in the greenhouse |
 | ARC-GLZ-015 | 3 | Growing-area schedules |
@@ -209,13 +209,13 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | COL-OWN-002 | 6 | Live ownership document and sync lock |
 | COL-OWN-004 | 6 | Enforced ownership through a server plugin (optional) |
 | COL-OFF-001 | 6 | Working copy layout and offline editing |
-| ADV-RSP-001 | 7 | Reviera Scene Protocol (RSP) |
+| ADV-RSP-001 | 7 | Riviera Scene Protocol (RSP) |
 | ADV-XR-001 | 7 | Internal engine translation layer (walkthrough, VR and AR) |
 | ADV-BRG-001 | 7 | Reference bridges |
 
 ## A.3 Consolidated command index
 
-**2326 unique commands** in 434 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2326 unique commands** in 434 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -1430,7 +1430,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `file.close` | 2 | document_id, save?: "ask"\ | "yes"\ | "no" | — |
 | `file.convert_schema` | 2 | document_id, target: "IFC4"\ | "IFC4X3_ADD2" | report | No (clears undo) |
 | `file.ifc_open_options` | 2 | options? | options | No | DM-FILE-001 |
-| `file.locate_rxd` | 2a | path to an external `.reviera` file or folder | status | No | DM-RXD-004 |
+| `file.locate_rxd` | 2a | path to an external `.riviera` file or folder | status | No | DM-RXD-004 |
 | `file.location.add` | 2 | url, name?, auth: none\ | basic\ | digest\ | bearer, trusted_http? |
 | `file.location.browse` | 2 | location_id, path? | entry[] | No | DM-FILE-007 |
 | `file.location.list` | 2 | — | location[] | No | DM-FILE-007 |

@@ -365,7 +365,7 @@
     "name": "energy_house",
     "title": "Energy house",
     "group": "Sustainability",
-    "weather": "reviera_synthetic.epw",
+    "weather": "riviera_synthetic.epw",
     "steps": [
       {
         "command": "script.run",
@@ -379,7 +379,7 @@
     "name": "daylight_studio",
     "title": "Daylight studios",
     "group": "Sustainability",
-    "weather": "reviera_synthetic.epw",
+    "weather": "riviera_synthetic.epw",
     "steps": [
       {
         "command": "script.run",

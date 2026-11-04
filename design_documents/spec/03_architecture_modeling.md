@@ -3,7 +3,7 @@
 **Area code:** ARC · **Primary source:** `research/02_architecture_modeling.md` · **Target architecture:** `TECH_STACK.md`
 **Functional reference:** Revit 2026 behaviour, with the 2027 changes applied where they differ (most importantly, there is no Options Bar).
 
-This chapter specifies how Reviera creates and edits the building model. It covers datums, walls, inserts, curtain systems, slabs, roofs, circulation, openings, rooms and areas, free-form and site elements, the general modify tools, groups, constraints and selection. It also defines the geometry algorithms that turn parametric elements into OpenCASCADE (OCCT) solids: wall joins and layer cleanup, layer wrapping, roof generation, stair and railing generation, shape editing, boolean cuts and room boundary computation. Those algorithms are written at implementation depth.
+This chapter specifies how Riviera creates and edits the building model. It covers datums, walls, inserts, curtain systems, slabs, roofs, circulation, openings, rooms and areas, free-form and site elements, the general modify tools, groups, constraints and selection. It also defines the geometry algorithms that turn parametric elements into OpenCASCADE (OCCT) solids: wall joins and layer cleanup, layer wrapping, roof generation, stair and railing generation, shape editing, boolean cuts and room boundary computation. Those algorithms are written at implementation depth.
 
 ---
 
@@ -26,7 +26,7 @@ This chapter specifies how Reviera creates and edits the building model. It cove
 - **"Left of the drawing direction".** For a curve traced from start to end and viewed from above, *left* is the side reached by rotating the tangent by +90° about +Z.
 
 ### 3.0.2 Requirement blocks
-Feature blocks follow the template in `00_conventions.md` §5. Each **Commands** line names registry commands. All of them are undoable unless they are marked *(query)*. They are exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>(...)`) and to MCP. The following conventions apply to every command signature in this chapter:
+Feature blocks follow the template in `00_conventions.md` §5. Each **Commands** line names registry commands. All of them are undoable unless they are marked *(query)*. They are exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>(...)`) and to MCP. The following conventions apply to every command signature in this chapter:
 - `curve` is a 2D or 3D curve value: `Line{p0,p1}`, `Arc{center,radius,a0,a1,normal}`, `Arc3{p0,pm,p1}`, `Ellipse{center,rx,ry,rot,a0,a1}`, `Spline{ctrl,knots,degree}` or `CurveLoop[...]`.
 - `loops` is a list of closed `CurveLoop`s. The first loop is the outer loop and the rest are holes. Commands may accept several outer loops when the feature allows it.
 - `level_ref` is the element ID of a level. `host_ref` is an element ID, optionally followed by a face reference (`elem#face:<stable-face-key>`).
@@ -53,7 +53,7 @@ The Rust core keeps a **regeneration graph**. Its nodes are elements and its dir
 - Every physical element is contained in its storey through `IfcRelContainedInSpatialStructure`. Elements on a reference (non-story) level are contained in the nearest story level at or below that level, and the true reference level is recorded in RXD element data (`placement`).
 - Every type is linked to its occurrences through `IfcRelDefinesByType`, and materials are linked through `IfcRelAssociatesMaterial`.
 - **IFC keeps** element geometry and representations, types, material layer sets, openings and voids (`IfcRelVoidsElement` / `IfcRelFillsElement`), `IfcRelSpaceBoundary`, standard `Pset_*` / `Qto_*` sets, and the values of user-visible parameters (property sets defined by the DM chapter).
-- **Reviera Extension Data (RXD)** keeps everything else. The carrier, encoding, geometry hash and reconciliation rules are defined in `spec/02a_extension_data_format.md`; this chapter only says *which* RXD object holds each piece of data, using two forms:
+- **Riviera Extension Data (RXD)** keeps everything else. The carrier, encoding, geometry hash and reconciliation rules are defined in `spec/02a_extension_data_format.md`; this chapter only says *which* RXD object holds each piece of data, using two forms:
   - **"RXD element data (`<kind>`)"** is data owned by one element (or one type): its recipe (`recipe.wall`, `recipe.roof`, `recipe.stair`, `recipe.railing`, `recipe.curtain_grid`, `recipe.toposolid`, …), its `sketch`, and the constraints and join overrides it owns. For types this is the type-level RXD data.
   - **"RXD document `<name>`"** is project-level data. This chapter uses `model/constraints` (constraints between elements, attach relations, Join Geometry and Cut Geometry pairs), `model/groups`, `model/rooms` (room and area computation settings, area schemes and rules, unplaced rooms), `model/selection_sets`, `model/parts` (part divisions and merges), `project/settings` (site settings), `families/<id>` (family recipes, including in-place families and masses) and the views documents (colour schemes; DOC chapter).
 
@@ -78,8 +78,8 @@ The Rust core keeps a **regeneration graph**. Its nodes are elements and its dir
 | Flip state (facing, hand, mirrored) of family instances | RXD element data (`placement`) |
 
 All references are IFC GlobalIds, in the reference forms defined in `02a_extension_data_format.md` §6.2. Sub-element references use named sub-references, such as `#end:1`, `#face:core.ext` or `#axis:<uuid>`, never indices.
-- **Edits by other tools.** When the geometry hash in an element's RXD data no longer matches its IFC representation, or the element has no RXD data, Reviera treats the element as described in `02a_extension_data_format.md` §7: it is either stale (the user chooses between keeping the external geometry and regenerating) or non-parametric.
-- In the IFC files Reviera writes, every element has an `Axis` or `FootPrint` representation where one makes sense, plus a `Body` representation. The `Body` uses the simplest valid form in this order of preference: `IfcExtrudedAreaSolid`, then `IfcBooleanClippingResult`, then `IfcFacetedBrep` / `IfcAdvancedBrep`, then `IfcPolygonalFaceSet`. On load, the parametric definition in RXD takes precedence (unless it is stale) over the explicit body. The body is a cache that lets other tools read the file.
+- **Edits by other tools.** When the geometry hash in an element's RXD data no longer matches its IFC representation, or the element has no RXD data, Riviera treats the element as described in `02a_extension_data_format.md` §7: it is either stale (the user chooses between keeping the external geometry and regenerating) or non-parametric.
+- In the IFC files Riviera writes, every element has an `Axis` or `FootPrint` representation where one makes sense, plus a `Body` representation. The `Body` uses the simplest valid form in this order of preference: `IfcExtrudedAreaSolid`, then `IfcBooleanClippingResult`, then `IfcFacetedBrep` / `IfcAdvancedBrep`, then `IfcPolygonalFaceSet`. On load, the parametric definition in RXD takes precedence (unless it is stale) over the explicit body. The body is a cache that lets other tools read the file.
 
 ---
 
@@ -107,7 +107,7 @@ The behaviours in this section are implemented once, in the tool framework, and 
 - **There is no Options Bar.** Every tool option is either a control on the contextual tab (toggle, numeric field or drop-down) or a field in the Properties palette's *New <Element>* block.
 
 **Behaviour & rules.**
-- Tool options are **remembered per tool for the session**. The user can choose to persist them per user in the user settings file (`reviera-user.toml`; UI chapter).
+- Tool options are **remembered per tool for the session**. The user can choose to persist them per user in the user settings file (`riviera-user.toml`; UI chapter).
 - Every tool can be invoked in two orders: *select, then tool* (the tool acts on the current selection at once) and *tool, then select*. In the second order the user confirms with **Enter** or **Finish**.
 - Each commit is a single undo step. A multi-step tool, such as sketch mode or the group editor, uses a **transaction group** that collapses into one undo step on Finish and is rolled back completely on Cancel.
 - A tool descriptor declares its panels, options, input phases and command bindings. The UI tab is built from that descriptor, so tools added from Lua get the same UI treatment.
@@ -131,7 +131,7 @@ The behaviours in this section are implemented once, in the tool framework, and 
 
 **Behaviour & rules.**
 - **System types** (walls, floors, roofs, ceilings, stairs, railings, ramps, curtain walls and systems, toposolids, levels, grids) are defined in the project.
-- **Loadable types** (doors, windows, components, columns, profiles, balusters, panels, mullion profiles) come from Reviera family files (DM chapter).
+- **Loadable types** (doors, windows, components, columns, profiles, balusters, panels, mullion profiles) come from Riviera family files (DM chapter).
 - Changing the type of a placed element keeps the element's reference geometry: the location line for walls, the boundary for slabs and the insertion point for families.
 - A type change that cannot be applied, such as a door type that is wider than its host segment, is rejected with a warning that names the elements involved.
 
@@ -199,7 +199,7 @@ The behaviours in this section are implemented once, in the tool framework, and 
 2. **Near-axis curves.** A line within 0.2° of the X or Y axis of the view or work plane, but not exactly on it, raises a *warning* ("Line is slightly off axis"). This is not an error.
 3. **Overlaps.** Two curves that share a positive-length piece are an error ("Curves overlap").
 4. **Loop building.** Endpoints are merged within `TOL_POINT`, and a graph is built in which curves are edges. Every vertex must have degree exactly 2. A vertex of degree 1 means an open loop, and a vertex of degree 3 or more means a branch. Both are errors ("Curves must form closed loops").
-5. **Self-intersection.** No two curves may intersect except at a shared endpoint. Reviera uses exact line/arc intersection; ellipses and splines are subdivided adaptively to `TOL_POINT`. An intersection is an error ("Curves intersect").
+5. **Self-intersection.** No two curves may intersect except at a shared endpoint. Riviera uses exact line/arc intersection; ellipses and splines are subdivided adaptively to `TOL_POINT`. An intersection is an error ("Curves intersect").
 6. **Nesting.** The loops are classified by containment. At even depth (0, 2, …) a loop is an outer boundary, and at odd depth it is a hole. An element type that allows only one outer loop (for example a roof by footprint) reports "Only one outer boundary is allowed" when it finds more.
 7. **Role-specific rules.**
    - An extrusion roof needs exactly one **open** chain.
@@ -244,7 +244,7 @@ Loop orientation is normalised on Finish: outer loops counter-clockwise and hole
 **Purpose.** On-the-fly dimensions that show where an element is and let the user drive its position by typing a value.
 
 **Workflow.**
-1. While an element is being placed, or when exactly one element is selected, Reviera shows temporary dimensions to the **nearest parallel references** on each principal side.
+1. While an element is being placed, or when exactly one element is selected, Riviera shows temporary dimensions to the **nearest parallel references** on each principal side.
 2. The user clicks the dimension text, types a value and presses Enter. The **selected** element moves, and the reference at the other end stays where it is.
 3. The user can drag a witness-line grip to another reference, or click the grip repeatedly to cycle through the candidate references on the same element (for walls: face, centreline, core face, core centre).
 4. The *Make permanent* icon below a temporary dimension turns it into a permanent dimension (DOC chapter).
@@ -252,8 +252,8 @@ Loop orientation is normalised on Finish: outer loops counter-clockwise and hole
 **UI.** Text size and background (opaque or transparent) are set in Options › Graphics. The default references are set in Manage › Additional Settings › **Temporary Dimensions**: walls measure to Centerlines, Center of Core, Faces or Faces of Core, and doors and windows measure to Centerlines or Openings.
 
 **Behaviour & rules.**
-- **Reference search.** The candidates are references (faces, centrelines, datum planes and reference planes) that are parallel to the element's reference within `TOL_ANGLE` and visible in the view. Reviera chooses the closest candidate on each side within 30 m, and falls back to the nearest grid or level.
-- For a hosted insert, Reviera measures along the host wall to the nearest perpendicular walls or openings, as set in the Temporary Dimensions settings.
+- **Reference search.** The candidates are references (faces, centrelines, datum planes and reference planes) that are parallel to the element's reference within `TOL_ANGLE` and visible in the view. Riviera chooses the closest candidate on each side within 30 m, and falls back to the nearest grid or level.
+- For a hosted insert, Riviera measures along the host wall to the nearest perpendicular walls or openings, as set in the Temporary Dimensions settings.
 - Editing a temporary dimension runs a move command, so it respects pins, constraints and hosting (§3.12).
 
 **Commands.** `dim.temporary_query(element_id, view_id) -> [TempDim]` *(query)*. Driving a temporary dimension issues `element.move` or `wall.set_location`. `dim.make_permanent(view_id, temporary_dimension_ref | {ref_a, ref_b}) -> dimension_id` creates the permanent dimension.
@@ -384,8 +384,8 @@ Dragging a control issues the matching command once, on mouse-up. The preview du
 1. The user opens a section or elevation view. The tool is unavailable in other views.
 2. The user starts Architecture › Datum › **Level** (`LL`). Draw choices are **Line** and **Pick Lines** (with *Offset*).
 3. While the cursor moves, level ends align with the ends of existing levels, and a temporary vertical dimension to the nearest level is shown. The user clicks the start and then the end.
-4. Reviera names the level by incrementing the trailing number or letter of the previous name: *Level 2* → *Level 3*, *L02* → *L03*, *A* → *B*.
-5. Clicking the name label renames the level. Reviera then asks whether to rename the associated views. Clicking the elevation label edits the elevation.
+4. Riviera names the level by incrementing the trailing number or letter of the previous name: *Level 2* → *Level 3*, *L02* → *L03*, *A* → *B*.
+5. Clicking the name label renames the level. Riviera then asks whether to rename the associated views. Clicking the elevation label edits the elevation.
 
 **UI.** Placement-panel controls: **Make Plan View** (on by default) and **Plan View Types…** (Floor Plan, Ceiling Plan, Structural Plan, and so on). Instance and type parameters are listed below.
 
@@ -441,9 +441,9 @@ Dragging a control issues the matching command once, on mouse-up. The preview du
 **Regeneration.** Root node, with outgoing `datum` edges to columns that have *Moves With Grids* on, to grid-locked constraints, and to dimensions.
 
 **Data (IFC mapping).**
-- **`IfcGrid`** is contained in the ground story. By default Reviera writes one per scope box plus one for the grids that have no scope box. Each grid line is an **`IfcGridAxis`** with `AxisTag` = Name, `AxisCurve` set to `IfcPolyline` / `IfcTrimmedCurve` / `IfcCompositeCurve` (for multi-segment grids), and `SameSense`.
+- **`IfcGrid`** is contained in the ground story. By default Riviera writes one per scope box plus one for the grids that have no scope box. Each grid line is an **`IfcGridAxis`** with `AxisTag` = Name, `AxisCurve` set to `IfcPolyline` / `IfcTrimmedCurve` / `IfcCompositeCurve` (for multi-segment grids), and `SameSense`.
 - **U/V assignment** follows DM-IFC-006: lines within ±45° of project X are `UAxes`, the others `VAxes`, and arcs and multi-segment grids `WAxes`. IFC4 requires `VAxes` to be non-empty; see Open questions.
-- **Per-axis data** is RXD, as DM-IFC-006 specifies: one RXD document per grid line, `model/datums/<axis GlobalId>`, holding the grid system's GlobalId, the curve, bubble flags, the type reference, the 3D and per-view 2D extents, elbow offsets and the scope box. The grid's name is the `AxisTag`. The `IfcGrid`'s own `Reviera_Element` data only marks it as a Reviera grid system.
+- **Per-axis data** is RXD, as DM-IFC-006 specifies: one RXD document per grid line, `model/datums/<axis GlobalId>`, holding the grid system's GlobalId, the curve, bubble flags, the type reference, the 3D and per-view 2D extents, elbow offsets and the scope box. The grid's name is the `AxisTag`. The `IfcGrid`'s own `Riviera_Element` data only marks it as a Riviera grid system.
 - **Edits by other tools.** On open, the `IfcGridAxis` entities win over the RXD records (DM-IFC-006): moved, retagged, added and removed axes move, rename, add and remove grids.
 - **Grid type:** `IfcTypeObject` (`ApplicableOccurrence = "IfcGrid"`) whose graphic parameters are stored as properties on the type.
 
@@ -562,14 +562,14 @@ Dragging a control issues the matching command once, on mouse-up. The preview du
 - Set › **Pick a Plane** is available as a direct shortcut.
 
 **Work Plane Viewer.** Architecture › Work Plane › **Viewer**, also on the Work Plane panel of the `Modify | <Element>` tab for work-plane-based elements and sketch-based forms (sweeps, swept blends, in-place and mass forms).
-- **Which plane.** With a work-plane-based element or a profile selected, the viewer looks at that element's plane. Otherwise it looks at the active work plane of the view it was started from (the last active view). If that view has no work plane (an elevation or section where none has been set), Reviera asks for one first, as for any work-plane tool.
+- **Which plane.** With a work-plane-based element or a profile selected, the viewer looks at that element's plane. Otherwise it looks at the active work plane of the view it was started from (the last active view). If that view has no work plane (an elevation or section where none has been set), Riviera asks for one first, as for any work-plane tool.
 - **What it is.** An orthographic view whose view direction is the plane's normal and whose up direction is the plane's Y axis (or world +Z projected onto the plane when the plane is horizontal). It opens in a new tab or floating window, **zoomed to the extents of the model**; ordinary zoom and pan then apply. It has no crop and no far clip, and uses the *Medium* detail level and the source view's visual style.
 - **Temporary.** It is not listed in the Project Browser, cannot be placed on a sheet, renamed or saved, and is discarded when closed or when the project closes. Only one viewer exists per project window; starting it again re-aims the existing one.
 - **Editing.** All modify and sketch tools work in it. Edits are ordinary transactions, so they appear in every other view at once and undo as usual. Its work plane is the plane it looks at.
 - **Data.** Nothing is written to IFC or RXD; the viewer is session state only.
 
 **Behaviour & rules.**
-- The default work plane of a plan view is its associated level. Elevations and sections have no default and must be set before a work-plane tool can run; if none is set, Reviera asks the user for one.
+- The default work plane of a plan view is its associated level. Elevations and sections have no default and must be set before a work-plane tool can run; if none is set, Riviera asks the user for one.
 - A work-plane-based element stores its host plane. Moving the host moves the element. The element exposes the *Work Plane* instance parameter, *Edit Work Plane* and *Pick New*.
 - *Dissociate* fixes the element in place: it keeps its current world position and loses the host.
 
@@ -598,7 +598,7 @@ Dragging a control issues the matching command once, on mouse-up. The preview du
 ### 3.3.1 Wall kinds and function
 **ID:** ARC-WALL-001 · **Priority:** P0 · **Ref:** research/02 §4.1
 
-**Purpose.** Define which kinds of wall Reviera supports and how each one is classified.
+**Purpose.** Define which kinds of wall Riviera supports and how each one is classified.
 
 | Kind | Description | Priority | Spec |
 |---|---|---|---|
@@ -675,7 +675,7 @@ Dragging a control issues the matching command once, on mouse-up. The preview du
 - Pick Faces creates walls whose location line lies on the face, according to the Location Line option, and records *Related to Mass* (ARC-MASS-003).
 - **Location line persistence.**
   - The location line stays in place through type changes.
-  - Changing the *Location Line* parameter of a placed wall leaves its geometry where it is. Reviera recomputes the stored location-curve offset so that the body does not move.
+  - Changing the *Location Line* parameter of a placed wall leaves its geometry where it is. Riviera recomputes the stored location-curve offset so that the body does not move.
   - Flipping mirrors the wall about its **current** location line.
   - The blue end dots are drawn on the location line.
 - **Implementation note (2026-10-15).** Location lines are built for straight walls: the recipe's curve is the location line and the geometry is offset to the centreline by the type's faces and core (`walls::line_offset`), so type changes keep the line and flips mirror about it; `wall.create` takes `location_line`, and `wall.set_location_line` (an addition) changes it without moving the body. The window: the Location Line row on walls and in the Wall tool's palette. Not built yet: curved walls on lines other than the centreline, the tool's preview drawn off the line, the *Offset* option.
@@ -734,7 +734,7 @@ Dragging a control issues the matching command once, on mouse-up. The preview du
 | Phasing | Phase Created, Phase Demolished | DM chapter |
 
 **Behaviour & rules.**
-- **Height computation.** `z_base = elev(BaseConstraint) + BaseOffset`. `z_top = elev(TopConstraint) + TopOffset`, or `z_base + UnconnectedHeight` when the wall is unconnected. The result must satisfy `z_top − z_base > TOL_SHORT`; otherwise Reviera reports the error "Wall top below base" and leaves the wall unregenerated (its last valid body is kept and the wall is flagged).
+- **Height computation.** `z_base = elev(BaseConstraint) + BaseOffset`. `z_top = elev(TopConstraint) + TopOffset`, or `z_base + UnconnectedHeight` when the wall is unconnected. The result must satisfy `z_top − z_base > TOL_SHORT`; otherwise Riviera reports the error "Wall top below base" and leaves the wall unregenerated (its last valid body is kept and the wall is flagged).
 - **Length** is measured along the location centreline after joins are resolved, as the reference product does at the wall's computation length.
 - **Area** is measured on the exterior face (finish exterior), net of openings.
 
@@ -801,10 +801,10 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
   - `IsVentilated` (TRUE for an Air layer, FALSE otherwise, UNKNOWN for a membrane);
   - `Name` = the function name;
   - `Category` = `LoadBearing` (Structure), `Insulation` (Thermal), `Finish` (Finish 1/2), `Membrane` or `Substrate`;
-  - `Priority` = `100 − 10·(p−1)`, clamped to 0–100, with membranes written as 0. IFC's priority runs the other way (higher means stronger), so Reviera reverses the scale on export.
+  - `Priority` = `100 − 10·(p−1)`, clamped to 0–100, with membranes written as 0. IFC's priority runs the other way (higher means stronger), so Riviera reverses the scale on export.
 - The occurrence carries `IfcMaterialLayerSetUsage`.
-- **RXD type data** (`recipe.compound`): the exact Reviera priority, wraps, variable and structural flags per layer (keyed by a named layer sub-reference, not by index), `core_start` and `core_end`, the vertical regions, the type-level sweeps and reveals, and the default wrapping.
-- **Import without RXD.** When a type has no RXD data (for example, it was created by another tool), Reviera infers the core as the contiguous `LoadBearing` layers and the priorities from `Category`.
+- **RXD type data** (`recipe.compound`): the exact Riviera priority, wraps, variable and structural flags per layer (keyed by a named layer sub-reference, not by index), `core_start` and `core_end`, the vertical regions, the type-level sweeps and reveals, and the default wrapping.
+- **Import without RXD.** When a type has no RXD data (for example, it was created by another tool), Riviera infers the core as the contiguous `LoadBearing` layers and the priorities from `Category`.
 
 **Commands.**
 - `compound.set_layers(type_id, layers: [{function, priority?, material_id, thickness, wraps?, structural_material?, variable?}], core_start, core_end)`
@@ -819,7 +819,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 **Acceptance criteria.**
 - [ ] A type whose layers are all outside the core (empty core) saves, regenerates and round-trips through IFC and RXD.
 - [ ] Setting a Finish layer to priority 1 while it lies between a priority-3 layer and the core fails validation with a message naming both layers.
-- [ ] Reading an IFC with Priority 100/90/80 and no RXD data yields Reviera priorities 1/2/3.
+- [ ] Reading an IFC with Priority 100/90/80 and no RXD data yields Riviera priorities 1/2/3.
 
 **Implementation note (2026-10-15).** Floor and ceiling types take layers too (`compound.set_layers` and `compound.get` accept them; top first); the type's thickness is their total (`type.set_param thickness` is then refused), floors are drawn layer by layer in each layer's material, the IFC type gets an `IfcMaterialLayerSet` and its floors share an `IfcMaterialLayerSetUsage` (AXIS3, NEGATIVE, from the top); Edit Assembly opens from Modify | Floors and Ceilings. Not built yet: roof types' layers, variable layers under a shape-edited top, layer joins between floors and walls.
 
@@ -963,11 +963,11 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
   - **Exterior Angle** `αₑ` and **Interior Angle** `αᵢ` default from the type, and an instance can override them with *Enable Angle Overrides*. A positive angle tilts the top of that face **inward**.
   - The type's thickness is measured at the base or at the top, as *Width Measured At* says.
   - The variable layer absorbs the difference, so its thickness at height h is `t_v(h) = t_v0 − h·(tan αₑ + tan αᵢ)` when measured at the base.
-  - If `t_v(h) ≤ 0` anywhere within the wall height, Reviera reports "Variable layer thickness would reach zero" and does not commit the change.
+  - If `t_v(h) ≤ 0` anywhere within the wall height, Riviera reports "Variable layer thickness would reach zero" and does not commit the change.
   - Layers on the exterior side of the variable layer stay parallel to the exterior face, and layers on the interior side stay parallel to the interior face.
 - **Geometry.** Each layer is the region between two *ruled* surfaces. Straight walls are built as a prism of the layer's 2D cross-section polygon, in the plane normal to the wall axis, along the wall length (`BRepPrimAPI_MakePrism`). Curved walls are built as a sweep of the cross-section along the location curve (`BRepOffsetAPI_MakePipeShell` with a fixed binormal of +Z, which keeps the faces conical).
 
-**Data (IFC mapping).** The body is an `IfcExtrudedAreaSolid` of the parallelogram or trapezoid profile along the wall axis for straight walls, and an `IfcSurfaceCurveSweptAreaSolid` or Brep for curved walls. `IfcMaterialLayerSetUsage` still applies, and for tapered walls IFC4 has `IfcMaterialLayerWithOffsets` (OffsetDirection AXIS3, with the offset values at the top). Reviera writes it for tapered walls.
+**Data (IFC mapping).** The body is an `IfcExtrudedAreaSolid` of the parallelogram or trapezoid profile along the wall axis for straight walls, and an `IfcSurfaceCurveSweptAreaSolid` or Brep for curved walls. `IfcMaterialLayerSetUsage` still applies, and for tapered walls IFC4 has `IfcMaterialLayerWithOffsets` (OffsetDirection AXIS3, with the offset values at the top). Riviera writes it for tapered walls.
 
 **Commands.** `wall.set_cross_section(wall_ids, mode: Vertical|Slanted|Tapered, angle?: f64, exterior_angle?: f64, interior_angle?: f64, override_angles?: bool)`.
 
@@ -988,7 +988,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
   - **Sample Height**.
   - Rows from top to bottom. Each row has a basic wall type, a **Height** (exactly one row is *Variable*), an **Offset** from the reference (positive toward the exterior), Top and Base extensions (when the sub-type's layers are extendable) and a **Flip** flag.
   - Buttons: Insert, Delete, Up, Down and Variable.
-- **Instance layout.** For wall height `H`, each fixed row takes its own height, and the variable row takes `H − Σ fixed`. If that would be ≤ 0, Reviera reports "Stacked wall too short for its fixed rows".
+- **Instance layout.** For wall height `H`, each fixed row takes its own height, and the variable row takes `H − Σ fixed`. If that would be ≤ 0, Riviera reports "Stacked wall too short for its fixed rows".
 - Sub-walls are real child elements. They are selectable with Tab and expose a subset of instance parameters (Room Bounding, Structural, phasing, Mark).
 - Joins: each sub-wall joins with whatever is at its own height, using the join algorithm (§3.3.12) once per height interval.
 - Ellipse stacked walls need Offset = Wall Centerline and every row's offset set to 0.
@@ -1005,7 +1005,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - [x] A stacked wall with a 900 mm fixed base row and a variable upper row, drawn 2.7 m high, has sub-walls 0.9 m and 1.8 m high.
 - [x] Break Up produces two basic walls whose IFC GlobalIds are those of the former sub-walls.
 
-**Implementation note (2026-10-15, first build).** As built: the wall type's recipe carries `stacked_wall` (offset reference and rows, top first); its width is the rows' envelope about the location line, kept in step when a row type's width or layers change. A stacked wall is an ordinary Reviera wall of that type, so drawing, moving, joins and hosting work as for basic walls; its body is one piece per row, the row's band across the wall cut at the stacked wall's joined ends. Sub-walls have GlobalIds derived from the stacked wall's, so they are stable across saves and Break Up keeps them. Commands: `stackedwall.set_rows`, `stackedwall.create_type` (an addition), `wall.break_up`. IFC: the stacked wall is `ELEMENTEDWALL` with no body, aggregating one `IfcWall` per row with a faceted B-rep (cut by the doors and windows), typed by the row's type; tagged `rxd:stacked_wall` and not loaded as elements. Refused: slanted or tapered stacked walls, horizontal splits, a wall too short for its fixed rows (on creation). The window: Modify | Walls › Edit Stack (a grid like Edit Assembly; on a basic wall it makes a new stacked type) and Break Up. Not built yet: Tab-selecting sub-walls and their own parameters, joins per height interval, top and base extensions, curved and elliptical stacked walls, Sample Height.
+**Implementation note (2026-10-15, first build).** As built: the wall type's recipe carries `stacked_wall` (offset reference and rows, top first); its width is the rows' envelope about the location line, kept in step when a row type's width or layers change. A stacked wall is an ordinary Riviera wall of that type, so drawing, moving, joins and hosting work as for basic walls; its body is one piece per row, the row's band across the wall cut at the stacked wall's joined ends. Sub-walls have GlobalIds derived from the stacked wall's, so they are stable across saves and Break Up keeps them. Commands: `stackedwall.set_rows`, `stackedwall.create_type` (an addition), `wall.break_up`. IFC: the stacked wall is `ELEMENTEDWALL` with no body, aggregating one `IfcWall` per row with a faceted B-rep (cut by the doors and windows), typed by the row's type; tagged `rxd:stacked_wall` and not loaded as elements. Refused: slanted or tapered stacked walls, horizontal splits, a wall too short for its fixed rows (on creation). The window: Modify | Walls › Edit Stack (a grid like Edit Assembly; on a basic wall it makes a new stacked type) and Break Up. Not built yet: Tab-selecting sub-walls and their own parameters, joins per height interval, top and base extensions, curved and elliptical stacked walls, Sample Height.
 
 ### 3.3.12 Wall joins and layer cleanup
 **ID:** ARC-JOIN-001 · **Priority:** P0 · **Ref:** research/02 §1 (2025/2026), §4.5 (Layer join rules), §4.7, §17.4 · screenshots/architecture/compound_layer_priority_joins.png
@@ -1024,7 +1024,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 **Behaviour & rules.**
 
 **A. Join detection.** Detection runs per *join node*.
-1. For each wall end `E` (point `P_E` on the location curve, tangent `d_E` pointing *out of* the wall) whose status is Allow, Reviera queries an R-tree of wall footprints at `P_E` with radius `TOL_JOIN`.
+1. For each wall end `E` (point `P_E` on the location curve, tangent `d_E` pointing *out of* the wall) whose status is Allow, Riviera queries an R-tree of wall footprints at `P_E` with radius `TOL_JOIN`.
 2. **End-to-end candidates.** Another wall end `F` with `|P_E − P_F| ≤ TOL_JOIN`, or whose extended location lines cross within `max(w_E, w_F)` of both endpoints, forms an **L/corner node**. A third or fourth end joins the same node when it lies within `TOL_JOIN` of the node point.
 3. **End-to-span candidates.** If `P_E`, extended along `d_E` by at most `w_other/2 + TOL_JOIN`, lands inside another wall's footprint away from that wall's ends, the result is a **T node** (E abuts the continuous wall).
 4. Two walls whose spans cross with neither end involved get no automatic join. The user can create one with Join Geometry.
@@ -1032,11 +1032,11 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
    - The walls' vertical extents overlap.
    - The walls are on the same level band, with their base levels within the overlap.
    - The angle between the location lines is above 1°. Parallel overlapping walls only join through Join Geometry.
-   - The number of ends in an L node is at most 4. With more, Reviera reports "Too many walls at one join" and leaves the extras unjoined.
+   - The number of ends in an L node is at most 4. With more, Riviera reports "Too many walls at one join" and leaves the extras unjoined.
 6. The node's **join order** is a list of the wall ends in it. By default the first wall drawn comes first. *Previous* and *Next* rotate the list.
 7. **Mid-end faces.** Vertical faces created by an edited profile or by a wall opening (ARC-WALL-009, ARC-OPEN-003) are join targets just like wall ends. A wall end that abuts a notch face forms a T node against that face.
 
-**B. Layer bands.** For each wall `W` at height interval `I` (see C), Reviera builds the plan **bands**:
+**B. Layer bands.** For each wall `W` at height interval `I` (see C), Riviera builds the plan **bands**:
 - Each layer `j` occupies the strip between two offset curves of the location centreline, at signed distances `a_j` and `b_j`. Positive distances are toward the exterior, and the values follow from the layer thicknesses and the flip.
 - Every band carries `(wall, layer index, priority p, in_core flag, material)`.
 - Membrane layers have zero width. They take no part in the cleanup and are re-inserted afterward as zero-thickness boundaries.
@@ -1118,21 +1118,21 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - **Valid targets:** floors, roofs (including extrusion roofs), ceilings, non-vertical reference planes, the walls directly above or below, in-place floors and roofs, toposolids (base only), and elements in linked models (attach base only, read-only).
 - **Top attach.** Let `S` be the target's solid. The wall body is clipped by the *upward shadow* of the target's bottom faces:
   `Tool = Prism(BottomFaces(S) ∩ WallFootprintXY, +Z, ∞) ∪ S`, and `Wall := Wall − Tool`.
-  Reviera uses the underside faces (those whose normal has Z < 0) and extrudes them up to the scene's bounding box (`BRepPrimAPI_MakePrism` with a finite vector).
+  Riviera uses the underside faces (those whose normal has Z < 0) and extrudes them up to the scene's bounding box (`BRepPrimAPI_MakePrism` with a finite vector).
   - Only the part of the wall under the target is affected. Partial overlap therefore attaches only the overlapped part, and the rest keeps its own top constraint.
   - A reference plane counts as an infinite half-space.
 - **Base attach** works the same way with the downward shadow of the target's top faces.
 - **Height before clipping.** The wall's nominal top is raised to the maximum height of the target over the wall's footprint, so that the wall can grow up to a high ridge. The *Top Is Attached* flag then becomes true. The nominal top and the stored constraint are kept for detaching.
-- **Slanted walls.** The target must cover the wall's whole plan projection. Otherwise Reviera reports "Attach target does not cover the slanted wall".
+- **Slanted walls.** The target must cover the wall's whole plan projection. Otherwise Riviera reports "Attach target does not cover the slanted wall".
 - **Reference planes.** Attaching to a second reference plane on the same end replaces the first.
 - Extendable layers are disabled while the wall is attached.
-- After a floor or roof is finished, Reviera offers to attach the walls directly below to it (ARC-FLR-001, ARC-ROOF-001).
+- After a floor or roof is finished, Riviera offers to attach the walls directly below to it (ARC-FLR-001, ARC-ROOF-001).
 
 **Regeneration.** An `attach` edge runs from the target to the wall. A cycle (for example, a roof whose footprint is locked to a wall that is attached to the same roof) is permitted because the footprint lock reads only the wall's **plan** curve, which does not depend on the attachment. The graph splits the wall node into a *plan* stage and a *body* stage so that no real cycle exists (§3.15).
 
 **Data (IFC mapping).** An `IfcRelConnectsElements` with `Name = "AttachTop"` or `"AttachBase"` (RelatingElement = target, RelatedElement = wall). The clipped body is written as an `IfcBooleanClippingResult` when the target is planar (with an `IfcHalfSpaceSolid` or `IfcPolygonalBoundedHalfSpace`), and as a Brep otherwise. The attach relation is also stored in RXD document `model/constraints`, which is authoritative.
 
-**Implementation notes (2026-10-13).** As built, tops attach to Reviera roofs. The wall's footprint is split by the roof's faces (each piece's top on its face's plane), and the roof must cover the whole footprint (`wall.attach_not_covered`). The body is a faceted B-rep in the wall's own placement frame, so openings placed relative to the wall keep their place. The attach target is stored in the wall's recipe (`attach_top`) until `model/constraints` exists, and the `IfcRelConnectsElements` comes later. The viewport draws the wall cut by its openings up to the roof's lowest point over it, with the part above as a separate solid. Deleting the roof detaches its walls.
+**Implementation notes (2026-10-13).** As built, tops attach to Riviera roofs. The wall's footprint is split by the roof's faces (each piece's top on its face's plane), and the roof must cover the whole footprint (`wall.attach_not_covered`). The body is a faceted B-rep in the wall's own placement frame, so openings placed relative to the wall keep their place. The attach target is stored in the wall's recipe (`attach_top`) until `model/constraints` exists, and the `IfcRelConnectsElements` comes later. The viewport draws the wall cut by its openings up to the roof's lowest point over it, with the part above as a separate solid. Deleting the roof detaches its walls.
 
 **Commands.**
 - `wall.attach(wall_ids, end: Top|Base, target_id)`
@@ -1150,7 +1150,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 **Purpose.** Change a straight wall's elevation outline: gables, notches and holes.
 
 **Workflow.**
-1. The user selects a straight wall and chooses Mode › **Edit Profile**. In a plan view Reviera offers Go To View.
+1. The user selects a straight wall and chooses Mode › **Edit Profile**. In a plan view Riviera offers Go To View.
 2. The wall outline appears as sketch curves, together with dashed reference planes that show the original rectangle: the base, the top and the two ends.
 3. The user edits: deletes, splits or adds lines, draws arcs, and adds inner closed loops for holes.
 4. **Finish** applies the profile. **Reset Profile** restores the rectangle.
@@ -1180,7 +1180,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 **Workflow (instance level).**
 1. The user starts Architecture › Build › Wall › **Wall: Sweep** or **Wall: Reveal** in a 3D or elevation view.
 2. The user chooses the type and, on the Placement panel, **Horizontal** or **Vertical**.
-3. Hovering a wall previews the sweep, and a click places it. Reviera pre-selects the same height on adjacent joined walls so that a click continues the run.
+3. Hovering a wall previews the sweep, and a click places it. Riviera pre-selects the same height on adjacent joined walls so that a click continues the run.
 4. **Restart** starts a separate run. Clicking empty space ends the tool.
 5. Selected sweeps offer *Add/Remove Walls*, *Modify Returns* (Straight or Angled) and end drag handles.
 
@@ -1406,7 +1406,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 
 **Behaviour & rules.**
 - **Cutting.** A wall-hosted family carries an *opening cut* (a void solid in the family's coordinate system).
-  - On placement, Reviera transforms the void into the host's coordinates and creates an `IfcOpeningElement` whose body is the void, clipped to the host's thickness plus 1 mm on each side.
+  - On placement, Riviera transforms the void into the host's coordinates and creates an `IfcOpeningElement` whose body is the void, clipped to the host's thickness plus 1 mm on each side.
   - The host body is then cut (`BRepAlgoAPI_Cut`), and wrapping applies (ARC-WRAP-001).
   - If the void does not reach through the full host width (for example, a recess), the opening's PredefinedType is `RECESS`.
 - **Constraint along the host.** An insert can only move along its host's surface and keeps its offset from the host face. Moving it off the host requires **Disjoin** (ARC-MOD-004) or *Pick New Host*.
@@ -1461,7 +1461,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - **`IfcDoor`** with `OverallHeight`, `OverallWidth`, `PredefinedType = DOOR` (`GATE` or `TRAPDOOR` where the family says so) and `OperationType` from the family (for example `SINGLE_SWING_LEFT`), written on both the occurrence and the type (`IfcDoorType.OperationType`), with `UserDefinedOperationType` when the value is `USERDEFINED`.
 - **`IfcDoorType`** with `IfcDoorLiningProperties` and `IfcDoorPanelProperties` derived from family parameters where it can map them.
 - `Pset_DoorCommon` holds Reference (Type Mark), FireRating, IsExternal (Function), HandicapAccessible and similar where they are set.
-- Hand and facing are expressed by the placement's mirrored axis. A mirrored instance has a negative determinant, and Reviera writes `IfcCartesianTransformationOperator3DnonUniform` in the mapped representation, so viewers show it correctly.
+- Hand and facing are expressed by the placement's mirrored axis. A mirrored instance has a negative determinant, and Riviera writes `IfcCartesianTransformationOperator3DnonUniform` in the mapped representation, so viewers show it correctly.
 - From/To Room are written as `IfcRelSpaceBoundary` (for the door) and as property values.
 
 **Commands.**
@@ -1475,7 +1475,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - [ ] Ten doors placed in sequence are numbered 1 to 10.
 
 ### 3.4.2a Door operations: double, revolving, sliding, storefront and automatic doors
-**ID:** ARC-DOOR-002 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); Reviera's own design (Appendix A.2a); IFC4 `IfcDoorTypeOperationEnum`, `Pset_DoorCommon.HasDrive`; ADA 2010 404.1, 404.3
+**ID:** ARC-DOOR-002 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); Riviera's own design (Appendix A.2a); IFC4 `IfcDoorTypeOperationEnum`, `Pset_DoorCommon.HasDrive`; ADA 2010 404.1, 404.3
 
 **Purpose.** The commonest door kinds beyond a single swinging leaf, as values of the built-in door type. *(Owner requests, 2026-10-14: "Door options need to include double-doors, turnstyle doors, and glass store style swing and automatic door options"; "Yes, revolving door. And automatic sliding door that includes the space needed for the sliding elements.")*
 
@@ -1527,7 +1527,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - [x] The default 1.2 m window placed in a 1 m wall is 1 m wide; placed in a flat dormer's front wall it sits above the main roof and shrinks under the dormer roof.
 
 ### 3.4.3a Window shapes: round, round-top and other profiles
-**ID:** ARC-WIN-002 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); Reviera's own design (Appendix A.2a)
+**ID:** ARC-WIN-002 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); Riviera's own design (Appendix A.2a)
 
 **Purpose.** Windows (and doors) that are not rectangles: round (oculus) windows, round-top (arched-head) windows, and the common head and outline shapes, as parametric built-in types. *(Owner request, 2026-10-13: "spec out more complex windows including round and with a round top".)*
 
@@ -1554,7 +1554,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - **Doors** take the round-top and Gothic heads too (arched doorways).
 - **Display:** elevations and 3D show the true outline. Plans show the frame at the cut height, and the arch in the head dashed above the cut where the view shows it.
 
-**Data (IFC mapping).** `IfcWindow` with `PartitioningType` and `UserDefinedPartitioningType` for shaped windows, and `IfcWindowType` carrying the shape's parameters in the Reviera property set. The opening's `IfcOpeningElement` body is an `IfcExtrudedAreaSolid` of an `IfcArbitraryClosedProfileDef` (an `IfcIndexedPolyCurve` with arc segments, or an `IfcCircleProfileDef` for round windows), so consumers see the true shape. The recipe is RXD type data (`recipe.window_type`, `shape`).
+**Data (IFC mapping).** `IfcWindow` with `PartitioningType` and `UserDefinedPartitioningType` for shaped windows, and `IfcWindowType` carrying the shape's parameters in the Riviera property set. The opening's `IfcOpeningElement` body is an `IfcExtrudedAreaSolid` of an `IfcArbitraryClosedProfileDef` (an `IfcIndexedPolyCurve` with arc segments, or an `IfcCircleProfileDef` for round windows), so consumers see the true shape. The recipe is RXD type data (`recipe.window_type`, `shape`).
 
 **Commands.** `type.set_param(type_id, "shape", rectangle|round|elliptical|round_top|fan|gable|trapezoid|polygon)` and the shape parameters (`rise`, `head_profile`, `radius_ratio`, `sides`, `rotation`, `left_height`, `right_height`, `muntins`), as for other type parameters. Placement is `window.place` / `door.place` unchanged.
 
@@ -1581,7 +1581,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 **Behaviour & rules.**
 - **Instance parameters** (typical): Level or Host, Offset or Elevation from Level, **Moves With Nearby Elements**, Work Plane, Schedule Level, Mark, Comments and phasing.
 - The context menu offers *Pick New Host* (ARC-HOST-001) and *Edit Family* (DM chapter).
-- With *Moves With Nearby Elements* on, Reviera records the nearest parallel wall within 300 mm at placement time, and the component keeps its offset from that wall (ARC-WALL-017).
+- With *Moves With Nearby Elements* on, Riviera records the nearest parallel wall within 300 mm at placement time, and the component keeps its offset from that wall (ARC-WALL-017).
 
 **Data (IFC mapping).** The IFC entity is chosen from the family's category through the category mapping table (DM chapter). Examples: Furniture → `IfcFurniture`; Casework → `IfcFurniture` (`PredefinedType = SHELF` or USERDEFINED); Plumbing Fixtures → `IfcSanitaryTerminal`; Planting → `IfcGeographicElement` (4X3: `VEGETATION`); Generic Models → `IfcBuildingElementProxy`. The geometry is an `IfcMappedItem` of the type's `RepresentationMap`, with the family geometry built once per type.
 
@@ -1603,7 +1603,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 
 **Behaviour & rules.**
 - An architectural column that is **joined to walls** takes the wall's material (the core material of the joined wall).
-- The wall's wrapping layers wrap around the column faces that face away from the wall. Reviera treats the column's section as a mid-span obstacle and applies end-wrapping (ARC-WRAP-001) to the wall pieces that meet it.
+- The wall's wrapping layers wrap around the column faces that face away from the wall. Riviera treats the column's section as a mid-span obstacle and applies end-wrapping (ARC-WRAP-001) to the wall pieces that meet it.
 - Structural columns behave differently and are covered in the STR chapter.
 - With **Moves With Grids** on, a column at a grid intersection keeps its offsets from both grids.
 - **Attach Top/Base** (Modify | Columns):
@@ -1627,7 +1627,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - [x] A column attached at its top to a sloping roof with Maximum Intersection reaches the highest point where the roof crosses the column's footprint. With Minimum Intersection it reaches the lowest.
 - [ ] A column joined to a plastered wall takes the plaster finish on its faces.
 
-*Built (2026-10-15):* `column.place_architectural`, `column.set`, `column.attach` (top only; targets: Reviera roofs, floors and ceilings; Cut Column style: with Maximum and Midline the top is cut by the underside), `column.detach`; column types (`IfcColumnType` with a `recipe.column_type`: rectangular width × depth or round diameter) through `type.duplicate`, `type.set_param` and `element.set_type`. Columns move, rotate, mirror and copy, follow their levels and are deleted with them; an attach target that goes leaves the column at its own top. Architecture › **Column** places them in plans (Spacebar turns 90°), Properties edits constraints, rotation and type, and Modify | Columns › Attach Top / Detach Top attach to what is directly above. IFC: `IfcColumn` (`COLUMN`, `Pset_ColumnCommon.LoadBearing` false) with a faceted B-rep body, contained in its base level. Not yet: attaching bases, Cut Target and Do Not Cut styles, reference planes and levels as targets, wall materials and wrapping, Moves With Grids, Room Bounding.
+*Built (2026-10-15):* `column.place_architectural`, `column.set`, `column.attach` (top only; targets: Riviera roofs, floors and ceilings; Cut Column style: with Maximum and Midline the top is cut by the underside), `column.detach`; column types (`IfcColumnType` with a `recipe.column_type`: rectangular width × depth or round diameter) through `type.duplicate`, `type.set_param` and `element.set_type`. Columns move, rotate, mirror and copy, follow their levels and are deleted with them; an attach target that goes leaves the column at its own top. Architecture › **Column** places them in plans (Spacebar turns 90°), Properties edits constraints, rotation and type, and Modify | Columns › Attach Top / Detach Top attach to what is directly above. IFC: `IfcColumn` (`COLUMN`, `Pset_ColumnCommon.LoadBearing` false) with a faceted B-rep body, contained in its base level. Not yet: attaching bases, Cut Target and Do Not Cut styles, reference planes and levels as targets, wall materials and wrapping, Moves With Grids, Room Bounding.
 
 ### 3.4.6 Flip controls and mirrored state
 **ID:** ARC-FLIP-001 · **Priority:** P0 · **Ref:** research/02 §2.4, §2.5, §4.13, §5.2, §5.3, §13 (Edge cases) · web: About Flip Controls; Flip Elements
@@ -1658,7 +1658,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - The flags `facing_flipped`, `hand_flipped` and `mirrored` (DM-INST-001) are stored in RXD element data (`placement`) and written as property values (*FacingFlipped*, *HandFlipped*, *Mirrored*) in the instance property set defined by the DM chapter.
 - **Geometry.** IFC placements (`IfcAxis2Placement3D`) cannot reflect, so the net transform `T = placement · F_facing · F_hand · M` is split: when `det(T) > 0` (no flip, both flips, or two mirrors), the reflection pairs are folded into a rotation of the `ObjectPlacement`; when `det(T) < 0`, the `IfcMappedItem.MappingTarget` is an `IfcCartesianTransformationOperator3DnonUniform` with `Scale = −1` on the reflected axis (X for hand, Y for facing), and the placement carries the rest.
 - **Doors and windows.** `IfcDoor.OperationType` swaps `…_LEFT` and `…_RIGHT` values when the effective hand changes (for example `SINGLE_SWING_LEFT` ↔ `SINGLE_SWING_RIGHT`); the type keeps its own value, and the occurrence value wins. The swing side is visible in the geometry and in the `IfcRelSpaceBoundary` of the door.
-- **On import without RXD**, Reviera derives the flags from the mapping transform's determinant and axis signs and marks them as inferred.
+- **On import without RXD**, Riviera derives the flags from the mapping transform's determinant and axis signs and marks them as inferred.
 
 **Commands.**
 - `insert.flip_hand(element_ids)` and `insert.flip_facing(element_ids)` flip doors, windows and other hosted inserts that have the matching control.
@@ -1715,7 +1715,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 **Workflow.** The user starts the Wall tool with a curtain-wall type. Line, Pick Lines and Pick Faces work, as do Spacebar and listening dimensions.
 
 **Behaviour & rules.**
-- **Arc curtain walls** are faceted at their vertical grid lines: each panel is a planar chord, and mullions sit on the arc. With no vertical grid lines, the panel is curved (a cylindrical panel) only if its type allows that. Otherwise Reviera adds a facet every 15° and warns.
+- **Arc curtain walls** are faceted at their vertical grid lines: each panel is a planar chord, and mullions sit on the arc. With no vertical grid lines, the panel is curved (a cylindrical panel) only if its type allows that. Otherwise Riviera adds a facet every 15° and warns.
 - For non-rectangular outlines, the user can edit the profile (ARC-WALL-009) or attach the top (ARC-WALL-008). Cells that cross the outline are clipped to it, panels take the clipped shape, and border mullions follow the outline.
 - Embedding is described in ARC-WALL-013.
 
@@ -1745,7 +1745,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
   - *Maximum Spacing*: panel count `m = ceil(D / S)`, positions `d_min + k·D/m` for k = 1…m−1.
   - *Minimum Spacing*: panel count `m = max(1, floor(D / S))`, positions `d_min + k·D/m`.
   - *None*: no type-driven lines.
-- **Adjust for Mullion Size.** When it is on, the spacing applies to the **clear panel width**, measured between mullion faces, instead of between centrelines. Reviera solves for line positions `x_k` such that `x_{k+1} − x_k − (w_k + w_{k+1})/2 = S_clear`, using the actual widths of the interior mullions `w_k` and border mullions (`w_b`) for this layout. For Max/Min Spacing and Fixed Number, the effective length becomes `D − Σ mullion widths` before dividing.
+- **Adjust for Mullion Size.** When it is on, the spacing applies to the **clear panel width**, measured between mullion faces, instead of between centrelines. Riviera solves for line positions `x_k` such that `x_{k+1} − x_k − (w_k + w_{k+1})/2 = S_clear`, using the actual widths of the interior mullions `w_k` and border mullions (`w_b`) for this layout. For Max/Min Spacing and Fixed Number, the effective length becomes `D − Σ mullion widths` before dividing.
 - **Independent lines** keep their absolute positions. Type-driven lines that fall within 1 mm of an independent line are suppressed.
 - The solver runs in `O(n)` and is a pure function of its inputs, so it can be unit-tested.
 
@@ -1915,7 +1915,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 
    Options: *Offset*, and **Extend into wall (to core)**.
 3. Outer loops define the floor, and inner loops define holes. **Finish**.
-4. If walls below end at this floor's level, Reviera asks whether to attach them to the floor's underside. If the floor overlaps walls, it asks whether to join geometry so that the floor cuts them.
+4. If walls below end at this floor's level, Riviera asks whether to attach them to the floor's underside. If the floor overlaps walls, it asks whether to join geometry so that the floor cuts them.
 
 **Behaviour & rules.**
 - **Instance parameters:** Level, **Height Offset from Level**, Room Bounding, Related to Mass (RO), Structural, Curved Edge Condition (shape-edited), **Slope Angle** (adjusts the slope-defining line without editing the sketch), Perimeter, Area, Volume, Elevation at Top, Elevation at Bottom, Elevation at Core Top, Elevation at Core Bottom, Thickness (RO, or editable when shape-edited with a variable layer), Comments, Mark and phasing.
@@ -2014,10 +2014,10 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 **Purpose.** Pitched, hipped, gabled and flat roofs generated from a plan footprint and per-edge slopes.
 
 **Workflow.**
-1. The user starts Architecture › Build › Roof › **Roof by Footprint** in a plan or reflected ceiling plan view. If the active level is the lowest level, Reviera offers to move the roof to the level above.
+1. The user starts Architecture › Build › Roof › **Roof by Footprint** in a plan or reflected ceiling plan view. If the active level is the lowest level, Riviera offers to move the roof to the level above.
 2. The user draws the footprint with Pick Walls (default), lines or shapes, and optionally slope arrows. Options: **Defines slope** (applies to each new line), **Overhang** (Pick Walls) and **Extend to wall core**.
 3. The footprint must be one closed outer loop, with optional inner loops for openings. A triangle symbol marks each slope-defining edge. Edges that do not define slope become gables.
-4. On **Finish**, Reviera offers to attach the **perimeter** walls under the roof, so that gable ends fill up to the roof and eave walls meet its underside (*gable infill*; see Behaviour & rules).
+4. On **Finish**, Riviera offers to attach the **perimeter** walls under the roof, so that gable ends fill up to the roof and eave walls meet its underside (*gable infill*; see Behaviour & rules).
 
 **Behaviour & rules.**
 - **Footprint curve properties:** Defines Roof Slope, Slope, Overhang, Plate Offset from Base, Offset from Roof Base, Extend into wall (to core) and Length.
@@ -2030,7 +2030,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - **Editing the footprint on the model** (ARC-SKCH-001): the selected roof shows grips at the footprint's corners and edge middles. Dragging an edge moves it across itself, with its neighbours stretched or shortened to meet it; dragging a corner moves it. Each drag is one undoable edit (`sketch.move_curve`, `sketch.move_corner`).
 - **Instance parameters:** Base Level, **Base Offset From Level**, Room Bounding, Related to Mass, **Cutoff Level**, **Cutoff Offset**, **Rafter Cut** (Plumb Cut, Two Cut – Plumb, Two Cut – Square), **Fascia Depth** (between 0 and the thickness), **Rafter or Truss**, Maximum Ridge Height (RO), Slope (applied to every slope-defining edge), Thickness (RO), Volume, Area, Comments, Mark and phasing.
 - **Type parameters:** Structure, Default Thickness, coarse fill and analytical properties.
-- **Align Eaves** (in the sketch): the user selects eave lines and chooses *Adjust Height* (each edge's plate offset is changed) or *Adjust Overhang*. Reviera then computes the change for each edge so that all the selected eave lines end at the same height.
+- **Align Eaves** (in the sketch): the user selects eave lines and chooses *Adjust Height* (each edge's plate offset is changed) or *Adjust Overhang*. Riviera then computes the change for each edge so that all the selected eave lines end at the same height.
 
 **Roof generation algorithm** (geometry kernel; runs per roof):
 1. **Edge data.** For each footprint edge `e` (in counter-clockwise order), let:
@@ -2040,16 +2040,16 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
    - `o_e ≥ 0` be the overhang.
 2. **Edge planes.** Each slope-defining edge carries the plane `P_e(p) = h_e + s_e · δ_e(p)`, where `δ_e(p)` is the signed horizontal distance from `L_e` toward the inside of the footprint. Each gable edge carries the vertical plane through `L_e`. An edge with a slope arrow carries the arrow's plane (ARC-SKCH-003) and is treated as slope-defining with that plane.
 3. **Eave polygon.** Each slope-defining edge line is moved outward by `o_e`, and its eave height becomes `h_e − s_e·o_e`. Gable edges are moved outward by their overhang at the same plate height. The eave polygon `E` is the closed loop of these lines, with consecutive lines intersected.
-4. **Wavefront propagation (generalised weighted straight skeleton).** Reviera treats the roof as a wavefront that rises in z.
+4. **Wavefront propagation (generalised weighted straight skeleton).** Riviera treats the roof as a wavefront that rises in z.
    - At height z, the active edge `e` is the **contour line** of `P_e` at height z: the set of points where `P_e(p) = z`. For edges that are parallel to their plane's contour, this is the edge line moved inward by `(z − h_e)/s_e`. For a slope-arrow plane, it is a line perpendicular to the arrow. Gable edges do not move.
-   - Starting from `z₀ = min over e of the eave heights`, Reviera processes events in increasing z:
+   - Starting from `z₀ = min over e of the eave heights`, Riviera processes events in increasing z:
      - **edge events**: an active edge shrinks to zero length, its two neighbours become adjacent, and a skeleton node is created;
      - **split events**: a reflex vertex of the wavefront hits an opposite edge, the polygon splits, and a node is created;
      - **vertex events**: several reflex vertices meet at once, which is handled as simultaneous split events, with ties broken by edge index for determinism.
    - Event times are the solutions of three-plane intersections (`P_a ∩ P_b ∩ P_c`), solved in `f64` with a relative tolerance of 1e-9. Coincident events within `TOL_POINT` are merged.
    - Propagation stops when every wavefront component has collapsed, or at the **cutoff height** `z_c = elev(CutoffLevel) + CutoffOffset`. At the cutoff, the remaining wavefront polygon becomes a flat top face (or an opening, if the *Cutoff* option says to leave it open for a second roof).
    - Each footprint edge `e` produces one **roof face**: the region swept by its active edge, which lies on `P_e`. Gable edges produce vertical gable faces, which become the gable walls' attach target and are not part of the roof's top surface.
-   - **Reference implementations.** The classic straight-skeleton event algorithm (Aichholzer and Aurenhammer, and its weighted generalisation) and the procedural-extrusion model by Kelly and Wonka (2011) are published references for this approach. Reviera implements it itself in Rust. CGAL's straight-skeleton package is GPL-3.0-or-later and compatible, but it is not a required dependency.
+   - **Reference implementations.** The classic straight-skeleton event algorithm (Aichholzer and Aurenhammer, and its weighted generalisation) and the procedural-extrusion model by Kelly and Wonka (2011) are published references for this approach. Riviera implements it itself in Rust. CGAL's straight-skeleton package is GPL-3.0-or-later and compatible, but it is not a required dependency.
    - **Convex footprints.** For a convex footprint with all edges slope-defining and no arrows, the result must equal the lower envelope `z(p) = min_e P_e(p)`. The test suite uses this as a cross-check.
 5. **Inner loops (courtyards).** An inner loop of the footprint is a **courtyard**. Its edges are footprint edges like the outline's: slope-defining by default (the roof falls toward the courtyard), or gables. They take part in the skeleton as further wavefronts: the outline runs counter-clockwise and each courtyard clockwise, and a reflex vertex of one wavefront may meet an edge of another, joining them. A flat roof gets a slab with holes. Openings through a finished roof (shafts, skylights, dormers) are made with the opening tools (ARC-OPEN-*), not with footprint loops. *(Owner clarification, 2026-10-13: full-loop buildings with a central courtyard.)*
 6. **Surface to solid.**
@@ -2062,11 +2062,11 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
      - Gable edges get a vertical cut at the eave polygon.
    - Every cut is a `BRepAlgoAPI_Cut` with a half-space or with a prism of the cut polygon.
 7. **Joins.**
-   - *Join/Unjoin Roof* (ARC-ROOF-006) extends this roof's picked edge face until it meets the target roof's face, and Reviera clips it there.
+   - *Join/Unjoin Roof* (ARC-ROOF-006) extends this roof's picked edge face until it meets the target roof's face, and Riviera clips it there.
    - Walls attached to the roof use its underside (ARC-WALL-008).
-   - Roof–roof overlaps that are not joined stay overlapping. Reviera does not merge them silently.
+   - Roof–roof overlaps that are not joined stay overlapping. Riviera does not merge them silently.
 8. **Validation.**
-   - If the skeleton fails (for example, because of degenerate input), Reviera reports "Roof cannot be generated from this footprint" and names the edges involved. The previous valid geometry is kept.
+   - If the skeleton fails (for example, because of degenerate input), Riviera reports "Roof cannot be generated from this footprint" and names the edges involved. The previous valid geometry is kept.
    - A slope steeper than 89.9° is an error.
    - A footprint that is not closed, or that intersects itself, fails sketch validation.
 
@@ -2102,7 +2102,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - The body is the `IfcRoof`'s own `Brep` representation, one `IfcFacetedBrep` per face slab (IFC allows a roof either to have its own body or to be decomposed). Aggregated `IfcSlab` parts come later with layered roof types.
 - Per-edge eave heights are handled by extending each face from the plate down its own plane along the corner trajectories to its eave line, so steeper edges reach lower eaves.
 - Each face slab is mitred against its neighbours by the plane through the shared edge halfway between the two face normals, and cut plumb at eaves and rakes.
-- A new roof whose footprint was picked from walls sets its base offset to the walls' tops (Reviera's default; the user can change it).
+- A new roof whose footprint was picked from walls sets its base offset to the walls' tops (Riviera's default; the user can change it).
 - A roof drawn with lines on the highest level (no level above it) also starts at the tops of the walls on that level, rather than at floor height inside them.
 - **Roof shape** (Properties, `roof.set_shape`):
   - Hip: every curve slopes.
@@ -2112,7 +2112,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
   - Flat: no curve slopes.
   - "Along" means within 10° of the longest curve's direction. A roof whose curves match no shape shows *Custom*. Slopes and overhangs are kept.
 - Properties also set the **Overhang** of every curve (*Varies* when they differ), and **Cutoff Level** is chosen from the levels.
-- **Attach Walls** (`roof.attach_walls`, Modify | Roofs): attaches the Reviera **perimeter** walls that the roof covers and that start below it. Gable walls fill up to the ridge, and eave walls meet the roof's underside.
+- **Attach Walls** (`roof.attach_walls`, Modify | Roofs): attaches the Riviera **perimeter** walls that the roof covers and that start below it. Gable walls fill up to the ridge, and eave walls meet the roof's underside.
   - A wall is on the perimeter when, just beside one of its faces at its middle, there is no enclosed region of its level.
   - Interior walls are left alone; Attach Top attaches them by hand.
   - This is offered after any new roof, however its footprint was made, not only one from picked walls.
@@ -2234,7 +2234,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - [ ] A soffit made with Pick Roof Edges follows the eave when the roof overhang changes.
 
 ### 3.6.7a Eaves and wall bearing
-**ID:** ARC-ROOF-010 · **Priority:** P0 · **Ref:** owner requirement (2026-10-13); Reviera's own design (Appendix A.2a)
+**ID:** ARC-ROOF-010 · **Priority:** P0 · **Ref:** owner requirement (2026-10-13); Riviera's own design (Appendix A.2a)
 
 **Purpose.** Define a roof's eaves as a construction that meets the perimeter walls correctly, not only as an overhang of the roof plane. *(Owner clarification, 2026-10-13: "the overhang tool… needs to implement the correct methods to join with perimeter walls".)*
 
@@ -2324,7 +2324,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - [ ] An arrow whose tail is not on a boundary edge, or that sits on a slope-defining edge, is reported on Finish and the sketch stays open.
 
 ### 3.6.8a Dormers (automated)
-**ID:** ARC-ROOF-007 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); Reviera's own design (Appendix A.2a)
+**ID:** ARC-ROOF-007 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); Riviera's own design (Appendix A.2a)
 
 **Purpose.** Add a dormer to a sloped roof in one step, with its roof, its walls, the walls that fill the gaps down to the main roof, and the opening in the main roof. This automates the manual sequence of ARC-OPEN-005 (dormer walls and roof, Join/Unjoin Roof, Dormer opening).
 
@@ -2337,7 +2337,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
    - *Flat*: a flat lifted roof.
 3. The user sets the **width**, the **front wall height** (from the main roof's plate or a level), the dormer roof's slope (pitched styles), its overhang, and the wall type (default: the type of the wall below the eave).
 4. The user clicks on a sloped face of the main roof. The click gives the dormer's centre line, which runs up the face's fall line. The front stands at the click point, or set back by the *Front setback* option from the eave line below.
-5. Reviera previews the dormer. A second click (or Enter) places it.
+5. Riviera previews the dormer. A second click (or Enter) places it.
 
 **Behaviour & rules.**
 - **Generated parts** (one dormer *assembly* that owns them):
@@ -2374,7 +2374,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - As built:
   - `dormer.create(roof_id, point, style?, width?, front_height?, slope?, overhang?)`, `dormer.set(dormer_id, style?, width?, front_height?, slope?, overhang?)` and `dormer.move(dormer_id, point)`.
   - Defaults: 1.8 m wide, eave 0.9 m above the main roof, the main roof's slope (a shed takes a third of it), 300 mm overhang. Front setback and wall type choice come later.
-- **The dormer roof** is a Reviera footprint roof on the dormer's outline, using the main roof's type. Its edges are set by style:
+- **The dormer roof** is a Riviera footprint roof on the dormer's outline, using the main roof's type. Its edges are set by style:
   - gable: sides slope, front gable;
   - hip: front slopes too;
   - shed: front only;
@@ -2401,7 +2401,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
   - hipped-gable fronts.
 
 ### 3.6.8b Arched and vaulted roofs
-**ID:** ARC-ROOF-008 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); Reviera's own design (Appendix A.2a)
+**ID:** ARC-ROOF-008 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); Riviera's own design (Appendix A.2a)
 
 **Purpose.** Smooth arched (barrel and segmental) roofs over a footprint, including **tapering vaults** whose arch widens or narrows from one end to the other to fit a trapezoidal footprint.
 
@@ -2439,7 +2439,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 - **Window:** Architecture › Arched Roof sketches the footprint like Roof, and Finish makes it arched (and offers to attach the walls; the end walls fill up to the arch). A selected arched roof shows Profile, Taper, Rise and the overhangs in Properties.
 
 ### 3.6.8c Dome roofs
-**ID:** ARC-ROOF-009 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); Reviera's own design (Appendix A.2a)
+**ID:** ARC-ROOF-009 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); Riviera's own design (Appendix A.2a)
 
 **Purpose.** Domes over circular, elliptical and polygonal plans.
 
@@ -2523,7 +2523,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 4. **Top surface.** Each triangle is lifted to the heights of its vertices, giving planar facets. A point added *Along Surface* takes the current height of the surface at its (x, y) position plus its offset, evaluated **once, at insertion**. After that its height is absolute.
 5. **Layers.** The behaviour depends on the type:
    - **No variable layer:** the whole slab follows the warped top with constant thickness. Each layer surface is the top surface offset along the facet normals (floors and roofs, `BRepOffsetAPI_MakeOffsetShape` with intersection joins) or straight down (toposolids).
-   - **One variable layer:** the layers **above** the variable layer follow the warped top. The layers **below** it keep the original flat (or sloped-plane) shape. The variable layer fills the space between, and it must stay ≥ 0 thick everywhere; otherwise Reviera reports "Variable layer would be negative" and does not commit the edit.
+   - **One variable layer:** the layers **above** the variable layer follow the warped top. The layers **below** it keep the original flat (or sloped-plane) shape. The variable layer fills the space between, and it must stay ≥ 0 thick everywhere; otherwise Riviera reports "Variable layer would be negative" and does not commit the edit.
 6. **Curved Edge Condition** (instance, for arc boundaries): *Conform to curve* keeps the arc edge on the surface; *Project to side* uses vertical faces on the arc.
 7. **Validation.** Points outside the boundary are rejected. A split line that crosses another split line creates a vertex where they cross, whose height is interpolated from the first line.
 
@@ -2532,7 +2532,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 **Data (IFC mapping).**
 - The modifiers are stored in RXD element data: `sketch` (role `shape`) for floors and roofs, and `recipe.toposolid` for toposolids.
 - The body becomes an `IfcFacetedBrep` (IFC4) or an `IfcPolygonalFaceSet` with `Closed = TRUE`.
-- `IfcMaterialLayerSetUsage` is kept. For a variable layer, IFC4 offers `IfcMaterialLayerWithOffsets`, which cannot describe a free-form variable thickness. Reviera writes the nominal thickness and puts the true geometry in the body.
+- `IfcMaterialLayerSetUsage` is kept. For a variable layer, IFC4 offers `IfcMaterialLayerWithOffsets`, which cannot describe a free-form variable thickness. Riviera writes the nominal thickness and puts the true geometry in the body.
 
 **Commands.**
 - `shape.add_point(element_id, xy, mode: AlongSurface(offset)|Absolute(z), elevation_base?) -> key`
@@ -2559,7 +2559,7 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 
 **Workflow.**
 1. The user selects eligible elements and chooses Modify | <Element> › Create › **Create Parts**, or starts Modify › Create › **Create Parts** first, picks elements (ineligible ones are drawn in half-tone and cannot be picked) and presses Enter or Spacebar.
-2. Reviera creates the parts in one transaction. The current view switches its *Parts Visibility* to *Show Parts* if it was *Show Original*, and the status bar reports how many parts were created.
+2. Riviera creates the parts in one transaction. The current view switches its *Parts Visibility* to *Show Parts* if it was *Show Original*, and the status bar reports how many parts were created.
 3. The user selects parts to divide (ARC-PART-002), merge or exclude (ARC-PART-003), or to edit their properties (ARC-PART-004).
 
 **Behaviour & rules.**
@@ -2714,10 +2714,10 @@ R and U are computed from the layer materials' thermal assets: `R = Rsi + Σ t�
 
 ## 3.6a Glazed enclosures (greenhouses, solariums, atriums)
 
-Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, researched in `research/09`–`11`. A **glazed enclosure** is one element that lays out and keeps consistent a glazed building or room made of Reviera's ordinary elements: knee walls, glazed roofs (sloped glazing, glazed vaults and domes), curtain walls, members, gutters, doors and vents. This section covers phase 1 of the plan: the enclosure, commercial greenhouse forms, glazing and frame types, vents, growing layouts and glazing on curved roofs. Climate and growing equipment, sunlight management, atriums, loads, residential forms and code rule sets follow in later phases and get their own sections then.
+Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, researched in `research/09`–`11`. A **glazed enclosure** is one element that lays out and keeps consistent a glazed building or room made of Riviera's ordinary elements: knee walls, glazed roofs (sloped glazing, glazed vaults and domes), curtain walls, members, gutters, doors and vents. This section covers phase 1 of the plan: the enclosure, commercial greenhouse forms, glazing and frame types, vents, growing layouts and glazing on curved roofs. Climate and growing equipment, sunlight management, atriums, loads, residential forms and code rule sets follow in later phases and get their own sections then.
 
 ### 3.6a.1 Glazed enclosure element and tool
-**ID:** ARC-GLZ-001 · **Priority:** P1 · **Ref:** owner requirement (2026-10-28); Reviera's own design (Appendix A.2a); research/09 §1–2
+**ID:** ARC-GLZ-001 · **Priority:** P1 · **Ref:** owner requirement (2026-10-28); Riviera's own design (Appendix A.2a); research/09 §1–2
 
 **Purpose.** Create a whole glazed enclosure in one step, from a form and a few parameters, and keep its parts consistent when the parameters change, while each part stays an ordinary element that other tools, schedules and analyses understand.
 
@@ -2734,7 +2734,7 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 - **Host building.** An attached enclosure (lean-to, or along a façade) joins the host walls: its roof meets the host wall with a flashing line, and its knee and end walls join the host's.
 - Parts are created in one transaction; Undo removes the whole enclosure.
 
-**Data (IFC mapping).** The enclosure is an `IfcElementAssembly` with `PredefinedType = USERDEFINED` and `ObjectType = GlazedEnclosure` aggregating its parts (`IfcRelAggregates`), in category `cat.glazed_enclosures`. Its form and parameters are RXD element data (`recipe.enclosure`) and the user-visible design values are the `Reviera_EnclosureDesign` property set (ARC-GLZ-007). Parts keep their own IFC classes.
+**Data (IFC mapping).** The enclosure is an `IfcElementAssembly` with `PredefinedType = USERDEFINED` and `ObjectType = GlazedEnclosure` aggregating its parts (`IfcRelAggregates`), in category `cat.glazed_enclosures`. Its form and parameters are RXD element data (`recipe.enclosure`) and the user-visible design values are the `Riviera_EnclosureDesign` property set (ARC-GLZ-007). Parts keep their own IFC classes.
 
 **Commands.** `enclosure.create(form, footprint | host_wall_ids, level_id, params) -> element_id` (built: `form`, `level_id`, `origin`, `rotation`, `length`, `span`, `spans`, `peaks`, `bay`, `eave`, `pitch`, `knee`, `gutters`), `enclosure.set(enclosure_id, params) -> ()`, `enclosure.get(enclosure_id) -> {form, params, parts[]}`, `enclosure.detach(part_ids[]) -> ()`, `enclosure.forms() -> [{form, params schema, defaults}]`.
 
@@ -2744,7 +2744,7 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 - [ ] A detached gutter is not changed when the enclosure's eave height changes.
 - [ ] `enclosure.create` from Lua and from MCP makes the same enclosure as the dialog.
 
-*Built (2026-10-28), first part:* `reviera_core::enclosures` with the gable, multispan and Venlo forms (ARC-GLZ-002), on a level from a typed corner and direction or two clicks in a plan (Architecture › Build › Glazed Enclosure), and Properties › Glazed Enclosure editing the sizes. Parts: sloped-glazing roofs per span of *Greenhouse Roof Glass*; curtain walls of *Greenhouse Wall Glass*, the end walls attached to every span's roof (**curtain walls' tops attach to roofs**, `wall.attach`, several roofs at once, panels and mullions clipped to the roof line, stopping under a glazed roof's bars; uncovered stretches keep the wall's own top); knee walls; a **door in each end wall** (`doors`, on by default): the panes round the wall's middle merged into one curtain-wall door at least 1.5 × 2.1 m (`IfcDoor`), the end walls glazed to the ground between the side knee walls where there is a knee wall; level gutters on the outer eaves and in each valley, the roofs stopping half a gutter's width short of a valley so the gutter sits between them, and the outer eaves overhanging the side glass by half a bar. `enclosure.create`, `.set`, `.get`, `.detach`, `.forms`; category `cat.glazed_enclosures`. **Posts** (`frame`, on by default): structural steel columns of square hollow section (HSS 3×3×¼ for spans under 6 m, HSS 4×4×¼ above) at every bay on each gutter line, the outer ones just inside the glass and knee walls, the valley ones under the valley gutters (a Venlo's truss lines only), with a **gutter beam** of the same section along each line of posts carrying the gutter (`IfcBeam`, girder); listed by `enclosure.get` as `posts` and `beams`. Not yet: rafters, purlins and trusses, vents beyond the ridge vents, door types and sliding doors, the headhouse, keeping a part's own edits on regeneration (a change rebuilds every part), Detach from Enclosure in the menu, and the other forms. Sample: `greenhouses`.
+*Built (2026-10-28), first part:* `riviera_core::enclosures` with the gable, multispan and Venlo forms (ARC-GLZ-002), on a level from a typed corner and direction or two clicks in a plan (Architecture › Build › Glazed Enclosure), and Properties › Glazed Enclosure editing the sizes. Parts: sloped-glazing roofs per span of *Greenhouse Roof Glass*; curtain walls of *Greenhouse Wall Glass*, the end walls attached to every span's roof (**curtain walls' tops attach to roofs**, `wall.attach`, several roofs at once, panels and mullions clipped to the roof line, stopping under a glazed roof's bars; uncovered stretches keep the wall's own top); knee walls; a **door in each end wall** (`doors`, on by default): the panes round the wall's middle merged into one curtain-wall door at least 1.5 × 2.1 m (`IfcDoor`), the end walls glazed to the ground between the side knee walls where there is a knee wall; level gutters on the outer eaves and in each valley, the roofs stopping half a gutter's width short of a valley so the gutter sits between them, and the outer eaves overhanging the side glass by half a bar. `enclosure.create`, `.set`, `.get`, `.detach`, `.forms`; category `cat.glazed_enclosures`. **Posts** (`frame`, on by default): structural steel columns of square hollow section (HSS 3×3×¼ for spans under 6 m, HSS 4×4×¼ above) at every bay on each gutter line, the outer ones just inside the glass and knee walls, the valley ones under the valley gutters (a Venlo's truss lines only), with a **gutter beam** of the same section along each line of posts carrying the gutter (`IfcBeam`, girder); listed by `enclosure.get` as `posts` and `beams`. Not yet: rafters, purlins and trusses, vents beyond the ridge vents, door types and sliding doors, the headhouse, keeping a part's own edits on regeneration (a change rebuilds every part), Detach from Enclosure in the menu, and the other forms. Sample: `greenhouses`.
 
 ### 3.6a.2 Commercial greenhouse forms
 **ID:** ARC-GLZ-002 · **Priority:** P1 · **Ref:** owner requirement (2026-10-28); research/09 §1.1, §2
@@ -2791,20 +2791,20 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 - **Frame types** carry member sections, material (aluminium glazing bar, galvanised steel tube, timber, uPVC), finish, and the deflection limits for members supporting glass, used by the structural checks of a later phase.
 - Light transmission of the glazing type, frame shading (the share of roof area the frame covers) and the glazing's haze feed daylight and crop-light analyses; U and g feed loads and energy.
 
-**Data (IFC mapping).** Glazing types are `IfcPlateType` (CURTAIN_PANEL or SHEET) with a material whose optics are `Pset_MaterialOptical` (VisibleTransmittance, SolarTransmittance, …), and `Reviera_GlazingUnit` for the values IFC has no property for (ARC-GLZ-007). Frame types are `IfcMemberType` with profiles and `Reviera_FrameSystem`.
+**Data (IFC mapping).** Glazing types are `IfcPlateType` (CURTAIN_PANEL or SHEET) with a material whose optics are `Pset_MaterialOptical` (VisibleTransmittance, SolarTransmittance, …), and `Riviera_GlazingUnit` for the values IFC has no property for (ARC-GLZ-007). Frame types are `IfcMemberType` with profiles and `Riviera_FrameSystem`.
 
 **Commands.** `glazing.list_types() -> [type]`, `glazing.create_type(name, base?, values) -> type_id`, `glazing.set_type(type_id, values) -> ()`, `frame.list_types()`, `frame.create_type(...)`, `frame.set_type(...)`.
 
 **Acceptance criteria.**
 - [ ] Changing an enclosure's roof glazing to twin-wall polycarbonate 10 mm updates the panels and the roof's U-value in the energy model.
-- [ ] A glazing type's light transmission and haze are written to `Pset_MaterialOptical` and `Reviera_GlazingUnit` on export and read back on import.
+- [ ] A glazing type's light transmission and haze are written to `Pset_MaterialOptical` and `Riviera_GlazingUnit` on export and read back on import.
 - [ ] A roof pitch below the glazing type's minimum shows a warning on the enclosure.
 
-*Built (2026-10-28), glazing:* `reviera_core::glazing_library`: twelve build-ups (horticultural float, toughened, diffuse AR and laminated glass, a low-e double unit, twin- and five-wall polycarbonate, multi-skin acrylic, single and double inflated polyethylene) with light and PAR transmission, haze, U, g, safety class, interlayer, thickness, weight, least pitch and structure, each citing its sources (E-46); `glazing.list_types`, `glazing.create_type` (`for` roof or wall, bar spacing), `glazing.set_type`; an enclosure's `roof_glazing` and `wall_glazing` (Properties › Roof Glazing, Wall Glazing), the greenhouse defaults carrying the float glass's and the tunnel film the double polyethylene's values. Values are the `Reviera_GlazingUnit` property set on the type; the U-value is also the type's common `ThermalTransmittance`, which the energy model reads. Not yet: `Pset_MaterialOptical` on the material, light and g in the energy and crop-light analyses.
+*Built (2026-10-28), glazing:* `riviera_core::glazing_library`: twelve build-ups (horticultural float, toughened, diffuse AR and laminated glass, a low-e double unit, twin- and five-wall polycarbonate, multi-skin acrylic, single and double inflated polyethylene) with light and PAR transmission, haze, U, g, safety class, interlayer, thickness, weight, least pitch and structure, each citing its sources (E-46); `glazing.list_types`, `glazing.create_type` (`for` roof or wall, bar spacing), `glazing.set_type`; an enclosure's `roof_glazing` and `wall_glazing` (Properties › Roof Glazing, Wall Glazing), the greenhouse defaults carrying the float glass's and the tunnel film the double polyethylene's values. Values are the `Riviera_GlazingUnit` property set on the type; the U-value is also the type's common `ThermalTransmittance`, which the energy model reads. Not yet: `Pset_MaterialOptical` on the material, light and g in the energy and crop-light analyses.
 
 *Built (2026-10-29), pitch check:* `enclosure.get` returns `warnings`: a roof pitch below its glazing type's `MinimumPitch` (read from the roof's type, so `glazing.set_type` changes count), and a pitch under 10° where condensate drips rather than running to the gutters (E-45); tunnels are not checked. Properties › Glazed Enclosure shows them as **Warnings**.
 
-*Built (2026-10-29), frame types:* `reviera_core::frame_library`: five systems (aluminium glazing bars 40 × 80 and 50 × 100 mm, galvanised steel hoops 50 mm, timber bars 50 × 100 mm, uPVC bars 60 × 90 mm) with material, finish, bar section and the deflection limit of members carrying glass (L/175, at most 15 mm; E-52), each citing its sources; `frame.list_types`, `frame.create_type` (an `IfcMemberType` MULLION), `frame.set_type`; values in the published `Reviera_FrameSystem` set. An enclosure's `frame_system` (Properties › Frame System) makes its glazing types with that frame's bars (named "… on <frame> (roof)"), which carry the set too, and the enclosure's clearances follow the bar's depth; the greenhouse defaults carry the aluminium bars' (the film the steel hoops'). `enclosure.get` returns `frame_shading`, the share of the roof the bars cover (Properties › Frame Shading). Not yet: profiles on the member types, rafters, purlins and trusses as frame members, and the shading and deflection limit used by the crop-light and structural analyses.
+*Built (2026-10-29), frame types:* `riviera_core::frame_library`: five systems (aluminium glazing bars 40 × 80 and 50 × 100 mm, galvanised steel hoops 50 mm, timber bars 50 × 100 mm, uPVC bars 60 × 90 mm) with material, finish, bar section and the deflection limit of members carrying glass (L/175, at most 15 mm; E-52), each citing its sources; `frame.list_types`, `frame.create_type` (an `IfcMemberType` MULLION), `frame.set_type`; values in the published `Riviera_FrameSystem` set. An enclosure's `frame_system` (Properties › Frame System) makes its glazing types with that frame's bars (named "… on <frame> (roof)"), which carry the set too, and the enclosure's clearances follow the bar's depth; the greenhouse defaults carry the aluminium bars' (the film the steel hoops'). `enclosure.get` returns `frame_shading`, the share of the roof the bars cover (Properties › Frame Shading). Not yet: profiles on the member types, rafters, purlins and trusses as frame members, and the shading and deflection limit used by the crop-light and structural analyses.
 
 ### 3.6a.4 Vents
 **ID:** ARC-GLZ-004 · **Priority:** P1 · **Ref:** research/09 §4.1–4.2; research/10 §6
@@ -2817,19 +2817,19 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 - Each vent has an opening angle, its free (aerodynamic) area and an actuator (manual, motor; rack-and-pinion, chain); vents close in the view by an *Open* parameter used by analyses and shown in 3D.
 - Vent area and the floor area feed the ventilation sizing check of the climate phase.
 
-**Data (IFC mapping).** A vent is an `IfcWindow` (roof or wall) with its operation type, hosted in the glazing, with `Reviera_Vent` (free area, discharge coefficient, actuator, opening angle); a motor is an `IfcActuator` assigned to it.
+**Data (IFC mapping).** A vent is an `IfcWindow` (roof or wall) with its operation type, hosted in the glazing, with `Riviera_Vent` (free area, discharge coefficient, actuator, opening angle); a motor is an `IfcActuator` assigned to it.
 
 **Commands.** `enclosure.set_vents(enclosure_id, kind, target_percent? | count?, opening_angle?) -> [vent_id]`, `vent.set(vent_id, open?, angle?) -> ()`.
 
-*Built (2026-10-28), ridge vents:* an enclosure's `vents` (percent of the floor area, default 18, 0 for none; Properties › Ridge Vents) swaps panes of each roof's top row for vents, alternating side to side along the ridge and spread evenly until the target is reached; `enclosure.get` reports the vent area and share. A vent is a new panel kind (`Vent`) of curtain walls and sloped glazing, drawn hung from its upper edge and open 15°; sloped glazing now takes pane overrides plane by plane (`recipe.roof.panes`: plane key, cell, panel). A curtain-wall vent is written to IFC as an `IfcWindow`. Not yet: side and gable vents, roll-up sides, vents' free area and actuators (`Reviera_Vent`), opening and closing them, a glazed roof's vents as their own `IfcWindow` (its glazing is one body in IFC), and `enclosure.set_vents` / `vent.set`.
+*Built (2026-10-28), ridge vents:* an enclosure's `vents` (percent of the floor area, default 18, 0 for none; Properties › Ridge Vents) swaps panes of each roof's top row for vents, alternating side to side along the ridge and spread evenly until the target is reached; `enclosure.get` reports the vent area and share. A vent is a new panel kind (`Vent`) of curtain walls and sloped glazing, drawn hung from its upper edge and open 15°; sloped glazing now takes pane overrides plane by plane (`recipe.roof.panes`: plane key, cell, panel). A curtain-wall vent is written to IFC as an `IfcWindow`. Not yet: side and gable vents, roll-up sides, vents' free area and actuators (`Riviera_Vent`), opening and closing them, a glazed roof's vents as their own `IfcWindow` (its glazing is one body in IFC), and `enclosure.set_vents` / `vent.set`.
 
 **Acceptance criteria.**
 - [ ] A 9.6 × 40 m gable greenhouse with continuous ridge vents at a 18 % target reports roof vent area ≥ 69 m² (18 % of 384 m²) and places vents in whole bays.
-- [ ] A vent's free area is in `Reviera_Vent` on export.
+- [ ] A vent's free area is in `Riviera_Vent` on export.
 
-*Built (2026-10-29), side vents and vent values:* `reviera_core::vents`: an enclosure's `vent` settings (design opening angle, default 30°; discharge coefficient 0.6; actuator manual, rack and pinion, chain or linear; E-54) and each vent's **free area**, the opening of a top-hung sash `w` × `h` at angle θ (`w·2h·sin(θ/2) + h²·sin θ`, at most `w·h`), and **effective area** (× the discharge coefficient). **Side vents** (`side_vents`, percent of the floor, default 0): a vent band along each side wall's top (`curtain::make_vent_band`; a sawtooth's low side only), sized so its panes between the bars make the target. `enclosure.set_vents(enclosure_id, kind: roof|side, target_percent?, opening_angle?, discharge?, actuator?)`; `enclosure.get` adds `free_vent_area`, `effective_vent_area`, `side_vent_area` (`vent_area` counts every vent pane). `Reviera_Vent` (OpeningAngle, DischargeCoefficient, Actuator, FreeArea, EffectiveArea) on each curtain-wall vent `IfcWindow`, and with VentCount and the totals on every roof and curtain wall with vents; read back from IFC. Properties › Side Vents, Vent Opening Angle, Vent Actuator, Free / Effective Vent Area.
+*Built (2026-10-29), side vents and vent values:* `riviera_core::vents`: an enclosure's `vent` settings (design opening angle, default 30°; discharge coefficient 0.6; actuator manual, rack and pinion, chain or linear; E-54) and each vent's **free area**, the opening of a top-hung sash `w` × `h` at angle θ (`w·2h·sin(θ/2) + h²·sin θ`, at most `w·h`), and **effective area** (× the discharge coefficient). **Side vents** (`side_vents`, percent of the floor, default 0): a vent band along each side wall's top (`curtain::make_vent_band`; a sawtooth's low side only), sized so its panes between the bars make the target. `enclosure.set_vents(enclosure_id, kind: roof|side, target_percent?, opening_angle?, discharge?, actuator?)`; `enclosure.get` adds `free_vent_area`, `effective_vent_area`, `side_vent_area` (`vent_area` counts every vent pane). `Riviera_Vent` (OpeningAngle, DischargeCoefficient, Actuator, FreeArea, EffectiveArea) on each curtain-wall vent `IfcWindow`, and with VentCount and the totals on every roof and curtain wall with vents; read back from IFC. Properties › Side Vents, Vent Opening Angle, Vent Actuator, Free / Effective Vent Area.
 
-*Built (2026-10-29), roll-up sides and gable vents:* a curtain-wall panel kind **RollUp** (`Panel::RollUp`): the cell left open, its body the rolled film (60 mm) at the cell's top, written as an `IfcWindow` "Roll-up Side" with `Reviera_Vent`, its free area the whole opening. An enclosure's `roll_up` (metres up the side walls from their foot, 0.2–5 m; any form's side walls, a tunnel's sidewalls included, not a sawtooth's high face; skipped where it would meet a side vent band or the wall is too short) via `curtain::make_roll_up`; `gable_vents` (a band that deep under each end wall's top, 0.2–3 m, only where it stays 400 mm above the door) via `make_vent_band`, which now keeps the wall's other panel overrides. `enclosure.set_vents` kinds `roll_up` and `gable` take `height`; `enclosure.get` adds `gable_vent_area`, and roll-up openings count in `side_vent_area`. Properties › Roll-up Sides, Gable Vents. Not yet: gutter vents, `vent.set` and opening vents in the view (drawn 15° open), the actuator as an `IfcActuator`, a glazed roof's vents as their own `IfcWindow`.
+*Built (2026-10-29), roll-up sides and gable vents:* a curtain-wall panel kind **RollUp** (`Panel::RollUp`): the cell left open, its body the rolled film (60 mm) at the cell's top, written as an `IfcWindow` "Roll-up Side" with `Riviera_Vent`, its free area the whole opening. An enclosure's `roll_up` (metres up the side walls from their foot, 0.2–5 m; any form's side walls, a tunnel's sidewalls included, not a sawtooth's high face; skipped where it would meet a side vent band or the wall is too short) via `curtain::make_roll_up`; `gable_vents` (a band that deep under each end wall's top, 0.2–3 m, only where it stays 400 mm above the door) via `make_vent_band`, which now keeps the wall's other panel overrides. `enclosure.set_vents` kinds `roll_up` and `gable` take `height`; `enclosure.get` adds `gable_vent_area`, and roll-up openings count in `side_vent_area`. Properties › Roll-up Sides, Gable Vents. Not yet: gutter vents, `vent.set` and opening vents in the view (drawn 15° open), the actuator as an `IfcActuator`, a glazed roof's vents as their own `IfcWindow`.
 
 ### 3.6a.5 Growing layouts: benches, rolling benches, aisles and growing gutters
 **ID:** ARC-GLZ-005 · **Priority:** P1 · **Ref:** owner requirement (2026-10-28, commercial grows); research/09 §4.6; research/11 Part B
@@ -2855,7 +2855,7 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 - [x] An NFT layout never has a run longer than 12 m: longer runs are split, each with its own feed end.
 - [x] Lengthening the host enclosure lays the layout out again on the new floor.
 
-*Built (2026-10-28):* `reviera_core::growing`: a layout on a glazed enclosure (`growing.layout`, `growing.set_layout`, `growing.summary`; Architecture › Growing Layout, Properties › Growing Layout) of benches, rolling benches (groups of five, 50 mm apart, one aisle per group), ebb-and-flow tables or NFT tables (channels 100 mm wide at 200 mm centres, falling `slope`, runs ≤ 12 m), each piece its own element (`IfcFurniture` ObjectType `Bench`, `RollingBench`, `EbbFlowTable`; `IfcBuildingElementProxy` `GrowingGutter`) in category `cat.growing_systems`, with its top or channels and legs as faceted B-reps; `across` (from the side walls to a main aisle along the middle, in line with the doors) or `along` (split by a main aisle across the middle); clear of the walls by `clearance` (at least 200 mm in a framed enclosure, past its outer posts) and split round the valley posts, so no piece meets a post; laid out again when the enclosure changes. Defaults (E-48): 1.8 m wide, 0.6 m aisles, 1.2 m main aisle, 0.2 m clearance, tops at 0.8 m (ebb-and-flow 0.75 m, NFT 0.9 m and 1.2 m tables), NFT fall 2 %.
+*Built (2026-10-28):* `riviera_core::growing`: a layout on a glazed enclosure (`growing.layout`, `growing.set_layout`, `growing.summary`; Architecture › Growing Layout, Properties › Growing Layout) of benches, rolling benches (groups of five, 50 mm apart, one aisle per group), ebb-and-flow tables or NFT tables (channels 100 mm wide at 200 mm centres, falling `slope`, runs ≤ 12 m), each piece its own element (`IfcFurniture` ObjectType `Bench`, `RollingBench`, `EbbFlowTable`; `IfcBuildingElementProxy` `GrowingGutter`) in category `cat.growing_systems`, with its top or channels and legs as faceted B-reps; `across` (from the side walls to a main aisle along the middle, in line with the doors) or `along` (split by a main aisle across the middle); clear of the walls by `clearance` (at least 200 mm in a framed enclosure, past its outer posts) and split round the valley posts, so no piece meets a post; laid out again when the enclosure changes. Defaults (E-48): 1.8 m wide, 0.6 m aisles, 1.2 m main aisle, 0.2 m clearance, tops at 0.8 m (ebb-and-flow 0.75 m, NFT 0.9 m and 1.2 m tables), NFT fall 2 %.
 
 *Built (2026-10-29), high-wire gutters and rooms:* **high-wire gutters** (`high_wire`; `IfcBuildingElementProxy` ObjectType `HighWireGutter`): a hanging substrate gutter 250 mm wide per row, rows 1.25 m apart (`width` + `aisle`), running along by default, falling `slope` (0.5 %) to its drain end, at `height` 0.6 m, with hangers at most 3 m apart up to a crop wire at `wire` (3.25 m), kept 0.4 m under an enclosure's eaves (1 m under a tunnel's crown) or 0.3 m under a room's top; E-55. **Layouts in rooms:** `growing.layout(host_id, …)` takes an enclosed room as well as an enclosure (`enclosure_id` still accepted); the frame runs along the room's longest boundary edge (`along`) or square to it (`across`), each row's run is where both its long edges and its centre line are inside the boundary (holes too), less the `clearance` at each end, split by a main aisle across the middle; heights are from the room's floor; the summary's floor area is the room's. A room's layout is laid out again on `growing.set_layout`, not on its own when the room changes. Not yet: drainage to plumbing, pieces from Component Library types, a high-wire layout's growing area as its rows (it is its gutters'), layouts following a room.
 
@@ -2879,25 +2879,25 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 
 *Built (2026-10-29), glazed vaults and domes:* an arched roof or dome of a Sloped Glazing type is glazed on its exact surface (`RoofGeometry::surface`, a vault's springing frame or the dome; its faces stay the fine grid for attachment and plans): a vault in bays along it (at most `grid_u` apart, else the type's Grid 1 spacing) and `grid_v` divisions of equal arc length round the arch (else from Grid 2); a dome in `grid_u` meridians (a polygon's on its sides) and `grid_v` rings of equal length up the profile, stopping at an oculus, the crown ring triangles. Four-cornered panels are split into two triangles by `triangulate`: `auto` (those more than 1 mm out of plane), `always`, `never`. Panels are the glazing's thickness above the surface, inset half a bar; a bar runs along every panel edge, turned to the mean of the panels' normals there, the border bars on the grid's outer edges. `roof.set_glazing(roof_id, grid_u?, grid_v?, triangulate?) -> {panels, triangles, bars, max_warp}`; Properties › Glazing Grid. Checked: a 9 m-span barrel vault in 1.5 m bays and 12 divisions has 144 flat panels whose corners lie on the arch; a round dome's ring panels are flat. Not yet: vents in curved glazing, glazing over an arch's overhangs, and the panels as their own `IfcPlate` (the roof's glazing is one body in IFC).
 
-*Built (2026-10-29), geodesic domes:* `reviera_core::geodesic`: class I subdivision of an icosahedron standing on a vertex (so hubs lie in level rings), cut at the hub ring nearest the `truncation` with every panel wholly above it kept, the lowest ring on the level at `base_offset`; `level_base` says whether every base hub lies on that ring (2V at 1/2 does; 3V at 5/8 steps). An `IfcRoof` DOME_ROOF whose body is a triangular glass panel per face (inset half a strut's width, the glazing's thickness deep) and a strut per edge (the frame system's bar, its depth toward the centre); its `glazing` and `frame_system` are library entries (defaults toughened 4 mm glass on 50 × 100 mm aluminium, E-53) carried on the element as `Reviera_GlazingUnit` and `Reviera_FrameSystem`, its U-value in `Pset_RoofCommon`. `roof.create_geodesic` takes library names rather than type ids; `roof.set_geodesic`; `roof.geodesic` reports height, base radius, level base, hubs, panels, struts, the struts by length class (A, B, C … from the shortest, to 0.1 mm) with counts, glass and floor area. Checked: a 2V hemisphere has 26 hubs, 40 panels and 65 struts (30 × 0.5465 R, 35 × 0.6180 R); a 3V 5/8 has three strut classes and is open only at its base (Euler characteristic 1). Architecture › Build › Geodesic Dome (frequency and truncation, then the centre and radius clicks); Properties › Geodesic Dome edits it and shows the report. In IFC the body is faceted B-reps, one per panel and strut. Not yet: the struts and panels as their own `IfcMember` and `IfcPlate`, hub connectors, vents and doors, riser walls under a stepped base; the Roofs context tools (eaves, dormers, attach walls, sloped glazing) leave a geodesic dome alone with a generic "select a roof" message.
+*Built (2026-10-29), geodesic domes:* `riviera_core::geodesic`: class I subdivision of an icosahedron standing on a vertex (so hubs lie in level rings), cut at the hub ring nearest the `truncation` with every panel wholly above it kept, the lowest ring on the level at `base_offset`; `level_base` says whether every base hub lies on that ring (2V at 1/2 does; 3V at 5/8 steps). An `IfcRoof` DOME_ROOF whose body is a triangular glass panel per face (inset half a strut's width, the glazing's thickness deep) and a strut per edge (the frame system's bar, its depth toward the centre); its `glazing` and `frame_system` are library entries (defaults toughened 4 mm glass on 50 × 100 mm aluminium, E-53) carried on the element as `Riviera_GlazingUnit` and `Riviera_FrameSystem`, its U-value in `Pset_RoofCommon`. `roof.create_geodesic` takes library names rather than type ids; `roof.set_geodesic`; `roof.geodesic` reports height, base radius, level base, hubs, panels, struts, the struts by length class (A, B, C … from the shortest, to 0.1 mm) with counts, glass and floor area. Checked: a 2V hemisphere has 26 hubs, 40 panels and 65 struts (30 × 0.5465 R, 35 × 0.6180 R); a 3V 5/8 has three strut classes and is open only at its base (Euler characteristic 1). Architecture › Build › Geodesic Dome (frequency and truncation, then the centre and radius clicks); Properties › Geodesic Dome edits it and shows the report. In IFC the body is faceted B-reps, one per panel and strut. Not yet: the struts and panels as their own `IfcMember` and `IfcPlate`, hub connectors, vents and doors, riser walls under a stepped base; the Roofs context tools (eaves, dormers, attach walls, sloped glazing) leave a geodesic dome alone with a generic "select a roof" message.
 
-### 3.6a.7 Reviera types and property sets for glazed enclosures
+### 3.6a.7 Riviera types and property sets for glazed enclosures
 **ID:** ARC-GLZ-007 · **Priority:** P1 · **Ref:** owner direction (2026-10-28: "defining entity types outside of IFC and adding custom properties in our namespace"); Chapter 2 §2.2.2 category registry
 
-**Purpose.** Represent what IFC has no entity or property for, in Reviera's own namespace, without breaking the file for other tools.
+**Purpose.** Represent what IFC has no entity or property for, in Riviera's own namespace, without breaking the file for other tools.
 
 **Behaviour & rules.**
-- New **categories** in the category registry, each with its IFC carrier (class, `PredefinedType` USERDEFINED where needed, `ObjectType`): `cat.glazed_enclosures` (`IfcElementAssembly`, `GlazedEnclosure`), `cat.growing_systems` (`IfcFurniture` / `IfcBuildingElementProxy`, `Bench`, `RollingBench`, `GrowingGutter`, `HighWireGutter`), `cat.vents` (`IfcWindow` with `Reviera_Vent`); later phases add `cat.shading_devices` (`IfcShadingDevice`: JALOUSIE for louvres, SHUTTER, AWNING, USERDEFINED `Fin`, `BriseSoleil`, `Baffle`, `LightShelf`, `Screen`) and atrium spaces (`IfcSpace`, ObjectType `Atrium`).
-- **Property sets** in Reviera's namespace, named `Reviera_<Name>`, for engineering values with no standard property: `Reviera_EnclosureDesign` (form, spans, bays, heights, pitch, design life class), `Reviera_GlazingUnit` (safety class, PAR transmission, haze, wall structure, minimum pitch), `Reviera_FrameSystem`, `Reviera_Vent`, and later `Reviera_ShadingPerformance` and `Reviera_GrowingClimate`. They appear in Properties and schedules like any property set.
-- **Standard first:** a standard property is used where one exists (`Pset_MaterialOptical`, `Pset_ShadingDeviceCommon`, `Pset_PipeSegmentTypeGutter`, `Pset_SpaceThermalDesign`), and no Reviera property repeats one.
-- **Published definitions.** Each `Reviera_*` set is defined once, machine-readably (names, data types, units, descriptions, applicable classes), as `schemas/psets/reviera-psets-1.json` under the MIT licence (interop components are MIT), so other tools can read them; publishing them in the buildingSMART Data Dictionary under a Reviera domain is a later option.
-- A file stripped of RXD keeps the enclosure's parts and their `Reviera_*` property sets; a file stripped of those too is still a valid building (Chapter 2 principle 5).
+- New **categories** in the category registry, each with its IFC carrier (class, `PredefinedType` USERDEFINED where needed, `ObjectType`): `cat.glazed_enclosures` (`IfcElementAssembly`, `GlazedEnclosure`), `cat.growing_systems` (`IfcFurniture` / `IfcBuildingElementProxy`, `Bench`, `RollingBench`, `GrowingGutter`, `HighWireGutter`), `cat.vents` (`IfcWindow` with `Riviera_Vent`); later phases add `cat.shading_devices` (`IfcShadingDevice`: JALOUSIE for louvres, SHUTTER, AWNING, USERDEFINED `Fin`, `BriseSoleil`, `Baffle`, `LightShelf`, `Screen`) and atrium spaces (`IfcSpace`, ObjectType `Atrium`).
+- **Property sets** in Riviera's namespace, named `Riviera_<Name>`, for engineering values with no standard property: `Riviera_EnclosureDesign` (form, spans, bays, heights, pitch, design life class), `Riviera_GlazingUnit` (safety class, PAR transmission, haze, wall structure, minimum pitch), `Riviera_FrameSystem`, `Riviera_Vent`, and later `Riviera_ShadingPerformance` and `Riviera_GrowingClimate`. They appear in Properties and schedules like any property set.
+- **Standard first:** a standard property is used where one exists (`Pset_MaterialOptical`, `Pset_ShadingDeviceCommon`, `Pset_PipeSegmentTypeGutter`, `Pset_SpaceThermalDesign`), and no Riviera property repeats one.
+- **Published definitions.** Each `Riviera_*` set is defined once, machine-readably (names, data types, units, descriptions, applicable classes), as `schemas/psets/riviera-psets-1.json` under the MIT licence (interop components are MIT), so other tools can read them; publishing them in the buildingSMART Data Dictionary under a Riviera domain is a later option.
+- A file stripped of RXD keeps the enclosure's parts and their `Riviera_*` property sets; a file stripped of those too is still a valid building (Chapter 2 principle 5).
 
-*Built (2026-10-28):* categories `cat.glazed_enclosures` and `cat.growing_systems`; `Reviera_GlazingUnit`, defined in `schemas/psets/reviera-psets-1.json` with its schema `reviera.psets-1.schema.json` (MIT). Published `Reviera_*` sets are read back from IFC as parameters like any property set; only the RXD carriers (`Reviera_Manifest`, `Reviera_Element`, `Reviera_Type`, `Reviera_Doc:*`) are not. *Since (2026-10-29):* `Reviera_FrameSystem` (ARC-GLZ-003), `Reviera_Vent` (ARC-GLZ-004), and `Reviera_EnclosureDesign` on the enclosure (form, length, width, span, spans, bay spacing, eave and ridge height, pitch, floor area, roof and side vent targets), all in the published file. *Since:* `Reviera_GrowingClimate` (ARC-GLZ-008) and `Reviera_GrowLight` (ARC-GLZ-009). Not yet: `Reviera_ShadingPerformance`, a design life class, and *Reattach*.
+*Built (2026-10-28):* categories `cat.glazed_enclosures` and `cat.growing_systems`; `Riviera_GlazingUnit`, defined in `schemas/psets/riviera-psets-1.json` with its schema `riviera.psets-1.schema.json` (MIT). Published `Riviera_*` sets are read back from IFC as parameters like any property set; only the RXD carriers (`Riviera_Manifest`, `Riviera_Element`, `Riviera_Type`, `Riviera_Doc:*`) are not. *Since (2026-10-29):* `Riviera_FrameSystem` (ARC-GLZ-003), `Riviera_Vent` (ARC-GLZ-004), and `Riviera_EnclosureDesign` on the enclosure (form, length, width, span, spans, bay spacing, eave and ridge height, pitch, floor area, roof and side vent targets), all in the published file. *Since:* `Riviera_GrowingClimate` (ARC-GLZ-008) and `Riviera_GrowLight` (ARC-GLZ-009). Not yet: `Riviera_ShadingPerformance`, a design life class, and *Reattach*.
 
 **Acceptance criteria.**
-- [x] The published property-set definition file validates against its JSON Schema and lists every `Reviera_*` property the glazed enclosure tools write.
-- [ ] An enclosure exported, stripped of `Reviera_Element` RXD and reopened shows its parts and their `Reviera_GlazingUnit` values; *Reattach* rebuilds the enclosure from them where it can.
+- [x] The published property-set definition file validates against its JSON Schema and lists every `Riviera_*` property the glazed enclosure tools write.
+- [ ] An enclosure exported, stripped of `Riviera_Element` RXD and reopened shows its parts and their `Riviera_GlazingUnit` values; *Reattach* rebuilds the enclosure from them where it can.
 
 ### 3.6a.8 Growing climate by crop
 **ID:** ARC-GLZ-008 · **Priority:** P1 · **Ref:** owner requirement (2026-10-28, commercial grows); research/11 §B1, §B2, §B5, §B10
@@ -2909,15 +2909,15 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 - An enclosure's **growing climate** is a preset's values, or the designer's over them; it is kept on the enclosure, survives its regeneration, and goes with it to IFC.
 - Values are checked: target DLI 0.5–70 mol·m⁻²·d⁻¹, photoperiod 1–24 h, CO₂ 0–5,000 ppm (5,000 ppm harms people), air −10 to 50 °C, humidity least ≤ most.
 
-**Data (IFC mapping).** `Reviera_GrowingClimate` on the enclosure's `IfcElementAssembly` (Crop, TargetDailyLightIntegral, DayTemperature and NightTemperature in kelvin, RelativeHumidityMin/Max, CarbonDioxideSetpoint, Photoperiod); RXD element data `rxd:growing_climate`. Later phases put the same set on climate zones (`IfcZone`, `IfcSpace`).
+**Data (IFC mapping).** `Riviera_GrowingClimate` on the enclosure's `IfcElementAssembly` (Crop, TargetDailyLightIntegral, DayTemperature and NightTemperature in kelvin, RelativeHumidityMin/Max, CarbonDioxideSetpoint, Photoperiod); RXD element data `rxd:growing_climate`. Later phases put the same set on climate zones (`IfcZone`, `IfcSpace`).
 
 **Commands.** `growing.crops() -> [crop]`, `enclosure.set_climate(enclosure_id, crop?, target_dli?, day_temperature?, night_temperature?, humidity?, co2?, photoperiod?, clear?) -> ()`.
 
 **Acceptance criteria.**
-- [x] Setting tomato on a Venlo range writes its target DLI (25), set points and photoperiod (18 h) as `Reviera_GrowingClimate`, which comes back from IFC.
+- [x] Setting tomato on a Venlo range writes its target DLI (25), set points and photoperiod (18 h) as `Riviera_GrowingClimate`, which comes back from IFC.
 - [x] An unknown crop, or a photoperiod over 24 h, is refused.
 
-*Built (2026-10-29):* `reviera_core::hothouse` with seven presets (tomato, cucumber, sweet pepper, head lettuce, strawberry, bedding and potted plants, propagation), Properties › Growing Climate on the enclosure (crop, target DLI, day and night temperature, CO₂, photoperiod). Not yet: temperature integration and day/night ramps, VPD and humidity-deficit set points, climate zones as `IfcZone`, the set points in the heating and cooling loads.
+*Built (2026-10-29):* `riviera_core::hothouse` with seven presets (tomato, cucumber, sweet pepper, head lettuce, strawberry, bedding and potted plants, propagation), Properties › Growing Climate on the enclosure (crop, target DLI, day and night temperature, CO₂, photoperiod). Not yet: temperature integration and day/night ramps, VPD and humidity-deficit set points, climate zones as `IfcZone`, the set points in the heating and cooling loads.
 
 ### 3.6a.9 Crop light and grow lights
 **ID:** ARC-GLZ-009 · **Priority:** P1 · **Ref:** owner requirement (2026-10-28, commercial grows); research/09 §4.7, §6.2; research/11 §B1, §B10 item 5
@@ -2930,7 +2930,7 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 - **Grow lights.** Top-lights hung under the gutters on a grid across each span, each covering its fixture's photons × a maintenance factor (0.9) over the target PPFD, so the mean PPFD over the floor is at least the target. The target is the climate's shortfall in its darkest month over its photoperiod (else 110 µmol·m⁻²·s⁻¹, a current university standard for new LED installations). Fixtures default to 1,500 µmol/s at 600 W (2.5 µmol/J) and 1.1 × 0.12 × 0.08 m (E-58); one below 2.3 µmol/J (DLC's minimum since 2023) is flagged. The lights follow their enclosure.
 - **Report.** Each month's outdoor, natural (inside) and lamp DLI, the total against the target, the darkest month and the lamp PPFD it needs; the layout's fixtures, mean PPFD, power, power density, efficacy and the DLI the lamps add.
 
-**Data (IFC mapping).** Grow lights are `IfcLightFixture` (USERDEFINED, ObjectType `GrowLight`) with `Reviera_GrowLight` (PhotonFlux, ElectricalPower, PhotonEfficacy), owned by an `IfcElementAssembly` (ObjectType `GrowLightLayout`) carrying the layout's FixtureCount, TargetPPFD, AveragePPFD, PowerDensity and MaintenanceFactor; the layout's recipe is RXD element data.
+**Data (IFC mapping).** Grow lights are `IfcLightFixture` (USERDEFINED, ObjectType `GrowLight`) with `Riviera_GrowLight` (PhotonFlux, ElectricalPower, PhotonEfficacy), owned by an `IfcElementAssembly` (ObjectType `GrowLightLayout`) carrying the layout's FixtureCount, TargetPPFD, AveragePPFD, PowerDensity and MaintenanceFactor; the layout's recipe is RXD element data.
 
 **Commands.** `enclosure.crop_light(enclosure_id, clearness?, outdoor_dli?) -> {source, transmission, months, darkest_month, required_ppfd, lamp_ppfd}`, `growing.lights(enclosure_id, photon_flux?, power?, target_ppfd?, height?, maintenance?) -> element_id`, `growing.set_lights(lights_id, …) -> ()`, `growing.lights_summary(lights_id) -> {fixtures, average_ppfd, power, power_density, efficacy, lamp_dli, warnings}`.
 
@@ -2938,7 +2938,7 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 - [x] A Venlo range of tomatoes at 52° N under clear glass is darkest in December and short of its target; grow lights laid out for it bring every month to the target, and a longer range gets more fixtures.
 - [x] With a weather file imported, the outdoor light is the file's global radiation × 1.96.
 
-*Built (2026-10-29):* `reviera_core::hothouse`; `weather.import` keeps each month's mean daily global radiation (`monthly_global`, a file imported before has none and the estimate is used). Architecture › Build › Grow Lights lays them out in the selected enclosure; Properties › Growing Climate shows the darkest month, the roof's transmission, the lamp PPFD needed and laid out, and the months short of target; Properties › Grow Lights edits the fixture, target, height and maintenance factor. Sample: `greenhouses` (lettuce in the Venlo, tomatoes in the sawtooth, at a site in the western Netherlands). Not yet: energy and shade screens in the light path, the glazing's hemispherical (diffuse) transmission, lamps switched off in bright sun (450/400 µmol·m⁻²·s⁻¹ thresholds), a uniformity map from photometry, grow lights in rooms, the lamps' heat in the loads, and photoperiod blackout.
+*Built (2026-10-29):* `riviera_core::hothouse`; `weather.import` keeps each month's mean daily global radiation (`monthly_global`, a file imported before has none and the estimate is used). Architecture › Build › Grow Lights lays them out in the selected enclosure; Properties › Growing Climate shows the darkest month, the roof's transmission, the lamp PPFD needed and laid out, and the months short of target; Properties › Grow Lights edits the fixture, target, height and maintenance factor. Sample: `greenhouses` (lettuce in the Venlo, tomatoes in the sawtooth, at a site in the western Netherlands). Not yet: energy and shade screens in the light path, the glazing's hemispherical (diffuse) transmission, lamps switched off in bright sun (450/400 µmol·m⁻²·s⁻¹ thresholds), a uniformity map from photometry, grow lights in rooms, the lamps' heat in the loads, and photoperiod blackout.
 
 ### 3.6a.10 Energy, shade and blackout screens
 **ID:** ARC-GLZ-010 · **Priority:** P1 · **Ref:** owner requirement (2026-10-28, commercial grows); research/11 §B4, §B10 item 4; research/09 §4.4–4.5
@@ -2951,7 +2951,7 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 - **Crop light.** With a shade screen, each month also reports the natural light with it closed, and whether it would be closed (natural light above the target by more than 30 %).
 - **Heat loss.** With an energy or blackout screen, the night heat loss (ARC-GLZ-011) is also given with the screen closed: the loss × (1 − its energy saving). The published savings are of heating energy at night, so they apply to the whole loss.
 
-**Data (IFC mapping).** Each screen is an `IfcShadingDevice` (USERDEFINED, ObjectType `EnergyScreen`, `ShadeScreen` or `BlackoutScreen`) with `Reviera_Screen` (Kind, Material, LightTransmission, EnergySaving, Porous); the enclosure's recipe holds the screens.
+**Data (IFC mapping).** Each screen is an `IfcShadingDevice` (USERDEFINED, ObjectType `EnergyScreen`, `ShadeScreen` or `BlackoutScreen`) with `Riviera_Screen` (Kind, Material, LightTransmission, EnergySaving, Porous); the enclosure's recipe holds the screens.
 
 **Commands.** `enclosure.set_screens(enclosure_id, screens: [{kind, material?}]) -> ()`, `enclosure.screen_library() -> [entry]`.
 
@@ -2959,7 +2959,7 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 - [x] A Venlo range with an energy screen and a shade screen has one of each per span under the gutters, clear of the posts and the grow lights, as `IfcShadingDevice`s with their values.
 - [x] The crop light in July at 52° N with a 50 % shade screen reports the shaded light and the screen closed; the heat loss with a 35 % energy screen is 62 % lower.
 
-*Built (2026-10-30):* `reviera_core::hothouse` (screens): the library (`enclosure.screen_library`), `screens` on the enclosure's recipe (`enclosure.set_screens`, also `screens` in `enclosure.set`), sheets as enclosure parts with `recipe.greenhouse_screen` (faceted in IFC, hidden in plan), listed by `enclosure.get` as `screens`; the crop light's `shaded` and `shade_closed` per month; Properties › Growing Climate › Screens (none, energy, shade, both, all three) and *Shade Screen Closed*. Sample: `greenhouses` (energy and shade screens in the Venlo). Not yet: screens in tunnels (slope-flat-slope or curved), screen materials as types, their open and closed states in the view, light leaks for blackout, and the screens' effect on ventilation.
+*Built (2026-10-30):* `riviera_core::hothouse` (screens): the library (`enclosure.screen_library`), `screens` on the enclosure's recipe (`enclosure.set_screens`, also `screens` in `enclosure.set`), sheets as enclosure parts with `recipe.greenhouse_screen` (faceted in IFC, hidden in plan), listed by `enclosure.get` as `screens`; the crop light's `shaded` and `shade_closed` per month; Properties › Growing Climate › Screens (none, energy, shade, both, all three) and *Shade Screen Closed*. Sample: `greenhouses` (energy and shade screens in the Venlo). Not yet: screens in tunnels (slope-flat-slope or curved), screen materials as types, their open and closed states in the view, light leaks for blackout, and the screens' effect on ventilation.
 
 ### 3.6a.11 Quick heat loss of a glazed enclosure
 **ID:** ARC-GLZ-011 · **Priority:** P1 · **Ref:** research/09 §4.5, §6.3 (G011); GLAZED_ENCLOSURES_PLAN §7 (*Quick heat loss of a greenhouse*)
@@ -2968,7 +2968,7 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 
 **Behaviour & rules.**
 - **Method** (SI form of the NGMA table method): Q = Σ(U·A) · C · W · ΔT + 0.33 · N · V · ΔT, in watts:
-  - U·A for each part: roof glazing and glazed walls from their glazing types' U-values (`Reviera_GlazingUnit`), knee walls and the headhouse's shared wall from their wall types' `Pset_WallCommon.ThermalTransmittance` (1.0 W/m²K where none is given);
+  - U·A for each part: roof glazing and glazed walls from their glazing types' U-values (`Riviera_GlazingUnit`), knee walls and the headhouse's shared wall from their wall types' `Pset_WallCommon.ThermalTransmittance` (1.0 W/m²K where none is given);
   - **C**, the construction factor, by frame: 1.08 for glass on metal bars at most 0.6 m apart, 1.05 at wider spacings, 1.02 for film on metal, 1.00 for film or sheet on timber (glass on timber 1.00);
   - **W**, the wind factor, 1.00 up to 15 mph (6.7 m/s), rising 0.008 per mph to 1.16 at 35 mph;
   - **N**, air changes per hour, by glazing: 1.0 for sealed glass and multiwall sheet, 0.8 for film (0.6–1.0 published), or the value given; **V** the enclosed volume;
@@ -2982,7 +2982,7 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 - [x] A 9.6 × 40 m gable glasshouse at 15 °C inside and −10 °C outside reports its U·A by part, C = 1.05 (its glass's bars are 1.125 m apart), its total in kW and W/m² within the published method's arithmetic.
 - [x] A film tunnel uses C = 1.02 (steel hoops) and N = 0.8.
 
-*Built (2026-10-30):* `enclosure.heat_loss` (`reviera_core::hothouse`): parts' U·A (roof glazing by its regenerated area, glazed walls by their panels and mullions, knee walls by their regenerated faces), C, W (`wind_factor`), N, V, ΔT, transmission, infiltration, total, W/m², and `with_screen`. Properties › Growing Climate › *Heat Loss*. The construction factor follows the roofs' glazing-bar spacing (1.125 m: 1.05). Not yet: a bar spacing from the glazing type itself, the headhouse's shared wall, the gable areas of arched ends by the tables (the arch is regenerated instead), and radiation to a clear sky.
+*Built (2026-10-30):* `enclosure.heat_loss` (`riviera_core::hothouse`): parts' U·A (roof glazing by its regenerated area, glazed walls by their panels and mullions, knee walls by their regenerated faces), C, W (`wind_factor`), N, V, ΔT, transmission, infiltration, total, W/m², and `with_screen`. Properties › Growing Climate › *Heat Loss*. The construction factor follows the roofs' glazing-bar spacing (1.125 m: 1.05). Not yet: a bar spacing from the glazing type itself, the headhouse's shared wall, the gable areas of arched ends by the tables (the arch is regenerated instead), and radiation to a clear sky.
 
 
 ### 3.6a.12 Ventilation sizing
@@ -3004,7 +3004,7 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 - [x] A 9.6 × 40 m house at sea level in a temperate climate needs about 15.6 m³/s of fan airflow (8 cfm/ft² × 4,133 ft²), two 10 m³/s fans, at least 1.25 × their face area of inlets, and with 100 mm pads the airflow raised 15 % to 17.9 m³/s and about 14.1 m² of pad.
 - [x] Its natural vents are reported as a share of the floor against 15–20 %.
 
-*Built (2026-10-30):* `enclosure.ventilation` (`reviera_core::hothouse`): airflow, per m², the altitude factor, fan count, inlet area, pad area and the 1-in-20 rule's, HAF and winter airflow, roof and side vents' free area as shares of the floor, and notes (draw distance over 46 m, vents under 15 %, fan height and efficiency). Properties › Growing Climate › *Fan Ventilation*, *Natural Vents*. Not yet: fans and pads placed as equipment in the model, the heat-balance method (EP406) and stack and wind natural ventilation.
+*Built (2026-10-30):* `enclosure.ventilation` (`riviera_core::hothouse`): airflow, per m², the altitude factor, fan count, inlet area, pad area and the 1-in-20 rule's, HAF and winter airflow, roof and side vents' free area as shares of the floor, and notes (draw distance over 46 m, vents under 15 %, fan height and efficiency). Properties › Growing Climate › *Fan Ventilation*, *Natural Vents*. Not yet: fans and pads placed as equipment in the model, the heat-balance method (EP406) and stack and wind natural ventilation.
 
 ### 3.6a.13 CO₂ enrichment sizing
 **ID:** ARC-GLZ-013 · **Priority:** P2 · **Ref:** research/11 §B2 (C038–C041, C054)
@@ -3045,7 +3045,7 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 **Acceptance criteria.**
 - [x] A 9.6 × 40 m glasshouse losing about 128 kW (15 °C inside, −10 °C outside) needs at least three unit heaters (40 m ÷ 18 m), about 111 m of perimeter fin pipe (some 1.1 runs round its 99 m perimeter), and root-zone heat over its benches covers under a quarter of the load.
 
-*Built (2026-10-30):* `enclosure.heating` (`reviera_core::hothouse`): load (and with the energy screen closed), unit heaters and their size, perimeter fin pipe and its runs, under-bench fin pipe for the whole load and the runs the benches take, growing area, root-zone heat and its share, notes. Properties › Growing Climate › *Heating*.
+*Built (2026-10-30):* `enclosure.heating` (`riviera_core::hothouse`): load (and with the energy screen closed), unit heaters and their size, perimeter fin pipe and its runs, under-bench fin pipe for the whole load and the runs the benches take, growing area, root-zone heat and its share, notes. Properties › Growing Climate › *Heating*.
 
 ### Heating pipes laid in the greenhouse
 **ID:** ARC-GLZ-016 · **Priority:** P2 · **Ref:** GLAZED_ENCLOSURES_PLAN §9 (phase 2, *heating pipes laid out in the model*); ARC-GLZ-014; MEP-PIPE-001
@@ -3078,8 +3078,8 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 
 **Behaviour & rules.**
 - `enclosure.pad_and_fan` sizes as `enclosure.ventilation` does: `climate`, `fan_airflow`, `fan_size` (1.22 m), and `pads` of `100` or `150` mm (default 100; none is refused).
-- It lays a **Pad and Fan Cooling** layout (`IfcElementAssembly`, ObjectType *PadAndFanCooling*, `Reviera_PadAndFan` FanCount, TotalAirflow, PadArea) whose parts are:
-  - the sized number of **exhaust fans** (`IfcFan` PROPELLORAXIAL, `Reviera_PadAndFan.Airflow`), square housings of the fan's size, 0.45 m deep and 0.6 m up, spread across the far end wall;
+- It lays a **Pad and Fan Cooling** layout (`IfcElementAssembly`, ObjectType *PadAndFanCooling*, `Riviera_PadAndFan` FanCount, TotalAirflow, PadArea) whose parts are:
+  - the sized number of **exhaust fans** (`IfcFan` PROPELLORAXIAL, `Riviera_PadAndFan.Airflow`), square housings of the fan's size, 0.45 m deep and 0.6 m up, spread across the far end wall;
   - the **evaporative pad** (`IfcEvaporativeCooler` DIRECTEVAPORATIVERIGIDMEDIAAIRCOOLER, PadArea), `pad_height` high (1.5 m) from 0.3 m up, as thick as the pad and centred on the near end wall. Its length is the pad area over its height, at most the end wall less 0.4 m.
 - `reversed` swaps the ends. Laying again replaces the house's earlier pad and fans; `remove` takes them away. They are laid again when the enclosure changes (its length or span).
 - Refused when the fans do not fit across the end wall. Noted when the pad would be longer than the end wall (make it higher, or add pad in the side walls), or when the pad and fans are more than 61 m apart (the air warms too much along the house).
@@ -3110,7 +3110,7 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 **Acceptance criteria.**
 - [x] A 9.6 × 40 m gable house of tomatoes with an along-the-length bench layout shows 384 m² floor, a growing share between 60 and 75 %, 8 pieces and its crop. A Venlo house without a layout shows no growing area and no crop. The Growing Systems schedule lists the layout (8 pieces) and its 8 benches.
 
-*Built (2026-10-31):* the fields above in `reviera_core::schedules`; the `greenhouses` sample gains a Greenhouse Schedule and a Growing Area Schedule.
+*Built (2026-10-31):* the fields above in `riviera_core::schedules`; the `greenhouses` sample gains a Greenhouse Schedule and a Growing Area Schedule.
 
 
 ## 3.7 Stairs, railings and ramps
@@ -3129,7 +3129,7 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
 - **Relationship graph** (inside the stair recipe):
   - Each run knows its `relative_base_height` and `relative_top_height` within the stair.
   - Runs that are connected through a landing share that landing's height.
-  - When the user removes risers from one run, the next connected run gains the same number, so the total riser count stays equal to `N_desired`. Reviera applies this rebalancing to the *downstream* run along the stair path, or to the upstream run if no downstream run exists.
+  - When the user removes risers from one run, the next connected run gains the same number, so the total riser count stays equal to `N_desired`. Riviera applies this rebalancing to the *downstream* run along the stair path, or to the upstream run if no downstream run exists.
   - Automatic and picked landings reshape when their runs move. Sketched landings do not.
 - **Arrangements.** Overlapping and T-shaped arrangements (several runs meeting one landing) are allowed.
 - A stair cannot be a member of an assembly element.
@@ -3228,13 +3228,13 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
   - the type's **Maximum Riser Height** `R_max`, **Minimum Tread Depth** `T_min` and **Minimum Run Width** `W_min`;
   - the instance's **Desired Number of Risers** `N_d` and **Actual Tread Depth** `T`.
 - **Derivation:**
-  1. `N_min = ceil(H / R_max − 1e-9)`. The default `N_d` is `N_min`. If the user enters `N_d < N_min`, Reviera warns "Riser height exceeds maximum", and the value is allowed but flagged.
+  1. `N_min = ceil(H / R_max − 1e-9)`. The default `N_d` is `N_min`. If the user enters `N_d < N_min`, Riviera warns "Riser height exceeds maximum", and the value is allowed but flagged.
   2. Actual riser height `R = H / N_d`.
   3. **Treads per run.** For a run with `k` risers, *Begin with Riser* `B` and *End with Riser* `E`: `treads = k − 1 + (1 − B) + (1 − E)`. Each flag that is off adds a tread at that end, while the riser count stays the same.
   4. Straight run length = `treads · T`.
   5. **Winder treads.** The user's tread depth `T` is applied at the **walking line**, which lies at the path offset (by default the run's centre line). Inner and outer tread widths follow the winder geometry (ARC-STAIR-004).
   6. **Spiral runs.** The angle per tread is `φ = T / r_w`, where `r_w` is the walking-line radius. Total angle = `treads · φ`.
-- **Stair Calculator** (optional, on the type): the rule `a ≤ m·R + n·T ≤ b`, with user-set `m`, `n`, `a` and `b`. The default is `m = 2`, `n = 1`, `a = 0.60` m and `b = 0.65` m. If the rule is not met, Reviera shows a warning, not an error.
+- **Stair Calculator** (optional, on the type): the rule `a ≤ m·R + n·T ≤ b`, with user-set `m`, `n`, `a` and `b`. The default is `m = 2`, `n = 1`, `a = 0.60` m and `b = 0.65` m. If the rule is not met, Riviera shows a warning, not an error.
 - **Validation warnings:** `R > R_max`, `T < T_min`, run width `< W_min`, and "Not enough risers placed" when a run session is finished with risers remaining. In that last case the stair is still created, and its top is not connected.
 - **Multistory stairs.** *Connect Levels* (or *Multistory Top Level*) repeats the stair between each pair of consecutive selected levels. The repetitions are generated copies. If the story heights differ, each copy recomputes `N` and `R` for its own story while keeping the same run layout. A copy whose layout cannot fit gets its own warning.
 
@@ -3264,7 +3264,7 @@ Owner requirement (2026-10-28), planned in `GLAZED_ENCLOSURES_PLAN.md`, research
    - The walking line `γ` is the path at the walking offset.
    - Tread boundaries are placed every `T` along `γ`.
    - Inside the turn, each boundary is a line through its point on `γ`, at an angle that varies **linearly** from parallel (at the ends of the parallel-tread zones) to radial through the inner corner point (at the turn's middle). This "balanced" distribution gives a positive inner tread width wherever the minimum inner width (1/3 of `T`, configurable) allows.
-   - If the minimum inner width cannot be met, Reviera warns "Winder inner width below minimum".
+   - If the minimum inner width cannot be met, Riviera warns "Winder inner width below minimum".
    - Each tread is the polygon between consecutive boundaries and the run's side lines, extruded by the tread thickness at height `i·R`.
 4. **Spiral runs.** Each tread is an annular sector `[r_in, r_out] × [θ_i, θ_i + φ]`, built with `BRepPrimAPI_MakeRevol` of a rectangle about the centre axis or as a prism of the sector face, at height `i·R`. A monolithic underside is a helicoidal ruled surface between the inner and outer helices offset downward by the structural depth. It is built with `BRepOffsetAPI_ThruSections` through radial section lines every 5°.
 5. **Landings.**
@@ -3327,7 +3327,7 @@ These are view annotation and are specified in the DOC chapter. This chapter req
 **Implementation note (2026-10-15, first build).** As built: plans draw each stair's path through its tread middles up to the cut plane, an arrow, UP (DN in a plan of its top level) and a zig-zag cut mark across the first tread above the cut; `stair.number_treads(view_id, stair_id, start_number?)` makes a view's tread numbers (`IfcAnnotation`, `recipe.stair_numbers`), numbered by tread index, deleted with the stair or the view. The window: Modify | Stairs › Number Treads. Not built yet: Stair Path and cut mark types, number type properties, riser numbers, the path above the cut, sections.
 
 ### 3.7.6a Stairs through floors: completing to the level above, openings and railings
-**ID:** ARC-STAIR-007 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); Reviera's own design (Appendix A.2a); headroom by DM-CODE-001
+**ID:** ARC-STAIR-007 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); Riviera's own design (Appendix A.2a); headroom by DM-CODE-001
 
 **Purpose.** A stair reaches the level above without counting risers, and the floor or ceiling it passes under is opened to the code's headroom, with the opening editable. *(Owner requests, 2026-10-14: "modify to have it automatically extend, and when encountering a slab/ceiling/etc. intelligently offer to create the opening, and the opening needs to have adjustment handles. If a banister attached to the stairs it should also auto-extend"; "When offering to create the opening reference well known standards for clearances required for typical construction codes"; "Stairs extend should be able to 'snap' to the level above and intelligently complete the stairs.")*
 
@@ -3335,7 +3335,7 @@ These are view annotation and are specified in the DOC chapter. This chapter req
 - **Snapping to the level above.** While a run is drawn, a length within one tread of the one that places every riser left snaps to it. The status bar says the stair reaches the level above, and that click makes the stair.
 - **Completing.** Ending the tool early (Esc) completes the stair: the last run carries straight on with the risers left, and the preview shows that before Esc.
 - **Extending as the levels move.** A stair made this way (`auto_extend`, the default for new stairs) keeps reaching its top: when a level moves or the riser count changes, the last run takes the difference. Railings on the stair follow its runs as they are, so they extend with it.
-- **Headroom check.** Every Reviera floor and ceiling above the stair's base and lower than its top plus the headroom is checked. Where it leaves less than the headroom over a tread (measured from the nosing line, taken at the next nosing's height) or a landing, the region over those treads and landings, the stair's full width, is the opening it needs. Floors already opened there are not short.
+- **Headroom check.** Every Riviera floor and ceiling above the stair's base and lower than its top plus the headroom is checked. Where it leaves less than the headroom over a tread (measured from the nosing line, taken at the next nosing's height) or a landing, the region over those treads and landings, the stair's full width, is the opening it needs. Floors already opened there are not short.
 - **The offer.** After the stair is made (and from **Stair Openings** on the stair's contextual tab), the floors that are short are named, with their least headroom or "in the stair's way", and the choice is the model's code (first, as the default) or another code, each with its headroom and clause, or not to open. The opening is made in each short floor (`stair.create_openings`); running it again reshapes the stair's own openings.
 - **The opening** is a vertical opening (ARC-OPEN-002) named *Stair Opening* that records the stair, the headroom and the clause. In plans of its floor's level it is drawn crossed corner to corner; selecting it shows grips at its corners and edge middles, and dragging them reshapes it (`opening.set_loops`).
 - Guards around the opening at the upper floor are not added yet; a railing by Pick Edges (ARC-RAIL-001) can follow its edges.
@@ -3424,7 +3424,7 @@ These are view annotation and are specified in the DOC chapter. This chapter req
   - `railing.create(type_id?, path, closed?, base_level, base_offset?)` (Sketch Path).
   - `railing.create_on_edges(type_id?, host_id, edges?, setback?)` (Pick Edges and Guard all open edges) for floors, decks and flat roofs.
 - **Hosted paths:** a hosted railing keeps its host and the host's curve keys. Its path is those curves moved in by the setback and met at the corners, at the host's top, so it follows the host's outline.
-- **Open edges:** an edge is open when no Reviera wall runs along it (parallel, its centreline within half its width plus 150 mm). Each run of open edges is one railing; a whole loop is a closed one.
+- **Open edges:** an edge is open when no Riviera wall runs along it (parallel, its centreline within half its width plus 150 mm). Each run of open edges is one railing; a whole loop is a closed one.
 - **Default type** "Guard Rail - 1000mm" (`IfcRailingType`): 1 m to the top of a 50 × 50 mm top rail, a 40 × 40 mm bottom rail 80 mm up, 20 mm balusters at 120 mm, and 80 mm posts reserving 50 mm on each side.
 - **Balusters** follow ARC-RAIL-002 with one pattern row:
   - the pattern breaks at every segment end, is justified at its beginning, and has no excess fill;
@@ -3476,7 +3476,7 @@ These are view annotation and are specified in the DOC chapter. This chapter req
 - [ ] With 2 balusters per tread on 0.28 m treads, balusters sit 0.07 m and 0.21 m behind each nosing.
 
 ### 3.7.8b Railing openings and gates
-**ID:** ARC-RAIL-003 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); Reviera's own design (Appendix A.2a)
+**ID:** ARC-RAIL-003 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); Riviera's own design (Appendix A.2a)
 
 **Purpose.** Openings and gates in a railing, added the way dormers are added to a roof. The user lays out the railing first, then selects it and adds features through its Modify tab. *(Owner clarifications, 2026-10-13: "Rails should also include gates, conceptually an opening or door"; "simple openings in the rail system and with a gate, single and double door"; "same Modify enhancement model as adding dormers to a roof".)*
 
@@ -3528,7 +3528,7 @@ These are view annotation and are specified in the DOC chapter. This chapter req
   - the `IfcDoorType` and the `IfcRelConnectsElements` to the railing.
 
 ### 3.7.8a Decks
-**ID:** ARC-DECK-001 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); Reviera's own design (Appendix A.2a)
+**ID:** ARC-DECK-001 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); Riviera's own design (Appendix A.2a)
 
 **Purpose.** Design decks and patios: the outline, the framing beneath, and the boards laid out one by one, so that quantities and a cut list come from the model. *(Owner requirement, 2026-10-13: "a bespoke deck design subsystem for mapping out the deck boards".)*
 
@@ -3626,11 +3626,11 @@ These are view annotation and are specified in the DOC chapter. This chapter req
 - **Instance parameters:** Base Level, Base Offset, Top Level, Top Offset, Multistory Top Level, Text (Up/Down), **Width**.
 - **Type parameters:** **Thickness** (used when Shape = Thick), **Function**, Text Size and Font, **Ramp Material**, **Maximum Incline Length**, **Ramp Max Slope (1/x)**, **Shape** (Thick or Solid) and identity data.
 - **Length.** The required horizontal length is `H · x`, where `H` is the height and `1/x` the maximum slope. When the run tool is used, the tooltip shows the remaining length. A drawn run that is too short raises "Ramp slope exceeds maximum", and the ramp is still created.
-- **Automatic landings.** When a straight run's length exceeds *Maximum Incline Length*, Reviera inserts a landing whose depth equals the ramp width. Runs between landings share the height in proportion to their lengths.
+- **Automatic landings.** When a straight run's length exceeds *Maximum Incline Length*, Riviera inserts a landing whose depth equals the ramp width. Runs between landings share the height in proportion to their lengths.
 - **Geometry.**
   - *Thick*: the top surface is a ruled surface between the boundary curves, rising linearly along the run path. The ramp is a slab of the given thickness under it, built as `BRepOffsetAPI_ThruSections` of cross-sections every 0.5 m along curved paths, or a prism for straight runs.
   - *Solid*: the volume between the top surface and the base level.
-- Usability tip carried into the UI: when the default top level would make the ramp unrealistically long, Reviera suggests setting the top level to the base level with a small top offset.
+- Usability tip carried into the UI: when the default top level would make the ramp unrealistically long, Riviera suggests setting the top level to the base level with a small top offset.
 - Sloped or shape-edited floors are an accepted alternative way to model ramps.
 
 **Data (IFC mapping).** **`IfcRamp`** (`STRAIGHT_RUN_RAMP`, `TWO_STRAIGHT_RUN_RAMP`, `QUARTER_TURN_RAMP`, `TWO_QUARTER_TURN_RAMP`, `HALF_TURN_RAMP` or `SPIRAL_RAMP`, classified as for stairs) with an **`IfcRampType`**, aggregating **`IfcRampFlight`** (`STRAIGHT` or `SPIRAL`), **`IfcSlab(LANDING)`** and **`IfcRailing`**. `Pset_RampCommon` holds RequiredSlope and IsExternal, and `Pset_RampFlightCommon` holds Headroom, ClearWidth and Slope. The sketch is stored in RXD element data (`sketch`).
@@ -3649,10 +3649,10 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 ### 3.7a.1 Vertical-transport rule packs
 **ID:** ARC-VT-001 · **Priority:** P1 · **Ref:** owner requirement (2026-11-03); `VERTICAL_TRANSPORT_PLAN.md` §3, §12a; research/16 Parts A, D, K, L
 
-**Purpose.** Keep every elevator rule and sizing default with its jurisdiction, edition, source and confidence, so that a check says exactly which rule a design breaks, and a user can add a local amendment or an office standard without changing Reviera.
+**Purpose.** Keep every elevator rule and sizing default with its jurisdiction, edition, source and confidence, so that a check says exactly which rule a design breaks, and a user can add a local amendment or an office standard without changing Riviera.
 
 **Behaviour & rules.**
-- **A rule pack** is a JSON file following `schemas/vt/reviera.vt-rules-1.schema.json` (MIT). Its header is the bathroom packs' (`id`, title, jurisdiction, edition, **layer**: `minimum`, `accessible` or `recommended`), so that both can later join one rules schema (KITCHENS_PLAN Question 1). It may hold:
+- **A rule pack** is a JSON file following `schemas/vt/riviera.vt-rules-1.schema.json` (MIT). Its header is the bathroom packs' (`id`, title, jurisdiction, edition, **layer**: `minimum`, `accessible` or `recommended`), so that both can later join one rules schema (KITCHENS_PLAN Question 1). It may hold:
   - **car_area**: the maximum inside car area for a rated load (kg → m²), interpolated linearly between rows, optionally growing by a fixed area per load beyond the last row;
   - **accessible_car**: minimum car width, depth and door width, in options of which a car must meet one, each with the door centred, to one side, or anywhere; and an optional turning circle that also passes;
   - **stretcher**: a stretcher's length, width and corner radius, and the number of storeys from which an elevator serving every floor must take it;
@@ -3686,7 +3686,7 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 - [x] A project on the IBC uses `us_ibc_ada`, `us_a17` and `practice_us` without being told; naming packs uses only those.
 - [x] A pack whose car-area rows fall in load is refused.
 
-*Built (2026-11-03):* `reviera_core::elevators`, the schema and the seven packs in `schemas/vt/`. Not yet: a model-properties page for choosing packs (the commands do it), Hong Kong and the other advisory packs of research/16 L1.
+*Built (2026-11-03):* `riviera_core::elevators`, the schema and the seven packs in `schemas/vt/`. Not yet: a model-properties page for choosing packs (the commands do it), Hong Kong and the other advisory packs of research/16 L1.
 
 ### 3.7a.2 Elevators sized from their capacity
 **ID:** ARC-VT-002 · **Priority:** P1 · **Ref:** owner requirement (2026-11-01, 2026-11-03); `VERTICAL_TRANSPORT_PLAN.md` §4.1–4.2; research/16 A2–A8, D3–D4, L2, L4 G-1
@@ -3709,7 +3709,7 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 - **Frame.** `point` is the middle of the hoistway's inside front face (the entrance line); local x runs across the hoistway, local y into it; at rotation 0 the landing is toward −y.
 - `elevator.list` lists the elevators with the levels they serve and their sizes. `elevator.delete`, given the car or any member, deletes the entrances, walls, shaft and car.
 
-**Data (IFC mapping).** The car is an `IfcTransportElement` (PredefinedType ELEVATOR) with `Pset_TransportElementCommon` (CapacityPeople, CapacityWeight), `Pset_TransportElementElevator` (ClearWidth, ClearDepth, ClearHeight, FireFightingLift) and `Reviera_Elevator` (RatedSpeed, DriveType, DoorOperation, DoorClearWidth, DoorClearHeight, HoistwayWidth, HoistwayDepth, PitDepth, Overhead, StopsServed, SizingPack), published in `schemas/psets/reviera-psets-1.json`. The shaft is an `IfcBuildingElementProxy` PROVISIONFORVOID with an `IfcOpeningElement` per floor it cuts (ARC-OPEN-004); walls and doors are ordinary.
+**Data (IFC mapping).** The car is an `IfcTransportElement` (PredefinedType ELEVATOR) with `Pset_TransportElementCommon` (CapacityPeople, CapacityWeight), `Pset_TransportElementElevator` (ClearWidth, ClearDepth, ClearHeight, FireFightingLift) and `Riviera_Elevator` (RatedSpeed, DriveType, DoorOperation, DoorClearWidth, DoorClearHeight, HoistwayWidth, HoistwayDepth, PitDepth, Overhead, StopsServed, SizingPack), published in `schemas/psets/riviera-psets-1.json`. The shaft is an `IfcBuildingElementProxy` PROVISIONFORVOID with an `IfcOpeningElement` per floor it cuts (ARC-OPEN-004); walls and doors are ordinary.
 
 **Acceptance criteria.**
 - [x] Under the US packs, an elevator serving two storeys gets the 2000 lb car (1727 × 1295 mm, 914 mm side door), the first that meets the ADA; serving four storeys, the 3500 lb car (2032 × 1651 mm), the first that takes the IBC stretcher, with 21 persons.
@@ -3766,16 +3766,16 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 - **Catalogue cars may carry their own** hoistway, pit, overhead, car and door heights, entrance and loading class, from the maker tables (research/16 B2–B7), in place of the pack's allowances and pit-and-overhead table. A car's own hoistway grows with any car width or depth given, by the same margins.
 - **Hospital** cars (`practice_us`: 5000 lb, 1727 × 2743 mm, 1372 mm two-speed door; `practice_en`: bed lifts of 1600–2500 kg) count for the stretcher rule and the passenger accessibility packs, like passenger cars.
 - **Freight** cars (2500–10,000 lb, class A by default) and **vehicle** cars (8000 lb, class B) carry no persons (CapacityPeople 0), have no landing zones, and are not counted for the stretcher or the accessibility packs. A `class` (`a`, `b`, `c1`, `c2`, `c3`) may be given.
-- **Entrances by kind.** A car's entrance is a sliding automatic door, a swinging door (opening onto the landing), or an **opening** in the hoistway wall for doors Reviera does not model yet: freight and vehicle cars' vertical bi-parting doors. Where a sliding door's leaves would not fit the front wall (a two-speed side-opening door, which stacks inside the hoistway), the entrance becomes an opening and the sizing says so in its notes.
+- **Entrances by kind.** A car's entrance is a sliding automatic door, a swinging door (opening onto the landing), or an **opening** in the hoistway wall for doors Riviera does not model yet: freight and vehicle cars' vertical bi-parting doors. Where a sliding door's leaves would not fit the front wall (a two-speed side-opening door, which stacks inside the hoistway), the entrance becomes an opening and the sizing says so in its notes.
 - **Freight loading classes** (`freight_classes` in a pack): a freight car's rated load must be at least its inside area times its class's least load per square metre (A and C 244 kg/m², B 146 kg/m², ASME A17.1 2.16.2.2 as California Title 8 §3101 restates it). `elevator.check` reports one below it.
 
-**Data (IFC mapping).** As ARC-VT-002, the car an `IfcTransportElement` ELEVATOR named for its kind; `Reviera_Elevator.Kind` and `Reviera_Elevator.LoadingClass`.
+**Data (IFC mapping).** As ARC-VT-002, the car an `IfcTransportElement` ELEVATOR named for its kind; `Riviera_Elevator.Kind` and `Riviera_Elevator.LoadingClass`.
 
 **Acceptance criteria.**
 - [x] A freight elevator takes the 2500 lb class A car with no persons; a vehicle elevator the 8000 lb class B car; a hospital elevator the 5000 lb car, its entrances openings.
 - [x] A class C2 freight car of 2.4 × 3.0 m rated 1000 kg is reported: it needs at least 1757 kg.
 
-*Built (2026-11-03):* in `reviera_core::elevators`; the Elevator dialog's *Kind*; the sample *Hospital, freight and small lifts*. Defaults are E-84. Not yet: vertical bi-parting and telescopic doors, truck approach zones (Z24), freight door operating bands (Z23), jack holes, the DoD drive-by-travel rule.
+*Built (2026-11-03):* in `riviera_core::elevators`; the Elevator dialog's *Kind*; the sample *Hospital, freight and small lifts*. Defaults are E-84. Not yet: vertical bi-parting and telescopic doors, truck approach zones (Z24), freight door operating bands (Z23), jack holes, the DoD drive-by-travel rule.
 
 ### 3.7a.6 Small lifts: LULAs, home elevators, platform lifts and dumbwaiters
 **ID:** ARC-VT-006 · **Priority:** P1 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §4.2 (`lift.small`); research/16 C1–C4; ADA 2010 §408–§410
@@ -3810,7 +3810,7 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
   - apparent power = motor power ÷ the power factor (0.85); full-load current = apparent power ÷ (√3 × voltage) for three phases, or ÷ voltage for one;
   - heat released = 30 % of the motor power for traction (VA's rule of thumb, research/16 H4) and 60 % for hydraulic (in line with the residential tank figures).
 - **Supply.** 480 V three-phase under `practice_us`, 400 V under `practice_en`; a catalogue car may give its own (LULA 208 V three-phase; home elevator 230 V and platform lift 120 V, single-phase).
-- The estimates are returned with the sizes (`power`: motor kW, current, voltage, phases, VA, heat kW), written to `Reviera_Elevator` (MotorPower, FullLoadCurrent, SupplyVoltage, HeatRelease), carried as the load of the controller's power connector (ARC-VT-008), and shown in the elevator schedule (ARC-VT-009).
+- The estimates are returned with the sizes (`power`: motor kW, current, voltage, phases, VA, heat kW), written to `Riviera_Elevator` (MotorPower, FullLoadCurrent, SupplyVoltage, HeatRelease), carried as the load of the controller's power connector (ARC-VT-008), and shown in the elevator schedule (ARC-VT-009).
 
 **Acceptance criteria.**
 - [x] A 3500 lb MRL car at 1.0 m/s is estimated at 0.55 × 1588 × 9.81 ÷ 0.7 ≈ 12.2 kW; a 2000 lb hydraulic car at 0.5 m/s at 2 × 907 × 9.81 × 0.5 ÷ 0.8 ≈ 11.1 kW, releasing 60 % of it as heat.
@@ -3868,13 +3868,13 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 - Overlapping openings (a pair of escalators side by side) now each cut the floor: a floor subtracts its openings one after another, not as one even-odd set.
 - `escalator.list` lists them; `escalator.delete`, given the unit or one of its openings, deletes it with its openings.
 
-**Data (IFC mapping).** `IfcTransportElement` ESCALATOR or MOVINGWALKWAY with `Pset_TransportElementCommon` (CapacityPeople as persons an hour, FireExit false) and `Reviera_Escalator` (Rise, Inclination, StepWidth, Speed, FlatSteps, Length, TrussWidth, PitDepth, MotorPower, SupportReactionLower, SupportReactionUpper, SizingPack), published in `schemas/psets/reviera-psets-1.json`.
+**Data (IFC mapping).** `IfcTransportElement` ESCALATOR or MOVINGWALKWAY with `Pset_TransportElementCommon` (CapacityPeople as persons an hour, FireExit false) and `Riviera_Escalator` (Rise, Inclination, StepWidth, Speed, FlatSteps, Length, TrussWidth, PitDepth, MotorPower, SupportReactionLower, SupportReactionUpper, SizingPack), published in `schemas/psets/riviera-psets-1.json`.
 
 **Acceptance criteria.**
 - [x] A 30° escalator of 4.5 m rise with 2 flat steps is 1.732 × 4.5 + 4.70 m long, its truss 1540 mm wide, good for 6000 persons an hour; at 7 m rise under EN 115-1 it has 3 flat steps and the longer ends.
-- [x] An escalator between two 300 mm floors 5 m apart cuts both, and nothing overlaps or stands in its zones; a pair 200 mm apart is clean; the file has ESCALATOR and MOVINGWALKWAY elements with `Reviera_Escalator`.
+- [x] An escalator between two 300 mm floors 5 m apart cuts both, and nothing overlaps or stands in its zones; a pair 200 mm apart is clean; the file has ESCALATOR and MOVINGWALKWAY elements with `Riviera_Escalator`.
 
-*Built (2026-11-03):* `reviera_core::escalators`; Architecture › Circulation › Escalator; the sample *Escalators and moving walks in a department store*. Not yet: crisscross and scissor arrangements as one command, transition radii, intermediate supports as elements, outdoor units, the airport and transit context (station run-off, unit counts, NFPA 130), wellway protection (draft curtains and sprinklers, shutters), intersection guards and deck barricades.
+*Built (2026-11-03):* `riviera_core::escalators`; Architecture › Circulation › Escalator; the sample *Escalators and moving walks in a department store*. Not yet: crisscross and scissor arrangements as one command, transition radii, intermediate supports as elements, outdoor units, the airport and transit context (station run-off, unit counts, NFPA 130), wellway protection (draft curtains and sprinklers, shutters), intersection guards and deck barricades.
 
 ### 3.7a.11 Escalator headroom, side clearance and landing zones
 **ID:** ARC-VT-011 · **Priority:** P1 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §6; research/16 L3 (Z29–Z32), P2, P4
@@ -3918,7 +3918,7 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 **Purpose.** Put a seated stairlift or a wheelchair platform lift on a stair, sized as makers build them, following the stair.
 
 **Behaviour & rules.**
-- **`stairlift.create`** on a Reviera stair (ARC-STAIR-001) and a `side` (left or right going up), sized from the packs' `stairlift_sizing` (generic, maker-style; research/16 Q2 A3, A4):
+- **`stairlift.create`** on a Riviera stair (ARC-STAIR-001) and a `side` (left or right going up), sized from the packs' `stairlift_sizing` (generic, maker-style; research/16 Q2 A3, A4):
   - **Seated** (`kind` seated): folds to 320 mm from the wall and is 530 mm deep in use; rail 160 mm in; 0.08 m/s, 140 kg; stairs of 25–50°; straight rails up to 7.06 m.
   - **Platform** (`kind` platform), by `family`: **straight** rack rails (800 × 1250, 800 × 1000, 750 × 900, 725 × 1000, 675 × 1000 mm platforms; 250 kg; 0.067 m/s; 10–45°), or **curved** tubes that follow turns and landings (800 × 1220, 800 × 1050, 800 × 900, 700 × 750 mm; 300 kg; 0.10 m/s; up to 45°; a drive box at the top). A stair that turns (winders, a spiral, or runs at an angle) takes the curved family unless one is given; the platform is the family's largest unless given. Each size carries its folded and in-use depth from the wall, the maker's recommended stair width and (curved) the inside-bend width.
   - From the makers' tables at the stair's angle: the platform's **run-out** beyond the bottom nosing and its **deck rise** above the nosing line (linear between rows, held at the ends).
@@ -3926,13 +3926,13 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 - `stair_use` (dwelling, exit or other), `occupants` and `parks_clear` (a hinged or slide-track rail end, or parking round a corner) are kept for the checks. `stairlift.list` lists the lifts; `stairlift.delete` deletes one with its type.
 - Wall loads at a support (F1, F2 and the moment; maker's planning values) are recorded for the structure.
 
-**Data (IFC mapping).** `IfcTransportElement` USERDEFINED with `Pset_TransportElementCommon` (CapacityPeople 1, FireExit false) and `Reviera_Stairlift` (Kind, Side, CurvedRail, FoldedDepth, UnfoldedDepth, RailDepth, RailLength, Incline, Speed, RatedLoad, ParksClear, Supply, SizingPack, PlatformWidth, PlatformLength, WallLoadFirst, WallLoadSecond, WallMoment), published in `schemas/psets/reviera-psets-1.json`.
+**Data (IFC mapping).** `IfcTransportElement` USERDEFINED with `Pset_TransportElementCommon` (CapacityPeople 1, FireExit false) and `Riviera_Stairlift` (Kind, Side, CurvedRail, FoldedDepth, UnfoldedDepth, RailDepth, RailLength, Incline, Speed, RatedLoad, ParksClear, Supply, SizingPack, PlatformWidth, PlatformLength, WallLoadFirst, WallLoadSecond, WallMoment), published in `schemas/psets/riviera-psets-1.json`.
 
 **Acceptance criteria.**
 - [x] A platform lift on a straight 32.7° stair takes the straight family's 800 × 1250 mm platform, its head box riding on the deck rise interpolated between the 30° and 35° rows; on a turning stair it takes the curved family's 800 × 1220 mm with a 1225 mm inside bend; an unknown platform size is refused.
-- [x] A seated lift on a 1100 mm dwelling stair with its opening for walking headroom overlaps nothing and has nothing in its zones; the file has STAIRLIFT and INCLINEDPLATFORMLIFT elements with `Reviera_Stairlift`.
+- [x] A seated lift on a 1100 mm dwelling stair with its opening for walking headroom overlaps nothing and has nothing in its zones; the file has STAIRLIFT and INCLINEDPLATFORMLIFT elements with `Riviera_Stairlift`.
 
-*Built (2026-11-04):* `reviera_core::stairlifts`; Architecture › Circulation › Stairlift (on the selected stair); the sample *Stairlifts and platform stairlifts in a parish hall and its house*. Not yet: the lift following later changes to its stair (it is made for the stair as it is), outdoor units, the charger outlet or dedicated circuit as an MEP connector, the backrest and footrest clearances (A18.1 values not public), maker products replacing the generic sizes.
+*Built (2026-11-04):* `riviera_core::stairlifts`; Architecture › Circulation › Stairlift (on the selected stair); the sample *Stairlifts and platform stairlifts in a parish hall and its house*. Not yet: the lift following later changes to its stair (it is made for the stair as it is), outdoor units, the charger outlet or dedicated circuit as an MEP connector, the backrest and footrest clearances (A18.1 values not public), maker products replacing the generic sizes.
 
 ### 3.7a.14 Stairlift running envelope and landings
 **ID:** ARC-VT-014 · **Priority:** P1 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §5; research/16 Q2 A3, Q5 (Z26e, Z26f)
@@ -3983,13 +3983,13 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 - **`hoistway`** on `elevator.create`: `walls` (default) or `glass`. A glass hoistway keeps the front wall and its entrances, and makes the sides and rear as curtain walls (ARC-CW-001) of the glass sizing's type, *Glass Hoistway*: laminated glass (10.8 mm) on steel posts (50 × 110 mm) as border and interior mullions, posts at most the lesser of the fixing spacing (1.5 m) and the largest pane's width (1.3 m) apart, transoms at most the largest pane's height (2.5 m) apart; from the pit floor to the overhead, clear of the front wall's ends and of each other's posts. They are members, deleted with the elevator. A glass hoistway needs `walls`.
 - Generic sizes come from the packs' `glass_sizing` (`practice_us`, `practice_en`); the structural values are flagged defaults (E-88).
 
-**Data (IFC mapping).** The curtain walls are `IfcCurtainWall` with their posts (`IfcMember` MULLION) and panes (`IfcPlate` CURTAIN_PANEL). `Reviera_Elevator` gains CarGlass, CarGlassThickness, CarGlassMass and GlassHoistway.
+**Data (IFC mapping).** The curtain walls are `IfcCurtainWall` with their posts (`IfcMember` MULLION) and panes (`IfcPlate` CURTAIN_PANEL). `Riviera_Elevator` gains CarGlass, CarGlassThickness, CarGlassMass and GlassHoistway.
 
 **Acceptance criteria.**
 - [x] A 1100 × 2200 mm rear panel takes 10.76 mm under EN 81-20 with the handrail note; a 2.1 m panel is beyond the table and noted; only a glazed traction car's hoistway widens, by 300 mm.
 - [x] A rear-and-sides glazed MRL car in a glass hoistway over three levels overlaps nothing and has nothing in its zones; the file has three curtain walls and the glass properties; deleting the elevator deletes them.
 
-*Built (2026-11-04):* in `reviera_core::panoramic` and `elevator.create`; the Elevator dialog's *Car glass* and *Hoistway*; the sample *Panoramic lifts in a hotel atrium*. Not yet: a glazed front with glass landing doors (IBC 2409.2.2's 60 %), 270° and curved cars, partially enclosed hoistways with their guard heights (EN 81-20 5.2.5.2.3: 3.5 m at the landing side, 2.5 m within 0.5 m of moving parts, down to 1.1 m at 2 m; California 8 ft within 4 ft), counterweight screens, observation landings, rail-bracket loads on the posts, wind on exterior shafts, and solar gain and ventilation of exterior glass shafts.
+*Built (2026-11-04):* in `riviera_core::panoramic` and `elevator.create`; the Elevator dialog's *Car glass* and *Hoistway*; the sample *Panoramic lifts in a hotel atrium*. Not yet: a glazed front with glass landing doors (IBC 2409.2.2's 60 %), 270° and curved cars, partially enclosed hoistways with their guard heights (EN 81-20 5.2.5.2.3: 3.5 m at the landing side, 2.5 m within 0.5 m of moving parts, down to 1.1 m at 2 m; California 8 ft within 4 ft), counterweight screens, observation landings, rail-bracket loads on the posts, wind on exterior shafts, and solar gain and ventilation of exterior glass shafts.
 
 ### 3.7a.17 The glass checks
 **ID:** ARC-VT-017 · **Priority:** P2 · **Ref:** research/16 F1, F3, N-E3
@@ -4021,7 +4021,7 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 **Acceptance criteria.**
 - [x] Four 3500 lb cars at 1.0 m/s over ten 3.5 m office floors miss the 30 s interval; the figures satisfy interval = RTT / 4 and HC5 = 300·P·4 / RTT; the population is estimated from the floors; a residential check without a population is refused; a second group sharing floors raises both groups' handling targets to 14.4 %.
 
-*Built (2026-11-04):* `reviera_core::traffic`, and Architecture › Circulation › Elevator Traffic; the sample *Elevator traffic in an office tower*. Not yet: lunchtime and two-way traffic and destination dispatch (a simulation, a compute-job provider; Question 7), zoned and sky-lobby banks, express zones, the absenteeism and stair allowances, and counting evacuation lifts in egress (§9).
+*Built (2026-11-04):* `riviera_core::traffic`, and Architecture › Circulation › Elevator Traffic; the sample *Elevator traffic in an office tower*. Not yet: lunchtime and two-way traffic and destination dispatch (a simulation, a compute-job provider; Question 7), zoned and sky-lobby banks, express zones, the absenteeism and stair allowances, and counting evacuation lifts in egress (§9).
 
 ### 3.7a.19 Escalator and walk capacity against demand
 **ID:** ARC-VT-019 · **Priority:** P2 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §9; research/16 E2, I4
@@ -4084,7 +4084,7 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 - [ ] A vertical opening in the upper of two stacked floors leaves the lower floor intact.
 - [ ] Moving the host floor 2 m moves the opening with it.
 
-*Built (2026-10-14):* `opening.create_vertical` and `opening.set_loops` on Reviera floors, ceilings and footprint roofs; loops partly outside notch the edge (polygon booleans by iOverlay); the opening moves and mirrors with its host and is deleted with it; Reviera's display cuts the host while the IFC keeps a slab whole and voids it with the opening (an `IfcExtrudedAreaSolid` of the loops through the host plus 1 mm; a roof's faceted body is written with the hole). Plans draw it crossed with grips. Stair openings (ARC-STAIR-007) make them. *Built (2026-10-15):* Architecture › Opening › **Vertical** sketches the loops on the plan's level; Finish cuts the floor (in a ceiling plan the ceiling) on that level the loops overlap most, else a roof; `opening.create_vertical` also takes sketch `curves`. In a roof an opening must lie within one face. Not yet: picking the host explicitly, Edit Sketch (grips reshape it), openings across roof faces and in arched roofs and domes.
+*Built (2026-10-14):* `opening.create_vertical` and `opening.set_loops` on Riviera floors, ceilings and footprint roofs; loops partly outside notch the edge (polygon booleans by iOverlay); the opening moves and mirrors with its host and is deleted with it; Riviera's display cuts the host while the IFC keeps a slab whole and voids it with the opening (an `IfcExtrudedAreaSolid` of the loops through the host plus 1 mm; a roof's faceted body is written with the hole). Plans draw it crossed with grips. Stair openings (ARC-STAIR-007) make them. *Built (2026-10-15):* Architecture › Opening › **Vertical** sketches the loops on the plan's level; Finish cuts the floor (in a ceiling plan the ceiling) on that level the loops overlap most, else a roof; `opening.create_vertical` also takes sketch `curves`. In a roof an opening must lie within one face. Not yet: picking the host explicitly, Edit Sketch (grips reshape it), openings across roof faces and in arched roofs and domes.
 
 ### 3.8.3 Wall opening
 **ID:** ARC-OPEN-003 · **Priority:** P0 · **Ref:** research/02 §4.11, §9
@@ -4118,7 +4118,7 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 - When the shaft is moved in any view, it moves everywhere.
 - **Implementation.** The shaft queries the R-tree for cuttable elements that overlap its bounding box. It adds a `cut` edge to each one and keeps that list up to date as elements are added, moved or deleted. Each host gets its own derived opening.
 
-**Data (IFC mapping).** The shaft itself is an **`IfcBuildingElementProxy`** with `PredefinedType = PROVISIONFORVOID` and the full prism as its body. For each host it cuts, Reviera writes a separate **`IfcOpeningElement`** (the part of the prism within the host, plus 1 mm), related to the host through `IfcRelVoidsElement`. Each derived opening records the shaft it comes from in RXD element data (`recipe.opening`). The symbolic lines are annotation (DOC chapter).
+**Data (IFC mapping).** The shaft itself is an **`IfcBuildingElementProxy`** with `PredefinedType = PROVISIONFORVOID` and the full prism as its body. For each host it cuts, Riviera writes a separate **`IfcOpeningElement`** (the part of the prism within the host, plus 1 mm), related to the host through `IfcRelVoidsElement`. Each derived opening records the shaft it comes from in RXD element data (`recipe.opening`). The symbolic lines are annotation (DOC chapter).
 
 **Commands.** `opening.create_shaft(loops, base_level, base_offset?, top: Level{id,offset} | Unconnected(h), symbolic_lines?: [curve]) -> element_id`.
 
@@ -4126,7 +4126,7 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 - [x] A shaft from Level 1 to Roof cuts every floor between them. A floor added later in that range is cut automatically.
 - [x] The IFC export contains one `IfcOpeningElement` per cut host, and each one is voided correctly.
 
-*Built (2026-10-15):* `opening.create_shaft` (loops or sketch curves, base level and offset, top level and offset or a height) and `opening.edit_shaft`; it cuts every Reviera floor, ceiling and footprint roof whose body its extent reaches into (computed on regeneration, so later hosts are cut too) and moves, copies and mirrors with the modify tools. Architecture › Opening › **Shaft** sketches it on the plan's level, up to the next level; plans of every level it passes draw it crossed with grips; Properties edits its extent and lists what it cuts. IFC: the proxy's body is the whole prism; each host gets a derived `IfcOpeningElement` (marked `rxd:shaft <shaft> <host>` in its Description, not loaded as an element) that is updated or removed on save. Not yet: symbolic lines, Pick Walls boundaries, toposolids (none exist yet).
+*Built (2026-10-15):* `opening.create_shaft` (loops or sketch curves, base level and offset, top level and offset or a height) and `opening.edit_shaft`; it cuts every Riviera floor, ceiling and footprint roof whose body its extent reaches into (computed on regeneration, so later hosts are cut too) and moves, copies and mirrors with the modify tools. Architecture › Opening › **Shaft** sketches it on the plan's level, up to the next level; plans of every level it passes draw it crossed with grips; Properties edits its extent and lists what it cuts. IFC: the proxy's body is the whole prism; each host gets a derived `IfcOpeningElement` (marked `rxd:shaft <shaft> <host>` in its Description, not loaded as an element) that is updated or removed on save. Not yet: symbolic lines, Pick Walls boundaries, toposolids (none exist yet).
 
 ### 3.8.5 Dormer opening
 **ID:** ARC-OPEN-005 · **Priority:** P1 · **Ref:** research/02 §9
@@ -4248,7 +4248,7 @@ These settings apply to the whole project. Walls that came from a non-parametric
 - The area-scheme commands are in ARC-AREA-001.
 
 **Algorithm.** Run per room. Rooms that share a level band and phase share the arrangement built in steps 2–3.
-1. **Computation plane.** `z_c = elev(Level) + Level.ComputationHeight`. The computation height is a level parameter that defaults to 0. When the room's base offset puts the room's floor above `z_c`, Reviera uses `z_c' = max(z_c, z_base + 1 mm)`.
+1. **Computation plane.** `z_c = elev(Level) + Level.ComputationHeight`. The computation height is a level parameter that defaults to 0. When the room's base offset puts the room's floor above `z_c`, Riviera uses `z_c' = max(z_c, z_base + 1 mm)`.
 2. **Candidate collection.** Query the bounding-box R-tree for elements whose 3D bounding box crosses `z_c` and the level's plan extent, then keep those that meet all of these:
    - `RoomBounding = true` (from the host model, or from linked models whose link is room-bounding);
    - they **exist in the room's phase** (created in or before that phase and not demolished in or before it);
@@ -4313,7 +4313,7 @@ These settings apply to the whole project. Walls that came from a non-parametric
 
 **Workflow.**
 1. Manage the schemes in *Area and Volume Computations › Area Schemes* (create, rename, delete). The defaults are *Gross Building* and *Rentable*.
-2. Room & Area › Area › **Area Plan** opens a dialog: Type (scheme), levels (multi-select), *Do not duplicate existing views*, and Scale. Reviera then asks whether to create area boundary lines automatically along the closed loops of exterior walls. (Curtain systems must be sketched by hand.)
+2. Room & Area › Area › **Area Plan** opens a dialog: Type (scheme), levels (multi-select), *Do not duplicate existing views*, and Scale. Riviera then asks whether to create area boundary lines automatically along the closed loops of exterior walls. (Curtain systems must be sketched by hand.)
 3. **Area Boundary** (Room & Area › Area): Draw, or **Pick Lines** with **Apply Area Rules** (the line's position follows the area-type rules; an area must be placed before its type is known) or with an *Offset*. Picked boundaries follow their walls; drawn ones are fixed.
 4. **Area** tool: Tag on Placement, orientation, Leader, and *Area*: New or Unplaced. A click inside boundaries places an area. An area can be placed unbounded and bounded later.
 5. Areas are made visible through V/G › Area › Interior Fill and Reference (DOC chapter).
@@ -4365,7 +4365,7 @@ These settings apply to the whole project. Walls that came from a non-parametric
 3. **Apply.** The view property *Color Scheme*, with *Color Scheme Location* = Background or Foreground, applies the scheme. Placing a **Color Fill Legend** (Annotate › Color Fill › Legend; DOC chapter) also applies it. Schemes work in plans and sections.
 
 **Behaviour & rules.**
-- **By value.** The row list is the set of distinct values of the parameter among elements of the category in the project (plus links, when included). Rows for values that no longer exist stay, marked as not *In Use*. New values get a colour from a pastel palette by default: Reviera's palette, the HSV wheel at saturation 0.35 and value 0.95, assigned by golden-ratio hue steps.
+- **By value.** The row list is the set of distinct values of the parameter among elements of the category in the project (plus links, when included). Rows for values that no longer exist stay, marked as not *In Use*. New values get a colour from a pastel palette by default: Riviera's palette, the HSV wheel at saturation 0.35 and value 0.95, assigned by golden-ratio hue steps.
 - **By range.** Rows are sorted by *At least*, and an element falls in the row with the largest *At least* ≤ its value. Units follow the parameter.
 - An element whose value is not in a visible row is not coloured.
 - **Graphics.** The fill draws the element's footprint (rooms and areas: `Ω` from ARC-ROOM-002) with the row's colour and pattern. In sections it draws the cut of the room solid.
@@ -4392,12 +4392,12 @@ These settings apply to the whole project. Walls that came from a non-parametric
 Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in `research/13_bathrooms.md` (sources S0869–S1180). The toolset covers home bathrooms, public and workplace toilets, locker rooms and spas (hot tubs, saunas, steam rooms). The rules that govern them (clearances, accessibility, rails, fixture counts) are **data in rule packs**, not constants, so that the same fixture can be checked against the US plumbing codes, the ADA, NKBA guidance or England's Approved Documents. This section starts with the rule packs and the fixtures' clearance zones. Grab bars, room layouts, toilet cores, locker rooms, wet areas and spas follow in later sections, in the order of the plan's §10.
 
 ### 3.9a.1 Bathroom rule packs
-**ID:** ARC-BATH-001 · **Priority:** P1 · **Ref:** owner requirement (2026-10-31); `BATHROOMS_PLAN.md` §3; research/13 Part G; Reviera's own design (Appendix A.2a)
+**ID:** ARC-BATH-001 · **Priority:** P1 · **Ref:** owner requirement (2026-10-31); `BATHROOMS_PLAN.md` §3; research/13 Part G; Riviera's own design (Appendix A.2a)
 
-**Purpose.** Keep every bathroom rule with its jurisdiction, edition, source and confidence, so that checks say exactly which rule a design breaks, and a user can adopt a local amendment or an office standard without changing Reviera.
+**Purpose.** Keep every bathroom rule with its jurisdiction, edition, source and confidence, so that checks say exactly which rule a design breaks, and a user can adopt a local amendment or an office standard without changing Riviera.
 
 **Behaviour & rules.**
-- **A rule pack** is a JSON file following `schemas/bath/reviera.bath-rules-1.schema.json` (MIT). It has an `id`, a title, its jurisdiction and edition, and a **layer**: `minimum` (a code), `accessible` (an accessibility standard) or `recommended` (guidance such as NKBA). It holds:
+- **A rule pack** is a JSON file following `schemas/bath/riviera.bath-rules-1.schema.json` (MIT). It has an `id`, a title, its jurisdiction and edition, and a **layer**: `minimum` (a code), `accessible` (an accessibility standard) or `recommended` (guidance such as NKBA). It holds:
   - **zones**: clearances in front of, beside or around fixtures (ARC-BATH-002);
   - **distances**: measured rules, such as a WC's centreline from its side wall, with a minimum and maximum.
 
@@ -4423,7 +4423,7 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 - [x] A project on the IRC with the ADA rule set uses `us_plumbing` and `ada_2010` without being told; naming `us_nkba` uses only that.
 - [x] A project pack that changes the IPC's 21 in to 24 in is used instead of the shipped pack of that id, and is saved with the model.
 
-*Built (2026-10-31):* `reviera_core::bath_rules`, the schema and the four packs in `schemas/bath/`, and Manage › Model Properties › Bathroom rules (automatic, or one tick per pack). A pack that breaks the schema is refused (`bath.pack_schema`), and so is a distance whose minimum is above its maximum.
+*Built (2026-10-31):* `riviera_core::bath_rules`, the schema and the four packs in `schemas/bath/`, and Manage › Model Properties › Bathroom rules (automatic, or one tick per pack). A pack that breaks the schema is refused (`bath.pack_schema`), and so is a distance whose minimum is above its maximum.
 
 ### 3.9a.2 Fixture clearance zones and the bathroom check
 **ID:** ARC-BATH-002 · **Priority:** P1 · **Ref:** owner requirement (2026-10-31); ARC-MOD-031; `BATHROOMS_PLAN.md` §4; research/13 E4, Part G
@@ -4455,7 +4455,7 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 - [ ] A fixture's zones turn when its wall is turned.
 - [x] With no side wall modelled, `bath.set_hand` puts the WC's ADA clearance on the chosen side.
 
-*Built (2026-10-31):* fixture spaces in `clearances::all` (so `clearance.list`, `clearance.check`, Check Overlaps and the views' virtual volumes include them, in green), `bath.check` in `reviera-app`, and View › Coordination › Check Bathrooms, which lists the findings and selects and frames the one picked. Defaults are recorded as E-65 in `EXPERT_REVIEW.md`. Not yet: turning spaces, transfer showers, Approved Document M's ambulant cubicles, and the exceptions for single-user rooms.
+*Built (2026-10-31):* fixture spaces in `clearances::all` (so `clearance.list`, `clearance.check`, Check Overlaps and the views' virtual volumes include them, in green), `bath.check` in `riviera-app`, and View › Coordination › Check Bathrooms, which lists the findings and selects and frames the one picked. Defaults are recorded as E-65 in `EXPERT_REVIEW.md`. Not yet: turning spaces, transfer showers, Approved Document M's ambulant cubicles, and the exceptions for single-user rooms.
 
 ### 3.9a.3 Grab bars
 **ID:** ARC-BATH-003 · **Priority:** P1 · **Ref:** owner requirement (2026-10-31: "rails"); `BATHROOMS_PLAN.md` §5; research/13 B1.7, B8
@@ -4480,7 +4480,7 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 - [x] A grab bar is written to IFC as an `IfcRailing` HANDRAIL with swept-disk geometry in its storey, and the file validates.
 - [ ] A grab bar moves with its wall.
 
-*Built (2026-10-31):* `reviera_core::grab_bars` (bodies with a bracket and a 75 mm flange at each point), bar rules in the pack schema and the ADA pack, `bath.place_grab_bars`, `grab_bar.create`, `grab_bar.set`, the bar checks in `bath.check`, and View › Coordination › Place Grab Bars (the selected fixtures, else all). Defaults are E-66 in `EXPERT_REVIEW.md`. Not yet: Approved Document M's drop-down and ambulant rails, A117.1 vertical and swing-up bars, bath and shower bars, children's heights, wall backing, and grips to drag a bar.
+*Built (2026-10-31):* `riviera_core::grab_bars` (bodies with a bracket and a 75 mm flange at each point), bar rules in the pack schema and the ADA pack, `bath.place_grab_bars`, `grab_bar.create`, `grab_bar.set`, the bar checks in `bath.check`, and View › Coordination › Place Grab Bars (the selected fixtures, else all). Defaults are E-66 in `EXPERT_REVIEW.md`. Not yet: Approved Document M's drop-down and ambulant rails, A117.1 vertical and swing-up bars, bath and shower bars, children's heights, wall backing, and grips to drag a bar.
 
 ### 3.9a.4 Generic bathroom components
 **ID:** ARC-BATH-004 · **Priority:** P1 · **Ref:** owner requirement (2026-10-31: "common equipment placeholder items"); `BATHROOMS_PLAN.md` §8; research/13 E3, E4
@@ -4524,7 +4524,7 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 - [x] A mirror placed on a wall is an `IfcFurniture` USERDEFINED with ObjectType "Mirror" in IFC, its bottom 1000 mm up.
 - [x] A WC, close-coupled placed against a wall has its waste connector 305 mm off the wall and gets its clear spaces under the packs in use.
 
-*Built (2026-10-31):* `reviera_core::bath_components` (the catalogue above, shaped from prisms), a new component category *Electric Appliance* (`IfcElectricAppliance`), `ElementType` written for types and `ObjectType` copied to copies of USERDEFINED types, `bath.load_components`, `bath.place_component`, and Architecture › Build › Bathroom, which loads them the first time and places the chosen one at each click (on the nearest wall face). Sizes marked as judgement in research/13 E3 are E-67 in `EXPERT_REVIEW.md`. Not yet: a WC seat as its own accessory, shower screens, cubicle partitions, lockers and benches (with toilet cores and locker rooms), and replacing a placeholder with a product.
+*Built (2026-10-31):* `riviera_core::bath_components` (the catalogue above, shaped from prisms), a new component category *Electric Appliance* (`IfcElectricAppliance`), `ElementType` written for types and `ObjectType` copied to copies of USERDEFINED types, `bath.load_components`, `bath.place_component`, and Architecture › Build › Bathroom, which loads them the first time and places the chosen one at each click (on the nearest wall face). Sizes marked as judgement in research/13 E3 are E-67 in `EXPERT_REVIEW.md`. Not yet: a WC seat as its own accessory, shower screens, cubicle partitions, lockers and benches (with toilet cores and locker rooms), and replacing a placeholder with a product.
 
 ### 3.9a.5 Bathroom layouts
 **ID:** ARC-BATH-005 · **Priority:** P1 · **Ref:** owner requirement (2026-10-31); `BATHROOMS_PLAN.md` §6.1; research/13 A3
@@ -4532,7 +4532,7 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 **Purpose.** Lay out a whole bathroom in one step from a common template, spaced by the rules in use, and say plainly when the room is too small and by how much.
 
 **Behaviour & rules.**
-- **The room** is found from a point inside it: the nearest wall in each of four directions along the wet wall and across it. It must be closed on all four sides by Reviera walls; otherwise the layout is refused and the open side named.
+- **The room** is found from a point inside it: the nearest wall in each of four directions along the wet wall and across it. It must be closed on all four sides by Riviera walls; otherwise the layout is refused and the open side named.
 - **The wet wall** is the wall given, or else the longer side. The fixtures run along it from one end (`left` or `right` as you face it; default left).
 - **Templates** (research/13 A3), with the generic components of ARC-BATH-004:
 
@@ -4560,7 +4560,7 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 - [x] `accessible_single_user` under `ada_2010` puts the WC's centreline 16–18 in from the side wall and places its grab bars.
 - [x] `replace` removes the earlier layout's components in the same room and places the new ones.
 
-*Built (2026-10-31):* `reviera_core::bath_layouts`, `bath.layouts`, `bath.layout`, and Architecture › Build › Bathroom Layout (a template, the start end and replace, then a click in a plan, through the Room tool's click). A fixture's clear spaces measured from its side wall (an ADA WC's 60 in) are kept clear by the next fixture. The IRC bath rule (21 in in front of a tub) is marked advisory in `us_plumbing`: its source gives no width, and the whole length is strict where a WC stands beside the tub. Not yet: layouts that re-fit when the room changes, Jack-and-Jill and back-to-back wet walls, doors and their swings in the fit, turning spaces, and shower rooms with the shower across the end.
+*Built (2026-10-31):* `riviera_core::bath_layouts`, `bath.layouts`, `bath.layout`, and Architecture › Build › Bathroom Layout (a template, the start end and replace, then a click in a plan, through the Room tool's click). A fixture's clear spaces measured from its side wall (an ADA WC's 60 in) are kept clear by the next fixture. The IRC bath rule (21 in in front of a tub) is marked advisory in `us_plumbing`: its source gives no width, and the whole length is strict where a WC stands beside the tub. Not yet: layouts that re-fit when the room changes, Jack-and-Jill and back-to-back wet walls, doors and their swings in the fit, turning spaces, and shower rooms with the shower across the end.
 
 ### 3.9a.6 Products in place of placeholders
 **ID:** ARC-BATH-006 · **Priority:** P1 · **Ref:** owner requirement (2026-10-31: "support for specific realized components with provided models and documents"); `BATHROOMS_PLAN.md` §8; research/13 F1–F5
@@ -4573,7 +4573,7 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 - **`bath.swap_product`** does the swap for the fixtures given and reports, for each: the size before and after, each connector that moved and by how much, and the `bath.check` findings that appeared or went away. Undo restores the placeholder.
 - **Documents.** A product's documents (data sheet, installation guide, O&M, warranty, EPD, HPD, certificates) are linked to its type as a material's are (COL-FE-006): a folder on this computer or on FileEngine. The `docs.*` commands take `type:` and the type's GlobalId in place of a material's name; `docs.materials` lists products (component types with manufacturer data) after the materials, labelled "Product: <name>". Values typed in or read from the documents are kept with the type. An EPD's GWP does not become a carbon factor for a product (`docs.invalid_input`): factors are for materials. *Architecture › Product Documents…* opens the Material Documents dialog on the selected component's type.
 
-**Data (IFC mapping).** The product is a custom-object type (DM-IMP-015) with its psets; copies map its representation. A swap changes only the copies' `IfcRelDefinesByType`. A product's documentation folder is an `IfcDocumentReference` related to the type by `IfcRelAssociatesDocument`; its values are `IfcPropertySet`s (`Reviera_EPD`, `Reviera_HPD`) in the type's HasPropertySets, rewritten on each save.
+**Data (IFC mapping).** The product is a custom-object type (DM-IMP-015) with its psets; copies map its representation. A swap changes only the copies' `IfcRelDefinesByType`. A product's documentation folder is an `IfcDocumentReference` related to the type by `IfcRelAssociatesDocument`; its values are `IfcPropertySet`s (`Riviera_EPD`, `Riviera_HPD`) in the type's HasPropertySets, rewritten on each save.
 
 **Commands.** See the catalog: `bath.make_product`, `bath.swap_product`; `element.set_type` (extended).
 
@@ -4581,9 +4581,9 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 - [x] A product made from an OBJ of a WC, in place of the generic close-coupled WC, has the WC's IFC class, predefined type and connectors, and its manufacturer data in `Pset_ManufacturerTypeInformation`.
 - [x] Swapping a placed generic WC for the product keeps its GlobalId and place, reports its new size and how far its waste connector moved, and lists findings that appear; undo restores the generic.
 - [x] Swapping a WC for a mirror type is refused.
-- [x] A product linked to a local documents folder, with EPD values typed in, is saved with one `IfcRelAssociatesDocument` and one `Reviera_EPD` property set on its type after two saves, and the file validates; a carbon factor from the product's EPD is refused.
+- [x] A product linked to a local documents folder, with EPD values typed in, is saved with one `IfcRelAssociatesDocument` and one `Riviera_EPD` property set on its type after two saves, and the file validates; a carbon factor from the product's EPD is refused.
 
-*Built (2026-10-31):* `bath.make_product` (in `reviera_core::bath_components`), `element.set_type` for component copies (same category; the copy's PredefinedType and ObjectType follow the new type), `bath.swap_product` in `reviera-app`, and Make Product… and Swap for Product… (Architecture › Component and the Architecture menu). Product documents (`type:` keys, the IFC association and property sets, Product Documents…) were built the same day. Not yet: products from Component Libraries and IFC files, and matching candidates by classification.
+*Built (2026-10-31):* `bath.make_product` (in `riviera_core::bath_components`), `element.set_type` for component copies (same category; the copy's PredefinedType and ObjectType follow the new type), `bath.swap_product` in `riviera-app`, and Make Product… and Swap for Product… (Architecture › Component and the Architecture menu). Product documents (`type:` keys, the IFC association and property sets, Product Documents…) were built the same day. Not yet: products from Component Libraries and IFC files, and matching candidates by classification.
 
 ### 3.9a.7 Fixture counts
 **ID:** ARC-BATH-007 · **Priority:** P1 · **Ref:** `BATHROOMS_PLAN.md` §6.4; research/13 C1
@@ -4637,7 +4637,7 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 - [x] A core asked for 360 occupants in Group B (one sex) gets five WCs, two of them may be urinals when asked.
 - [x] A core that does not fit its wall places nothing and reports the shortfall.
 
-*Built (2026-10-31):* `reviera_core::bath_cores` and `bath.toilet_core`, the *Toilet Partition* wall type (25 mm, PARTITIONING), doors swung out of their compartments, `bath.set_accessible` (the core marks all but the accessible compartment, one urinal and one lavatory), the side-wall search raised to 600 mm so raised partitions count as side walls, and Architecture › Build › Toilet Core (on the selected wall, from numbers or an occupancy). Not yet: ambulatory grab bars (ADA 604.8.2, both sides), toe clearance at the accessible compartment's partitions, family or assisted-use rooms, partition-system types from manufacturers, and cores in two rows facing each other.
+*Built (2026-10-31):* `riviera_core::bath_cores` and `bath.toilet_core`, the *Toilet Partition* wall type (25 mm, PARTITIONING), doors swung out of their compartments, `bath.set_accessible` (the core marks all but the accessible compartment, one urinal and one lavatory), the side-wall search raised to 600 mm so raised partitions count as side walls, and Architecture › Build › Toilet Core (on the selected wall, from numbers or an occupancy). Not yet: ambulatory grab bars (ADA 604.8.2, both sides), toe clearance at the accessible compartment's partitions, family or assisted-use rooms, partition-system types from manufacturers, and cores in two rows facing each other.
 
 ### 3.9a.9 Locker rooms
 **ID:** ARC-BATH-009 · **Priority:** P1 · **Ref:** `BATHROOMS_PLAN.md` §6.3; research/13 C2–C7
@@ -4674,7 +4674,7 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 - [x] Under `england_adm` a 6 × 4 m room is too narrow for two runs with 1500 mm in front of each (4.22 m needed) and the shortfall is reported.
 - [x] Asking for more lockers than fit reports how many fit.
 
-*Built (2026-10-31):* the five components, `locker` and `bench` fixture kinds (from the furniture's ObjectType), the ADA 811.3 and 903.2 zones and Approved Document M §5.18 zone in the packs, `bath.locker_room` (in `reviera_core::bath_layouts`), and Architecture › Build › Locker Room (its numbers, then a click in a plan). Defaults are E-68 in `EXPERT_REVIEW.md`. Not yet: individual shower cubicles and the accessible shower room, the drying area's towel rails, grooming counters, lobbies and screens against sightlines, pool changing villages, team rooms, and lockers in island runs.
+*Built (2026-10-31):* the five components, `locker` and `bench` fixture kinds (from the furniture's ObjectType), the ADA 811.3 and 903.2 zones and Approved Document M §5.18 zone in the packs, `bath.locker_room` (in `riviera_core::bath_layouts`), and Architecture › Build › Locker Room (its numbers, then a click in a plan). Defaults are E-68 in `EXPERT_REVIEW.md`. Not yet: individual shower cubicles and the accessible shower room, the drying area's towel rails, grooming counters, lobbies and screens against sightlines, pool changing villages, team rooms, and lockers in island runs.
 
 ### 3.9a.10 Bathroom electrical zones
 **ID:** ARC-BATH-010 · **Priority:** P1 · **Ref:** `BATHROOMS_PLAN.md` §6.5; research/13 A6.2
@@ -4725,7 +4725,7 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 - [x] A level shower on a flat floor is reported as having no fall.
 - [x] Under `england_adm`, falls of 1:20 are reported as too steep.
 
-*Built (2026-10-31):* the `falls` section of the pack schema with `us_plumbing` and `england_adm` values, `bath.shower_falls` (centre or linear drain; Architecture › Build › Shower Falls on the selected showers), and the falls check in `bath.check`. Not yet: the floor's build-up (screed, tanking) shown in section, drains sized or connected to waste pipes, falls for showers on toposolids or on floors other than Reviera floors, and the floor beside a linear drain's ends, which slopes down to it outside the shower area.
+*Built (2026-10-31):* the `falls` section of the pack schema with `us_plumbing` and `england_adm` values, `bath.shower_falls` (centre or linear drain; Architecture › Build › Shower Falls on the selected showers), and the falls check in `bath.check`. Not yet: the floor's build-up (screed, tanking) shown in section, drains sized or connected to waste pipes, falls for showers on toposolids or on floors other than Riviera floors, and the floor beside a linear drain's ends, which slopes down to it outside the shower area.
 
 ---
 
@@ -4872,7 +4872,7 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
   - the bench along the bench wall;
   - the steam head on the start end wall, across the room from the bench, and the control on the far wall;
   - with `generator` (default on), a `Steam generator` (an `IfcHumidifier`, STEAMINJECTION, a new *Humidifier* component category) on the floor outside the room, its back to the start end wall behind the head. Its connectors are the steam line and cold water at its top and a drain at its base;
-  - where a Reviera floor is under the room, its falls to a centre drain (as ARC-BATH-011).
+  - where a Riviera floor is under the room, its falls to a centre drain (as ARC-BATH-011).
   
   It returns the room's volume (under the sloped ceiling) and the generator's design volume for `material` and `exterior_wall`. With `replace` set, it removes an earlier layout in the room first. With `wall_assembly` it first gives the room's four walls the *Steam Room Wall (TCNA SR614)* type. That is a layered type (ARC-CMPD-001), steam side last: gypsum board 12.7 mm; steel studs, 20 ga at 406 mm, 92 mm; a vapour retarder lapped over the pan; cement backer board 12.7 mm; a bonded waterproof membrane; tile and setting bed 12 mm. The walls keep their location lines, so the room's faces move.
 - **Checks** in `bath.check`, for each steam head, of kind `steam`:
@@ -4953,7 +4953,7 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 - [x] A whirlpool bath under the IRC has a 457 × 600 mm space at its pump, 457 mm high; a plain bath has none.
 - [x] A vanity standing in it is reported.
 
-*Built (2026-11-01):* the `whirlpool` section and its `us_plumbing` values, the component and the zone. Not yet: the access panel drawn in the apron, NEC Part VII (the pump's GFCI circuit and its receptacle within 1 ft of the opening), and a bath enclosed on its apron side by tiling (the opening is then cut into it, which Reviera does not model).
+*Built (2026-11-01):* the `whirlpool` section and its `us_plumbing` values, the component and the zone. Not yet: the access panel drawn in the apron, NEC Part VII (the pump's GFCI circuit and its receptacle within 1 ft of the opening), and a bath enclosed on its apron side by tiling (the opening is then cut into it, which Riviera does not model).
 
 ### 3.9a.18 Bathroom elevations and schedules
 **ID:** ARC-BATH-018 · **Priority:** P1 · **Ref:** `BATHROOMS_PLAN.md` §9
@@ -5017,7 +5017,7 @@ Owner requirement (2026-10-31), planned in `BATHROOMS_PLAN.md` and researched in
 **Purpose.** Set tiles out on walls and floors from a chosen datum, with the full and cut tiles drawn and counted. Tile set-out is weak in other tools: tile is often only a repeated texture.
 
 **Behaviour & rules.**
-- **A tile layout** is an `IfcCovering` that Reviera rebuilds from its recipe, so it follows its host:
+- **A tile layout** is an `IfcCovering` that Riviera rebuilds from its recipe, so it follows its host:
   - CLADDING on a wall's face: along the wall from `from` to `to`, from `bottom` to `top` above its level;
   - FLOORING on a floor's top: the whole of it, square to its outline's first edge. On a warped top (a shower's or wet room's falls, ARC-SHAPE-001) each piece's corners sit on the top there.
 - **Tiles**: `tile` wide and high, with `joint` between them, `thickness` off the surface.
@@ -5156,7 +5156,7 @@ All family-editor commands from the DM chapter can be used inside the session.
 - **Instance parameters:** Work Plane, Text, **Horizontal Align** (Left, Center or Right), **Material**, **Depth** (0 means flat, which is recommended for performance), Comments, Mark and phasing.
 - **Type parameters:** Text Font, Text Size, Bold and Italic.
 - Model text is edited with *Edit Text*, moved and rotated like any element, and rehosted with *Edit Work Plane*.
-- **Glyph geometry.** The glyph outlines are taken from the font through FreeType (FTL/GPL-2.0+ dual licence; Reviera uses it under the GPL-2.0+ option, which is compatible). The quadratic and cubic contours become B-spline wires. They are built into faces, with holes found by contour orientation and nesting, and extruded by Depth (`BRepPrimAPI_MakePrism`). Text with Depth 0 is a set of planar faces.
+- **Glyph geometry.** The glyph outlines are taken from the font through FreeType (FTL/GPL-2.0+ dual licence; Riviera uses it under the GPL-2.0+ option, which is compatible). The quadratic and cubic contours become B-spline wires. They are built into faces, with holes found by contour orientation and nesting, and extruded by Depth (`BRepPrimAPI_MakePrism`). Text with Depth 0 is a set of planar faces.
 
 **Data (IFC mapping).**
 - **Depth > 0:** `IfcBuildingElementProxy` (`ObjectType = "ModelText"`) whose body is an `IfcPolygonalFaceSet` of the tessellated glyphs, or Brep when the export precision is set to high.
@@ -5168,7 +5168,7 @@ All family-editor commands from the DM chapter can be used inside the session.
 **Acceptance criteria.**
 - [x] The text "ABC" at depth 50 mm produces a solid with three lumps. The "A" has an enclosed hole.
 
-**Implementation note (2026-10-15, first build).** As built with Reviera's stroke font instead of TrueType fonts: each stroke thickened (12 % of the height) and a letter's strokes merged into one outline with its holes, pushed out of the work plane by the depth (1 mm at depth 0); `recipe.model_text` (text, plane, point, rotation, size, depth, alignment, material) on an `IfcBuildingElementProxy` (ObjectType ModelText) with a B-rep; `modeltext.create`, `modeltext.set_text`; moves and rotates with the ordinary tools. The window: Architecture › Model › Model Text. Not built yet: fonts, bold and italic, the depth-0 `IfcAnnotation`, the placement preview.
+**Implementation note (2026-10-15, first build).** As built with Riviera's stroke font instead of TrueType fonts: each stroke thickened (12 % of the height) and a letter's strokes merged into one outline with its holes, pushed out of the work plane by the depth (1 mm at depth 0); `recipe.model_text` (text, plane, point, rotation, size, depth, alignment, material) on an `IfcBuildingElementProxy` (ObjectType ModelText) with a B-rep; `modeltext.create`, `modeltext.set_text`; moves and rotates with the ordinary tools. The window: Architecture › Model › Model Text. Not built yet: fonts, bold and italic, the depth-0 `IfcAnnotation`, the placement preview.
 
 ### 3.10.3 Model lines
 **ID:** ARC-MLIN-001 · **Priority:** P0 · **Ref:** research/02 §11.3
@@ -5204,7 +5204,7 @@ All family-editor commands from the DM chapter can be used inside the session.
 **Workflow.**
 1. On the Massing & Site tab, the **Show Mass** drop-down sets how masses are displayed (see *Show Mass* below).
 2. **In-Place Mass**: the user names the mass, and the **conceptual design environment** opens.
-3. The user draws profiles (lines, reference lines, points, arcs and splines, closed or open), selects them and chooses **Create Form** (Solid or Void). Reviera infers the form from the selection:
+3. The user draws profiles (lines, reference lines, points, arcs and splines, closed or open), selects them and chooses **Create Form** (Solid or Void). Riviera infers the form from the selection:
 
 | Selection | Form | OCCT construction |
 |---|---|---|
@@ -5257,7 +5257,7 @@ All family-editor commands from the DM chapter can be used inside the session.
 
 **Behaviour & rules.**
 - The user selects a mass and chooses **Mass Floors**, then ticks the levels.
-- For each ticked level `L`, Reviera computes the planar section of the mass at `elev(L)` (`BRepAlgoAPI_Section`), builds faces from it, and creates a mass floor.
+- For each ticked level `L`, Riviera computes the planar section of the mass at `elev(L)` (`BRepAlgoAPI_Section`), builds faces from it, and creates a mass floor.
 - **Ticked levels that miss the mass** are remembered but produce no floor. If the mass is later changed so that it crosses such a level, the floor appears automatically; if it stops crossing, the floor disappears (and comes back when it crosses again). Mass floors, unlike elements by face, always follow their mass.
 - Levels added later that cross the mass get mass floors automatically when the mass has *all levels* selected.
 - **Top and bottom.** No mass floor is created at a level that coincides (within `TOL_POINT`) with a top face of the mass, because nothing lies above it. A floor *is* created at a level that coincides with the bottom face. Any part of the mass below the lowest mass floor is not counted in any mass floor's figures; the mass's own *Gross Volume* and *Gross Surface Area* still include it.
@@ -5310,7 +5310,7 @@ All family-editor commands from the DM chapter can be used inside the session.
   1. Sketch a closed boundary and Finish.
   2. Use Shape Editing › **Add Point** (*Along Surface* or *Absolute*; *Elevation Base* = Current Level, Project Base Point, Survey Point or Internal Origin; *Elevation*).
   3. Use **Modify Sub Elements** to drag points (blue arrow for vertical, red square for horizontal) or type elevations.
-- **Create from Import:** from 3D points or contour polylines in an imported or linked DWG, or from a points file (CSV or TXT: x, y, z with a header-row option). The number of points is capped by the setting `toposolid.max_points` (default 20 000, allowed range 10 000–50 000). For linked civil topography, `toposolid.link_max_points` applies. Above the cap, Reviera simplifies the points (ARC-TOPO-005) before triangulating and reports what it did.
+- **Create from Import:** from 3D points or contour polylines in an imported or linked DWG, or from a points file (CSV or TXT: x, y, z with a header-row option). The number of points is capped by the setting `toposolid.max_points` (default 20 000, allowed range 10 000–50 000). For linked civil topography, `toposolid.link_max_points` applies. Above the cap, Riviera simplifies the points (ARC-TOPO-005) before triangulating and reports what it did.
 - **Link Topography:** linked civil surfaces (LandXML and IFC4X3 `IfcGeographicElement`/terrain). Linking is covered in the COL chapter.
 
 **Behaviour & rules.**
@@ -5368,7 +5368,7 @@ All family-editor commands from the DM chapter can be used inside the session.
   - A floor, roof, building pad or another toposolid that intersects the host excavates it.
   - The cut tool is the cutter's solid **plus** a vertical prism of its plan footprint from the cutter's bottom up past the host's top. This is what lets a basement slab remove the soil above it.
   - The host's volume updates. Excavation is a `cut` edge.
-  - **Robustness.** Reviera does not jitter void positions. It relies on OCCT's fuzzy Booleans (`OCCT_FUZZY`) and retries once with a fuzzy value 10× larger before reporting "Excavation failed". See Deviations.
+  - **Robustness.** Riviera does not jitter void positions. It relies on OCCT's fuzzy Booleans (`OCCT_FUZZY`) and retries once with a fuzzy value 10× larger before reporting "Excavation failed". See Deviations.
 - **Cut Geometry / Join Geometry** with floors, walls, foundations and similar elements uses the general rules (ARC-MOD-016, ARC-MOD-017).
 - **Merge Toposolids** (Modify | Toposolid › Toposolid Shaping › **Merge**; see D16). It reverses a split and joins terrain pieces into one element:
   1. The user selects two or more toposolids (or starts the tool and picks them one after another, then Finish). An option *Remove points on common edges* (on by default) is on the contextual tab.
@@ -5403,11 +5403,11 @@ All family-editor commands from the DM chapter can be used inside the session.
 **Workflow.**
 1. The user starts Massing & Site › Modify Site › **Graded Region** and chooses either *Create a new toposolid exactly like the existing one* or *based on perimeter points only*.
 2. The user picks a toposolid from an existing phase.
-3. Reviera **demolishes** the original in the current phase (Phase Demolished = current phase) and creates a copy (Phase Created = current phase). The copy has either all the original points or only the perimeter points.
+3. Riviera **demolishes** the original in the current phase (Phase Demolished = current phase) and creates a copy (Phase Created = current phase). The copy has either all the original points or only the perimeter points.
 4. The user shape-edits the copy.
 
 **Behaviour & rules.**
-- **Cut and fill.** Selecting the graded toposolid shows **Cut**, **Fill** and **Net cut/fill**. Reviera computes them against the demolished original:
+- **Cut and fill.** Selecting the graded toposolid shows **Cut**, **Fill** and **Net cut/fill**. Riviera computes them against the demolished original:
   1. Overlay the two TINs in plan: take the union of their vertices and edges and build a CDT.
   2. In each resulting triangle `τ`, `Δz = z_new − z_old` is linear. If `Δz` changes sign inside `τ`, split `τ` along the zero line.
   3. `Fill = Σ ∫_τ max(Δz, 0)` and `Cut = Σ ∫_τ max(−Δz, 0)`. Both are exact for piecewise-linear surfaces (triangle area × mean Δz on each part). `Net = Fill − Cut`.
@@ -5498,12 +5498,12 @@ All family-editor commands from the DM chapter can be used inside the session.
 **Purpose.** Bring surface-only terrain from other tools into the toposolid model without supporting the legacy element kinds themselves.
 
 **Workflow.**
-1. On IFC import (or link-and-bind), Reviera detects surface-only terrain and lists it in the import report with a **Generate Toposolid** action. The user can also select such an element later (it is imported as a non-parametric element) and choose Modify › **Generate Toposolid**.
+1. On IFC import (or link-and-bind), Riviera detects surface-only terrain and lists it in the import report with a **Generate Toposolid** action. The user can also select such an element later (it is imported as a non-parametric element) and choose Modify › **Generate Toposolid**.
 2. A dialog asks for the **Base level** (default: the level nearest below the surface's lowest point) and the **Toposolid type** (default: the project's default toposolid type).
 3. OK creates the toposolid. The source surface stays in the model, unchanged, until the user deletes it.
 
 **Behaviour & rules.**
-- Reviera **does not create** surface-only terrains or building pads. Open alternative: a toposolid, plus a floor that excavates it.
+- Riviera **does not create** surface-only terrains or building pads. Open alternative: a toposolid, plus a floor that excavates it.
 - **On IFC import**, a terrain that is a surface without thickness (an open TIN on `IfcSite` or an `IfcGeographicElement`) is offered for conversion with **Generate Toposolid**: a base level and type dialog, non-destructive, with the original kept as a reference until it is deleted.
   - Sub-regions (separate surface patches with other materials) become sub-divisions.
   - Site components are rehosted onto the new toposolid if they can be. Otherwise they are listed.
@@ -5568,7 +5568,7 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
   - If the constraints cannot be satisfied, the transaction is rolled back, and the "Constraints are not satisfied" dialog offers **Remove Constraints** (deletes the conflicting constraints and retries) or **Unjoin Elements** (where joins conflict).
 - **Hosting.** Hosted inserts move only along their host unless the command has `disjoin = true`.
 - **3D views.** Rotate and Mirror in a 3D view work in the active work plane. The work plane must be set first.
-- **Mirroring** a family instance sets its read-only *Mirrored* flag (it can be scheduled and filtered). On hosted doors and windows, mirroring can flip hand or facing; Reviera stores the resulting hand and facing explicitly.
+- **Mirroring** a family instance sets its read-only *Mirrored* flag (it can be scheduled and filtered). On hosted doors and windows, mirroring can flip hand or facing; Riviera stores the resulting hand and facing explicitly.
 - **Groups.** Modifying a member of a group instance outside the group editor is refused. The user is pointed to *Edit Group* (ARC-GRP-002).
 - **Copy and Copy to Clipboard.** Copy keeps elements on the same level and in the same view. Pasting to other levels is done with Paste Aligned (ARC-MOD-021).
 - **Option memory.** Tool settings (Multiple, Copy, Disjoin, Constrain, Graphical or Numerical, joint gap, Delete Inner Segment, array options, Prefer) are kept for the session and can be stored in the user settings.
@@ -5597,8 +5597,8 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
 | ARC-MOD-028 | **Boolean geometry between elements** (owner clarification, 2026-10-13) | P1 | — | Beyond Cut and Join: **Intersect** keeps only the volume two elements share (for example a vault cut to a room's footprint), **Subtract** removes one element's volume from another's and **Union** fuses elements into one body. The first pick is the target and keeps its category, type and parameters; the others are *tools*. A tool may be hidden afterwards (*Hide tool*), deleted (*Consume tool*) or kept. The operation is a `csg` edge in the regeneration graph (`BRepAlgoAPI_Common`, `_Cut`, `_Fuse`), re-run whenever either element changes, and stored in RXD document `model/constraints`. In IFC the target's body is the result (as `IfcBooleanResult` of the two bodies where both are swept or CSG solids, otherwise a faceted B-rep), with `IfcRelInterferesElements` (`InterferenceType` "Intersect", "Subtract" or "Union"). Undoable, and *Remove Boolean* restores the target | `geometry.boolean(target_id, tool_ids, op: intersect\|subtract\|union, tools?: keep\|hide\|consume)`, `geometry.remove_boolean(target_id, tool_ids?)` |
 | ARC-MOD-018 | **Wall Joins** | P0 | — | Modify › Geometry › **Wall Joins**: hover a join (its node is marked by a square) and click it, or window-select several nodes. The contextual tab then offers *Butt*, *Miter* and *Square Off* (L joins only), *Previous* / *Next* to cycle which wall runs through (one node only), *Display* (*Use View Setting*, *Clean Join*, *Don't Clean Join*) and *Allow* / *Disallow Join*. Changes apply immediately and the tool stays on the node until Esc. Options that do not suit the selected nodes are disabled. The geometry rules, join limits and IFC mapping are in ARC-JOIN-001 | `wall.join_set_type(node_ref \| wall_end_refs, type: Butt\|Miter\|SquareOff)`, `wall.join_cycle_order(node_ref, step: +1\|-1)`, `wall.join_set_display(node_ref, display: ViewSetting\|Clean\|DontClean)`, `wall.set_join_allowed(wall_id, end: Start\|End, allowed: bool)` |
 | ARC-MOD-019 | **Split Face** | P1 | SF | The user picks a face (Tab cycles), sketches a closed loop inside it or an open chain ending on its edges, and presses Finish. The face is divided into regions that can be painted separately. The element's structure is unchanged. Not available on arc or elliptical walls. Deleting a split region removes it. Family instances (except columns) must be split in the family editor. OCCT: `BRepFeat_SplitShape` with the projected sketch edges | `face.split(face_ref, curves: [curve]) -> [face_key]` |
-| ARC-MOD-020 | **Paint / Remove Paint** | P1 | PT | The Material Browser is available while Paint is active. The user hovers a face (Tab cycles) and clicks to apply a material. The status bar shows existing paint. Works on walls, floors, roofs, masses, columns and in-place families. Does not work on loadable component instances. Painting a face that has a model pattern makes the pattern lines dimensionable and alignable. Paint is stored per face sub-reference in RXD element data (`paint`), and exported as an `IfcStyledItem` on the faces, which IFC supports only per representation item: Reviera splits the painted faces into their own `IfcFacetedBrep` item when exporting | `face.paint(face_refs, material_id)`, `face.remove_paint(face_refs)` |
-| ARC-MOD-021 | **Copy, Cut and Paste (clipboard)** | P0 | Ctrl+C / Ctrl+X / Ctrl+V | The Paste menu offers: **Paste from Clipboard** (enters paste mode, where the elements can be moved before Finish or Cancel); **Aligned to Selected Levels** (a searchable multi-select list); **Aligned to Selected Views** (view-specific elements; similar view types only); **Aligned to Current View**; **Aligned to Same Place** (also between design options, worksets and models that share coordinates); and **Aligned to Picked Level** (elevation views: pick a level line). The clipboard holds an IFC fragment plus its RXD element data, so pasting between Reviera instances works | `clipboard.copy(element_ids)`, `clipboard.cut(element_ids)`, `clipboard.paste(mode: Free(vector)|Levels([id])|Views([id])|CurrentView|SamePlace|PickedLevel(id)) -> [element_id]` |
+| ARC-MOD-020 | **Paint / Remove Paint** | P1 | PT | The Material Browser is available while Paint is active. The user hovers a face (Tab cycles) and clicks to apply a material. The status bar shows existing paint. Works on walls, floors, roofs, masses, columns and in-place families. Does not work on loadable component instances. Painting a face that has a model pattern makes the pattern lines dimensionable and alignable. Paint is stored per face sub-reference in RXD element data (`paint`), and exported as an `IfcStyledItem` on the faces, which IFC supports only per representation item: Riviera splits the painted faces into their own `IfcFacetedBrep` item when exporting | `face.paint(face_refs, material_id)`, `face.remove_paint(face_refs)` |
+| ARC-MOD-021 | **Copy, Cut and Paste (clipboard)** | P0 | Ctrl+C / Ctrl+X / Ctrl+V | The Paste menu offers: **Paste from Clipboard** (enters paste mode, where the elements can be moved before Finish or Cancel); **Aligned to Selected Levels** (a searchable multi-select list); **Aligned to Selected Views** (view-specific elements; similar view types only); **Aligned to Current View**; **Aligned to Same Place** (also between design options, worksets and models that share coordinates); and **Aligned to Picked Level** (elevation views: pick a level line). The clipboard holds an IFC fragment plus its RXD element data, so pasting between Riviera instances works | `clipboard.copy(element_ids)`, `clipboard.cut(element_ids)`, `clipboard.paste(mode: Free(vector)|Levels([id])|Views([id])|CurrentView|SamePlace|PickedLevel(id)) -> [element_id]` |
 | ARC-MOD-022 | **Create Similar** | P0 | CS | Starts the placement tool for the selected element's type, with its instance parameters as the *New* defaults. For walls the height properties are copied, and the top constraint is adapted to the active level. Esc twice exits. Exactly one element must be selected (also from the context menu). Only parameters that the family or system element defines are copied (dimensions, offsets, heights, hosting and placement options); user parameters such as Comments and Mark are not. For walls these are Base Offset, Unconnected Height, Top/Base Extension Distance, Top Constraint and Top Offset; on another level the top constraint moves the same number of levels up. Slanted walls copy only their type. The defaults hold until the user changes the type in the Type Selector. Not available for elements without a placement tool (groups, links, imports, in-place families): "Create Similar is not available for this element" | `tool.create_similar(element_id)` |
 | ARC-MOD-023 | **Measure** | P0 | — | *Between Two References* and *Along Element*. A temporary read-out; no element is created. **Between Two References**: click a start point or reference and an end point or reference (snaps apply; `SP` measures perpendicular to the target); the read-out shows the distance and, in plan and elevation, the angle from horizontal. In 3D views Ctrl constrains the second point to the plane through the first point perpendicular to the view direction. Option *Chain*: each click adds a segment, the status bar keeps a running total, and a double-click ends the chain. **Along Element**: click a wall, model line, beam or MEP curve (Tab takes a chain) to show its length; it is not available in 3D or for detail lines. Read-outs stay until the next measurement; Esc once clears, twice exits | `measure.between(ref_a, ref_b) -> {distance, dx, dy, dz, angle?}` *(query)*, `measure.along(element_id) -> length` *(query)*, `measure.chain(points: [point]) -> {segments: [f64], total}` *(query)* |
 | ARC-MOD-024 | **Demolish** | P1 | — | A hammer cursor: each clicked element gets Phase Demolished = the view's phase, and its graphics follow the phase filter. Undone by setting Phase Demolished to None. Elements that can be demolished highlight on hover. The change is model data, so the element shows as demolished in every view of that phase. Elements created after the view's phase, or already demolished in an earlier phase, are refused with a status-bar message. Hosted inserts are demolished with their host. Nothing is deleted or unhosted, and rooms in later phases recompute without the element. Linked elements and annotation cannot be demolished. Esc or Modify exits; each click is one undo step | `element.demolish(element_ids[], phase_id? (default: the active view's phase), view_id?) -> ()` |
@@ -5618,7 +5618,7 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
 - [ ] Mirror with Copy of a right-handed door produces a left-handed door with *Mirrored* = true.
 
 ### 3.12.2a Volume overlaps, virtual volumes and their resolution
-**ID:** ARC-MOD-030 · **Priority:** P0 · **Ref:** owner requirement (2026-10-13); Reviera's own design (Appendix A.2a)
+**ID:** ARC-MOD-030 · **Priority:** P0 · **Ref:** owner requirement (2026-10-13); Riviera's own design (Appendix A.2a)
 
 **Purpose.** One low-level operation, *volume overlap*, that finds where element bodies (and virtual volumes, ARC-MOD-031) occupy the same space and measures it. It serves:
 - boolean resolution (ARC-MOD-032);
@@ -5630,7 +5630,7 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
 
 **Behaviour & rules.**
 - **Bodies.** Every element's body as closed meshes in project coordinates:
-  - Reviera's own elements regenerated from their recipes (walls joined and cut by their openings, floors, ceilings, decks, roofs with their trims, stairs, railings, gates, doors and windows);
+  - Riviera's own elements regenerated from their recipes (walls joined and cut by their openings, floors, ceilings, decks, roofs with their trims, stairs, railings, gates, doors and windows);
   - elements known only from the IFC file, as tessellated for the 3D view.
 
   The 3D view draws the same bodies, so what is checked is what is seen.
@@ -5653,12 +5653,12 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
 - [x] A pipe through a hole in a slab does not overlap the slab; one through the slab's edge does, by its volume in the slab.
 
 **Implementation notes (2026-10-13).**
-- `reviera_core::bodies` gives every Reviera element's closed parts (the 3D view now draws them), and `reviera_core::overlap` measures them.
+- `riviera_core::bodies` gives every Riviera element's closed parts (the 3D view now draws them), and `riviera_core::overlap` measures them.
 - `overlap.find` is an application command, so imported elements are included.
 - The window lists the overlaps and frames a picked pair.
 - Later: overlap boxes drawn in the view, a background check with progress for large models, and the OCCT refinement.
 
-**ID:** ARC-MOD-031 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); Reviera's own design (Appendix A.2a)
+**ID:** ARC-MOD-031 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); Riviera's own design (Appendix A.2a)
 
 **Purpose.** *Virtual volumes*: non-physical spaces that elements need kept clear. They take part in overlap checks (ARC-MOD-030) but are never built, scheduled as material or exported as physical bodies. *(Owner requests, 2026-10-13:)*
 - *"virtual volume objects for door swings, and accessibility constraints that detect collision with other geometry";*
@@ -5707,7 +5707,7 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
   - flagged volumes drawn in the warning colour;
   - IFC export of clearances.
 
-**ID:** ARC-MOD-032 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); Reviera's own design (Appendix A.2a)
+**ID:** ARC-MOD-032 · **Priority:** P1 · **Ref:** owner requirement (2026-10-13); Riviera's own design (Appendix A.2a)
 
 **Purpose.** Overlaps between elements are flagged, and the user resolves each by choosing a boolean (CSG) mode. *(Owner request, 2026-10-13: "collisions should be detected, flagged and allow the user to resolve by selecting a CSG mode to resolve the overlaps.")*
 
@@ -5740,7 +5740,7 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
   - Move one of them apart.
 
   View › Coordination › Remove Boolean removes the selected elements' booleans.
-- **The solid boolean kernel** (`reviera-geom`, OCCT 7.9):
+- **The solid boolean kernel** (`riviera-geom`, OCCT 7.9):
   - each closed part becomes a solid (its triangles sewn into a shell, turned to face out);
   - `BRepAlgoAPI_Cut`, `_Common` or `_Fuse` runs on the compounds;
   - coplanar faces are merged (`ShapeUpgrade_UnifySameDomain`), and the result is triangulated back.
@@ -5789,7 +5789,7 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
 *Built (2026-10-15):* `element.array_linear` and `element.array_radial` without Group and Associate (refused with `array.group_not_supported` until groups exist): the members are independent copies made through the modify tools' transform, in one undo step. Modify › **Array** (AR) and **Radial Array** ask the number of members and Move To, then take the two picks (or a typed distance or angle) with every member previewed; the radial centre is the selection's centre. Not yet: Group and Associate, array sets and the count label, Constrain, placing the radial centre.
 
 ### 3.12.3a Array along a path
-**ID:** ARC-MOD-033 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); ARC-MOD-026, DM-IMP-015, DM-LIB-002 … 004; Reviera's own design
+**ID:** ARC-MOD-033 · **Priority:** P1 · **Ref:** owner requirement (2026-10-14); ARC-MOD-026, DM-IMP-015, DM-LIB-002 … 004; Riviera's own design
 
 **Purpose.** Repeat a component along any path, keeping it parametric: change the path, the count or the spacing, and the copies follow. This holds even when the component is a plain mesh with no parameters of its own. A typical use is a custom column model filling a Greek temple's colonnade: columns round the stylobate, one at every corner, and equal spacing along each side. Other uses are a hedge of shrubs along a curving garden edge, balusters along a curved balcony, lamp posts along a road, trees along an avenue and bollards along a kerb. *(Owner requirement, 2026-10-14: "a duplicate-along-a-path tool… a custom column model to fill in a Greek temple style facade; set the number of duplicates to space along the path; remains parametric even though the individual objects are plain meshes".)*
 
@@ -5904,7 +5904,7 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
 - Dimensions, tags and keynotes can only be grouped together with the elements they refer to. Otherwise they go into an attached detail group.
 - **Origin.** A group has an origin with three drag controls: the centre moves the origin, and the arm ends rotate it about Z. When placing or pasting, the cursor holds the origin. Swapping the type keeps the origin's position.
 - **Instance parameters:** Reference Level, **Origin Level Offset** (the group's height above its level; unhosted components may not follow), Mirrored (RO), phase and similar.
-- **Type operations:** Duplicate, Rename and **Swap** (with the Type Selector). On swap, attached detail groups with the same name are mapped automatically and dependent references are re-targeted. Where that cannot be done, Reviera warns.
+- **Type operations:** Duplicate, Rename and **Swap** (with the Type Selector). On swap, attached detail groups with the same name are mapped automatically and dependent references are re-targeted. Where that cannot be done, Riviera warns.
 - **Nested groups** are allowed and are selected with Tab.
 - **Implementation model.**
   - A group **type** holds a *template*: member elements in the group's local frame, each with a stable member key.
@@ -5946,7 +5946,7 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
 - While the editor is open, the elements outside the group are shown in half-tone.
 - On Finish, the edits are propagated to all instances in one transaction group.
 - View-specific elements added to a model group stay in the view and are not added to the group.
-- Reviera warns when an instance has been changed outside the editor in a way that breaks identity, which can only happen through scripts that bypass the commands. The warning offers *Restore* or *Make a new group type*.
+- Riviera warns when an instance has been changed outside the editor in a way that breaks identity, which can only happen through scripts that bypass the commands. The warning offers *Restore* or *Make a new group type*.
 
 **Commands.**
 - `group.edit(instance_id) -> session_id`
@@ -5986,7 +5986,7 @@ These tools are on the **Modify** tab and are repeated on every `Modify | <Eleme
 **Implementation note (2026-10-15, first build).** As built: `group.exclude_member` (by element or key) removes the member from that instance (so it is not scheduled or exported there), `group.restore_member` (one or all) makes it again from the template, `group.move_member_to_project` leaves it as an independent element. Not built yet: Save Group, Load as Group, converting to a link.
 
 ### 3.13.4 Modular units
-**ID:** ARC-GRP-004 · **Priority:** P1 · **Ref:** owner requirements (2026-10-31); ARC-GRP-001 … 003, ARC-MOD-033, MEP-SYS-002, MEP-DUCT-008; Reviera's own design (Appendix A.2a). *Planned; not built.*
+**ID:** ARC-GRP-004 · **Priority:** P1 · **Ref:** owner requirements (2026-10-31); ARC-GRP-001 … 003, ARC-MOD-033, MEP-SYS-002, MEP-DUCT-008; Riviera's own design (Appendix A.2a). *Planned; not built.*
 
 **Purpose.** Design a repeated unit once and repeat it to fill a building or a site, wherever identical units recur. Every copy follows changes to the original, and each copy's services connect to the shared routes that serve them all. The use-cases are many:
 - **rooms:** hotel guest rooms, apartments, student and care-home rooms, cells, offices, classrooms, patient rooms;
@@ -6071,7 +6071,7 @@ Temporary dimensions are specified in ARC-DIM-001 and listening dimensions in AR
   - **locked alignments** (Align › Lock, pick-and-lock in sketches);
   - **EQ equality** (the EQ symbol on a multi-segment dimension).
 - **Display.** When the referenced elements are selected, explicit constraints are drawn as blue dashed lines. **Reveal Constraints** (View Control Bar) shows every constraint in the view in red.
-- **Persistence.** Constraints are **model elements**, not view-specific ones. They survive deletion of the dimension that created them: Reviera asks whether to keep or remove the constraints.
+- **Persistence.** Constraints are **model elements**, not view-specific ones. They survive deletion of the dimension that created them: Riviera asks whether to keep or remove the constraints.
 - **Looser constraints** (unlocked dimensions and alignments) are dropped silently when they conflict.
 - **Implied constraints** (a wall attached to a roof, joined walls, hosted inserts, sketch lines locked to picked edges, *Moves With Nearby Elements*) are kept unless they conflict.
 - **EQ display** is a dimension setting: Value, Equality Text ("EQ") or Equality Formula (DOC chapter).
@@ -6093,7 +6093,7 @@ Temporary dimensions are specified in ARC-DIM-001 and listening dimensions in AR
   2. The solver collects the connected component of constraints reachable from the modified elements.
   3. It solves the component by least-change: minimise the weighted squared change of the untouched variables, subject to the equations. The proposed variables are fixed. It uses Gauss–Newton with a QR decomposition (the `nalgebra` crate, Apache-2.0).
   4. Most constraint graphs are linear (translations), so the solve converges in one iteration. Rotations need up to 20 iterations with a tolerance of `TOL_POINT`.
-  5. **Failure.** If the system has no solution (inconsistent) or does not converge, Reviera reports "Constraints are not satisfied", lists the constraints involved, and offers **Remove Constraints**.
+  5. **Failure.** If the system has no solution (inconsistent) or does not converge, Riviera reports "Constraints are not satisfied", lists the constraints involved, and offers **Remove Constraints**.
   6. **Looser constraints.** Unlocked alignments are tried as soft equations with weight 1e-3 and dropped if the solve fails. Then the solve is retried.
 - **Ordering.** The solve runs inside the transaction, before geometry regeneration. Solved variable changes become ordinary parameter changes, which then dirty the regeneration graph.
 
@@ -6246,7 +6246,7 @@ These commands are session-only and are not undoable.
 
 **ID:** ARC-KEY-002 · **Priority:** P0 · **Ref:** research/02 §16
 
-Two-letter sequences are typed without a modifier. The user can rebind every shortcut. Bindings are stored in Reviera's own keymap format (UI chapter); no reference-product keymap file is read or written.
+Two-letter sequences are typed without a modifier. The user can rebind every shortcut. Bindings are stored in Riviera's own keymap format (UI chapter); no reference-product keymap file is read or written.
 
 | Command | Key | Command | Key |
 |---|---|---|---|
@@ -6278,7 +6278,7 @@ Two-letter sequences are typed without a modifier. The user can rebind every sho
 
 ## Command catalog
 
-All commands below are registered once in the command registry and exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (one tool per command, JSON Schema generated from the definition). Parameter types follow §3.0.2. *Session* commands (sketch, stair assembly, group editor, in-place and mass editors) record into a transaction group that becomes one undo step on finish.
+All commands below are registered once in the command registry and exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (one tool per command, JSON Schema generated from the definition). Parameter types follow §3.0.2. *Session* commands (sketch, stair assembly, group editor, in-place and mass editors) record into a transaction group that becomes one undo step on finish.
 
 | Command | Parameters | Returns | Undoable | Req ID |
 |---|---|---|---|---|
@@ -6753,16 +6753,16 @@ All commands below are registered once in the command registry and exposed autom
 
 ### Intentional deviations
 
-| # | Topic | Reviera behaviour | Reason |
+| # | Topic | Riviera behaviour | Reason |
 |---|---|---|---|
 | D1 | Options Bar | None. Tool options live on the contextual tab or in the Properties *New <Element>* block (ARC-TOOL-001) | Matches the reference's own 2027 direction, and gives one UI model for every tool and for tools added from Lua |
 | D2 | Project format | IFC4 is the native format. Parametric intent is stored as RXD (`02a_extension_data_format.md`) | Required by `TECH_STACK.md`. Other IFC tools can read every element, and a tool that drops RXD still leaves valid geometry |
-| D3 | Compound priority scale | Reviera uses 1 (strongest) to 9. IFC4 `IfcMaterialLayer.Priority` uses 0–100 (higher is stronger), so export maps it with `100 − 10·(p−1)`. The exact value is kept in RXD | IFC defines the opposite direction |
+| D3 | Compound priority scale | Riviera uses 1 (strongest) to 9. IFC4 `IfcMaterialLayer.Priority` uses 0–100 (higher is stronger), so export maps it with `100 − 10·(p−1)`. The exact value is kept in RXD | IFC defines the opposite direction |
 | D4 | Join limit | Automatic detection is limited to 4 ends per node, as in the reference. The algorithm itself is general (ARC-JOIN-001 D.8) | Keeps the expected behaviour while leaving room to raise the limit later |
-| D5 | Curtain "Fixed Number" | Defined as the number of **interior grid lines** (ARC-CW-003) | The reference's wording is ambiguous, and Reviera states one meaning so the result is testable |
+| D5 | Curtain "Fixed Number" | Defined as the number of **interior grid lines** (ARC-CW-003) | The reference's wording is ambiguous, and Riviera states one meaning so the result is testable |
 | D6 | Excavation robustness | OCCT fuzzy Booleans with one retry, instead of randomly jittering void positions | Deterministic regeneration (ARC-REGEN-001) rules out random perturbation |
 | D7 | Import thresholds | Point caps are ordinary settings (`toposolid.max_points`, `toposolid.link_max_points`), not an INI file | Single settings system (DM chapter) |
-| D8 | Legacy terrain | No surface-only toposurface or building pad creation. Imported surface terrains are converted with Generate Toposolid (ARC-TOPO-006) | Reviera has no legacy files to support. The toposolid workflow covers the same use cases |
+| D8 | Legacy terrain | No surface-only toposurface or building pad creation. Imported surface terrains are converted with Generate Toposolid (ARC-TOPO-006) | Riviera has no legacy files to support. The toposolid workflow covers the same use cases |
 | D9 | Group files | *Save Group* and *Load as Group* use `.ifc` with embedded RXD, not a proprietary format | Open format. The proprietary formats are out of scope (`00_overview.md`) |
 | D10 | Stair by sketch | No separate legacy tool. Sketching happens only inside the stair assembly (ARC-STAIR-002) | Matches the reference's current behaviour, with a single code path |
 | D11 | Divide Surface, patterns, adaptive components in the conceptual environment | P3 (deferred). Masses support forms and editing only (ARC-MASS-001) | Large scope that the core architectural workflows do not need. Lua-driven panelisation is an open alternative |
@@ -6770,13 +6770,13 @@ All commands below are registered once in the command registry and exposed autom
 | D13 | Room reference lines | Initially through the centre of the boundary's bounding box | Simple and deterministic |
 | D14 | Paint on faces in IFC | Painted faces are split into separate representation items so they can carry `IfcStyledItem` | IFC styles apply per representation item, not per face |
 | D15 | In-place copies | Copying still creates a new in-place family, as in the reference. A later option may allow *Convert to loadable family* (DM chapter) | Keeps instances independent, as users expect |
-| D16 | Toposolid merge | Reviera provides `toposolid.merge`, which joins toposolids that share an edge or overlap into one element (ARC-TOPO-002) | The reference dropped Merge Surfaces with the move to toposolids and offers only Join Geometry, which leaves the seam visible; a true merge is the natural inverse of Split |
+| D16 | Toposolid merge | Riviera provides `toposolid.merge`, which joins toposolids that share an edge or overlap into one element (ARC-TOPO-002) | The reference dropped Merge Surfaces with the move to toposolids and offers only Join Geometry, which leaves the seam visible; a true merge is the natural inverse of Split |
 | D17 | Parts in IFC | By default a source element with parts is exported without its own `Body`; its leaf parts carry the geometry as `IfcBuildingElementPart` through `IfcRelAggregates` (ARC-PART-001). An option writes both | Avoids double counting in take-off and clash tools that read both the whole and its parts |
 | D18 | Mirrored state | *Mirrored* is set only by mirroring (Mirror tool or a family mirror control), never by Flip Hand / Flip Facing, and the flips are stored explicitly (ARC-FLIP-001) | Keeps mirrored doors findable in schedules and makes the IFC reflection operator deterministic |
 
 ### Open questions
 
-1. **IFC4 `IfcGrid` with a single direction.** IFC4 requires both `UAxes` and `VAxes` to be non-empty. When every grid line is parallel, should Reviera (a) put the last axis in `VAxes` (valid, but semantically wrong), (b) write one `IfcGrid` per axis plus a zero-length companion axis, or (c) use `WAxes`? The current draft follows (a), with a reconciliation note in the RXD data. This needs a decision together with the DM chapter's IFC validation rules.
+1. **IFC4 `IfcGrid` with a single direction.** IFC4 requires both `UAxes` and `VAxes` to be non-empty. When every grid line is parallel, should Riviera (a) put the last axis in `VAxes` (valid, but semantically wrong), (b) write one `IfcGrid` per axis plus a zero-length companion axis, or (c) use `WAxes`? The current draft follows (a), with a reconciliation note in the RXD data. This needs a decision together with the DM chapter's IFC validation rules.
 2. **Slab edges in IFC.** The draft uses `IfcSlab(USERDEFINED "SLABEDGE")`. The alternatives are `IfcBuildingElementProxy` and `IfcMember`, and the choice affects quantity take-off in other tools. A decision is needed together with the STR chapter, which owns thickened edges and curbs.
 3. **Areas as `IfcSpace`.** Writing areas from area schemes as `IfcSpace` (GFA or USERDEFINED) may make naive tools count spaces twice. One option is to export areas only when the user asks for them (the *Export area schemes* setting).
 4. **Reference levels.** Non-story levels are written as `IfcAnnotation`. IFC4X3 would allow `IfcBuildingStorey` with a "not a story" property, but other tools would still treat it as a storey. Confirm with COL, because BIMserver's storey-based queries are affected.

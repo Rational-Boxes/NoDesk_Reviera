@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2026 Reviera contributors
+// Copyright (C) 2026 Riviera contributors
 
 //! A client for the Open Source BIMserver's JSON API (TECH_STACK §3.7.1, spec Ch 6 §6.2).
 //!
@@ -20,7 +20,7 @@
 //!   `getSuggestedDeserializerForExtension`, `getSerializerByName`, `checkinSync`, `download`
 //!   and `cleanupLongAction`.
 //!
-//! This crate is MIT licensed (Reviera's interface components are), and talks to BIMserver
+//! This crate is MIT licensed (Riviera's interface components are), and talks to BIMserver
 //! (AGPL-3.0) over the network only.
 
 use std::sync::Arc;
@@ -178,7 +178,7 @@ fn http_client(timeout: Duration) -> Result<reqwest::blocking::Client> {
     reqwest::blocking::Client::builder()
         .tls_backend_preconfigured(tls)
         .timeout(timeout)
-        .user_agent(concat!("BIM-Reviera/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("BIM-Riviera/", env!("CARGO_PKG_VERSION")))
         .build()
         .map_err(|e| Error::new(ErrorKind::Transport, format!("the connection could not be set up: {e}")))
 }

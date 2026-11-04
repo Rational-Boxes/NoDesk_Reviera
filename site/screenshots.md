@@ -2,7 +2,7 @@
 
 [← Home](index.md)
 
-All screenshots show Reviera as it runs today, on Linux, in October 2026.
+All screenshots show Riviera as it runs today, on Linux, in October 2026.
 
 ## Architecture
 
@@ -60,4 +60,4 @@ values by member and position, for any load case or ASCE 7 combination.
 
 ---
 
-[What Reviera does →](features.md) · [Get started →](get-started.md)
+[What Riviera does →](features.md) · [Get started →](get-started.md)

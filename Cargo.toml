@@ -2,65 +2,65 @@
 [workspace]
 resolver = "3"
 members = [
-    "apps/reviera",
-    "crates/reviera-core",
-    "crates/reviera-app",
-    "crates/reviera-ifc",
-    "crates/reviera-geom",
-    "crates/reviera-rxd",
-    "crates/reviera-store",
-    "crates/reviera-livestore",
-    "crates/reviera-net",
+    "apps/riviera",
+    "crates/riviera-core",
+    "crates/riviera-app",
+    "crates/riviera-ifc",
+    "crates/riviera-geom",
+    "crates/riviera-rxd",
+    "crates/riviera-store",
+    "crates/riviera-livestore",
+    "crates/riviera-net",
     "clients/bimserver/rust",
     "clients/fileengine/rust",
     "clients/opencde/rust",
-    "crates/reviera-render",
-    "crates/reviera-render-wgpu",
-    "crates/reviera-godot",
-    "crates/reviera-lua",
-    "crates/reviera-mcp",
-    "crates/reviera-ui",
+    "crates/riviera-render",
+    "crates/riviera-render-wgpu",
+    "crates/riviera-godot",
+    "crates/riviera-lua",
+    "crates/riviera-mcp",
+    "crates/riviera-ui",
     "clients/rsp/rust",
     "clients/compute/rust",
     "clients/dstv/rust",
     "clients/precast-cam/rust",
-    "crates/reviera-compute",
+    "crates/riviera-compute",
 ]
-default-members = ["apps/reviera"]
+default-members = ["apps/riviera"]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.99"
 license = "GPL-3.0-or-later"
-authors = ["Reviera contributors"]
-repository = "https://github.com/Rational-Boxes/NoDesk_Reviera"
+authors = ["Riviera contributors"]
+repository = "https://github.com/Rational-Boxes/BIM_Riviera"
 publish = false
 
 [workspace.dependencies]
 # Internal crates
-reviera-core = { path = "crates/reviera-core" }
-reviera-app = { path = "crates/reviera-app" }
-reviera-ifc = { path = "crates/reviera-ifc" }
-reviera-geom = { path = "crates/reviera-geom" }
-reviera-rxd = { path = "crates/reviera-rxd" }
-reviera-store = { path = "crates/reviera-store" }
-reviera-livestore = { path = "crates/reviera-livestore" }
-reviera-net = { path = "crates/reviera-net" }
-reviera-bimserver = { path = "clients/bimserver/rust" }
-reviera-fileengine = { path = "clients/fileengine/rust" }
-reviera-opencde = { path = "clients/opencde/rust" }
-reviera-render = { path = "crates/reviera-render" }
-reviera-render-wgpu = { path = "crates/reviera-render-wgpu" }
-reviera-godot = { path = "crates/reviera-godot" }
-reviera-lua = { path = "crates/reviera-lua" }
-reviera-mcp = { path = "crates/reviera-mcp" }
-reviera-ui = { path = "crates/reviera-ui" }
-reviera-rsp = { path = "clients/rsp/rust" }
-reviera-dstv = { path = "clients/dstv/rust" }
-reviera-precast-cam = { path = "clients/precast-cam/rust" }
-reviera-compute-proto = { path = "clients/compute/rust" }
-reviera-compute = { path = "crates/reviera-compute" }
+riviera-core = { path = "crates/riviera-core" }
+riviera-app = { path = "crates/riviera-app" }
+riviera-ifc = { path = "crates/riviera-ifc" }
+riviera-geom = { path = "crates/riviera-geom" }
+riviera-rxd = { path = "crates/riviera-rxd" }
+riviera-store = { path = "crates/riviera-store" }
+riviera-livestore = { path = "crates/riviera-livestore" }
+riviera-net = { path = "crates/riviera-net" }
+riviera-bimserver = { path = "clients/bimserver/rust" }
+riviera-fileengine = { path = "clients/fileengine/rust" }
+riviera-opencde = { path = "clients/opencde/rust" }
+riviera-render = { path = "crates/riviera-render" }
+riviera-render-wgpu = { path = "crates/riviera-render-wgpu" }
+riviera-godot = { path = "crates/riviera-godot" }
+riviera-lua = { path = "crates/riviera-lua" }
+riviera-mcp = { path = "crates/riviera-mcp" }
+riviera-ui = { path = "crates/riviera-ui" }
+riviera-rsp = { path = "clients/rsp/rust" }
+riviera-dstv = { path = "clients/dstv/rust" }
+riviera-precast-cam = { path = "clients/precast-cam/rust" }
+riviera-compute-proto = { path = "clients/compute/rust" }
+riviera-compute = { path = "crates/riviera-compute" }
 # Common
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"

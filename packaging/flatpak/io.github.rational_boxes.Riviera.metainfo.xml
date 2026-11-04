@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright (C) 2026 Riviera contributors -->
+<component type="desktop-application">
+  <id>io.github.rational_boxes.Riviera</id>
+  <!-- The app id before the name was spelt correctly (2026-11-04). -->
+  <replaces>
+    <id>io.github.rational_boxes.Reviera</id>
+  </replaces>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>BIM Riviera</name>
+  <summary>Model buildings on native IFC</summary>
+  <developer id="io.github.rational_boxes">
+    <name>Riviera contributors</name>
+  </developer>
+  <description>
+    <p>
+      Riviera is a parametric Building Information Modeling (BIM) application for architecture,
+      structure and MEP. IFC is its native file format, so there is no proprietary container.
+      Every operation can be driven by Lua scripts and by AI agents through the Model Context
+      Protocol (MCP).
+    </p>
+    <p>This is an early pre-release. It already models a small building end to end:</p>
+    <ul>
+      <li>Straight and curved walls, doors and windows, floors, ceilings and decks</li>
+      <li>Hip, gable, arched and domed roofs with eaves and dormers</li>
+      <li>Stairs, railings with gates, rooms, levels and grids</li>
+      <li>Overlap detection with kept booleans, and door clearance checks</li>
+      <li>Plans, ceiling plans, sections, elevations, schedules and sheets to PDF and COBie</li>
+    </ul>
+    <p>
+      Help lists sample models to open, and the Castle Turret plugin shows what a Lua plugin can
+      do.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.rational_boxes.Riviera.desktop</launchable>
+  <provides>
+    <binary>riviera</binary>
+    <mediatype>application/x-ifc</mediatype>
+  </provides>
+  <url type="homepage">https://bimriviera.com/</url>
+  <url type="bugtracker">https://github.com/Rational-Boxes/BIM_Riviera/issues</url>
+  <url type="vcs-browser">https://github.com/Rational-Boxes/BIM_Riviera</url>
+  <screenshots>
+    <screenshot type="default">
+      <caption>A door selected in the 3D view</caption>
+      <image>https://raw.githubusercontent.com/Rational-Boxes/BIM_Riviera/main/design_documents/application_screenshots/3D-view.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>A floor plan with cut walls, stairs and furniture</caption>
+      <image>https://raw.githubusercontent.com/Rational-Boxes/BIM_Riviera/main/design_documents/application_screenshots/plan-view.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>A section box cutting a model open</caption>
+      <image>https://raw.githubusercontent.com/Rational-Boxes/BIM_Riviera/main/design_documents/application_screenshots/section-box.png</image>
+    </screenshot>
+  </screenshots>
+  <categories>
+    <category>Graphics</category>
+    <category>Engineering</category>
+  </categories>
+  <keywords>
+    <keyword>BIM</keyword>
+    <keyword>IFC</keyword>
+    <keyword>CAD</keyword>
+    <keyword>architecture</keyword>
+  </keywords>
+  <branding>
+    <color type="primary" scheme_preference="light">#9cc6f0</color>
+    <color type="primary" scheme_preference="dark">#1f5fa8</color>
+  </branding>
+  <requires>
+    <display_length compare="ge">768</display_length>
+  </requires>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.1.0~pre.9" date="2026-11-03" type="development">
+      <description>
+        <p>Ninth pre-release (tag 0.1.0-pre.9), for testing. The docked Issues pane lists every issue, open and resolved (greyed and marked), with a status filter and search, wherever the model's issues are kept: FileEngine, a project on a BCF API issue server such as OpenConstructionERP (preliminary), or the model itself. Issues are read whenever a FileEngine model opens, and replies, resolving, edits and new issues go back to the server; the model's own issues can be published to it. The FileEngine browser enters folders without closing its window.</p>
+      </description>
+    </release>
+    <release version="0.1.0~pre.8" date="2026-11-02" type="development">
+      <description>
+        <p>Eighth pre-release (tag 0.1.0-pre.8), for testing. Product data field sets are published to FileEngine as extraction prompt sets, and the review opens the marked-up PDF with each value's evidence highlighted. IFC files get default colours that web viewers such as FileEngine's xeokit preview show: translucent windows and distinct walls and floors, also for models saved before default colours existed. Steam rooms place their steam generator and check its distance and the control's height. macOS builds are fixed.</p>
+      </description>
+    </release>
+    <release version="0.1.0~pre.7" date="2026-11-01" type="development">
+      <description>
+        <p>Seventh pre-release (tag 0.1.0-pre.7), for testing: bathrooms. Rule packs for US, ADA and English codes with fixture clear spaces, grab bars and fixture counts; generic fixtures and accessories, and products to swap in; layouts from templates, toilet cores and locker rooms; electrical zones, shower falls and waterproofing; hot tubs, saunas (heater sized from the room, vents, sensor, door vent and notice), steam rooms and whirlpool baths, with ADA spa access; interior elevations and schedules, an HTML compliance report and BCF issues; and tile set-out on walls and floors. Also issues on FileEngine models, local material documents, and greenhouse heating pipes and pad-and-fan cooling.</p>
+      </description>
+    </release>
+    <release version="0.1.0~pre.6" date="2026-10-30" type="development">
+      <description>
+        <p>Sixth pre-release (tag 0.1.0-pre.6), for testing: models on FileEngine (Proxima File Vault): connections and sign-in with an API credential, opening a model from a folder, saving new versions with Ctrl+S that stop if someone else saved first (save a copy beside it, overwrite, or open theirs read-only), and the version history, to open or restore any version. BIMserver gains history, compare and restore, a sync lock, conflicts decided one by one, and advisory ownership of the elements being edited. Also a performance profiler, and greenhouse screens, quick heat loss, ventilation, CO₂ enrichment and heating sizing.</p>
+      </description>
+    </release>
+    <release version="0.1.0~pre.5" date="2026-10-29" type="development">
+      <description>
+        <p>Fifth pre-release (tag 0.1.0-pre.5), for testing: BIMserver projects (File › BIMserver…): servers and login, publishing a project, opening a server project as a working copy, checking in, and Get Latest and Synchronise, which merge other users' changes element by element and parameter by parameter and stop at conflicts for a choice. Greenhouses gain sawtooth ranges, frame systems, side and gable vents, roll-up sides, a headhouse, glazed vaults and domes, geodesic domes, high-wire gutters, growing layouts in rooms, crop climates, crop light by month and grow lights. The Flatpak may now use the network, for the servers the user adds.</p>
+      </description>
+    </release>
+    <release version="0.1.0~pre.4" date="2026-10-28" type="development">
+      <description>
+        <p>Fourth pre-release (tag 0.1.0-pre.4), for testing: greenhouses (gable, gutter-connected multispan, Venlo, hoop and gothic tunnels) made by one Glazed Enclosure tool, with glass walls filling the gables, doors, ridge vents, gutters and a steel frame; saved Hide in View and graphic overrides; crop regions sized and dragged, and cropped to scope boxes in sections and elevations; typed section box and slice positions.</p>
+      </description>
+    </release>
+    <release version="0.1.0~pre.3" date="2026-10-27" type="development">
+      <description>
+        <p>Third pre-release (tag 0.1.0-pre.3), for testing: spot elevations, coordinates and slopes, keynote tags and legends, legend views, crop regions with annotation crop (dragged, sized or following a scope box), and labels in 3D attached to their elements.</p>
+      </description>
+    </release>
+    <release version="0.1.0~pre.2" date="2026-10-26" type="development">
+      <description>
+        <p>Second pre-release (tag 0.1.0-pre.2), for testing: structure, steel and concrete detailing, MEP systems, analysis, coordination (BCF issues), annotation in sections, elevations and 3D, and a sample with a walkthrough for every ribbon tab.</p>
+      </description>
+    </release>
+    <release version="0.1.0~pre.1" date="2026-10-14" type="development">
+      <description>
+        <p>First pre-release (tag 0.1.0-pre.1), for testing.</p>
+      </description>
+    </release>
+  </releases>
+</component>

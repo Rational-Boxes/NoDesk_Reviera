@@ -3166,19 +3166,33 @@ dependencies = [
 ]
 
 [[package]]
-name = "reviera"
+name = "ring"
+version = "0.17.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a4689e6c2294d81e88dc6261c768b63bc4fcdb852be6d1352498b114f61383b7"
+dependencies = [
+ "cc",
+ "cfg-if",
+ "getrandom 0.2.17",
+ "libc",
+ "untrusted",
+ "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "riviera"
 version = "0.1.0"
 dependencies = [
- "reviera-app",
- "reviera-core",
- "reviera-mcp",
- "reviera-ui",
+ "riviera-app",
+ "riviera-core",
+ "riviera-mcp",
+ "riviera-ui",
  "serde_json",
  "tokio",
 ]
 
 [[package]]
-name = "reviera-app"
+name = "riviera-app"
 version = "0.1.0"
 dependencies = [
  "base64 0.23.1",
@@ -3186,20 +3200,20 @@ dependencies = [
  "keyring",
  "pdf-writer",
  "prost",
- "reviera-bimserver",
- "reviera-compute",
- "reviera-compute-proto",
- "reviera-core",
- "reviera-dstv",
- "reviera-fileengine",
- "reviera-geom",
- "reviera-ifc",
- "reviera-livestore",
- "reviera-lua",
- "reviera-opencde",
- "reviera-render",
- "reviera-render-wgpu",
- "reviera-store",
+ "riviera-bimserver",
+ "riviera-compute",
+ "riviera-compute-proto",
+ "riviera-core",
+ "riviera-dstv",
+ "riviera-fileengine",
+ "riviera-geom",
+ "riviera-ifc",
+ "riviera-livestore",
+ "riviera-lua",
+ "riviera-opencde",
+ "riviera-render",
+ "riviera-render-wgpu",
+ "riviera-store",
  "rust_xlsxwriter",
  "schemars",
  "serde",
@@ -3210,7 +3224,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "reviera-bimserver"
+name = "riviera-bimserver"
 version = "0.1.0"
 dependencies = [
  "base64 0.23.1",
@@ -3222,14 +3236,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "reviera-compute"
+name = "riviera-compute"
 version = "0.1.0"
 dependencies = [
  "libc",
  "prost",
  "prost-types",
- "reviera-compute-proto",
- "reviera-core",
+ "riviera-compute-proto",
+ "riviera-core",
  "rusqlite",
  "serde",
  "serde_json",
@@ -3241,7 +3255,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "reviera-compute-proto"
+name = "riviera-compute-proto"
 version = "0.1.0"
 dependencies = [
  "base64 0.23.1",
@@ -3268,7 +3282,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "reviera-core"
+name = "riviera-core"
 version = "0.1.0"
 dependencies = [
  "base64 0.23.1",
@@ -3277,27 +3291,28 @@ dependencies = [
  "imbl",
  "jsonschema",
  "quick-xml",
- "reviera-dstv",
- "reviera-precast-cam",
+ "riviera-dstv",
+ "riviera-precast-cam",
  "schemars",
  "serde",
  "serde_json",
  "sha2",
  "spade",
+ "tempfile",
  "thiserror 2.0.21",
  "uuid",
 ]
 
 [[package]]
-name = "reviera-dstv"
+name = "riviera-dstv"
 version = "0.1.0"
 
 [[package]]
-name = "reviera-fileengine"
+name = "riviera-fileengine"
 version = "0.1.0"
 dependencies = [
  "reqwest",
- "reviera-fileengine",
+ "riviera-fileengine",
  "rustls",
  "rustls-platform-verifier 0.6.2",
  "serde",
@@ -3306,29 +3321,29 @@ dependencies = [
 ]
 
 [[package]]
-name = "reviera-geom"
+name = "riviera-geom"
 version = "0.1.0"
 dependencies = [
  "cxx",
  "cxx-build",
- "reviera-core",
+ "riviera-core",
 ]
 
 [[package]]
-name = "reviera-godot"
+name = "riviera-godot"
 version = "0.1.0"
 dependencies = [
- "reviera-render",
- "reviera-rsp",
+ "riviera-render",
+ "riviera-rsp",
 ]
 
 [[package]]
-name = "reviera-ifc"
+name = "riviera-ifc"
 version = "0.1.0"
 dependencies = [
  "cxx",
  "cxx-build",
- "reviera-core",
+ "riviera-core",
  "serde",
  "serde_json",
  "tempfile",
@@ -3336,15 +3351,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "reviera-livestore"
+name = "riviera-livestore"
 version = "0.1.0"
 dependencies = [
  "getrandom 0.4.3",
  "hex",
  "keyring",
- "reviera-core",
- "reviera-ifc",
- "reviera-store",
+ "riviera-core",
+ "riviera-ifc",
+ "riviera-store",
  "rusqlite",
  "schemars",
  "serde",
@@ -3357,23 +3372,23 @@ dependencies = [
 ]
 
 [[package]]
-name = "reviera-lua"
+name = "riviera-lua"
 version = "0.1.0"
 dependencies = [
  "mlua",
- "reviera-core",
+ "riviera-core",
  "serde",
  "serde_json",
 ]
 
 [[package]]
-name = "reviera-mcp"
+name = "riviera-mcp"
 version = "0.1.0"
 dependencies = [
  "base64 0.23.1",
- "reviera-app",
- "reviera-core",
- "reviera-livestore",
+ "riviera-app",
+ "riviera-core",
+ "riviera-livestore",
  "rmcp",
  "schemars",
  "serde",
@@ -3385,15 +3400,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "reviera-net"
+name = "riviera-net"
 version = "0.1.0"
 
 [[package]]
-name = "reviera-opencde"
+name = "riviera-opencde"
 version = "0.1.0"
 dependencies = [
  "reqwest",
- "reviera-opencde",
+ "riviera-opencde",
  "rustls",
  "rustls-platform-verifier 0.6.2",
  "serde",
@@ -3401,7 +3416,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "reviera-precast-cam"
+name = "riviera-precast-cam"
 version = "0.1.0"
 dependencies = [
  "serde",
@@ -3409,16 +3424,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "reviera-render"
+name = "riviera-render"
 version = "0.1.0"
 dependencies = [
  "earcut",
  "glam",
- "reviera-core",
+ "riviera-core",
 ]
 
 [[package]]
-name = "reviera-render-wgpu"
+name = "riviera-render-wgpu"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
@@ -3426,15 +3441,15 @@ dependencies = [
  "png",
  "pollster",
  "raw-window-handle",
- "reviera-app",
- "reviera-core",
- "reviera-render",
+ "riviera-app",
+ "riviera-core",
+ "riviera-render",
  "serde_json",
  "wgpu",
 ]
 
 [[package]]
-name = "reviera-rsp"
+name = "riviera-rsp"
 version = "0.1.0"
 dependencies = [
  "serde",
@@ -3442,12 +3457,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "reviera-rxd"
+name = "riviera-rxd"
 version = "0.1.0"
 dependencies = [
  "base64 0.23.1",
  "hex",
- "reviera-core",
+ "riviera-core",
  "serde",
  "serde_json",
  "sha2",
@@ -3457,14 +3472,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "reviera-store"
+name = "riviera-store"
 version = "0.1.0"
 dependencies = [
- "reviera-core",
- "reviera-dstv",
- "reviera-geom",
- "reviera-ifc",
- "reviera-rxd",
+ "riviera-core",
+ "riviera-dstv",
+ "riviera-geom",
+ "riviera-ifc",
+ "riviera-rxd",
  "schemars",
  "serde",
  "serde_json",
@@ -3474,7 +3489,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "reviera-ui"
+name = "riviera-ui"
 version = "0.1.0"
 dependencies = [
  "base64 0.23.1",
@@ -3485,13 +3500,13 @@ dependencies = [
  "portable-pty",
  "pulldown-cmark",
  "raw-window-handle",
- "reviera-app",
- "reviera-core",
- "reviera-lua",
- "reviera-mcp",
- "reviera-render",
- "reviera-render-wgpu",
- "reviera-store",
+ "riviera-app",
+ "riviera-core",
+ "riviera-lua",
+ "riviera-mcp",
+ "riviera-render",
+ "riviera-render-wgpu",
+ "riviera-store",
  "serde",
  "serde_json",
  "tokio",
@@ -3500,20 +3515,6 @@ dependencies = [
  "vt100",
  "wxdragon",
  "wxdragon-sys",
-]
-
-[[package]]
-name = "ring"
-version = "0.17.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4689e6c2294d81e88dc6261c768b63bc4fcdb852be6d1352498b114f61383b7"
-dependencies = [
- "cc",
- "cfg-if",
- "getrandom 0.2.17",
- "libc",
- "untrusted",
- "windows-sys 0.52.0",
 ]
 
 [[package]]

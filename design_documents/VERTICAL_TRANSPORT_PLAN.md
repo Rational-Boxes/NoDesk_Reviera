@@ -91,20 +91,20 @@ What the tools do:
 - machine design: rope, sheave and safety-gear selection, controller logic and dispatching
   algorithms;
 - stamped structural design of hoistways, glass shafts, APM guideways, funicular viaducts and
-  ropeway towers. Reviera carries maker-style reactions and flags; an engineer designs.
+  ropeway towers. Riviera carries maker-style reactions and flags; an engineer designs.
 - time-step traffic simulation inside the editor. If built, it runs as a compute job (§9).
 - ropeway rope dynamics, wind-tunnel and evacuation-team planning beyond the rough checks in §8;
 - APM vehicle and train control engineering, and rail operations;
 - maintenance and inspection records (LOLER, A17.1 periodic tests). These are a later COBie and
   digital-twin link, not modelling.
 
-## 2. What Reviera already has
+## 2. What Riviera already has
 
 | Need | Existing tool | Status |
 |---|---|---|
 | A void through every floor between two levels, kept up to date | Shaft opening (ARC-OPEN-004) | Built |
 | Stairs completed to the level above, with openings and headroom checks | ARC-STAIR-007 | Built |
-| Rule packs with jurisdiction, edition, source and confidence | Bathroom rule packs (ARC-BATH-001), `schemas/bath/`; a general `reviera.rules-1` is proposed in KITCHENS_PLAN §3.1 | Built; generalisation awaits the kitchens answer |
+| Rule packs with jurisdiction, edition, source and confidence | Bathroom rule packs (ARC-BATH-001), `schemas/bath/`; a general `riviera.rules-1` is proposed in KITCHENS_PLAN §3.1 | Built; generalisation awaits the kitchens answer |
 | Clear zones as virtual volumes, checked while drawing | ARC-MOD-030/031, fixture spaces (ARC-BATH-002) | Built |
 | Generated placeholder components with IFC classes and ports | `bath_components` (ARC-BATH-004), connectors (MEP-CONN-001) | Built |
 | Products from a mesh; swap keeping GlobalId; documents on the type | DM-IMP-015, ARC-BATH-006, COL-FE-006/007 | Built |
@@ -115,7 +115,7 @@ What the tools do:
 | Heavy analysis out of process | Compute jobs (DM-RPC-001…, ANA-PLUG-003/008) | Built |
 | Repeated units with shared service spines | Modular units (ARC-GRP-004) | Specified, not built |
 | Site and terrain | Toposolids, property lines, site components (ARC-SITE-001) | Built |
-| **Alignments (IfcAlignment), guideways, rope lines** | — | **Not in Reviera.** Roads (research/17) need them too |
+| **Alignments (IfcAlignment), guideways, rope lines** | — | **Not in Riviera.** Roads (research/17) need them too |
 
 Each device produces walls, slabs, openings, spaces, doors, railings, equipment and ports that
 the other tools already understand.
@@ -124,7 +124,7 @@ the other tools already understand.
 
 ### 3.1 Schema
 
-Use the same schema as kitchens: one general `reviera.rules-1`, or the bath schema extended,
+Use the same schema as kitchens: one general `riviera.rules-1`, or the bath schema extended,
 depending on the owner's answer to KITCHENS_PLAN Question 1. Vertical transport needs these rule
 kinds beyond the bathroom four:
 
@@ -182,8 +182,8 @@ from E-83. These include the research/16 L5 list and the conflicts flagged acros
 ### 4.1 The elevator object
 
 `IfcTransportElement` ELEVATOR, with `Pset_TransportElementCommon`,
-`Pset_TransportElementElevator` and a Reviera set (`Reviera_Pset_Elevator`, published MIT). The
-Reviera set holds:
+`Pset_TransportElementElevator` and a Riviera set (`Riviera_Pset_Elevator`, published MIT). The
+Riviera set holds:
 - drive type: MRL traction, traction with a machine room, hydraulic holed, holeless, roped
   hydraulic;
 - rated load and speed, and capacity in persons;
@@ -336,7 +336,7 @@ Accelerating walks are a separate product type, outside the generic walk rules.
 
 ## 7. Guideways: people movers, inclined elevators and funiculars
 
-These run along a route, not through a floor, so they need an **alignment**. Reviera has none
+These run along a route, not through a floor, so they need an **alignment**. Riviera has none
 yet. Research/17 (roads, drives and lots) needs the same thing. Proposal: one shared foundation,
 specified once and used by both:
 - `IfcAlignment` with horizontal, vertical and cant layouts;
@@ -451,7 +451,7 @@ R2 for completeness only.
 1. Rule kinds (tables with interpolation, fit tests, swept envelopes, counts, edition flags) in
    the shared rules schema. First packs: `us_ibc_ada`, `us_a17_checklists`, `en81` and
    `england_adm_adb_adk`. Then `vt.check`.
-2. The elevator assembly, `Reviera_Pset_Elevator`, and `elevator.from_capacity` on the shaft
+2. The elevator assembly, `Riviera_Pset_Elevator`, and `elevator.from_capacity` on the shaft
    opening, with clear zones Z1–Z22 and hall fixtures (§4.1–4.3).
 3. Freight, service, hospital and vehicle elevators; LULA, residence, platform lifts,
    dumbwaiters and VRCs (§4.2).
@@ -513,7 +513,7 @@ positions. The README gains the goals, marked as not yet built.
 7. The up-peak calculation only; simulation stays a possible compute-job provider.
 8. The panoramic generator ships with its structural values as flagged defaults.
 
-The vertical-transport rules get their own schema (`reviera.vt-rules-1`) with the bath packs'
+The vertical-transport rules get their own schema (`riviera.vt-rules-1`) with the bath packs'
 header (format, id, title, jurisdiction, edition, layer), so that it can join a general
-`reviera.rules-1` if KITCHENS_PLAN Question 1 is answered that way.
+`riviera.rules-1` if KITCHENS_PLAN Question 1 is answered that way.
 

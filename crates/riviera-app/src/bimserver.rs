@@ -1,0 +1,2007 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Riviera contributors
+
+//! `bimserver.*`: BIMserver client mode (spec Ch 6 §6.1–6.2, COL-MODE-001/002, COL-BIM-001…004,
+//! COL-OFF-001), over the MIT client `riviera_bimserver`.
+//!
+//! - **Server profiles** (name, URL, the user name last used and how they log in) are per-user
+//!   settings (`bimserver.json` in the settings folder), never project data. The password or
+//!   user token lives in the OS keychain when *remember* is on (or for this session where there
+//!   is none); no command returns it. A session's token is kept in memory, and when the server
+//!   refuses it (expired, restarted) the call logs in again once with what is stored.
+//! - **Working copies.** An opened server project is a folder
+//!   `<data>/riviera/bimserver/<server-id>/<poid>/` holding `working.ifc` (the model, saved by
+//!   Ctrl+S like any file), `base.ifc` (the revision it is based on, for the merges to come) and
+//!   `state.json` (server, project, base revision). A document is in BIMserver mode when its
+//!   file is a working copy with its `state.json`, so the binding survives a restart and a file
+//!   copied elsewhere carries none.
+//! - **Check-in** saves the working copy and uploads it as a new revision, refused while the
+//!   server has a newer revision than the base (get latest and merge come next). **Publish**
+//!   checks a Local model in as a project's first revision (or, with `replace`, a newer one) and
+//!   turns it into that project's working copy.
+//!
+//! - **Get latest** downloads the newest revision as `remote.ifc` and merges it into the open
+//!   working copy three-way (`riviera_core::merge`, base = `base.ifc`), as one undoable
+//!   transaction; the downloaded revision becomes the base and the merged working copy is
+//!   saved. Conflicts are reported and nothing is changed unless `conflicts` says which side
+//!   wins. **Synchronise** is get latest (when the server moved on) and check-in.
+//!
+//! `bimserver.login` refuses a password or token from an agent (MCP), and
+//! `bimserver.remove_server` is not offered to agents. Not yet: the sync lock and the race
+//! check (COL-OWN-002), conflicts decided one by one (COL-MRG-002), notifications, history and restore,
+//! ownership, the streamed upload for large models, the calls off the UI thread, and the File ›
+//! Open › From BIMserver dialog.
+
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+
+use riviera_bimserver::{Client, ErrorKind, Project, Revision};
+use riviera_core::{Caller, CommandMeta, Effect, Error, HostCommand, Result, Source};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
+use crate::{App, DocumentId};
+
+/// The keychain service the secrets are stored under (the account is the server profile's id).
+pub const KEYCHAIN_SERVICE: &str = "org.bimriviera.bimserver";
+/// Commands not offered to agents: they remove stored credentials.
+pub const NOT_FOR_AGENTS: &[&str] = &["bimserver.remove_server"];
+/// The working copy's files.
+pub const WORKING: &str = "working.ifc";
+pub const BASE: &str = "base.ifc";
+pub const STATE: &str = "state.json";
+
+fn bad(code: &'static str, msg: impl Into<String>) -> Error {
+    Error::new(code, msg)
+}
+
+fn failed(e: riviera_bimserver::Error) -> Error {
+    let code = match e.kind {
+        ErrorKind::Url => "bimserver.bad_url",
+        ErrorKind::Transport => "bimserver.unreachable",
+        ErrorKind::Auth => "bimserver.not_authorised",
+        ErrorKind::Server => "bimserver.refused",
+        ErrorKind::Protocol => "bimserver.protocol",
+    };
+    Error::new(code, e.message.clone()).with_details(serde_json::json!({ "exception": e.exception }))
+}
+
+/// How a profile logs in.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum LoginKind {
+    #[default]
+    Password,
+    /// A user token (BIMserver shows one on the user's page).
+    UserToken,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[serde(default)]
+struct Settings {
+    servers: Vec<Profile>,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[serde(default)]
+struct Profile {
+    id: String,
+    name: String,
+    url: String,
+    /// Plain http to a host other than this computer, accepted by the user.
+    allow_http: bool,
+    /// Borrow elements automatically on edit (COL-OWN-001); on unless turned off.
+    #[serde(default = "yes")]
+    ownership: bool,
+    username: Option<String>,
+    login: LoginKind,
+    /// The server's version when last reached.
+    version: Option<String>,
+}
+
+/// Where a secret is kept.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Storage {
+    Keychain,
+    /// Memory, until Riviera closes.
+    Session,
+    /// Not stored: the next login asks for it.
+    None,
+}
+
+/// The servers' working state on the app.
+#[derive(Default)]
+pub struct Servers {
+    /// The settings file and the working copies' root; the per-user ones when `None`.
+    settings: Option<PathBuf>,
+    data: Option<PathBuf>,
+    /// Keeps secrets in memory only (tests, or no keychain).
+    session_only: bool,
+    session: HashMap<String, String>,
+    clients: HashMap<String, Client>,
+    /// This Riviera's session, as the sync lock names it.
+    session_id: Option<String>,
+    /// Merges waiting for conflict decisions, by document (COL-MRG-002).
+    pending: HashMap<DocumentId, Pending>,
+    /// Ownership documents read, by their extended-data oid (files never change).
+    owner_cache: HashMap<i64, Option<Ownership>>,
+    /// Each server's ownership schema, once looked up (`None`: the server cannot keep it).
+    schemas: HashMap<String, Option<i64>>,
+}
+
+/// A merge stopped at its conflicts: the revision downloaded (`remote.ifc`), the conflicts, the
+/// decisions taken so far, and, for a synchronise, its comment.
+#[derive(Debug, Clone)]
+struct Pending {
+    latest: i64,
+    number: i64,
+    conflicts: Vec<riviera_core::merge::Conflict>,
+    decisions: riviera_core::merge::Decisions,
+    sync_comment: Option<String>,
+}
+
+impl std::fmt::Debug for Servers {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Servers").field("settings", &self.settings).field("data", &self.data).finish_non_exhaustive()
+    }
+}
+
+/// The per-user data folder: `%LOCALAPPDATA%\Riviera`, else `$XDG_DATA_HOME/riviera` (or
+/// `~/.local/share/riviera`).
+pub(crate) fn data_dir() -> Option<PathBuf> {
+    if let Some(a) = std::env::var_os("LOCALAPPDATA") {
+        return Some(riviera_core::app_dirs::app_dir(Path::new(&a), "Riviera"));
+    }
+    let base = std::env::var_os("XDG_DATA_HOME").map(PathBuf::from).or_else(|| std::env::var_os("HOME").map(|h| Path::new(&h).join(".local/share")))?;
+    Some(riviera_core::app_dirs::app_dir(&base, "riviera"))
+}
+
+impl Servers {
+    /// Keeps the settings in `settings`, the working copies under `data` and the secrets in
+    /// memory: for tests and tools.
+    pub fn isolated(settings: PathBuf, data: PathBuf) -> Self {
+        Self { settings: Some(settings), data: Some(data), session_only: true, ..Self::default() }
+    }
+
+    fn file(&self) -> Result<PathBuf> {
+        self.settings.clone().or_else(|| crate::subscriptions::config_dir().map(|d| d.join("bimserver.json"))).ok_or_else(|| bad("bimserver.no_settings", "there is no per-user settings folder"))
+    }
+
+    fn root(&self) -> Result<PathBuf> {
+        self.data.clone().or_else(|| data_dir().map(|d| d.join("bimserver"))).ok_or_else(|| bad("bimserver.no_settings", "there is no per-user data folder"))
+    }
+
+    fn load(&self) -> Result<Settings> {
+        match std::fs::read(self.file()?) {
+            Ok(b) => serde_json::from_slice(&b).map_err(|e| bad("bimserver.settings_invalid", format!("bimserver.json: {e}"))),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Settings::default()),
+            Err(e) => Err(bad("bimserver.settings_unreadable", e.to_string())),
+        }
+    }
+
+    fn save(&self, s: &Settings) -> Result<()> {
+        let path = self.file()?;
+        if let Some(d) = path.parent() {
+            std::fs::create_dir_all(d).map_err(|e| bad("bimserver.settings_unwritable", e.to_string()))?;
+        }
+        let tmp = path.with_extension("json.tmp");
+        std::fs::write(&tmp, serde_json::to_vec_pretty(s).expect("settings serialise")).and_then(|()| std::fs::rename(&tmp, &path)).map_err(|e| bad("bimserver.settings_unwritable", e.to_string()))
+    }
+
+    fn keychain(&self) -> bool {
+        !self.session_only && keyring::Entry::store_status().is_ok()
+    }
+
+    fn put_secret(&mut self, id: &str, secret: &str) -> Storage {
+        if self.keychain() && keyring::Entry::new(KEYCHAIN_SERVICE, id).and_then(|e| e.set_password(secret)).is_ok() {
+            self.session.remove(id);
+            return Storage::Keychain;
+        }
+        self.session.insert(id.to_owned(), secret.to_owned());
+        Storage::Session
+    }
+
+    fn secret(&self, id: &str) -> Option<String> {
+        if let Some(s) = self.session.get(id) {
+            return Some(s.clone());
+        }
+        if !self.keychain() {
+            return None;
+        }
+        crate::keychain::password(KEYCHAIN_SERVICE, id).ok()
+    }
+
+    fn storage(&self, id: &str) -> Storage {
+        if self.session.contains_key(id) {
+            Storage::Session
+        } else if self.keychain() && crate::keychain::password(KEYCHAIN_SERVICE, id).is_ok() {
+            Storage::Keychain
+        } else {
+            Storage::None
+        }
+    }
+
+    fn delete_secret(&mut self, id: &str) {
+        self.session.remove(id);
+        if self.keychain() {
+            crate::keychain::forget(KEYCHAIN_SERVICE, id);
+        }
+    }
+
+    fn profile(&self, id: &str) -> Result<Profile> {
+        self.load()?.servers.into_iter().find(|p| p.id == id).ok_or_else(|| bad("bimserver.no_server", format!("no server profile {id:?}; bimserver.list_servers lists them")))
+    }
+
+    /// Logs `p` in with its stored secret.
+    fn relogin(&mut self, p: &Profile) -> Result<()> {
+        let secret = self.secret(&p.id).ok_or_else(|| bad("bimserver.not_logged_in", format!("log in to {} first (bimserver.login)", p.name)))?;
+        let c = self.client_for(p)?;
+        match p.login {
+            LoginKind::Password => c.login(p.username.as_deref().unwrap_or_default(), &secret),
+            LoginKind::UserToken => c.login_user_token(&secret),
+        }
+        .map_err(failed)
+    }
+
+    fn client_for(&mut self, p: &Profile) -> Result<&mut Client> {
+        if !self.clients.contains_key(&p.id) {
+            let c = Client::new(&p.url, p.allow_http).map_err(failed)?;
+            self.clients.insert(p.id.clone(), c);
+        }
+        Ok(self.clients.get_mut(&p.id).expect("inserted"))
+    }
+
+    /// Runs `f` on a logged-in client for server `id`, logging in again once if the server
+    /// refuses the session.
+    fn with<T>(&mut self, id: &str, f: impl Fn(&Client) -> riviera_bimserver::Result<T>) -> Result<T> {
+        let _p = riviera_core::profiler::scope("bimserver call");
+        let p = self.profile(id)?;
+        if !self.client_for(&p)?.logged_in() {
+            self.relogin(&p)?;
+        }
+        match f(self.clients.get(&p.id).expect("made")) {
+            Err(e) if e.kind == ErrorKind::Auth && self.secret(&p.id).is_some() => {
+                self.clients.get_mut(&p.id).expect("made").forget();
+                self.relogin(&p)?;
+                f(self.clients.get(&p.id).expect("made")).map_err(failed)
+            }
+            r => r.map_err(failed),
+        }
+    }
+
+    /// The working-copy folder of project `poid` on server `id`.
+    fn folder(&self, id: &str, poid: i64) -> Result<PathBuf> {
+        Ok(self.root()?.join(id).join(poid.to_string()))
+    }
+}
+
+/// A working copy's client state (`state.json`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct WorkingState {
+    pub server_id: String,
+    pub url: String,
+    pub poid: i64,
+    pub project: String,
+    pub schema: String,
+    /// The revision the working copy is based on, and its number.
+    pub base_roid: i64,
+    pub base_revision: i64,
+    /// Who checked out (the server's user name).
+    pub user: String,
+    /// Unix seconds of the last download or check-in.
+    pub synced_at: i64,
+}
+
+fn now() -> i64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs() as i64)
+}
+
+/// The working-copy state of a document's file, if it is a working copy.
+pub fn state_of(path: &Path) -> Option<WorkingState> {
+    if path.file_name()? != WORKING {
+        return None;
+    }
+    serde_json::from_slice(&std::fs::read(path.with_file_name(STATE)).ok()?).ok()
+}
+
+fn write_state(folder: &Path, s: &WorkingState) -> Result<()> {
+    std::fs::write(folder.join(STATE), serde_json::to_vec_pretty(s).expect("serialises")).map_err(|e| bad("bimserver.working_copy", e.to_string()))
+}
+
+fn not_for_agents(caller: &Caller, what: &str) -> Result<()> {
+    if caller.origin.source == Source::Mcp {
+        return Err(Error::new("permission.denied", format!("{what} is for the user (the BIMserver login dialog) and Lua, never for agents")));
+    }
+    Ok(())
+}
+
+impl App {
+    /// The BIMserver profiles' state (settings file, secrets, sessions).
+    pub fn bimserver_mut(&mut self) -> &mut Servers {
+        &mut self.bimserver
+    }
+
+    /// The document to act on and its working-copy state.
+    fn working_copy(&self, id: Option<DocumentId>) -> Result<(DocumentId, PathBuf, WorkingState)> {
+        let id = self.resolve(id)?;
+        let path = self.get(id)?.project.path().to_owned();
+        let st = state_of(&path).ok_or_else(|| bad("mode.not_available", "the project is not a BIMserver working copy (File › Open › From BIMserver, or Publish to BIMserver)"))?;
+        Ok((id, path, st))
+    }
+}
+
+/// A trailer on every check-in comment: which program made the revision.
+fn comment_with_trailer(comment: &str) -> Result<String> {
+    let c = comment.trim();
+    if c.is_empty() {
+        return Err(bad("bimserver.no_comment", "a check-in needs a comment"));
+    }
+    Ok(format!("{c}\n[riviera] BIM Riviera {}", env!("CARGO_PKG_VERSION")))
+}
+
+// ---- Server profiles and login (COL-BIM-001) ----
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct ServerOut {
+    pub id: String,
+    pub name: String,
+    pub url: String,
+    pub username: Option<String>,
+    pub login: LoginKind,
+    pub version: Option<String>,
+    /// Where its password or token is kept.
+    pub secret: Storage,
+    pub connected: bool,
+}
+
+fn server_out(s: &Servers, p: &Profile) -> ServerOut {
+    ServerOut { id: p.id.clone(), name: p.name.clone(), url: p.url.clone(), username: p.username.clone(), login: p.login, version: p.version.clone(), secret: s.storage(&p.id), connected: s.clients.get(&p.id).is_some_and(Client::logged_in) }
+}
+
+macro_rules! host {
+    ($ty:ident, $name:literal, $summary:literal, $desc:literal, [$($eff:ident),*], $params:ty, $out:ty, |$app:ident, $caller:ident, $p:ident| $body:block) => {
+        pub(crate) struct $ty;
+        impl HostCommand for $ty {
+            type Host = App;
+            type Params = $params;
+            type Output = $out;
+            const META: CommandMeta = CommandMeta { name: $name, version: 1, summary: $summary, description: $desc, effects: &[$(Effect::$eff),*], transaction_name: "" };
+            #[allow(unused_variables)]
+            fn run(&self, $app: &mut App, $caller: &Caller, $p: $params) -> Result<$out> $body
+        }
+    };
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AddServerParams {
+    pub name: String,
+    /// The server's root URL (where its `/json` is), https:// (http:// for localhost).
+    pub url: String,
+    /// Accept plain http:// to another computer (the password then crosses the network unencrypted).
+    #[serde(default)]
+    pub allow_http: bool,
+    /// Borrow elements automatically when they are edited (default true).
+    #[serde(default = "yes")]
+    pub ownership: bool,
+}
+
+host!(BimAddServer, "bimserver.add_server", "Add a BIMserver",
+    "Adds a server profile (COL-BIM-001): a name and the server's root URL (https://; http:// only for \
+     localhost unless `allow_http`). The server is asked for its version first; nothing is saved if it \
+     cannot be reached. Profiles are per-user settings, not project data. Returns the profile.",
+    [Settings, Network], AddServerParams, ServerOut, |app, caller, p| {
+    let name = p.name.trim().to_owned();
+    if name.is_empty() {
+        return Err(bad("bimserver.invalid_input", "a server needs a name"));
+    }
+    let c = Client::new(&p.url, p.allow_http).map_err(failed)?;
+    let info = c.server_info().map_err(failed)?;
+    if info.state != "RUNNING" {
+        return Err(bad("bimserver.not_running", format!("the server says it is {} (it must be set up and running)", info.state)));
+    }
+    let s = &mut app.bimserver;
+    let mut settings = s.load()?;
+    let url = c.url().to_owned();
+    if settings.servers.iter().any(|x| x.url == url) {
+        return Err(bad("bimserver.duplicate", format!("{url} is already a server profile")));
+    }
+    // Unique across settings files, so a new profile never finds an old profile's secret in the
+    // keychain under its id.
+    let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
+    let mut n = 0u32;
+    let id = loop {
+        let id = format!("server-{:x}", (nanos as u64) ^ (u64::from(std::process::id()) << 32) ^ u64::from(n));
+        if settings.servers.iter().all(|x| x.id != id) {
+            break id;
+        }
+        n += 1;
+    };
+    s.delete_secret(&id);
+    let profile = Profile { id: id.clone(), name, url, allow_http: p.allow_http, ownership: p.ownership, username: None, login: LoginKind::Password, version: Some(info.version) };
+    settings.servers.push(profile.clone());
+    s.save(&settings)?;
+    s.clients.insert(id, c);
+    Ok(server_out(s, &profile))
+});
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ServerIdParams {
+    pub server_id: String,
+}
+
+host!(BimRemoveServer, "bimserver.remove_server", "Remove a BIMserver",
+    "Removes a server profile and its stored password or token (COL-BIM-001). Working copies stay on disk. \
+     Not available to MCP.",
+    [Settings, Destructive], ServerIdParams, (), |app, caller, p| {
+    not_for_agents(caller, "removing a server's stored credentials")?;
+    let s = &mut app.bimserver;
+    let mut settings = s.load()?;
+    let before = settings.servers.len();
+    settings.servers.retain(|x| x.id != p.server_id);
+    if settings.servers.len() == before {
+        return Err(bad("bimserver.no_server", format!("no server profile {:?}", p.server_id)));
+    }
+    s.save(&settings)?;
+    s.delete_secret(&p.server_id);
+    s.clients.remove(&p.server_id);
+    Ok(())
+});
+
+host!(BimListServers, "bimserver.list_servers", "List BIMserver profiles",
+    "The server profiles: id, name, URL, user name, how they log in, version, where the secret is kept \
+     (keychain, session or none; never the secret) and whether a session is open.",
+    [Read], Option<serde_json::Value>, Vec<ServerOut>, |app, caller, p| {
+    let s = &app.bimserver;
+    Ok(s.load()?.servers.iter().map(|x| server_out(s, x)).collect())
+});
+
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct LoginParams {
+    pub server_id: String,
+    /// The user name (for a password login); the profile's last one when absent.
+    pub username: Option<String>,
+    pub password: Option<String>,
+    /// A user token instead of a user name and password.
+    pub user_token: Option<String>,
+    /// Keep the password or token in the OS keychain for the next session (default true).
+    #[serde(default = "yes")]
+    pub remember: bool,
+}
+
+impl std::fmt::Debug for LoginParams {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LoginParams").field("server_id", &self.server_id).field("username", &self.username).finish_non_exhaustive()
+    }
+}
+
+fn yes() -> bool {
+    true
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct SessionInfo {
+    pub server_id: String,
+    pub username: String,
+    pub name: String,
+    /// ADMIN, USER, READ_ONLY …
+    pub user_type: String,
+    pub version: Option<String>,
+    pub secret: Storage,
+}
+
+host!(BimLogin, "bimserver.login", "Log in to a BIMserver",
+    "Logs in (COL-BIM-001) with a user name and password, or a user token; with neither, with the stored \
+     ones. `remember` (default true) keeps them in the OS keychain (this session only where there is \
+     none). An agent (MCP) may only log in with stored credentials. Returns the user.",
+    [Network, Settings], LoginParams, SessionInfo, |app, caller, p| {
+    if p.password.is_some() || p.user_token.is_some() {
+        not_for_agents(caller, "a password or token")?;
+    }
+    let s = &mut app.bimserver;
+    let mut settings = s.load()?;
+    let at = settings.servers.iter().position(|x| x.id == p.server_id).ok_or_else(|| bad("bimserver.no_server", format!("no server profile {:?}", p.server_id)))?;
+    let mut profile = settings.servers[at].clone();
+    let fresh = match (p.password.filter(|x| !x.is_empty()), p.user_token.filter(|x| !x.is_empty())) {
+        (Some(pw), None) => {
+            let user = p.username.clone().or(profile.username.clone()).filter(|u| !u.trim().is_empty()).ok_or_else(|| bad("bimserver.invalid_input", "a password login needs the user name"))?;
+            profile.username = Some(user.trim().to_owned());
+            profile.login = LoginKind::Password;
+            Some(pw)
+        }
+        (None, Some(t)) => {
+            profile.login = LoginKind::UserToken;
+            Some(t)
+        }
+        (Some(_), Some(_)) => return Err(bad("bimserver.invalid_input", "give a password or a user token, not both")),
+        (None, None) => None,
+    };
+    let c = s.client_for(&profile)?;
+    match &fresh {
+        Some(secret) => match profile.login {
+            LoginKind::Password => c.login(profile.username.as_deref().unwrap_or_default(), secret),
+            LoginKind::UserToken => c.login_user_token(secret),
+        }
+        .map_err(failed)?,
+        None => s.relogin(&profile)?,
+    }
+    let c = s.clients.get(&profile.id).expect("made");
+    let user = c.logged_in_user().map_err(failed)?;
+    if let Ok(info) = c.server_info() {
+        profile.version = Some(info.version);
+    }
+    if profile.login == LoginKind::UserToken {
+        profile.username = Some(user.username.clone());
+    }
+    match fresh {
+        Some(secret) if p.remember => {
+            s.put_secret(&profile.id, &secret);
+        }
+        Some(_) => s.delete_secret(&profile.id),
+        None => {}
+    }
+    settings.servers[at] = profile.clone();
+    s.save(&settings)?;
+    Ok(SessionInfo { server_id: profile.id.clone(), username: user.username, name: user.name, user_type: user.user_type, version: profile.version, secret: s.storage(&profile.id) })
+});
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct LogoutParams {
+    pub server_id: String,
+    /// Also forget the stored password or token.
+    #[serde(default)]
+    pub forget: bool,
+}
+
+host!(BimLogout, "bimserver.logout", "Log out of a BIMserver",
+    "Ends the session on the server (COL-BIM-001); `forget` also removes the stored password or token.",
+    [Network, Settings], LogoutParams, (), |app, caller, p| {
+    let s = &mut app.bimserver;
+    s.profile(&p.server_id)?;
+    if let Some(c) = s.clients.get_mut(&p.server_id) {
+        let _ = c.logout();
+    }
+    if p.forget {
+        s.delete_secret(&p.server_id);
+    }
+    Ok(())
+});
+
+// ---- Projects and revisions (COL-BIM-002) ----
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct ProjectOut {
+    pub poid: i64,
+    pub name: String,
+    pub schema: String,
+    pub parent_poid: Option<i64>,
+    pub sub_projects: Vec<i64>,
+    pub last_roid: Option<i64>,
+    pub revisions: usize,
+    /// There is a working copy of it on this computer.
+    pub working_copy: bool,
+}
+
+fn project_out(s: &Servers, id: &str, p: &Project) -> ProjectOut {
+    let working = s.folder(id, p.oid).is_ok_and(|f| f.join(STATE).is_file());
+    ProjectOut { poid: p.oid, name: p.name.clone(), schema: p.schema.clone(), parent_poid: p.parent, sub_projects: p.sub_projects.clone(), last_roid: p.last_revision, revisions: p.revisions.len(), working_copy: working }
+}
+
+host!(BimListProjects, "bimserver.list_projects", "List a BIMserver's projects",
+    "The projects and sub-projects the user can see (COL-BIM-002): poid, name, schema, parent, \
+     sub-projects, latest revision, revision count, and whether there is a working copy here.",
+    [Read, Network], ServerIdParams, Vec<ProjectOut>, |app, caller, p| {
+    let s = &mut app.bimserver;
+    let projects = s.with(&p.server_id, Client::projects)?;
+    Ok(projects.iter().map(|x| project_out(s, &p.server_id, x)).collect())
+});
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ProjectParams {
+    pub server_id: String,
+    pub poid: i64,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct RevisionOut {
+    pub roid: i64,
+    pub number: i64,
+    pub comment: String,
+    /// Unix milliseconds.
+    pub date: i64,
+    pub user: String,
+    pub size: i64,
+    pub tag: Option<String>,
+}
+
+host!(BimListRevisions, "bimserver.list_revisions", "List a project's revisions",
+    "A project's revisions, oldest first (COL-BIM-002): roid, number, comment, date (Unix ms), the user \
+     who checked it in, size (objects) and tag.",
+    [Read, Network], ProjectParams, Vec<RevisionOut>, |app, caller, p| {
+    let s = &mut app.bimserver;
+    let revs: Vec<Revision> = s.with(&p.server_id, |c| c.revisions(p.poid))?;
+    let mut names: HashMap<i64, String> = HashMap::new();
+    let mut out = Vec::new();
+    for r in revs {
+        let user = match names.get(&r.user) {
+            Some(n) => n.clone(),
+            None => {
+                let n = s.with(&p.server_id, |c| c.user_name(r.user)).unwrap_or_else(|_| r.user.to_string());
+                names.insert(r.user, n.clone());
+                n
+            }
+        };
+        out.push(RevisionOut { roid: r.oid, number: r.number, comment: r.comment, date: r.date, user, size: r.size, tag: r.tag });
+    }
+    Ok(out)
+});
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct CreateProjectParams {
+    pub server_id: String,
+    pub name: String,
+    /// `ifc4` (default) or `ifc2x3tc1`.
+    pub schema: Option<String>,
+    pub parent_poid: Option<i64>,
+}
+
+host!(BimCreateProject, "bimserver.create_project", "Create a BIMserver project",
+    "A new project, or a sub-project of `parent_poid` (COL-BIM-002), of `schema` (ifc4 by default). The \
+     server decides who may (by default only administrators make top-level projects). Returns the project.",
+    [Network], CreateProjectParams, ProjectOut, |app, caller, p| {
+    let name = p.name.trim().to_owned();
+    if name.is_empty() {
+        return Err(bad("bimserver.invalid_input", "a project needs a name"));
+    }
+    let schema = p.schema.unwrap_or_else(|| "ifc4".into()).to_lowercase();
+    if !matches!(schema.as_str(), "ifc4" | "ifc2x3tc1") {
+        return Err(bad("bimserver.invalid_input", "the schema is ifc4 or ifc2x3tc1"));
+    }
+    let s = &mut app.bimserver;
+    let made = s.with(&p.server_id, |c| c.create_project(&name, &schema, p.parent_poid))?;
+    Ok(project_out(s, &p.server_id, &made))
+});
+
+// ---- Download and open (COL-BIM-003) ----
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DownloadParams {
+    pub server_id: String,
+    pub roid: i64,
+    pub path: PathBuf,
+    /// The revision's schema, for the serialiser (default ifc4).
+    pub schema: Option<String>,
+}
+
+host!(BimDownload, "bimserver.download_revision", "Download a revision as an IFC file",
+    "Writes revision `roid` to `path` as IFC (COL-BIM-003), serialised by the server (its IFC4 \
+     serialiser unless `schema` is ifc2x3tc1). Returns the bytes written.",
+    [Network, FileWrite], DownloadParams, u64, |app, caller, p| {
+    let schema = p.schema.unwrap_or_else(|| "ifc4".into());
+    let bytes = app.bimserver.with(&p.server_id, |c| {
+        let s = c.ifc_serializer(&schema)?;
+        c.download(p.roid, s.oid)
+    })?;
+    std::fs::write(&p.path, &bytes).map_err(|e| bad("file.write_failed", format!("{}: {e}", p.path.display())))?;
+    Ok(bytes.len() as u64)
+});
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct OpenParams {
+    pub server_id: String,
+    pub poid: i64,
+    /// A revision other than the latest, as a new working copy based on it (only when there is
+    /// none yet).
+    pub roid: Option<i64>,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct OpenOut {
+    pub document_id: DocumentId,
+    pub working_copy: PathBuf,
+    pub base_roid: i64,
+    pub base_revision: i64,
+    /// The existing working copy was opened (its local work kept), not a new download.
+    pub existing: bool,
+    /// The server has a revision newer than the working copy's base.
+    pub newer_on_server: bool,
+}
+
+host!(BimOpen, "bimserver.open", "Open a BIMserver project",
+    "Opens a server project as a working copy (COL-BIM-003, COL-OFF-001). If this computer has a working \
+     copy of it, that is opened with its local work (never overwritten) and `newer_on_server` says whether \
+     the server has moved on; otherwise the latest revision (or `roid`) is downloaded into \
+     <data>/riviera/bimserver/<server>/<poid>/ as base.ifc and working.ifc and opened.",
+    [Network, FileRead, FileWrite], OpenParams, OpenOut, |app, caller, p| {
+    let folder = app.bimserver.folder(&p.server_id, p.poid)?;
+    let project = app.bimserver.with(&p.server_id, |c| c.project(p.poid))?;
+    let working = folder.join(WORKING);
+    if let Some(st) = state_of(&working) {
+        if p.roid.is_some_and(|r| r != st.base_roid) {
+            return Err(bad("bimserver.working_copy_exists", "this project already has a working copy here; open it, or discard it before opening another revision"));
+        }
+        let id = match app.document_at(&working) {
+            Some(id) => id,
+            None => app.open(&working, false)?,
+        };
+        let newer = project.last_revision.is_some_and(|r| r != st.base_roid);
+        return Ok(OpenOut { document_id: id, working_copy: working, base_roid: st.base_roid, base_revision: st.base_revision, existing: true, newer_on_server: newer });
+    }
+    let roid = p.roid.or(project.last_revision).ok_or_else(|| bad("bimserver.empty_project", format!("{} has no revisions yet; publish a model to it (bimserver.publish_local)", project.name)))?;
+    let schema = project.schema.clone();
+    let (bytes, revs, user) = app.bimserver.with(&p.server_id, |c| {
+        let s = c.ifc_serializer(&schema)?;
+        Ok((c.download(roid, s.oid)?, c.revisions(p.poid)?, c.logged_in_user()?))
+    })?;
+    let number = revs.iter().find(|r| r.oid == roid).map_or(0, |r| r.number);
+    std::fs::create_dir_all(&folder).map_err(|e| bad("bimserver.working_copy", e.to_string()))?;
+    std::fs::write(folder.join(BASE), &bytes).and_then(|()| std::fs::write(&working, &bytes)).map_err(|e| bad("bimserver.working_copy", e.to_string()))?;
+    let profile = app.bimserver.profile(&p.server_id)?;
+    write_state(&folder, &WorkingState { server_id: p.server_id.clone(), url: profile.url, poid: p.poid, project: project.name.clone(), schema, base_roid: roid, base_revision: number, user: user.username, synced_at: now() })?;
+    let id = app.open(&working, false)?;
+    Ok(OpenOut { document_id: id, working_copy: working, base_roid: roid, base_revision: number, existing: false, newer_on_server: project.last_revision.is_some_and(|r| r != roid) })
+});
+
+// ---- Check in and publish (COL-BIM-004, COL-MODE-002) ----
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct CheckInOut {
+    pub poid: i64,
+    pub roid: i64,
+    pub revision: i64,
+    pub warnings: Vec<String>,
+    pub document_id: DocumentId,
+}
+
+/// Uploads the saved working copy at `working` as a new revision and makes it the base.
+fn check_in(app: &mut App, id: DocumentId, folder: &Path, mut st: WorkingState, comment: &str) -> Result<CheckInOut> {
+    let comment = comment_with_trailer(comment)?;
+    let data = std::fs::read(folder.join(WORKING)).map_err(|e| bad("bimserver.working_copy", e.to_string()))?;
+    let poid = st.poid;
+    let (r, revs) = app.bimserver.with(&st.server_id, |c| {
+        let d = c.deserializer_for(poid)?;
+        let r = c.check_in(poid, &comment, WORKING, &data, d.oid)?;
+        Ok((r, c.revisions(poid)?))
+    })?;
+    std::fs::copy(folder.join(WORKING), folder.join(BASE)).map_err(|e| bad("bimserver.working_copy", e.to_string()))?;
+    st.base_roid = r.roid;
+    st.base_revision = revs.iter().find(|x| x.oid == r.roid).map_or(st.base_revision + 1, |x| x.number);
+    st.synced_at = now();
+    write_state(folder, &st)?;
+    Ok(CheckInOut { poid, roid: r.roid, revision: st.base_revision, warnings: r.warnings, document_id: id })
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct CheckInParams {
+    pub comment: String,
+    pub document_id: Option<DocumentId>,
+}
+
+host!(BimCheckIn, "bimserver.check_in", "Check the working copy in",
+    "Saves the working copy and uploads it as a new revision of its project (COL-BIM-004), which becomes \
+     its base. The comment is required. Refused while the server has a revision newer than the base: \
+     another user's work would be overwritten (get latest and merge come with synchronise). In Local mode \
+     it fails with mode.not_available.",
+    [Network, FileWrite], CheckInParams, CheckInOut, |app, caller, p| {
+    let (id, path, st) = app.working_copy(p.document_id)?;
+    comment_with_trailer(&p.comment)?;
+    let latest = app.bimserver.with(&st.server_id, |c| c.project(st.poid))?.last_revision;
+    if latest.is_some_and(|r| r != st.base_roid) {
+        return Err(bad("bimserver.out_of_date", "the server has a newer revision than this working copy; it must be merged first (synchronise, not yet available) or the working copy opened again"));
+    }
+    app.save(id, None)?;
+    let folder = path.parent().expect("a working copy is in its folder").to_owned();
+    check_in(app, id, &folder, st, &p.comment)
+});
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PublishParams {
+    pub server_id: String,
+    /// An existing project, or `new_name` for a new one (under `parent_poid`).
+    pub poid: Option<i64>,
+    pub new_name: Option<String>,
+    pub parent_poid: Option<i64>,
+    pub comment: String,
+    /// Check in over a project that has revisions (a new revision; its history is kept).
+    #[serde(default)]
+    pub replace: bool,
+    pub document_id: Option<DocumentId>,
+}
+
+host!(BimPublish, "bimserver.publish_local", "Publish the project to a BIMserver",
+    "Publish to BIMserver (COL-MODE-002): checks the current Local model in to project `poid` (or a new \
+     project `new_name`) as its first revision, and makes the open document that project's working copy \
+     (saved to <data>/riviera/bimserver/<server>/<poid>/working.ifc). A project that has revisions is \
+     refused unless `replace`. The project's schema must be the model's. Returns the project, revision \
+     and document.",
+    [Network, FileWrite], PublishParams, CheckInOut, |app, caller, p| {
+    let id = app.resolve(p.document_id)?;
+    if state_of(app.get(id)?.project.path()).is_some() {
+        return Err(bad("bimserver.already_published", "the project is already a BIMserver working copy; check it in instead"));
+    }
+    comment_with_trailer(&p.comment)?;
+    let model_schema = app.get(id)?.project.ifc().schema().to_uppercase();
+    let want = match model_schema.as_str() {
+        "IFC2X3" => "ifc2x3tc1",
+        "IFC4" => "ifc4",
+        other => return Err(bad("bimserver.schema", format!("BIMserver takes IFC4 or IFC2X3 models; this one is {other}"))),
+    };
+    let project = match (p.poid, p.new_name.as_deref().map(str::trim).filter(|n| !n.is_empty())) {
+        (Some(poid), None) => app.bimserver.with(&p.server_id, |c| c.project(poid))?,
+        (None, Some(name)) => app.bimserver.with(&p.server_id, |c| c.create_project(name, want, p.parent_poid))?,
+        _ => return Err(bad("bimserver.invalid_input", "give the project's poid or a new_name, not both")),
+    };
+    if !project.schema.eq_ignore_ascii_case(want) {
+        return Err(bad("bimserver.schema", format!("{} is an {} project and the model is {want}; choose or create an {want} project", project.name, project.schema)));
+    }
+    if project.last_revision.is_some() && !p.replace {
+        return Err(bad("bimserver.has_revisions", format!("{} already has revisions; publish with replace to check in a new one over them", project.name)));
+    }
+    let folder = app.bimserver.folder(&p.server_id, project.oid)?;
+    if folder.join(STATE).is_file() {
+        return Err(bad("bimserver.working_copy_exists", format!("there is already a working copy of {} here; discard it first", project.name)));
+    }
+    std::fs::create_dir_all(&folder).map_err(|e| bad("bimserver.working_copy", e.to_string()))?;
+    let user = app.bimserver.with(&p.server_id, Client::logged_in_user)?;
+    let profile = app.bimserver.profile(&p.server_id)?;
+    let st = WorkingState { server_id: p.server_id.clone(), url: profile.url, poid: project.oid, project: project.name.clone(), schema: project.schema.clone(), base_roid: project.last_revision.unwrap_or(-1), base_revision: project.revisions.len() as i64, user: user.username, synced_at: now() };
+    app.save(id, Some(&folder.join(WORKING)))?;
+    write_state(&folder, &st)?;
+    match check_in(app, id, &folder, st, &p.comment) {
+        Ok(out) => Ok(out),
+        Err(e) => {
+            // Nothing reached the server: the folder is not a working copy.
+            let _ = std::fs::remove_file(folder.join(STATE));
+            Err(e)
+        }
+    }
+});
+
+// ---- Mode (COL-MODE-001) ----
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ModeParams {
+    pub document_id: Option<DocumentId>,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct ModeOut {
+    /// `local` or `bimserver`.
+    pub mode: String,
+    pub path: PathBuf,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub working_copy: Option<WorkingState>,
+    /// A session to its server is open.
+    pub connected: bool,
+}
+
+host!(ModelMode, "model.mode", "Tell the project's mode",
+    "Whether the project is Local (an IFC file) or a BIMserver working copy (COL-MODE-001), with the \
+     server, project, base revision and whether a session is open.",
+    [Read], Option<ModeParams>, ModeOut, |app, caller, p| {
+    let id = app.resolve(p.and_then(|p| p.document_id))?;
+    let path = app.get(id)?.project.path().to_owned();
+    let st = state_of(&path);
+    let connected = st.as_ref().is_some_and(|s| app.bimserver.clients.get(&s.server_id).is_some_and(Client::logged_in));
+    Ok(ModeOut { mode: if st.is_some() { "bimserver" } else { "local" }.into(), path, working_copy: st, connected })
+});
+
+// ---- Get latest, synchronise and merge (COL-BIM-005/006, COL-MRG-001) ----
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct SyncReport {
+    /// The base was already the server's latest revision.
+    pub up_to_date: bool,
+    pub base_roid: i64,
+    pub base_revision: i64,
+    /// The merge: elements created, updated and deleted in the working copy, the remote
+    /// changes taken, the elements merged facet by facet, and the conflicts.
+    pub created: usize,
+    pub updated: usize,
+    pub deleted: usize,
+    pub remote_changes: usize,
+    pub merged: usize,
+    pub conflicts: Vec<riviera_core::merge::Conflict>,
+    /// The merge was applied (false while conflicts wait for a decision).
+    pub applied: bool,
+    /// Elements deleted here this session that the merge could not bring back.
+    pub skipped: Vec<String>,
+    /// Synchronise: the revision checked in.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub checked_in: Option<CheckInOut>,
+    /// Synchronise: whether the sync lock was taken (`taken`), or the server could not keep it
+    /// (`unavailable`: Riviera's schema could not be registered there).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lock: Option<String>,
+    /// Synchronise: revisions another client checked in while this one synchronised, and the
+    /// corrective revision that merged them in.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub intruders: Vec<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub corrective: Option<CheckInOut>,
+    /// The merge waits for conflict decisions (merge.list_conflicts, merge.resolve, merge.finish).
+    pub pending: bool,
+}
+
+fn open_store(path: &Path) -> Result<riviera_core::Store> {
+    let (_, doc, _) = riviera_store::LocalProject::open(path).map_err(|e| bad("bimserver.working_copy", format!("{}: {e}", path.display())))?;
+    Ok(doc.store().clone())
+}
+
+/// Merges the server's latest revision into working copy `id` (saved first).
+fn get_latest(app: &mut App, id: DocumentId, path: &Path, st: WorkingState, policy: riviera_core::merge::Policy) -> Result<SyncReport> {
+    let folder = path.parent().expect("a working copy is in its folder").to_owned();
+    let poid = st.poid;
+    let project = app.bimserver.with(&st.server_id, |c| c.project(poid))?;
+    let mut report = SyncReport { up_to_date: true, base_roid: st.base_roid, base_revision: st.base_revision, created: 0, updated: 0, deleted: 0, remote_changes: 0, merged: 0, conflicts: Vec::new(), applied: false, skipped: Vec::new(), checked_in: None, lock: None, intruders: Vec::new(), corrective: None, pending: false };
+    let Some(latest) = project.last_revision.filter(|r| *r != st.base_roid) else { return Ok(report) };
+    report.up_to_date = false;
+    let schema = st.schema.clone();
+    let (bytes, revs) = app.bimserver.with(&st.server_id, |c| {
+        let s = c.ifc_serializer(&schema)?;
+        Ok((c.download(latest, s.oid)?, c.revisions(poid)?))
+    })?;
+    let remote_path = folder.join("remote.ifc");
+    std::fs::write(&remote_path, &bytes).map_err(|e| bad("bimserver.working_copy", e.to_string()))?;
+    let base = open_store(&folder.join(BASE))?;
+    let remote = open_store(&remote_path)?;
+    let plan = riviera_core::merge::three_way(&base, app.get(id)?.doc.store(), &remote, policy);
+    report.remote_changes = plan.remote_changes;
+    report.merged = plan.merged;
+    report.conflicts = plan.conflicts.clone();
+    let number = revs.iter().find(|r| r.oid == latest).map_or(st.base_revision, |r| r.number);
+    if !plan.conflicts.is_empty() && policy == riviera_core::merge::Policy::Fail {
+        // Kept for decisions, conflict by conflict (COL-MRG-002).
+        app.bimserver.pending.insert(id, Pending { latest, number, conflicts: plan.conflicts.clone(), decisions: Default::default(), sync_comment: None });
+        report.pending = true;
+        return Ok(report);
+    }
+    app.bimserver.pending.remove(&id);
+    finish_merge(app, id, &folder, st, plan, latest, number, report)
+}
+
+/// Applies a merge plan to working copy `id`, saves it, and makes revision `latest` its base.
+#[allow(clippy::too_many_arguments)]
+fn finish_merge(app: &mut App, id: DocumentId, folder: &Path, mut st: WorkingState, plan: riviera_core::merge::Plan, latest: i64, number: i64, mut report: SyncReport) -> Result<SyncReport> {
+    let remote_path = folder.join("remote.ifc");
+    let doc = &mut app.get_mut(id)?.doc;
+    let mut txn = doc.transaction(format!("Get Latest (revision {number})"), riviera_core::Origin::ui());
+    let applied = riviera_core::merge::apply(&mut txn, &plan)?;
+    txn.commit();
+    (report.created, report.updated, report.deleted, report.skipped) = (applied.created, applied.updated, applied.deleted, applied.skipped);
+    report.applied = true;
+    app.save(id, None)?;
+    std::fs::rename(&remote_path, folder.join(BASE)).map_err(|e| bad("bimserver.working_copy", e.to_string()))?;
+    st.base_roid = latest;
+    st.base_revision = number;
+    st.synced_at = now();
+    write_state(folder, &st)?;
+    report.base_roid = latest;
+    report.base_revision = number;
+    report.conflicts = plan.conflicts;
+    Ok(report)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct GetLatestParams {
+    pub document_id: Option<DocumentId>,
+    /// Conflicts: `fail` (report them and change nothing, the default), `local` or `remote`
+    /// (that side wins).
+    #[serde(default)]
+    pub conflicts: riviera_core::merge::Policy,
+}
+
+host!(BimGetLatest, "bimserver.get_latest", "Get the latest revision",
+    "Get Latest (COL-BIM-005): merges the project's newest revision into the open working copy, three-way \
+     against its base, element by element and parameter by parameter (recipes key by key, member lists as \
+     sets), as one undoable step; local changes stay local (nothing is uploaded). The revision becomes the \
+     base and the working copy is saved. Conflicts (both sides changed the same thing differently, or one \
+     deleted what the other changed) are reported and nothing changes unless `conflicts` is local or \
+     remote. Returns the sync report.",
+    [Network, Edit, FileWrite], GetLatestParams, SyncReport, |app, caller, p| {
+    let (id, path, st) = app.working_copy(p.document_id)?;
+    app.save(id, None)?;
+    get_latest(app, id, &path, st, p.conflicts)
+});
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SyncParams {
+    pub comment: String,
+    pub document_id: Option<DocumentId>,
+    #[serde(default)]
+    pub conflicts: riviera_core::merge::Policy,
+    /// Keep the elements this session borrowed (default: relinquish them).
+    #[serde(default)]
+    pub keep_borrowed: bool,
+}
+
+host!(BimSync, "bimserver.sync", "Synchronise with the server",
+    "Synchronise (COL-BIM-006, COL-OWN-002): saves the working copy and takes the project's sync lock (an \
+     ownership document in the server's extended data, 10 minutes, refused while another session holds \
+     it), gets the latest revision and merges it (as bimserver.get_latest; stopping at conflicts unless \
+     `conflicts` says which side wins), checks the merged working copy in with the comment, merges in any \
+     revision another client checked in meanwhile as a corrective revision, and releases the lock. Where \
+     the server cannot keep Riviera's ownership document the sync runs without the lock (`lock: \
+     unavailable`). Returns the sync report with the revision checked in.",
+    [Network, Edit, FileWrite], SyncParams, SyncReport, |app, caller, p| {
+    comment_with_trailer(&p.comment)?;
+    let (id, path, st) = app.working_copy(p.document_id)?;
+    app.save(id, None)?;
+    let lock = acquire_lock(app, &st)?;
+    let result = sync_locked(app, id, &path, st.clone(), &p);
+    let mut report = match result {
+        Ok(r) => r,
+        Err(e) => {
+            if let Some(l) = &lock {
+                let _ = release_lock(app, &st, l);
+            }
+            return Err(e);
+        }
+    };
+    match (&lock, &report.checked_in) {
+        (Some(l), None) => release_lock(app, &st, l)?,
+        // The new revision starts a fresh ownership chain with no lock.
+        (Some(l), Some(c)) => {
+            let (roid, number) = report.corrective.as_ref().map_or((c.roid, c.revision), |x| (x.roid, x.revision));
+            // The borrows made since the lock was taken, then this session's relinquished (unless
+            // kept), the revision they changed in recorded.
+            let me = app.bimserver.session_id();
+            let latest = read_ownership(app, &st.server_id, l.schema, l.roid)?.unwrap_or_else(|| l.state.clone());
+            let entries = latest
+                .entries
+                .into_iter()
+                .map(|mut e| {
+                    if !p.keep_borrowed && e.owner.as_ref().is_some_and(|o| o.session == me) {
+                        e.owner = None;
+                        e.last_changed_revision = number;
+                    }
+                    e
+                })
+                .collect();
+            write_ownership(app, &st, l.schema, roid, &Ownership { version: 1, parent_version: None, base_roid: roid, entries, requests: latest.requests, sync_lock: None })?;
+        }
+        _ => {}
+    }
+    report.lock = Some(if lock.is_some() { "taken" } else { "unavailable" }.to_owned());
+    if report.pending
+        && let Some(pm) = app.bimserver.pending.get_mut(&id)
+    {
+        pm.sync_comment = Some(p.comment.clone());
+    }
+    Ok(report)
+});
+
+/// Get latest, check in and the race check, under the lock.
+fn sync_locked(app: &mut App, id: DocumentId, path: &Path, st: WorkingState, p: &SyncParams) -> Result<SyncReport> {
+    let mut report = get_latest(app, id, path, st, p.conflicts)?;
+    if !report.up_to_date && !report.applied {
+        return Ok(report);
+    }
+    let st = state_of(path).expect("still a working copy");
+    let folder = path.parent().expect("in its folder").to_owned();
+    // The revision merged, kept for the race check.
+    let prior = open_store(&folder.join(BASE))?;
+    let prior_number = st.base_revision;
+    let ours = check_in(app, id, &folder, st, &p.comment)?;
+    (report.base_roid, report.base_revision) = (ours.roid, ours.revision);
+    // Race check: revisions between the one merged and ours came from a client that did not wait
+    // for the lock; merge them in and check in a corrective revision.
+    let st = state_of(path).expect("still a working copy");
+    let poid = st.poid;
+    let revs = app.bimserver.with(&st.server_id, |c| c.revisions(poid))?;
+    let intruders: Vec<(i64, i64)> = revs.iter().filter(|r| r.number > prior_number && r.number < ours.revision).map(|r| (r.oid, r.number)).collect();
+    report.checked_in = Some(ours);
+    if intruders.is_empty() {
+        return Ok(report);
+    }
+    let mut numbers = Vec::new();
+    for (roid, number) in &intruders {
+        let remote = revision_store(app, &st, *roid, &folder.join("intruder.ifc"))?;
+        let plan = riviera_core::merge::three_way(&prior, app.get(id)?.doc.store(), &remote, if p.conflicts == riviera_core::merge::Policy::Remote { riviera_core::merge::Policy::Remote } else { riviera_core::merge::Policy::Local });
+        report.conflicts.extend(plan.conflicts.clone());
+        let doc = &mut app.get_mut(id)?.doc;
+        let mut txn = doc.transaction(format!("Corrective Merge (revision {number})"), riviera_core::Origin::ui());
+        riviera_core::merge::apply(&mut txn, &plan)?;
+        txn.commit();
+        report.intruders.push(*roid);
+        numbers.push(number.to_string());
+    }
+    app.save(id, None)?;
+    let comment = format!("[riviera:merge] Corrective merge of revision {} checked in during a synchronise", numbers.join(", "));
+    let fixed = check_in(app, id, &folder, st, &comment)?;
+    (report.base_roid, report.base_revision) = (fixed.roid, fixed.revision);
+    report.corrective = Some(fixed);
+    Ok(report)
+}
+
+// ---- The ownership document and the sync lock (COL-OWN-002) ----
+
+/// The extended-data schema of the ownership document.
+pub const OWNERSHIP_SCHEMA: &str = "org.riviera.ownership/1.0";
+/// How long a sync lock holds without renewal (seconds).
+pub const LOCK_SECONDS: i64 = 600;
+
+/// Who holds something: the server's user, and the Riviera session.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Owner {
+    pub user_id: i64,
+    pub user_name: String,
+    pub session: String,
+}
+
+/// The sync lock: who holds it, and when it was taken and expires (Unix seconds).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct SyncLock {
+    pub owner: Owner,
+    pub acquired: i64,
+    pub expires: i64,
+}
+
+/// The ownership document (`org.riviera.ownership/1.0`).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Ownership {
+    pub version: i64,
+    pub parent_version: Option<i64>,
+    pub base_roid: i64,
+    pub entries: Vec<Entry>,
+    pub requests: Vec<serde_json::Value>,
+    pub sync_lock: Option<SyncLock>,
+}
+
+/// One owned (or once owned) thing: `ifc:<GlobalId>`; its owner (none once relinquished), since
+/// when, and the revision in which it last changed.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Entry {
+    pub target: String,
+    pub owner: Option<Owner>,
+    #[serde(default)]
+    pub since: i64,
+    #[serde(default)]
+    pub last_changed_revision: i64,
+}
+
+/// The lock this session took: on which revision, under which schema, and the state it wrote.
+struct Held {
+    schema: i64,
+    roid: i64,
+    state: Ownership,
+}
+
+impl Servers {
+    fn session_id(&mut self) -> String {
+        self.session_id
+            .get_or_insert_with(|| {
+                let n = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
+                format!("{:x}-{:x}", n as u64, std::process::id())
+            })
+            .clone()
+    }
+}
+
+/// The ownership schema's oid on the server, registering it on first use; `None` where the
+/// server will not register it.
+fn ownership_schema(app: &mut App, server: &str) -> Result<Option<i64>> {
+    if let Some(known) = app.bimserver.schemas.get(server) {
+        return Ok(*known);
+    }
+    let found = match app.bimserver.with(server, |c| c.extended_schema(OWNERSHIP_SCHEMA))? {
+        Some(id) => Some(id),
+        None => match app.bimserver.with(server, |c| c.add_extended_schema(OWNERSHIP_SCHEMA, "application/json", "BIM Riviera: element ownership and the sync lock (COL-OWN-002)")) {
+            Ok(id) => Some(id),
+            Err(e) if e.code == "bimserver.refused" => None,
+            Err(e) => return Err(e),
+        },
+    };
+    app.bimserver.schemas.insert(server.to_owned(), found);
+    Ok(found)
+}
+
+/// The current ownership state on revision `roid`: from the root, the earliest child of each
+/// version (the deterministic chain of COL-OWN-002).
+fn read_ownership(app: &mut App, server: &str, schema: i64, roid: i64) -> Result<Option<Ownership>> {
+    let items = app.bimserver.with(server, |c| c.extended_data(roid))?;
+    let mut docs: Vec<Ownership> = Vec::new();
+    for x in items.iter().filter(|x| x.schema == schema) {
+        if !app.bimserver.owner_cache.contains_key(&x.oid) {
+            let bytes = app.bimserver.with(server, |c| c.file(x.file))?;
+            app.bimserver.owner_cache.insert(x.oid, serde_json::from_slice::<Ownership>(&bytes).ok());
+        }
+        if let Some(Some(d)) = app.bimserver.owner_cache.get(&x.oid) {
+            docs.push(d.clone());
+        }
+    }
+    let Some(mut current) = docs.iter().find(|d| d.parent_version.is_none()).cloned() else { return Ok(None) };
+    while let Some(next) = docs.iter().find(|d| d.parent_version == Some(current.version)) {
+        current = next.clone();
+    }
+    Ok(Some(current))
+}
+
+fn write_ownership(app: &mut App, st: &WorkingState, schema: i64, roid: i64, doc: &Ownership) -> Result<()> {
+    let data = serde_json::to_vec(doc).expect("serialises");
+    let title = format!("ownership v{}", doc.version);
+    app.bimserver.with(&st.server_id, |c| c.add_extended_data(roid, schema, &title, "ownership.json", "application/json", &data))
+}
+
+/// Takes the project's sync lock on its latest revision; `None` where the server cannot keep
+/// the ownership document.
+fn acquire_lock(app: &mut App, st: &WorkingState) -> Result<Option<Held>> {
+    let Some(schema) = ownership_schema(app, &st.server_id)? else { return Ok(None) };
+    let poid = st.poid;
+    let Some(roid) = app.bimserver.with(&st.server_id, |c| c.project(poid))?.last_revision else { return Ok(None) };
+    let me = app.bimserver.with(&st.server_id, Client::logged_in_user)?;
+    let session = app.bimserver.session_id();
+    let current = read_ownership(app, &st.server_id, schema, roid)?;
+    let t = now();
+    if let Some(l) = current.as_ref().and_then(|c| c.sync_lock.as_ref()).filter(|l| l.expires > t && l.owner.session != session) {
+        return Err(locked(l, t));
+    }
+    let base = current.unwrap_or(Ownership { version: 0, base_roid: roid, ..Ownership::default() });
+    let mine = SyncLock { owner: Owner { user_id: me.oid, user_name: if me.name.is_empty() { me.username } else { me.name }, session: session.clone() }, acquired: t, expires: t + LOCK_SECONDS };
+    let state = Ownership { version: base.version + 1, parent_version: (base.version > 0).then_some(base.version), sync_lock: Some(mine), ..base };
+    write_ownership(app, st, schema, roid, &state)?;
+    // Another session may have written a child of the same version first: the chain decides.
+    let after = read_ownership(app, &st.server_id, schema, roid)?.unwrap_or_default();
+    match &after.sync_lock {
+        Some(l) if l.owner.session == session => Ok(Some(Held { schema, roid, state: after })),
+        Some(l) => Err(locked(l, t)),
+        None => Err(bad("bimserver.sync_locked", "the sync lock could not be taken; try again")),
+    }
+}
+
+fn locked(l: &SyncLock, t: i64) -> Error {
+    let mins = ((l.expires - t) as f64 / 60.0).ceil().max(1.0);
+    Error::new("bimserver.sync_locked", format!("the project is being synchronised by {} (the lock lapses within {mins:.0} min); try again shortly", l.owner.user_name))
+        .with_details(serde_json::json!({ "holder": l.owner.user_name, "expires": l.expires }))
+}
+
+/// Releases a lock this session holds, on the revision it was taken on.
+fn release_lock(app: &mut App, st: &WorkingState, held: &Held) -> Result<()> {
+    let state = Ownership { version: held.state.version + 1, parent_version: Some(held.state.version), sync_lock: None, ..held.state.clone() };
+    write_ownership(app, st, held.schema, held.roid, &state)
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct LockStatus {
+    /// The server keeps Riviera's ownership document.
+    pub available: bool,
+    pub locked: bool,
+    pub holder: Option<String>,
+    /// Unix seconds.
+    pub expires: Option<i64>,
+    /// The lock is this session's.
+    pub mine: bool,
+}
+
+host!(BimLockStatus, "bimserver.lock_status", "Tell whether the project is being synchronised",
+    "The sync lock of the open working copy's project (COL-OWN-002): whether the server keeps Riviera's \
+     ownership document, whether someone holds the lock, who and until when.",
+    [Read, Network], Option<HistoryParams>, LockStatus, |app, caller, p| {
+    let (_, _, st) = app.working_copy(p.and_then(|p| p.document_id))?;
+    let schema = app.bimserver.with(&st.server_id, |c| c.extended_schema(OWNERSHIP_SCHEMA))?;
+    let poid = st.poid;
+    let roid = app.bimserver.with(&st.server_id, |c| c.project(poid))?.last_revision;
+    let mut out = LockStatus { available: schema.is_some(), locked: false, holder: None, expires: None, mine: false };
+    if let (Some(schema), Some(roid)) = (schema, roid)
+        && let Some(l) = read_ownership(app, &st.server_id, schema, roid)?.and_then(|o| o.sync_lock).filter(|l| l.expires > now())
+    {
+        out.mine = l.owner.session == app.bimserver.session_id();
+        (out.locked, out.holder, out.expires) = (true, Some(l.owner.user_name), Some(l.expires));
+    }
+    Ok(out)
+});
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ThreeWayParams {
+    pub base_path: PathBuf,
+    pub local_path: PathBuf,
+    pub remote_path: PathBuf,
+    pub out_path: PathBuf,
+    #[serde(default)]
+    pub policy: riviera_core::merge::Policy,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct MergeReport {
+    pub created: usize,
+    pub updated: usize,
+    pub deleted: usize,
+    pub remote_changes: usize,
+    pub merged: usize,
+    pub conflicts: Vec<riviera_core::merge::Conflict>,
+    /// The merged model was written (not while conflicts wait under the `fail` policy).
+    pub written: bool,
+}
+
+host!(MergeThreeWay, "merge.three_way", "Merge three IFC files",
+    "Three-way merge of files (COL-MRG-001), for scripts and tests: the changes from `base_path` to \
+     `remote_path` merged into `local_path`, element by element and parameter by parameter, written to \
+     `out_path`. Conflicts: `policy` fail (report them; nothing written), local or remote.",
+    [FileRead, FileWrite], ThreeWayParams, MergeReport, |app, caller, p| {
+    let base = open_store(&p.base_path)?;
+    let remote = open_store(&p.remote_path)?;
+    let (mut project, mut doc, _) = riviera_store::LocalProject::open(&p.local_path).map_err(|e| bad("merge.read", format!("{}: {e}", p.local_path.display())))?;
+    let plan = riviera_core::merge::three_way(&base, doc.store(), &remote, p.policy);
+    let mut out = MergeReport { created: 0, updated: 0, deleted: 0, remote_changes: plan.remote_changes, merged: plan.merged, conflicts: plan.conflicts.clone(), written: false };
+    if !plan.conflicts.is_empty() && p.policy == riviera_core::merge::Policy::Fail {
+        return Ok(out);
+    }
+    let mut txn = doc.transaction("Merge", riviera_core::Origin::ui());
+    let a = riviera_core::merge::apply(&mut txn, &plan)?;
+    txn.commit();
+    (out.created, out.updated, out.deleted) = (a.created, a.updated, a.deleted);
+    project.save_as(&doc, &p.out_path).map_err(|e| bad("merge.write", format!("{}: {e}", p.out_path.display())))?;
+    out.written = true;
+    Ok(out)
+});
+
+// ---- History, compare and restore (COL-BIM-008) ----
+
+/// A revision's label from its comment: `restore` or `ownership` for Riviera's own kinds.
+fn label(comment: &str) -> Option<String> {
+    let c = comment.trim_start();
+    c.strip_prefix("[riviera:").and_then(|r| r.split_once(']')).map(|(k, _)| k.to_owned())
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct HistoryRow {
+    #[serde(flatten)]
+    pub revision: RevisionOut,
+    /// `restore` for a restored revision (comment `[riviera:restore] …`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    /// The working copy's base.
+    pub base: bool,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct HistoryParams {
+    pub document_id: Option<DocumentId>,
+}
+
+host!(BimHistory, "bimserver.history", "List the working copy's revisions",
+    "The revisions of the open working copy's project, newest first (COL-BIM-008): number, date, user, \
+     comment, size, Riviera's label (restore), and which one is the working copy's base.",
+    [Read, Network], Option<HistoryParams>, Vec<HistoryRow>, |app, caller, p| {
+    let (_, _, st) = app.working_copy(p.and_then(|p| p.document_id))?;
+    let revs = BimListRevisions.run(app, caller, ProjectParams { server_id: st.server_id.clone(), poid: st.poid })?;
+    Ok(revs.into_iter().rev().map(|r| HistoryRow { label: label(&r.comment), base: r.roid == st.base_roid, revision: r }).collect())
+});
+
+/// Revision `roid` of the working copy's project, downloaded to `path` and read.
+fn revision_store(app: &mut App, st: &WorkingState, roid: i64, path: &Path) -> Result<riviera_core::Store> {
+    let schema = st.schema.clone();
+    let bytes = app.bimserver.with(&st.server_id, |c| {
+        let s = c.ifc_serializer(&schema)?;
+        c.download(roid, s.oid)
+    })?;
+    std::fs::write(path, &bytes).map_err(|e| bad("bimserver.working_copy", e.to_string()))?;
+    let store = open_store(path);
+    let _ = std::fs::remove_file(path);
+    store
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct CompareParams {
+    /// The older revision; the working copy's base when absent.
+    pub roid_a: Option<i64>,
+    /// The newer revision; the working copy itself (its local changes) when absent.
+    pub roid_b: Option<i64>,
+    pub document_id: Option<DocumentId>,
+}
+
+host!(BimCompare, "bimserver.compare", "Compare revisions",
+    "The changes between two revisions of the working copy's project (COL-BIM-008): elements added, \
+     deleted and modified (with the class, name or parameters that changed), by GlobalId. `roid_a` defaults \
+     to the working copy's base and `roid_b` to the working copy itself, so with neither it lists the local \
+     changes not yet checked in.",
+    [Read, Network], CompareParams, riviera_core::merge::ChangeSet, |app, caller, p| {
+    let (id, path, st) = app.working_copy(p.document_id)?;
+    let folder = path.parent().expect("in its folder").to_owned();
+    let a = match p.roid_a.filter(|r| *r != st.base_roid) {
+        Some(r) => revision_store(app, &st, r, &folder.join("compare-a.ifc"))?,
+        None => open_store(&folder.join(BASE))?,
+    };
+    let b = match p.roid_b {
+        Some(r) => revision_store(app, &st, r, &folder.join("compare-b.ifc"))?,
+        None => app.get(id)?.doc.store().clone(),
+    };
+    Ok(riviera_core::merge::diff(&a, &b))
+});
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RestoreParams {
+    pub roid: i64,
+    pub reason: String,
+    pub document_id: Option<DocumentId>,
+}
+
+host!(BimRestore, "bimserver.restore", "Restore a revision as the latest",
+    "Restore as latest (COL-BIM-008): checks revision `roid`'s content in as a new revision, with the \
+     comment `[riviera:restore] Restored revision n: <reason>`; the history is kept. The open working copy \
+     must be up to date and have no local changes (synchronise or discard them first); it then becomes the \
+     restored model, as one undoable step. Returns the new revision.",
+    [Network, Edit, FileWrite], RestoreParams, CheckInOut, |app, caller, p| {
+    let reason = p.reason.trim().to_owned();
+    if reason.is_empty() {
+        return Err(bad("bimserver.no_comment", "say why the revision is restored"));
+    }
+    let (id, path, st) = app.working_copy(p.document_id)?;
+    let folder = path.parent().expect("in its folder").to_owned();
+    let poid = st.poid;
+    let (project, revs) = app.bimserver.with(&st.server_id, |c| Ok((c.project(poid)?, c.revisions(poid)?)))?;
+    if project.last_revision.is_some_and(|r| r != st.base_roid) {
+        return Err(bad("bimserver.out_of_date", "get the latest revision first: the restore is checked in over it"));
+    }
+    let base = open_store(&folder.join(BASE))?;
+    if !riviera_core::merge::diff(&base, app.get(id)?.doc.store()).is_empty() {
+        return Err(bad("bimserver.local_changes", "the working copy has changes not checked in; synchronise them or undo them first"));
+    }
+    let number = revs.iter().find(|r| r.oid == p.roid).map(|r| r.number).ok_or_else(|| bad("bimserver.no_revision", format!("revision {} is not one of {}'s", p.roid, st.project)))?;
+    let restored = revision_store(app, &st, p.roid, &folder.join("restore.ifc"))?;
+    // The working copy becomes the restored model (base == local, so the merge takes it all).
+    let plan = riviera_core::merge::three_way(&base, app.get(id)?.doc.store(), &restored, riviera_core::merge::Policy::Remote);
+    let doc = &mut app.get_mut(id)?.doc;
+    let mut txn = doc.transaction(format!("Restore Revision {number}"), riviera_core::Origin::ui());
+    riviera_core::merge::apply(&mut txn, &plan)?;
+    txn.commit();
+    app.save(id, None)?;
+    check_in(app, id, &folder, st, &format!("[riviera:restore] Restored revision {number}: {reason}"))
+});
+
+// ---- Conflicts one by one, and the stash (COL-MRG-002) ----
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct ConflictRow {
+    /// Its id for merge.resolve: `c1`, `c2` …
+    pub id: String,
+    #[serde(flatten)]
+    pub conflict: riviera_core::merge::Conflict,
+}
+
+fn pending_of(app: &App, id: DocumentId) -> Result<&Pending> {
+    app.bimserver.pending.get(&id).ok_or_else(|| bad("merge.none_pending", "no merge waits for decisions (Get Latest or Synchronise found no conflicts, or it was finished or cancelled)"))
+}
+
+fn rows(p: &Pending) -> Vec<ConflictRow> {
+    p.conflicts
+        .iter()
+        .enumerate()
+        .map(|(k, c)| ConflictRow { id: format!("c{}", k + 1), conflict: riviera_core::merge::Conflict { decision: p.decisions.get(&c.key()).cloned(), ..c.clone() } })
+        .collect()
+}
+
+#[derive(Debug, Default, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DocParams {
+    pub document_id: Option<DocumentId>,
+}
+
+host!(MergeListConflicts, "merge.list_conflicts", "List the conflicts waiting for decisions",
+    "The pending merge's conflicts (COL-MRG-002): id, element (GlobalId, class, name), kind, facet, the \
+     local and remote values, and the decision taken so far.",
+    [Read], Option<DocParams>, Vec<ConflictRow>, |app, caller, p| {
+    let id = app.resolve(p.and_then(|p| p.document_id))?;
+    Ok(rows(pending_of(app, id)?))
+});
+
+/// mine, theirs or value.
+#[derive(Debug, Clone, Copy, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ChoiceKind {
+    Mine,
+    Theirs,
+    Value,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ResolveParams {
+    pub conflict_id: String,
+    pub choice: ChoiceKind,
+    /// For `value`: the merged value (null removes the facet).
+    pub value: Option<serde_json::Value>,
+    /// Mine or theirs for every conflict on that element (so a wall's curve is never half one
+    /// side's, half the other's).
+    #[serde(default)]
+    pub element: bool,
+    pub document_id: Option<DocumentId>,
+}
+
+host!(MergeResolve, "merge.resolve", "Decide one conflict",
+    "Decides conflict `conflict_id` of the pending merge (COL-MRG-002): keep `mine`, take `theirs`, or a \
+     `value` of its own (a property's merged value; not for a whole element); with `element`, mine or \
+     theirs for every conflict on the same element. Nothing changes until merge.finish.",
+    [Edit], ResolveParams, (), |app, caller, p| {
+    let id = app.resolve(p.document_id)?;
+    let pm = app.bimserver.pending.get_mut(&id).ok_or_else(|| bad("merge.none_pending", "no merge waits for decisions"))?;
+    let k: usize = p.conflict_id.trim_start_matches('c').parse().ok().filter(|k| *k >= 1 && *k <= pm.conflicts.len()).ok_or_else(|| bad("merge.no_conflict", format!("no conflict {:?}; merge.list_conflicts lists them", p.conflict_id)))?;
+    let c = &pm.conflicts[k - 1];
+    let choice = match p.choice {
+        ChoiceKind::Mine => riviera_core::merge::Choice::Mine,
+        ChoiceKind::Theirs => riviera_core::merge::Choice::Theirs,
+        ChoiceKind::Value if c.facet == "element" => return Err(bad("merge.bad_choice", "a whole element is kept or taken, not given a value")),
+        ChoiceKind::Value => riviera_core::merge::Choice::Value(p.value.clone().ok_or_else(|| bad("merge.bad_choice", "give the value"))?),
+    };
+    if p.element {
+        if matches!(choice, riviera_core::merge::Choice::Value(_)) {
+            return Err(bad("merge.bad_choice", "a whole element is kept or taken, not given a value"));
+        }
+        let g = c.guid.clone();
+        for k in pm.conflicts.iter().filter(|x| x.guid == g).map(riviera_core::merge::Conflict::key).collect::<Vec<_>>() {
+            pm.decisions.insert(k, choice.clone());
+        }
+    } else {
+        pm.decisions.insert(c.key(), choice);
+    }
+    Ok(())
+});
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ResolveAllParams {
+    pub choice: ChoiceKind,
+    /// Only conflicts on elements of this IFC class.
+    pub class: Option<String>,
+    /// Also those already decided (default: only the undecided).
+    #[serde(default)]
+    pub all: bool,
+    pub document_id: Option<DocumentId>,
+}
+
+host!(MergeResolveAll, "merge.resolve_all", "Decide many conflicts",
+    "Keep `mine` or take `theirs` for every undecided conflict of the pending merge (or every one, with \
+     `all`), optionally only on elements of `class` (COL-MRG-002). Returns how many were decided.",
+    [Edit], ResolveAllParams, usize, |app, caller, p| {
+    let id = app.resolve(p.document_id)?;
+    let pm = app.bimserver.pending.get_mut(&id).ok_or_else(|| bad("merge.none_pending", "no merge waits for decisions"))?;
+    let choice = match p.choice {
+        ChoiceKind::Mine => riviera_core::merge::Choice::Mine,
+        ChoiceKind::Theirs => riviera_core::merge::Choice::Theirs,
+        ChoiceKind::Value => return Err(bad("merge.bad_choice", "decide many conflicts as mine or theirs")),
+    };
+    let mut n = 0;
+    for c in &pm.conflicts {
+        if p.class.as_deref().is_some_and(|k| !c.class.eq_ignore_ascii_case(k)) || (!p.all && pm.decisions.contains_key(&c.key())) {
+            continue;
+        }
+        pm.decisions.insert(c.key(), choice.clone());
+        n += 1;
+    }
+    Ok(n)
+});
+
+/// One change the merge set aside: the losing side of a decided conflict.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct StashEntry {
+    pub id: u64,
+    pub guid: String,
+    pub class: String,
+    pub name: Option<String>,
+    pub facet: String,
+    /// The value set aside (for a whole element, its content; absent for a deletion).
+    pub value: Option<serde_json::Value>,
+    /// Whose change it was: `mine` or `theirs`.
+    pub side: String,
+    /// The revision merged.
+    pub revision: i64,
+    /// Unix seconds.
+    pub at: i64,
+}
+
+fn stash_path(path: &Path) -> PathBuf {
+    path.with_file_name("stash.json")
+}
+
+fn read_stash(path: &Path) -> Vec<StashEntry> {
+    std::fs::read(stash_path(path)).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default()
+}
+
+fn write_stash(path: &Path, s: &[StashEntry]) -> Result<()> {
+    std::fs::write(stash_path(path), serde_json::to_vec_pretty(s).expect("serialises")).map_err(|e| bad("bimserver.working_copy", e.to_string()))
+}
+
+host!(MergeFinish, "merge.finish", "Apply the conflict decisions",
+    "Finishes the pending merge (COL-MRG-002): every conflict must be decided (or `rest` says mine or theirs \
+     for the undecided). The merge is applied as one undoable step and the revision becomes the base; the \
+     losing side of each conflict goes to the stash (stash.list). A pending synchronise then checks in. \
+     Returns the sync report.",
+    [Network, Edit, FileWrite], FinishParams, SyncReport, |app, caller, p| {
+    let (id, path, st) = app.working_copy(p.document_id)?;
+    let mut pm = pending_of(app, id)?.clone();
+    if let Some(rest) = p.rest {
+        let c = match rest {
+            ChoiceKind::Mine => riviera_core::merge::Choice::Mine,
+            ChoiceKind::Theirs => riviera_core::merge::Choice::Theirs,
+            ChoiceKind::Value => return Err(bad("merge.bad_choice", "the rest are mine or theirs")),
+        };
+        for k in pm.conflicts.iter().map(riviera_core::merge::Conflict::key) {
+            pm.decisions.entry(k).or_insert_with(|| c.clone());
+        }
+    }
+    let folder = path.parent().expect("in its folder").to_owned();
+    let base = open_store(&folder.join(BASE))?;
+    let remote = open_store(&folder.join("remote.ifc"))?;
+    let plan = riviera_core::merge::three_way_decided(&base, app.get(id)?.doc.store(), &remote, riviera_core::merge::Policy::Fail, &pm.decisions);
+    let open: Vec<&riviera_core::merge::Conflict> = plan.conflicts.iter().filter(|c| c.decision.is_none()).collect();
+    if !open.is_empty() {
+        // The working copy changed since: new conflicts join the list.
+        let known: std::collections::BTreeSet<_> = pm.conflicts.iter().map(riviera_core::merge::Conflict::key).collect();
+        let fresh: Vec<_> = plan.conflicts.iter().filter(|c| !known.contains(&c.key())).cloned().collect();
+        let n = open.len();
+        let p2 = app.bimserver.pending.get_mut(&id).expect("pending");
+        p2.conflicts.extend(fresh);
+        return Err(bad("merge.undecided", format!("{n} conflict(s) still need a decision (merge.list_conflicts)")));
+    }
+    // The losing sides, to the stash.
+    let mut stash = read_stash(&path);
+    let first = stash.iter().map(|e| e.id).max().unwrap_or(0) + 1;
+    for (id, c) in (first..).zip(&plan.conflicts) {
+        let (side, value) = match c.decision.as_ref().expect("decided") {
+            riviera_core::merge::Choice::Mine => ("theirs", c.remote.clone()),
+            _ => ("mine", c.local.clone()),
+        };
+        stash.push(StashEntry { id, guid: c.guid.clone(), class: c.class.clone(), name: c.name.clone(), facet: c.facet.clone(), value, side: side.into(), revision: pm.number, at: now() });
+    }
+    write_stash(&path, &stash)?;
+    app.bimserver.pending.remove(&id);
+    let report = SyncReport { up_to_date: false, base_roid: st.base_roid, base_revision: st.base_revision, created: 0, updated: 0, deleted: 0, remote_changes: plan.remote_changes, merged: plan.merged, conflicts: Vec::new(), applied: false, skipped: Vec::new(), checked_in: None, lock: None, intruders: Vec::new(), corrective: None, pending: false };
+    let report = finish_merge(app, id, &folder, st, plan, pm.latest, pm.number, report)?;
+    match pm.sync_comment {
+        Some(comment) => {
+            let mut synced = BimSync.run(app, caller, SyncParams { comment, document_id: Some(id), conflicts: riviera_core::merge::Policy::Fail, keep_borrowed: false })?;
+            (synced.created, synced.updated, synced.deleted, synced.conflicts) = (report.created, report.updated, report.deleted, report.conflicts);
+            Ok(synced)
+        }
+        None => Ok(report),
+    }
+});
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct FinishParams {
+    /// Mine or theirs for the conflicts not yet decided.
+    pub rest: Option<ChoiceKind>,
+    pub document_id: Option<DocumentId>,
+}
+
+host!(MergeCancel, "merge.cancel", "Abandon the pending merge",
+    "Abandons the pending merge (COL-MRG-002): the working copy stays exactly as it was and its base is \
+     unchanged.",
+    [Edit], Option<DocParams>, (), |app, caller, p| {
+    let (id, path, _) = app.working_copy(p.and_then(|p| p.document_id))?;
+    pending_of(app, id)?;
+    app.bimserver.pending.remove(&id);
+    let _ = std::fs::remove_file(path.with_file_name("remote.ifc"));
+    Ok(())
+});
+
+host!(StashList, "stash.list", "List the conflict stash",
+    "The changes merges set aside (COL-MRG-002): the losing side of each decided conflict, with the element, \
+     facet, value, whose it was and the revision merged. The stash stays on this computer.",
+    [Read], Option<DocParams>, Vec<StashEntry>, |app, caller, p| {
+    let (_, path, _) = app.working_copy(p.and_then(|p| p.document_id))?;
+    Ok(read_stash(&path))
+});
+
+/// Sets the JSON value at `path` (`key/sub/sub`) inside `params`, removing it for `None`.
+fn set_facet(e: &mut riviera_core::Element, facet: &str, value: Option<serde_json::Value>) {
+    match facet {
+        "class" => {
+            if let Some(serde_json::Value::String(c)) = value {
+                e.class = c;
+            }
+        }
+        "name" => e.name = value.and_then(|v| v.as_str().map(str::to_owned)),
+        _ => {
+            let mut parts = facet.split('/');
+            let key = parts.next().unwrap_or_default().to_owned();
+            let rest: Vec<&str> = parts.collect();
+            if rest.is_empty() {
+                match value {
+                    Some(v) => e.params.insert(key, v),
+                    None => e.params.remove(&key),
+                };
+                return;
+            }
+            let root = e.params.entry(key).or_insert_with(|| serde_json::json!({}));
+            let mut at = root;
+            for (k, part) in rest.iter().enumerate() {
+                let last = k + 1 == rest.len();
+                let Some(obj) = at.as_object_mut() else { return };
+                if last {
+                    match value {
+                        Some(v) => obj.insert((*part).to_owned(), v),
+                        None => obj.remove(*part),
+                    };
+                    return;
+                }
+                at = obj.entry((*part).to_owned()).or_insert_with(|| serde_json::json!({}));
+            }
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct StashEntryParams {
+    pub entry_id: u64,
+    /// Also the element's other entries from the same side (a curve's start and end together).
+    #[serde(default)]
+    pub element: bool,
+    pub document_id: Option<DocumentId>,
+}
+
+host!(StashReapply, "stash.reapply", "Re-apply a stashed change",
+    "Re-applies stash entry `entry_id` to the working copy as a new, undoable local edit (COL-MRG-002): the \
+     property or name set to the value set aside, or a whole element brought back (with a new GlobalId if \
+     its own was retired in this session); with `element`, the element's other entries from the same side \
+     too, in the same edit. The entries leave the stash.",
+    [Edit, FileWrite], StashEntryParams, (), |app, caller, p| {
+    let (id, path, _) = app.working_copy(p.document_id)?;
+    let mut stash = read_stash(&path);
+    let first = stash.iter().find(|e| e.id == p.entry_id).cloned().ok_or_else(|| bad("stash.no_entry", format!("no stash entry {}", p.entry_id)))?;
+    let take = |e: &StashEntry| e.id == first.id || (p.element && e.guid == first.guid && e.side == first.side && e.revision == first.revision);
+    let entries: Vec<StashEntry> = stash.iter().filter(|e| take(e)).cloned().collect();
+    stash.retain(|e| !take(e));
+    let doc = &mut app.get_mut(id)?.doc;
+    let mut txn = doc.transaction("Re-apply Stashed Change", riviera_core::Origin::ui());
+    for entry in entries {
+        let existing = riviera_core::GlobalId::parse(&entry.guid).and_then(|g| txn.store().find_by_guid(&g));
+        if entry.facet == "element" {
+            let snap: Option<riviera_core::merge::Snap> = entry.value.clone().and_then(|v| serde_json::from_value(v).ok());
+            match (existing, snap) {
+                (Some(eid), Some(s)) => txn.modify(eid, |e| {
+                    e.class = s.class;
+                    e.name = s.name;
+                    e.params = s.params;
+                })?,
+                (Some(eid), None) => txn.delete(eid)?,
+                (None, Some(s)) => {
+                    let mut n = riviera_core::NewElement::new(&s.class);
+                    n.name = s.name.clone();
+                    n.params = s.params.clone();
+                    let with_guid = riviera_core::GlobalId::parse(&entry.guid).map(|g| n.clone().guid(g));
+                    if with_guid.map(|w| txn.create(w)).is_none_or(|r| r.is_err()) {
+                        txn.create(n)?;
+                    }
+                }
+                (None, None) => {}
+            }
+        } else {
+            let eid = existing.ok_or_else(|| bad("stash.no_element", "the element is no longer in the model"))?;
+            let (facet, value) = (entry.facet.clone(), entry.value.clone());
+            txn.modify(eid, |e| set_facet(e, &facet, value))?;
+        }
+    }
+    txn.commit();
+    write_stash(&path, &stash)
+});
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct StashDiscardParams {
+    pub entry_ids: Vec<u64>,
+    pub document_id: Option<DocumentId>,
+}
+
+host!(StashDiscard, "stash.discard", "Discard stashed changes",
+    "Deletes stash entries (COL-MRG-002). Returns how many were removed.",
+    [Edit, FileWrite], StashDiscardParams, usize, |app, caller, p| {
+    let (_, path, _) = app.working_copy(p.document_id)?;
+    let mut stash = read_stash(&path);
+    let before = stash.len();
+    stash.retain(|e| !p.entry_ids.contains(&e.id));
+    write_stash(&path, &stash)?;
+    Ok(before - stash.len())
+});
+
+// ---- Advisory ownership: borrowing on edit (COL-OWN-001) ----
+
+/// What the ownership check needs of an edit: the GlobalIds of the elements it modified or
+/// deleted (added ones are new and nobody else's).
+pub fn touched(before: &riviera_core::Store, after: &riviera_core::Store, changed: &riviera_core::ChangedSummary) -> Vec<String> {
+    let mut out: Vec<String> = changed.modified.iter().filter_map(|id| after.get(*id).map(|e| e.guid().to_string())).collect();
+    out.extend(changed.deleted.iter().filter_map(|id| before.get(*id).map(|e| e.guid().to_string())));
+    out.sort();
+    out.dedup();
+    out
+}
+
+/// Borrows `guids` for this session on working copy `st`'s project (COL-OWN-001): refused when
+/// another session owns one, or one changed in a revision newer than the base. Nothing to do
+/// where ownership is off or the server cannot keep the document.
+fn borrow(app: &mut App, st: &WorkingState, guids: &[String]) -> Result<()> {
+    if guids.is_empty() || !app.bimserver.profile(&st.server_id)?.ownership {
+        return Ok(());
+    }
+    let Some(schema) = ownership_schema(app, &st.server_id)? else { return Ok(()) };
+    let poid = st.poid;
+    let Some(roid) = app.bimserver.with(&st.server_id, |c| c.project(poid))?.last_revision else { return Ok(()) };
+    let me = app.bimserver.session_id();
+    for attempt in 0..2 {
+        let current = read_ownership(app, &st.server_id, schema, roid)?.unwrap_or(Ownership { version: 0, base_roid: roid, ..Ownership::default() });
+        let mut wanted = Vec::new();
+        for g in guids {
+            let target = format!("ifc:{g}");
+            match current.entries.iter().find(|e| e.target == target) {
+                Some(e) if e.owner.as_ref().is_some_and(|o| o.session != me) => {
+                    let who = e.owner.as_ref().map(|o| o.user_name.clone()).unwrap_or_default();
+                    return Err(Error::new("ownership.owned_by_other", format!("{who} is editing this element; ask them to synchronise and relinquish it, then try again")).with_details(serde_json::json!({ "guid": g, "owner": who })));
+                }
+                Some(e) if e.owner.is_none() && e.last_changed_revision > st.base_revision => {
+                    return Err(Error::new("ownership.not_latest", format!("this element changed in revision {}, newer than the working copy's {}; get the latest revision first", e.last_changed_revision, st.base_revision)).with_details(serde_json::json!({ "guid": g, "revision": e.last_changed_revision })));
+                }
+                Some(e) if e.owner.is_some() => {}
+                _ => wanted.push(target),
+            }
+        }
+        if wanted.is_empty() {
+            return Ok(());
+        }
+        let user = app.bimserver.with(&st.server_id, Client::logged_in_user)?;
+        let owner = Owner { user_id: user.oid, user_name: if user.name.is_empty() { user.username } else { user.name }, session: me.clone() };
+        let t = now();
+        let mut entries = current.entries.clone();
+        for w in &wanted {
+            match entries.iter_mut().find(|e| &e.target == w) {
+                Some(e) => {
+                    e.owner = Some(owner.clone());
+                    e.since = t;
+                }
+                None => entries.push(Entry { target: w.clone(), owner: Some(owner.clone()), since: t, last_changed_revision: 0 }),
+            }
+        }
+        let next = Ownership { version: current.version + 1, parent_version: (current.version > 0).then_some(current.version), entries, ..current.clone() };
+        write_ownership(app, st, schema, roid, &next)?;
+        // Another session may have written a child of the same version first: the chain decides.
+        let after = read_ownership(app, &st.server_id, schema, roid)?.unwrap_or_default();
+        let ours = wanted.iter().all(|w| after.entries.iter().any(|e| &e.target == w && e.owner.as_ref().is_some_and(|o| o.session == me)));
+        if ours {
+            return Ok(());
+        }
+        if attempt == 1 {
+            return Err(bad("ownership.busy", "someone else claimed elements at the same moment; try again"));
+        }
+    }
+    Ok(())
+}
+
+impl App {
+    /// After an edit of working copy `id`: borrows what it modified or deleted, or says why it
+    /// may not (the caller then undoes the edit). Offline, the edit stands.
+    pub(crate) fn claim_edit(&mut self, id: DocumentId, before: &riviera_core::Store, changed: &riviera_core::ChangedSummary) -> Result<()> {
+        let Some(st) = self.docs.get(&id).and_then(|d| state_of(d.project.path())) else { return Ok(()) };
+        let guids = touched(before, self.get(id)?.doc.store(), changed);
+        match borrow(self, &st, &guids) {
+            Err(e) if e.code == "bimserver.unreachable" || e.code == "bimserver.not_logged_in" => Ok(()),
+            r => r,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct OwnershipIdsParams {
+    pub element_ids: Vec<riviera_core::ElementRef>,
+    pub document_id: Option<DocumentId>,
+}
+
+fn guids_of(app: &App, id: DocumentId, refs: &[riviera_core::ElementRef]) -> Result<Vec<String>> {
+    let store = app.get(id)?.doc.store();
+    refs.iter().map(|r| store.resolve(r).and_then(|i| store.get(i)).map(|e| e.guid().to_string()).ok_or_else(|| bad("element.not_found", "no such element"))).collect()
+}
+
+host!(OwnershipBorrow, "ownership.borrow", "Borrow elements",
+    "Borrows elements of the open working copy for this session (COL-OWN-001), as editing them does \
+     automatically: refused when another session owns one (naming them) or one changed in a revision \
+     newer than the base.",
+    [Network], OwnershipIdsParams, (), |app, caller, p| {
+    let (id, _, st) = app.working_copy(p.document_id)?;
+    let guids = guids_of(app, id, &p.element_ids)?;
+    borrow(app, &st, &guids)
+});
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RelinquishParams {
+    /// The elements to relinquish; all this session's when absent.
+    pub element_ids: Option<Vec<riviera_core::ElementRef>>,
+    pub document_id: Option<DocumentId>,
+}
+
+host!(OwnershipRelinquish, "ownership.relinquish", "Relinquish borrowed elements",
+    "Gives up this session's borrows (all, or `element_ids`) without synchronising (COL-OWN-001); \
+     synchronise relinquishes them too. Returns how many were relinquished.",
+    [Network], RelinquishParams, usize, |app, caller, p| {
+    let (id, _, st) = app.working_copy(p.document_id)?;
+    let only = p.element_ids.as_ref().map(|r| guids_of(app, id, r)).transpose()?;
+    let Some(schema) = ownership_schema(app, &st.server_id)? else { return Ok(0) };
+    let poid = st.poid;
+    let Some(roid) = app.bimserver.with(&st.server_id, |c| c.project(poid))?.last_revision else { return Ok(0) };
+    let Some(current) = read_ownership(app, &st.server_id, schema, roid)? else { return Ok(0) };
+    let me = app.bimserver.session_id();
+    let mut n = 0;
+    let entries = current
+        .entries
+        .iter()
+        .cloned()
+        .map(|mut e| {
+            let pick = only.as_ref().is_none_or(|o| o.iter().any(|g| e.target == format!("ifc:{g}")));
+            if pick && e.owner.as_ref().is_some_and(|o| o.session == me) {
+                e.owner = None;
+                n += 1;
+            }
+            e
+        })
+        .collect();
+    if n > 0 {
+        let next = Ownership { version: current.version + 1, parent_version: Some(current.version), entries, ..current.clone() };
+        write_ownership(app, &st, schema, roid, &next)?;
+    }
+    Ok(n)
+});
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct OwnershipInfo {
+    pub guid: String,
+    /// Who holds it, if anyone.
+    pub owner: Option<String>,
+    pub mine: bool,
+    /// Unix seconds.
+    pub since: Option<i64>,
+    /// The revision it last changed in (when relinquished after a change).
+    pub last_changed_revision: Option<i64>,
+}
+
+host!(OwnershipQuery, "ownership.query", "Tell who is editing elements",
+    "For each element of the open working copy (COL-OWN-001): who has it borrowed (if anyone), whether it \
+     is this session, since when, and the revision it last changed in.",
+    [Read, Network], OwnershipIdsParams, Vec<OwnershipInfo>, |app, caller, p| {
+    let (id, _, st) = app.working_copy(p.document_id)?;
+    let guids = guids_of(app, id, &p.element_ids)?;
+    let me = app.bimserver.session_id();
+    let current = match ownership_schema(app, &st.server_id)? {
+        Some(schema) => {
+            let poid = st.poid;
+            match app.bimserver.with(&st.server_id, |c| c.project(poid))?.last_revision {
+                Some(roid) => read_ownership(app, &st.server_id, schema, roid)?.unwrap_or_default(),
+                None => Ownership::default(),
+            }
+        }
+        None => Ownership::default(),
+    };
+    Ok(guids
+        .into_iter()
+        .map(|g| {
+            let e = current.entries.iter().find(|e| e.target == format!("ifc:{g}"));
+            OwnershipInfo {
+                owner: e.and_then(|e| e.owner.as_ref()).map(|o| o.user_name.clone()),
+                mine: e.and_then(|e| e.owner.as_ref()).is_some_and(|o| o.session == me),
+                since: e.and_then(|e| e.owner.as_ref().map(|_| e.since)),
+                last_changed_revision: e.map(|e| e.last_changed_revision).filter(|r| *r > 0),
+                guid: g,
+            }
+        })
+        .collect())
+});

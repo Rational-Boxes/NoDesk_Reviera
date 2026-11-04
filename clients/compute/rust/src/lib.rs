@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2026 Reviera contributors
+// Copyright (C) 2026 Riviera contributors
 
-//! The remote computation contract (BIM Reviera spec Ch 2 §2.17): the generated gRPC types of
+//! The remote computation contract (BIM Riviera spec Ch 2 §2.17): the generated gRPC types of
 //! `reviera.compute.v1` and the job kinds' packages, technique negotiation, blob codecs, the
 //! local transport, and a toolkit for writing runners. MIT, so a runner or service under any
-//! licence can implement the contract without Reviera's code.
+//! licence can implement the contract without Riviera's code.
 
 #![allow(clippy::doc_lazy_continuation, clippy::large_enum_variant)]
 

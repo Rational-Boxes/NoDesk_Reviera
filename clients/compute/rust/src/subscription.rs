@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2026 Reviera contributors
+// Copyright (C) 2026 Riviera contributors
 
-//! The client side of remote analysis subscriptions (BIM Reviera spec Ch 2 §2.17.11,
+//! The client side of remote analysis subscriptions (BIM Riviera spec Ch 2 §2.17.11,
 //! DM-RPC-011), over the HTTPS binding described in `reviera/compute/v1/subscription.proto`.
 //!
 //! - Only `https://` URLs, except `http://localhost` when the caller asks for development use.
@@ -300,7 +300,7 @@ impl std::fmt::Debug for Client {
 }
 
 /// A client for public https services (data connectors): the platform's certificate roots,
-/// TLS 1.2 and 1.3, redirects followed, Reviera's user agent.
+/// TLS 1.2 and 1.3, redirects followed, Riviera's user agent.
 pub fn public_client(timeout: Duration) -> Result<reqwest::blocking::Client, Error> {
     let provider: Arc<CryptoProvider> = Arc::new(rustls::crypto::ring::default_provider());
     let verifier = rustls_platform_verifier::Verifier::new_with_extra_roots(Vec::new(), provider.clone()).map_err(|e| Error::new("certificate", format!("The certificates could not be loaded: {e}")))?;
@@ -314,7 +314,7 @@ pub fn public_client(timeout: Duration) -> Result<reqwest::blocking::Client, Err
     reqwest::blocking::Client::builder()
         .tls_backend_preconfigured(tls)
         .timeout(timeout)
-        .user_agent(concat!("BIM-Reviera/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("BIM-Riviera/", env!("CARGO_PKG_VERSION")))
         .build()
         .map_err(|e| Error::new("tls", format!("The connection could not be set up: {e}")))
 }
@@ -354,7 +354,7 @@ impl Client {
             .tls_backend_preconfigured(tls)
             .redirect(reqwest::redirect::Policy::none())
             .timeout(timeout)
-            .user_agent(concat!("BIM-Reviera/", env!("CARGO_PKG_VERSION")))
+            .user_agent(concat!("BIM-Riviera/", env!("CARGO_PKG_VERSION")))
             .build()
             .map_err(|e| Error::new("tls", format!("The connection could not be set up: {e}")))?;
         Ok(Self { http, base, token: Mutex::new(None) })

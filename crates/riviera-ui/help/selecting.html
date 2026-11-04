@@ -1,0 +1,198 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Riviera contributors -->
+<h1>Selecting and modifying</h1>
+<p class="lead">Select elements in a view, then change them in Properties, with grips, or with
+the tools of the Modify tab. Every change can be undone.</p>
+<p class="see">See it in the <a href="riviera:sample/modify_tools">Editing tools</a> sample (every Modify tool side by side), with its <a href="riviera:help/walkthrough-modify_tools">walkthrough</a>.</p>
+<nav class="toc">
+  <a href="#select">Selecting</a>
+  <a href="#box">Box selection</a>
+  <a href="#quick">Quick modify menu</a>
+  <a href="#tools">Modify tools</a>
+  <a href="#grips">Grips and dragging</a>
+  <a href="#delete">Deleting and pinning</a>
+  <a href="#undo">Undo and history</a>
+</nav>
+
+<h2 id="select">Selecting</h2>
+<table>
+  <tr><td>Click</td><td>Selects the element under the cursor. Clicking empty space, or
+    <kbd>Esc</kbd>, clears the selection.</td></tr>
+  <tr><td><kbd>Ctrl</kbd>+click</td><td>Adds the element to the selection.</td></tr>
+  <tr><td><kbd>Shift</kbd>+click</td><td>Removes it from the selection.</td></tr>
+  <tr><td><b>Modify</b> <kbd>MD</kbd></td><td>Ends the running tool, so clicks select
+    again.</td></tr>
+  <tr><td><kbd>Tab</kbd></td><td>Cycles what is under the cursor: the element, then the chain
+    of walls joined to it, then other elements there (<kbd>Shift</kbd>+<kbd>Tab</kbd> goes back).
+    The status bar names it; the next click selects it.</td></tr>
+</table>
+<p>The selection decides what Properties show and which
+<a href="riviera:help/window#contextual">contextual tab</a> appears. The Model Tree, schedules
+(selecting a row) and Check Overlaps also select elements. In plans, a room is selected by
+clicking its label or inside it. <code>selection.get</code>, <code>selection.set</code>,
+<code>selection.add</code>, <code>selection.remove</code>, <code>selection.clear</code></p>
+
+<h2 id="box">Box selection</h2>
+<p>Drag a box over the elements:</p>
+<ul>
+  <li><b>Left to right</b> draws a solid <i>window</i>: it selects what is entirely inside.</li>
+  <li><b>Right to left</b> draws a dashed <i>crossing</i>: it selects what is inside or touches
+    it.</li>
+</ul>
+<p>In plans, a left drag that starts on nothing draws the box. In 3D views a left drag orbits, so
+hold <kbd>Ctrl</kbd> or <kbd>Shift</kbd> while dragging. <kbd>Ctrl</kbd> adds the boxed elements
+to the selection and <kbd>Shift</kbd> removes them. Only what the view shows can be boxed: its
+view range, section box, slices and hidden elements are respected.</p>
+
+<h2 id="quick">The quick modify menu</h2>
+<p>A middle click (press and release without moving; a middle drag pans) on an element opens a
+menu at the cursor for the selection. The element is selected first if it is not already
+(<kbd>Ctrl</kbd> keeps the rest of the selection). It offers:</p>
+<ul>
+  <li><b>Move</b>, <b>Copy</b>, <b>Rotate</b>, <b>Mirror – Pick Axis</b>, <b>Mirror – Draw
+    Axis</b>;</li>
+  <li><b>Flip Wall</b> for walls, <b>Flip Hand</b> and <b>Flip Facing</b> for doors and
+    windows;</li>
+  <li><b>Hide in View</b>, <b>Make Translucent</b> / <b>Make Opaque</b>, <b>Isolate</b>,
+    <b>Reset Hide/Isolate</b> (when anything is hidden) and <b>Section Box</b>;</li>
+  <li><b>Pin</b> or <b>Unpin</b>, and <b>Delete</b>.</li>
+</ul>
+<p>With exactly two elements selected, the menu checks whether they overlap. When they do, it
+offers the booleans: cut either by the other, intersect, union, join (by precedence), or accept
+the overlap. See <a href="riviera:help/coordination#booleans">Booleans</a>.</p>
+
+<h3 id="radial">The radial menu (experimental)</h3>
+<p>Turn on <b>View › User Interface › Radial Menu (Experimental)</b> and a middle click opens a
+ring of up to eight items around the pointer instead. Move toward an item to highlight it; keep
+going until you reach its label and, if it has a ▸, the ring moves to the pointer and shows the
+next tier. Move back into the middle to go up a tier. Click a highlighted command to run it;
+click anywhere else, right-click or press <kbd>Esc</kbd> to close the ring. The arrow keys,
+<kbd>Enter</kbd> and <kbd>Backspace</kbd> work too.</p>
+<ul>
+  <li>On an element the ring holds the quick modify menu: <b>Transform</b>, <b>Visibility</b>,
+    Create Component, Pin or Unpin, Delete, and the overlap booleans for two overlapping
+    elements.</li>
+  <li>On empty space it holds the whole ribbon: <b>Menu</b> (the menu bar) at the top, then the
+    tabs, each opening its panels and their tools. A tier with more than eight items ends in
+    <b>More…</b>.</li>
+</ul>
+<p>The setting is remembered for you; turn it off the same way to get the popup menu back.</p>
+
+<h2 id="tools">Modify tools</h2>
+<p>The tools are on the <b>Modify</b> tab, on every contextual tab and in the <b>Modify</b>
+menu. They work in plan views. Move, Copy, Rotate and Mirror act on the selection made first
+(select, then start the tool). Points snap like the
+drawing tools, and lengths and angles can be typed and placed with <kbd>Enter</kbd>.
+<kbd>Esc</kbd> drops the last pick, then ends the tool. Align, Offset, Trim/Extend and Split
+pick elements in the view and stay active for more picks.</p>
+<table>
+  <tr><th>Tool</th><th>How it works</th></tr>
+  <tr><td><b>Move</b> <kbd>MV</kbd></td><td>Click a start point and an end point, or type a
+    distance. <a class="run" href="riviera:action/element.move">Move</a></td></tr>
+  <tr><td><b>Copy</b> <kbd>CO</kbd></td><td>As Move, leaving the original in place.</td></tr>
+  <tr><td><b>Rotate</b> <kbd>RO</kbd></td><td>Rotates about the selection's centre: click a point on
+    the first ray, then the second ray, or type an angle in degrees.</td></tr>
+  <tr><td><b>Array</b> <kbd>AR</kbd></td><td>Copies in a row: give the number of members (the
+    original included) and <b>Move To</b>, then click a start point and where the second member
+    (<i>2nd</i>) or the last member (<i>Last</i>) goes, or type a distance. The members are
+    independent copies, selected afterwards. <code>element.array_linear</code>
+    <a class="run" href="riviera:action/element.array_linear">Array</a></td></tr>
+  <tr><td><b>Radial Array</b></td><td>Copies round the selection's centre: the number of members
+    and Move To, then the first ray and the second (or last) member's ray, or a typed angle; with
+    <i>Last</i> and 360 the members are spaced evenly round the full turn.
+    <code>element.array_radial</code></td></tr>
+  <tr><td><b>Mirror – Pick Axis</b> <kbd>MM</kbd></td><td>Mirrored copies about a wall, wall face
+    or grid you click.</td></tr>
+  <tr><td><b>Mirror – Draw Axis</b> <kbd>DM</kbd></td><td>Mirrored copies about an axis drawn
+    with two clicks.</td></tr>
+  <tr><td><b>Align</b> <kbd>AL</kbd></td><td>Pick the reference line (a wall face, centreline or
+    grid), then each line to align with it. <kbd>Esc</kbd> picks a new reference.</td></tr>
+  <tr><td><b>Offset</b> <kbd>OF</kbd></td><td>Click a wall or grid: it is copied parallel to itself,
+    toward the cursor, at the offset distance (type a distance to change it).</td></tr>
+  <tr><td><b>Trim/Extend to Corner</b> <kbd>TR</kbd></td><td>Click two walls on the parts to
+    keep: they are trimmed or extended to meet at a corner.</td></tr>
+  <tr><td><b>Trim/Extend Single Element</b></td><td>Pick the boundary (a wall or grid), then click
+    the walls to trim or extend to it, on the part to keep. <kbd>Esc</kbd> picks a new
+    boundary.</td></tr>
+  <tr><td><b>Split Element</b> <kbd>SL</kbd></td><td>Splits a wall in two where you
+    click. Split with Gap and Split Horizontally are on Modify | Walls: see
+    <a href="riviera:help/walls#split">Walls</a>.</td></tr>
+</table>
+<p>Walls carry their doors and windows when they are moved, copied or mirrored.
+<code>element.move</code>, <code>element.copy</code>, <code>element.rotate</code>,
+<code>element.mirror</code>, <code>element.align</code>, <code>element.offset</code>,
+<code>element.trim_corner</code>, <code>element.trim_extend</code>,
+<code>element.split</code></p>
+
+<h2 id="measure">Measuring</h2>
+<p><b>Modify › Measure</b> <a href="riviera:action/tool.measure">Measure</a> measures in a plan
+without changing anything. Click points: the status bar shows each segment, its angle and the
+running total. <kbd>Esc</kbd> clears the chain; a second <kbd>Esc</kbd> ends the tool.</p>
+<p>Scripts measure with <code>measure.between</code> (the distance between two points, its
+components and its angle), <code>measure.chain</code> (a chain's segments and total) and
+<code>measure.along</code> (the length of a wall, curtain wall, ramp or grid along its
+curve).</p>
+
+<h2 id="grips">Grips and dragging</h2>
+<p>Many elements can be changed by dragging, each drag one undo step:</p>
+<table>
+  <tr><td>Walls and grids</td><td>A selected wall or grid shows a grip at each end: drag it to
+    move that end. Drag the selected walls or grids themselves to move them.</td></tr>
+  <tr><td>Doors and windows</td><td>Drag a selected one along its wall.</td></tr>
+  <tr><td>Floors, ceilings, roofs, decks</td><td>In a plan, a selected one shows grips at its
+    corners and edge middles: drag an edge across, or a corner.
+    See <a href="riviera:help/sketch#grips">Sketch mode</a>.</td></tr>
+  <tr><td>Vertical openings and shafts</td><td>The same corner and edge grips. See
+    <a href="riviera:help/openings">Openings</a>.</td></tr>
+  <tr><td>Section box and slices</td><td>Face grips and slice grips in 3D views.</td></tr>
+  <tr><td>Tags, text, viewports</td><td>Drag them in plans and on sheets.</td></tr>
+</table>
+
+<h2 id="groups">Groups</h2>
+<p>A group is a set of elements placed many times and kept identical.</p>
+<ul>
+  <li><b>Architecture › Model › Create Group</b> (<kbd>GP</kbd>) makes the selection a group
+    (doors and windows of its walls come along) and names it.</li>
+  <li><b>Place Group</b>: choose the group, then click in a plan where its origin goes (the
+    middle of the original elements); Esc ends.</li>
+  <li>Members can't be moved or deleted on their own. Select a member and use <b>Modify | Model
+    Groups › Edit Group</b> (<kbd>EG</kbd>): change the members, <b>Add</b> or <b>Remove</b>
+    selected elements, then <b>Finish</b> (every instance follows) or <b>Cancel</b>.</li>
+  <li><b>Exclude</b> removes the selected member from its instance only; <b>Restore
+    Excluded</b> brings such members back. <b>Ungroup</b> leaves the members as ordinary
+    elements.</li>
+</ul>
+<p>Each instance is saved as an <code>IfcGroup</code> with its members assigned to it.
+<code>group.create</code>, <code>group.place</code>, <code>group.edit</code>,
+<code>group.finish</code>, <code>group.cancel</code>, <code>group.exclude_member</code>,
+<code>group.restore_member</code>, <code>group.ungroup</code>, <code>group.swap_type</code></p>
+
+<h2 id="selection-sets">Saved selections</h2>
+<p><b>Manage › Selection › Save Selection</b> names the current selection; <b>Load
+Selection</b> selects a saved set again (deleted members are left out). Members of groups are
+saved as their group. When some members are hidden in the current view, Load Selection asks
+whether to include them.</p>
+<p><b>Edit Selection</b> changes a saved set in place. Its members are selected; click or drag a
+window over elements to take them out, or choose <b>Add to Selection</b> (<kbd>A</kbd>) first to
+put them in (<b>Remove from Selection</b>, <kbd>R</kbd>, switches back). <b>Finish Selection</b>
+(<kbd>Enter</kbd>) keeps the change as one step you can undo; <kbd>Esc</kbd> cancels.</p>
+<p><b>Sets as IfcGroups</b> chooses whether each saved selection is also written to the IFC file
+as a group, so other tools can see it. <code>selectionset.save</code>,
+<code>selectionset.load</code>, <code>selectionset.edit</code>, <code>selectionset.rename</code>,
+<code>selectionset.delete</code>, <code>selectionset.list</code>,
+<code>selectionset.set_export</code></p>
+
+<h2 id="delete">Deleting and pinning</h2>
+<p><b>Delete</b> (<kbd>DE</kbd>, or the <kbd>Delete</kbd> key) deletes the selection along with
+what depends on it: a wall's doors and windows, a dormer's parts. Deleting a level first lists
+what would go with it. <code>element.delete</code></p>
+<p><b>Pin</b> (<kbd>PN</kbd>) keeps the selected elements from being moved or deleted;
+<b>Unpin</b> (<kbd>UP</kbd>) releases them. <code>element.pin</code>,
+<code>element.unpin</code></p>
+
+<h2 id="undo">Undo, redo and history</h2>
+<p><b>Edit › Undo</b> (<kbd>Ctrl</kbd>+<kbd>Z</kbd>) and <b>Redo</b>
+(<kbd>Ctrl</kbd>+<kbd>Y</kbd>). Every change is one transaction; a tool that makes several
+changes, and a whole script run, undo as one step. The history records who made each change
+(you, a script or an agent); the <code>edit.history</code> command lists it, and
+<code>edit.undo</code> takes a number of steps.</p>

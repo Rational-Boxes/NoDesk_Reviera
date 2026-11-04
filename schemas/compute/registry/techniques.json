@@ -1,5 +1,5 @@
 {
-  "$comment": "SPDX-License-Identifier: MIT. Technique identifiers for negotiation on the remote computation contract (BIM Reviera spec Ch 2 DM-RPC-001). This registry only grows: identifiers are never reused or removed, only marked deprecated.",
+  "$comment": "SPDX-License-Identifier: MIT. Technique identifiers for negotiation on the remote computation contract (BIM Riviera spec Ch 2 DM-RPC-001). This registry only grows: identifiers are never reused or removed, only marked deprecated.",
   "version": 1,
   "categories": {
     "compression": [

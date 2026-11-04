@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2026 Reviera contributors
+// Copyright (C) 2026 Riviera contributors
 
 //! Technique negotiation (DM-RPC-001): each side offers the identifiers it accepts, in order of
 //! preference, per category; the choice is the client's most preferred identifier that the

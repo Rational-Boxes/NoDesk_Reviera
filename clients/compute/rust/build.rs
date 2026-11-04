@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2026 Reviera contributors
+// Copyright (C) 2026 Riviera contributors
 
 //! Compiles the contract's `.proto` files with protox (pure Rust), so no `protoc` is needed.
 

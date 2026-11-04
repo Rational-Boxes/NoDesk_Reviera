@@ -1,0 +1,30 @@
+[package]
+name = "riviera"
+description = "BIM Riviera: open-source BIM authoring on native IFC"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "riviera"
+path = "src/main.rs"
+
+# Opens the window without a console window on Windows (shortcuts and the file association).
+[[bin]]
+name = "riviera-gui"
+path = "src/bin/riviera-gui.rs"
+
+[dependencies]
+riviera-core.workspace = true
+riviera-app.workspace = true
+riviera-mcp.workspace = true
+riviera-ui.workspace = true
+tokio.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

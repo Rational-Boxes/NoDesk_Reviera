@@ -1,0 +1,1248 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Riviera contributors
+
+//! `docs.*`: materials documented on FileEngine (spec Ch 6, COL-FE-006 and COL-FE-007;
+//! `design_documents/FILEENGINE_INTEGRATION.md` §7 and §7c).
+//!
+//! - A project material links to one **documentation folder** (`docs.link`), whose files carry a
+//!   `doc.type` (EPD, HPD, specification, …) in their FileEngine metadata (`docs.list`,
+//!   `docs.set_doc_type`).
+//! - `docs.extract` asks the conversion service's headless extraction (`POST /csai/v1/extract`)
+//!   for a **field set** (`schemas/extract/<set>.json`, MIT) from the folder's documents of that
+//!   set's `doc.type`, or from files named. Each value comes back with the quote it was read from,
+//!   or as not found. The run is kept for this session; nothing is written.
+//! - Each field set is published to the server as an extraction **prompt set** (`riviera.<set>`,
+//!   `docs.publish_field_sets`), the first time a session extracts with it, with nothing to set up
+//!   on the server. Extraction then names the set and the revision published, so the server's
+//!   cache, marked-up PDFs and folder automation all see the same definition. A set an editor has
+//!   taken over is used as the editor left it; a server without prompt sets is sent the schema.
+//! - `docs.apply_extracted` writes the fields the user accepts onto the material in one undo step
+//!   (`docs.set_values`), each with its source, optionally into the folder's metadata too, and an
+//!   EPD's GWP as the material's embodied-carbon factor.
+
+use std::collections::{BTreeMap, HashMap};
+use std::time::Duration;
+
+use riviera_core::product_docs::{Link, Source as DocSource, Taken};
+use riviera_core::{Caller, CommandMeta, Effect, Error, HostCommand, Result};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
+
+use crate::App;
+
+/// How long one extraction may take: the service reads each document whole.
+const EXTRACT_TIMEOUT: Duration = Duration::from_secs(15 * 60);
+
+/// The field sets Riviera ships, by id.
+const FIELD_SETS: &[(&str, &str)] = &[("epd", include_str!("../../../schemas/extract/epd.json")), ("hpd", include_str!("../../../schemas/extract/hpd.json"))];
+
+fn bad(code: &'static str, msg: impl Into<String>) -> Error {
+    Error::new(code, msg)
+}
+
+macro_rules! host {
+    ($ty:ident, $name:literal, $summary:literal, $desc:literal, [$($eff:ident),*], $params:ty, $out:ty, |$app:ident, $caller:ident, $p:ident| $body:block) => {
+        pub(crate) struct $ty;
+        impl HostCommand for $ty {
+            type Host = App;
+            type Params = $params;
+            type Output = $out;
+            const META: CommandMeta = CommandMeta { name: $name, version: 1, summary: $summary, description: $desc, effects: &[$(Effect::$eff),*], transaction_name: "" };
+            #[allow(unused_variables)]
+            fn run(&self, $app: &mut App, $caller: &Caller, $p: $params) -> Result<$out> $body
+        }
+    };
+}
+
+// ---- Field sets ----
+
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct Field {
+    pub field: String,
+    pub label: String,
+    /// The IFC property it is written as.
+    pub property: String,
+    /// The folder metadata key it may fill.
+    pub folder_key: Option<String>,
+    /// string, number, boolean.
+    pub kind: String,
+    /// The unit a number is asked for in, if the field set names one.
+    pub unit: Option<String>,
+    pub description: String,
+}
+
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct FieldSet {
+    pub id: String,
+    pub title: String,
+    pub description: String,
+    /// The IFC property set its values are written as.
+    pub pset: String,
+    /// The `doc.type` of the documents it reads.
+    pub doc_type: String,
+    pub fields: Vec<Field>,
+    /// The prompt set it is published as on a FileEngine server.
+    pub slug: String,
+    #[serde(skip)]
+    instructions: String,
+    #[serde(skip)]
+    schema: Value,
+    /// Its prompt-set definition (`fileengine.prompt_set.v1`).
+    #[serde(skip)]
+    definition: Value,
+}
+
+/// The schema without Riviera's own annotations, as the service is sent it.
+fn plain(v: &Value) -> Value {
+    match v {
+        Value::Object(m) => Value::Object(m.iter().filter(|(k, _)| !k.starts_with("x-") && !matches!(k.as_str(), "$id" | "$schema")).map(|(k, v)| (k.clone(), plain(v))).collect()),
+        other => other.clone(),
+    }
+}
+
+fn parse_set(id: &str, text: &str) -> FieldSet {
+    let v: Value = serde_json::from_str(text).expect("the shipped field sets are JSON");
+    let x = &v["x-riviera"];
+    let s = |v: &Value| v.as_str().unwrap_or_default().to_owned();
+    let fields = v["properties"]
+        .as_object()
+        .into_iter()
+        .flatten()
+        .map(|(k, f)| Field {
+            field: k.clone(),
+            label: f["x-riviera"]["label"].as_str().unwrap_or(k).to_owned(),
+            property: f["x-riviera"]["property"].as_str().unwrap_or(k).to_owned(),
+            folder_key: f["x-riviera"]["folder_key"].as_str().map(str::to_owned),
+            kind: f["type"].as_str().unwrap_or("string").to_owned(),
+            unit: f["x-riviera"]["unit"].as_str().map(str::to_owned),
+            description: s(&f["description"]),
+        })
+        .collect();
+    let slug = format!("riviera.{id}");
+    let definition = definition(&v, &slug);
+    FieldSet { id: id.to_owned(), title: s(&v["title"]), description: s(&v["description"]), pset: s(&x["pset"]), doc_type: s(&x["doc_type"]), fields, slug, instructions: s(&x["instructions"]), schema: plain(&v), definition }
+}
+
+/// A field set as a prompt set (`fileengine.prompt_set.v1`): its fields typed as the service
+/// types them, each with its label, description and unit. Riviera's own mapping (`x-riviera`:
+/// property, folder key) stays in Riviera.
+fn definition(v: &Value, slug: &str) -> Value {
+    let fields: Vec<Value> = v["properties"]
+        .as_object()
+        .into_iter()
+        .flatten()
+        .map(|(k, f)| {
+            let t = match (f["type"].as_str().unwrap_or("string"), f["format"].as_str()) {
+                (_, _) if f["enum"].is_array() => "enum",
+                ("string", Some("date")) => "date",
+                ("number", _) => "number",
+                ("integer", _) => "integer",
+                ("boolean", _) => "boolean",
+                ("array", _) => "list",
+                _ => "string",
+            };
+            let mut d = json!({ "name": k, "label": f["x-riviera"]["label"].as_str().unwrap_or(k), "type": t, "description": f["description"].as_str().unwrap_or_default() });
+            // The service takes a unit only on a number, and a short one; a longer one stays in the description.
+            match f["x-riviera"]["unit"].as_str() {
+                Some(u) if matches!(t, "number" | "integer") && u.chars().count() <= 32 => d["unit"] = json!(u),
+                Some(u) => d["description"] = json!(format!("{} (in {u})", d["description"].as_str().unwrap_or_default()).trim().to_owned()),
+                None => {}
+            }
+            if t == "enum" {
+                d["enum"] = f["enum"].clone();
+            }
+            for b in ["minimum", "maximum"] {
+                if f[b].is_number() && matches!(t, "number" | "integer") {
+                    d[b] = f[b].clone();
+                }
+            }
+            d
+        })
+        .collect();
+    let title = v["title"].as_str().unwrap_or(slug);
+    json!({
+        "format": "fileengine.prompt_set.v1",
+        "type": "extraction_prompt_set",
+        "name": format!("{title} (BIM Riviera)"),
+        "slug": slug,
+        "description": v["description"],
+        "instructions": v["x-riviera"]["instructions"],
+        "fields": fields,
+    })
+}
+
+pub fn field_sets() -> Vec<FieldSet> {
+    FIELD_SETS.iter().map(|(id, t)| parse_set(id, t)).collect()
+}
+
+fn field_set(id: &str) -> Result<FieldSet> {
+    let id = id.trim().to_lowercase();
+    field_sets().into_iter().find(|s| s.id == id).ok_or_else(|| bad("docs.no_field_set", format!("no field set {id:?}; docs.field_sets lists them ({})", FIELD_SETS.iter().map(|s| s.0).collect::<Vec<_>>().join(", "))))
+}
+
+host!(DocsFieldSets, "docs.field_sets", "List the product data field sets",
+    "The field sets docs.extract can read from documents (COL-FE-007): each with its fields (label, the IFC \
+     property it fills, the FileEngine folder metadata key it may fill, its type), the property set its values \
+     are written as and the doc.type of the documents it reads. Shipped as JSON Schemas in schemas/extract/.",
+    [Read], riviera_core::embodied_carbon::Empty, Vec<FieldSet>, |app, caller, p| {
+    Ok(field_sets())
+});
+
+// ---- Field sets as prompt sets on the server ----
+
+/// The server's prompt set a field set's extraction names.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct PromptSetRef {
+    pub id: String,
+    pub slug: String,
+    /// The revision extraction pins (the one Riviera published), or none for the set's current
+    /// one (an editor's).
+    pub revision: Option<u64>,
+    /// `application` (Riviera's definition) or `builder` (an editor took it over).
+    pub managed: String,
+}
+
+/// What publishing a field set to a connection's server came to.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct Publication {
+    pub set: String,
+    pub slug: String,
+    /// The prompt set extraction names, or none when the field set's schema is sent instead.
+    pub prompt_set: Option<PromptSetRef>,
+    /// Whether this publish made a set or a revision (false: the server had it already).
+    pub created: bool,
+    pub changed: bool,
+    /// Why extraction uses something other than Riviera's own published revision.
+    pub note: Option<String>,
+    /// The server's warnings (a model it does not offer, …).
+    pub warnings: Vec<String>,
+}
+
+/// Publishes field set `set` as prompt set `riviera.<set>` on connection `conn` (idempotent:
+/// unchanged, it changes nothing), and keeps the answer for the session.
+fn publish(app: &mut App, conn: &str, set: &FieldSet) -> Result<Publication> {
+    // A set published before the name was spelt correctly is `reviera.<set>` on the server, and
+    // an editor may have taken it over: keep using it until a `riviera.<set>` exists.
+    let old = format!("reviera.{}", set.id);
+    let listed = app.fileengine.with(conn, |c| c.prompt_sets("")).ok().unwrap_or_default();
+    let legacy;
+    let set = if listed.iter().any(|p| p["slug"] == old.as_str()) && !listed.iter().any(|p| p["slug"] == set.slug.as_str()) {
+        let mut s = set.clone();
+        s.definition["slug"] = old.clone().into();
+        s.slug = old;
+        legacy = s;
+        &legacy
+    } else {
+        set
+    };
+    let answer = app.fileengine.with(conn, |c| Ok(c.publish_prompt_set(&set.slug, &set.definition)))?;
+    let mut out = Publication { set: set.id.clone(), slug: set.slug.clone(), prompt_set: None, created: false, changed: false, note: None, warnings: Vec::new() };
+    match answer {
+        Ok(v) => {
+            out.created = v["created"] == true;
+            out.changed = v["changed"] == true;
+            out.warnings = v["warnings"].as_array().into_iter().flatten().map(|w| w.as_str().map_or_else(|| w["message"].as_str().unwrap_or(&w.to_string()).to_owned(), str::to_owned)).collect();
+            if v["model"]["fallback"] == true {
+                out.note = Some(format!("the server runs it on its default model ({})", v["model"]["used"].as_str().unwrap_or("?")));
+            }
+            out.prompt_set = Some(PromptSetRef { id: v["id"].as_str().unwrap_or_default().to_owned(), slug: set.slug.clone(), revision: v["revision"].as_u64(), managed: "application".into() });
+        }
+        Err(e) => match (e.status, e.code()) {
+            // A server from before prompt sets.
+            (Some(404), None) => out.note = Some("this server has no extraction prompt sets yet, so the field set's schema is sent".into()),
+            (Some(409), Some(code @ ("managed_in_builder" | "locked"))) => {
+                // An editor has the set: extraction uses it as they left it.
+                let found = app.fileengine.with(conn, |c| c.prompt_sets(""))?.into_iter().find(|p| p["slug"] == set.slug.as_str());
+                match found {
+                    Some(p) => {
+                        out.note = Some(format!("an editor {} {} on the server, so its revision {} is used, not Riviera's definition", if code == "locked" { "locked" } else { "manages" }, set.slug, p["revision"]));
+                        out.prompt_set = Some(PromptSetRef { id: p["id"].as_str().unwrap_or_default().to_owned(), slug: set.slug.clone(), revision: None, managed: p["managed"].as_str().unwrap_or("builder").to_owned() });
+                    }
+                    None => out.note = Some(format!("an editor manages {} on the server but it has no published revision, so the field set's schema is sent", set.slug)),
+                }
+            }
+            (Some(410), _) => {
+                let by = e.detail.as_ref().and_then(|d| d["replaced_by"].as_str()).filter(|s| !s.is_empty()).map(str::to_owned);
+                match by {
+                    Some(id) => {
+                        out.note = Some(format!("{} was retired on the server; the set that replaces it ({id}) is used", set.slug));
+                        out.prompt_set = Some(PromptSetRef { id, slug: set.slug.clone(), revision: None, managed: "builder".into() });
+                    }
+                    None => out.note = Some(format!("{} was retired on the server, so the field set's schema is sent", set.slug)),
+                }
+            }
+            // Refused for this key or over the server's limits: extraction still works with the schema.
+            (Some(400 | 403 | 429), _) => out.note = Some(format!("the server did not take the prompt set ({}), so the field set's schema is sent", e.message)),
+            _ => return Err(crate::fileengine::failed(e)),
+        },
+    }
+    app.fileengine.keep_publication(conn, out.clone());
+    Ok(out)
+}
+
+/// The prompt set extraction with `set` names on `conn`: the one published this session, else
+/// published now.
+fn publication(app: &mut App, conn: &str, set: &FieldSet) -> Result<Publication> {
+    match app.fileengine.publication(conn, &set.id) {
+        Some(p) => Ok(p),
+        None => publish(app, conn, set),
+    }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PublishParams {
+    pub connection_id: String,
+    /// The field sets (default: all of them).
+    #[serde(default)]
+    pub sets: Vec<String>,
+}
+
+host!(DocsPublishFieldSets, "docs.publish_field_sets", "Publish the field sets to FileEngine",
+    "Publishes Riviera's field sets (docs.field_sets) to the connection's server as extraction prompt sets \
+     named riviera.<set> (COL-FE-011), so that the server's extraction, its marked-up PDFs and folder \
+     automation use the same definitions. Any signed-in member may: nothing is set up on the server first. \
+     Publishing an unchanged set changes nothing; a changed one becomes its next revision. docs.extract \
+     publishes a set the first time a session uses it, so this is only needed to publish ahead or again. A set \
+     an editor took over or locked is left as they have it and used as it is; a server without prompt sets \
+     is noted and its extractions are sent the schema.",
+    [Network], PublishParams, Vec<Publication>, |app, caller, p| {
+    let sets: Vec<FieldSet> = if p.sets.is_empty() { field_sets() } else { p.sets.iter().map(|s| field_set(s)).collect::<Result<_>>()? };
+    sets.iter().map(|s| publish(app, &p.connection_id, s)).collect()
+});
+
+// ---- Links and documents (COL-FE-006) ----
+
+fn link_of(app: &App, material: &str) -> Result<Link> {
+    let id = app.active().ok_or_else(|| bad("document.none", "no document is open"))?;
+    let d = riviera_core::product_docs::data(app.get(id)?.doc.store());
+    d.materials.get(material.trim()).and_then(|m| m.link.clone()).ok_or_else(|| bad("docs.not_linked", format!("{material:?} is not linked to a documentation folder; docs.link links it")))
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct LinkParams {
+    /// The material, as its layers name it (docs.materials lists them).
+    pub material: String,
+    /// A folder on this computer…
+    pub path: Option<std::path::PathBuf>,
+    /// …or a FileEngine folder.
+    pub connection_id: Option<String>,
+    pub folder_uid: Option<String>,
+}
+
+host!(DocsLink, "docs.link", "Link a material to its documentation folder",
+    "Links a project material to one folder of its product documents (COL-FE-006): a folder on this computer \
+     (`path`), or a FileEngine folder (`connection_id`, `folder_uid`, kept by its uid, which survives renames \
+     and moves). The model keeps the folder's name and where it is, and exports the link as an \
+     IfcDocumentReference on the IfcMaterial (a file:// address for a local folder). A local folder's \
+     document types are kept in the model. One undo step. Returns the link.",
+    [Network, Edit], LinkParams, Link, |app, caller, p| {
+    let link = match (&p.path, &p.connection_id, &p.folder_uid) {
+        (Some(path), None, None) => {
+            let dir = std::fs::canonicalize(path).map_err(|e| bad("docs.no_folder", format!("{}: {e}", path.display())))?;
+            if !dir.is_dir() {
+                return Err(bad("docs.no_folder", format!("{} is not a folder", dir.display())));
+            }
+            // The types already set, kept when linking the same folder again.
+            let types = link_of(app, &p.material).ok().filter(|l| l.path.as_deref() == Some(&*dir.to_string_lossy())).map(|l| l.types).unwrap_or_default();
+            Link { folder_name: dir.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(), path: Some(dir.to_string_lossy().into_owned()), types, ..Link::default() }
+        }
+        (None, Some(conn), Some(uid)) => {
+            let url = app.fileengine.profile_url(conn)?;
+            let folder = app.fileengine.with(conn, |c| c.stat(uid))?;
+            if !folder.is_dir() {
+                return Err(bad("docs.invalid_input", format!("{} is a file, not a folder", folder.name)));
+            }
+            Link { connection_id: conn.clone(), url, folder_uid: folder.uid, folder_name: folder.name, ..Link::default() }
+        }
+        _ => return Err(bad("docs.invalid_input", "give a local folder's path, or a FileEngine connection_id and folder_uid")),
+    };
+    app.execute("docs.set_link", json!({ "material": p.material, "link": link }), caller)?;
+    Ok(link)
+});
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct DocumentOut {
+    pub uid: String,
+    pub name: String,
+    /// The `doc.type` metadata (EPD, HPD, specification, certification, …), if set.
+    pub doc_type: Option<String>,
+    pub version: String,
+    pub size: u64,
+    pub modified_by: String,
+    /// Unix seconds.
+    pub modified_at: i64,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ListParams {
+    /// A linked material: its folder.
+    pub material: Option<String>,
+    /// Or a folder on a connection.
+    pub connection_id: Option<String>,
+    pub folder_uid: Option<String>,
+}
+
+fn folder_of(app: &App, material: Option<&str>, connection_id: Option<&str>, folder_uid: Option<&str>) -> Result<Link> {
+    match (material, connection_id, folder_uid) {
+        (Some(m), None, None) => link_of(app, m),
+        (None, Some(c), Some(f)) => Ok(Link { connection_id: c.to_owned(), folder_uid: f.to_owned(), ..Link::default() }),
+        _ => Err(bad("docs.invalid_input", "give a linked material, or a connection_id and a folder_uid")),
+    }
+}
+
+/// A local folder's documents: its files (not hidden ones, not subfolders), their types as the
+/// link keeps them, the time they changed as their version.
+fn local_documents(link: &Link) -> Result<Vec<DocumentOut>> {
+    let dir = link.path.clone().unwrap_or_default();
+    let mut out = Vec::new();
+    for e in std::fs::read_dir(&dir).map_err(|e| bad("docs.no_folder", format!("{dir}: {e}")))?.flatten() {
+        let name = e.file_name().to_string_lossy().into_owned();
+        let Ok(meta) = e.metadata() else { continue };
+        if name.starts_with('.') || !meta.is_file() {
+            continue;
+        }
+        let mtime = meta.modified().unwrap_or(std::time::UNIX_EPOCH);
+        let modified = mtime.duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs() as i64);
+        // The file's modified time in FileEngine's version form, 20261031_142233.000.
+        let version: String = riviera_livestore::iso8601(mtime).chars().filter_map(|c| match c {
+            '-' | ':' | 'Z' => None,
+            'T' => Some('_'),
+            c => Some(c),
+        }).collect();
+        out.push(DocumentOut { doc_type: link.types.get(&name).cloned(), version, uid: name.clone(), name, size: meta.len(), modified_by: String::new(), modified_at: modified });
+    }
+    out.sort_by(|a, b| a.doc_type.cmp(&b.doc_type).then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase())));
+    Ok(out)
+}
+
+fn documents_of(app: &mut App, link: &Link) -> Result<Vec<DocumentOut>> {
+    if link.is_local() { local_documents(link) } else { documents(app, &link.connection_id, &link.folder_uid) }
+}
+
+fn documents(app: &mut App, conn: &str, folder: &str) -> Result<Vec<DocumentOut>> {
+    let mut out = app.fileengine.with(conn, |c| {
+        let mut out = Vec::new();
+        for e in c.list(folder, false)?.into_iter().filter(|e| !e.deleted && !e.is_dir()) {
+            let meta = c.metadata(&e.uid).unwrap_or_default();
+            let stat = c.stat(&e.uid)?;
+            out.push(DocumentOut { doc_type: meta.get("doc.type").cloned(), version: stat.version, uid: e.uid, name: e.name, size: e.size, modified_by: e.modified_by, modified_at: e.modified_at });
+        }
+        Ok(out)
+    })?;
+    out.sort_by(|a, b| a.doc_type.cmp(&b.doc_type).then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase())));
+    Ok(out)
+}
+
+host!(DocsList, "docs.list", "List a material's documents",
+    "The documents in a linked material's folder (on this computer or on FileEngine), or in any FileEngine \
+     folder (`connection_id`, `folder_uid`) (COL-FE-006): each with its type (EPD, HPD, specification, \
+     certification, installation, O&M, warranty, SDS, drawing, other), its version (a local file: the time it \
+     changed), size and who changed it last. A local document's uid is its file name.",
+    [Network, Read], ListParams, Vec<DocumentOut>, |app, caller, p| {
+    let link = folder_of(app, p.material.as_deref(), p.connection_id.as_deref(), p.folder_uid.as_deref())?;
+    documents_of(app, &link)
+});
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SetDocTypeParams {
+    /// A linked material whose folder is on this computer (the type is kept in the model)…
+    pub material: Option<String>,
+    /// …or the FileEngine connection the document is on (its doc.type metadata).
+    pub connection_id: Option<String>,
+    /// The document: its uid, or a local document's file name.
+    pub file_uid: String,
+    /// EPD, HPD, specification, certification, installation, O&M, warranty, SDS, drawing or other.
+    pub doc_type: String,
+}
+
+host!(DocsSetDocType, "docs.set_doc_type", "Set a document's type",
+    "Sets a document's type (COL-FE-006): a FileEngine document's doc.type metadata (`connection_id`), or, for a \
+     material linked to a folder on this computer (`material`), the type the model keeps for that file (one \
+     undo step). docs.extract uses it to choose the documents a field set reads (an EPD's for `epd`).",
+    [Network, Edit], SetDocTypeParams, (), |app, caller, p| {
+    let t = p.doc_type.trim();
+    if t.is_empty() {
+        return Err(bad("docs.invalid_input", "name the document's type (EPD, HPD, specification, …)"));
+    }
+    match (&p.material, &p.connection_id) {
+        (Some(m), None) => {
+            let mut link = link_of(app, m)?;
+            if !link.is_local() {
+                return Err(bad("docs.invalid_input", "this material's folder is on FileEngine: give its connection_id"));
+            }
+            if !local_documents(&link)?.iter().any(|d| d.uid == p.file_uid) {
+                return Err(bad("docs.no_document", format!("{:?} is not in {}", p.file_uid, link.path.clone().unwrap_or_default())));
+            }
+            link.types.insert(p.file_uid.clone(), t.to_owned());
+            app.execute("docs.set_link", json!({ "material": m, "link": link }), caller).map(drop)
+        }
+        (None, Some(conn)) => app.fileengine.with(conn, |c| c.set_metadata(&p.file_uid, "doc.type", t)),
+        _ => Err(bad("docs.invalid_input", "give the material (a local folder) or the FileEngine connection_id")),
+    }
+});
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct EnterValuesParams {
+    pub material: String,
+    /// The field set (docs.field_sets: `epd`, `hpd`).
+    pub set: String,
+    /// Field → value as the document gives it (a number for number fields; text for the rest).
+    pub values: BTreeMap<String, Value>,
+    /// Field → the unit the document prints, where it has one.
+    #[serde(default)]
+    pub units: BTreeMap<String, String>,
+    /// The document they were read from: a local file name or a FileEngine uid (default: the
+    /// linked folder's only document of the set's type, if there is one).
+    pub document: Option<String>,
+    /// For an EPD: make its GWP A1-A3 the material's embodied-carbon factor, as docs.apply_extracted.
+    #[serde(default)]
+    pub carbon: bool,
+}
+
+host!(DocsEnterValues, "docs.enter_values", "Enter product data by hand",
+    "Writes a field set's values (docs.field_sets) onto a material as read from a document by a person \
+     (COL-FE-007): the same values, IFC properties and sources as docs.apply_extracted, and with `carbon` an \
+     EPD's GWP A1-A3 as the material's embodied-carbon factor. Numbers are checked for number fields. Works \
+     with or without FileEngine. One undo step.",
+    [Edit], EnterValuesParams, Applied, |app, caller, p| {
+    let set = field_set(&p.set)?;
+    let material = p.material.trim().to_owned();
+    // The source document, and its version when it can be read.
+    let docs = link_of(app, &material).ok().and_then(|l| documents_of(app, &l).ok()).unwrap_or_default();
+    let of_type: Vec<&DocumentOut> = docs.iter().filter(|d| d.doc_type.as_deref().is_some_and(|t| t.eq_ignore_ascii_case(&set.doc_type))).collect();
+    let doc = match &p.document {
+        Some(d) => docs.iter().find(|x| x.uid == *d || x.name == *d),
+        None if of_type.len() == 1 => Some(of_type[0]),
+        None => None,
+    };
+    let (file_uid, file_name, version) = match (doc, &p.document) {
+        (Some(d), _) => (d.uid.clone(), d.name.clone(), d.version.clone()),
+        (None, Some(d)) => (d.clone(), d.clone(), String::new()),
+        (None, None) => (String::new(), String::new(), String::new()),
+    };
+    let mut values: BTreeMap<String, Option<Taken>> = BTreeMap::new();
+    let mut plain: HashMap<String, Value> = HashMap::new();
+    for (field, v) in &p.values {
+        let f = set.fields.iter().find(|f| &f.field == field).ok_or_else(|| bad("docs.invalid_input", format!("{field:?} is not a field of {}", set.id)))?;
+        let v = match (f.kind.as_str(), v) {
+            (_, Value::Null) => continue,
+            (_, Value::String(t)) if t.trim().is_empty() => continue,
+            ("number", Value::Number(_)) => v.clone(),
+            ("number", Value::String(t)) => json!(t.trim().replace(',', "").parse::<f64>().map_err(|_| bad("docs.invalid_input", format!("{} must be a number, not {t:?}", f.label)))?),
+            ("number", _) => return Err(bad("docs.invalid_input", format!("{} must be a number", f.label))),
+            (_, Value::String(t)) => json!(t.trim()),
+            _ => json!(v.to_string()),
+        };
+        plain.insert(field.clone(), v.clone());
+        values.insert(field.clone(), Some(Taken { value: v, unit: p.units.get(field).cloned().filter(|u| !u.trim().is_empty()), label: f.label.clone(), property: f.property.clone(), source: DocSource { file_uid: file_uid.clone(), file_name: file_name.clone(), version: version.clone(), run_id: String::new(), cached: false } }));
+    }
+    if values.is_empty() {
+        return Err(bad("docs.invalid_input", "enter at least one value"));
+    }
+    let carbon = if p.carbon { Some(carbon_args(&set, &plain)?) } else { None };
+    let out = app.execute("docs.set_values", json!({ "material": material, "set": set.id, "pset": set.pset, "values": values, "carbon": carbon }), caller)?;
+    let o = &out.result;
+    Ok(Applied { material, written: serde_json::from_value(o["written"].clone()).unwrap_or_default(), factor_ref: o["factor_ref"].as_str().map(str::to_owned), factor_per_unit: o["factor_per_unit"].as_f64(), factor_unit: serde_json::from_value(o["factor_unit"].clone()).ok(), folder_keys: Vec::new() })
+});
+
+/// The carbon factor's inputs from an EPD's values.
+fn carbon_args(set: &FieldSet, plain: &HashMap<String, Value>) -> Result<Value> {
+    if set.id != "epd" {
+        return Err(bad("docs.invalid_input", "only an EPD's values make a carbon factor"));
+    }
+    let get = |k: &str| plain.get(k).cloned().ok_or_else(|| bad("docs.invalid_input", format!("a carbon factor needs the EPD's {k} among the values")));
+    let gwp = get("gwp_a1a3")?.as_f64().ok_or_else(|| bad("docs.invalid_input", "the GWP is not a number"))?;
+    let s = |v: Option<Value>| v.and_then(|v| v.as_str().map(str::to_owned)).unwrap_or_default();
+    Ok(json!({ "gwp_a1a3": gwp, "declared_unit": s(Some(get("declared_unit")?)), "epd_number": s(Some(get("epd_number")?)), "program_operator": s(plain.get("program_operator").cloned()), "product": s(plain.get("product").cloned()), "valid_until": plain.get("valid_until").and_then(Value::as_str) }))
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct OpenDocumentParams {
+    pub material: String,
+    /// The document: a local file name or a FileEngine uid (docs.list).
+    pub file_uid: String,
+}
+
+host!(DocsOpenPath, "docs.document_path", "Where a material's document is",
+    "The file on this computer for one of a material's documents (COL-FE-006): in its local folder, or a \
+     FileEngine document downloaded to a temporary copy. The window opens it in the system's viewer.",
+    [Network, Read, FileWrite], OpenDocumentParams, std::path::PathBuf, |app, caller, p| {
+    let link = link_of(app, &p.material)?;
+    if link.is_local() {
+        let path = std::path::Path::new(link.path.as_deref().unwrap_or_default()).join(&p.file_uid);
+        if !path.is_file() || p.file_uid.contains(['/', '\\']) {
+            return Err(bad("docs.no_document", format!("{:?} is not in the material's folder", p.file_uid)));
+        }
+        return Ok(path);
+    }
+    let (name, bytes) = app.fileengine.with(&link.connection_id, |c| Ok((c.stat(&p.file_uid)?.name, c.read(&p.file_uid)?)))?;
+    let dir = std::env::temp_dir().join(format!("riviera-docs-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).map_err(|e| bad("docs.write", e.to_string()))?;
+    let safe: String = name.chars().map(|c| if c == '/' || c == '\\' { '_' } else { c }).collect();
+    let path = dir.join(safe);
+    std::fs::write(&path, bytes).map_err(|e| bad("docs.write", e.to_string()))?;
+    Ok(path)
+});
+
+// ---- Extraction (COL-FE-007) ----
+
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct FieldValue {
+    pub field: String,
+    pub label: String,
+    pub found: bool,
+    pub value: Value,
+    /// The unit as printed.
+    pub unit: Option<String>,
+    /// The words the value was read from, and where they sit in the document's text.
+    pub quote: Option<String>,
+    pub offset: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct DocumentResult {
+    pub file_uid: String,
+    pub name: String,
+    pub version: String,
+    pub cached: bool,
+    /// Whether the answer matched the field set.
+    pub valid: bool,
+    pub fields: Vec<FieldValue>,
+    /// The marked-up PDF the service made with each value's evidence highlighted: `status`
+    /// (written, no_pdf, too_large, disabled) and the sidecar's `name` and `uid`.
+    pub markup: Option<Value>,
+}
+
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct Skipped {
+    pub file_uid: String,
+    pub name: Option<String>,
+    /// Why: no text, not found or not readable, budget, …
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct Run {
+    pub run_id: String,
+    pub set: String,
+    pub connection_id: String,
+    /// The material it was run for, if any.
+    pub material: Option<String>,
+    pub documents: Vec<DocumentResult>,
+    pub skipped: Vec<Skipped>,
+    /// The service's counts: found, not found, dropped for want of a quote, cached, tokens.
+    pub summary: Value,
+    /// The server's prompt set it ran (`id`, `name`, `revision`, `current_revision`), or none
+    /// when the field set's schema was sent.
+    pub prompt_set: Option<Value>,
+    /// Why it ran with something other than Riviera's own published definition.
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ExtractParams {
+    /// The field set: `epd` or `hpd` (docs.field_sets).
+    pub set: String,
+    /// A linked material: its folder's documents of the set's doc.type.
+    pub material: Option<String>,
+    /// Or these documents, on `connection_id`.
+    pub connection_id: Option<String>,
+    #[serde(default)]
+    pub files: Vec<String>,
+    /// `use` (default) answers again from the service's cache; `refresh` reads the documents again.
+    #[serde(default)]
+    pub cache: Option<String>,
+}
+
+fn to_run(v: &Value, set: &FieldSet, conn: &str, material: Option<String>) -> Run {
+    let s = |v: &Value| v.as_str().unwrap_or_default().to_owned();
+    let documents = v["items"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|it| it["skipped"].is_null())
+        .map(|it| DocumentResult {
+            file_uid: s(&it["file_uid"]),
+            name: s(&it["name"]),
+            version: s(&it["version"]),
+            cached: it["cached"] == true,
+            valid: it["valid"] != false,
+            fields: set
+                .fields
+                .iter()
+                .map(|f| {
+                    let d = &it["data"][&f.field];
+                    let found = d["found"] == true && !d["value"].is_null();
+                    FieldValue {
+                        field: f.field.clone(),
+                        label: f.label.clone(),
+                        found,
+                        value: if found { d["value"].clone() } else { Value::Null },
+                        unit: d["unit"].as_str().filter(|u| !u.is_empty()).map(str::to_owned),
+                        quote: d["evidence"]["quote"].as_str().map(str::to_owned),
+                        offset: d["evidence"]["offset"].as_u64(),
+                    }
+                })
+                .collect(),
+            markup: Some(it["markup"].clone()).filter(|m| m.is_object()),
+        })
+        .collect();
+    let mut skipped: Vec<Skipped> = v["plan"]["skipped"].as_array().into_iter().flatten().map(|k| Skipped { file_uid: s(&k["file_uid"]), name: k["name"].as_str().map(str::to_owned), reason: s(&k["reason"]) }).collect();
+    skipped.extend(v["items"].as_array().into_iter().flatten().filter(|it| !it["skipped"].is_null()).map(|it| Skipped { file_uid: s(&it["file_uid"]), name: it["name"].as_str().map(str::to_owned), reason: it["skipped"].as_str().map_or_else(|| it["skipped"].to_string(), str::to_owned) }));
+    let prompt_set = [&v["summary"]["prompt_set"], &v["plan"]["prompt_set"]].into_iter().find(|p| p.is_object()).cloned();
+    Run { run_id: s(&v["run_id"]), set: set.id.clone(), connection_id: conn.to_owned(), material, documents, skipped, summary: v["summary"].clone(), prompt_set, note: None }
+}
+
+host!(DocsExtract, "docs.extract", "Read product data from documents",
+    "Reads a field set's values (docs.field_sets: `epd`, `hpd`) out of documents with the conversion service's \
+     headless extraction (COL-FE-007): a linked material's folder documents whose doc.type is the set's, or the \
+     `files` named on `connection_id`. Each value comes with the quote it was read from, or as not found: the \
+     service never guesses. Nothing is written; docs.apply_extracted writes the values the user accepts. The \
+     run is kept for this session. Reading takes about half a minute a document; asking again is answered \
+     from the service's cache unless `cache` is `refresh`. The field set goes as the server's prompt set \
+     riviera.<set>, published the first time a session uses it (docs.publish_field_sets), at the revision \
+     published, or as an editor left it; a server without prompt sets is sent the schema. A PDF read with a \
+     prompt set gets a marked-up copy with the evidence highlighted (each document's `markup`).",
+    [Network, Read], ExtractParams, Run, |app, caller, p| {
+    let set = field_set(&p.set)?;
+    let cache = p.cache.as_deref().unwrap_or("use");
+    if !matches!(cache, "use" | "refresh") {
+        return Err(bad("docs.invalid_input", "cache is use or refresh"));
+    }
+    let (conn, files, material) = match (&p.material, &p.connection_id, p.files.is_empty()) {
+        (Some(m), None, true) => {
+            let link = link_of(app, m)?;
+            if link.is_local() {
+                return Err(bad("docs.local_folder", "reading values from documents uses FileEngine's AI extraction, so it needs the documents on FileEngine; enter the values instead (docs.enter_values, Enter Values…)"));
+            }
+            let docs = documents(app, &link.connection_id, &link.folder_uid)?;
+            let files: Vec<String> = docs.iter().filter(|d| d.doc_type.as_deref().is_some_and(|t| t.eq_ignore_ascii_case(&set.doc_type))).map(|d| d.uid.clone()).collect();
+            if files.is_empty() {
+                return Err(bad("docs.no_documents", format!("no document in {:?} has doc.type {}; docs.list shows their types and docs.set_doc_type sets one", link.folder_name, set.doc_type)));
+            }
+            (link.connection_id, files, Some(m.trim().to_owned()))
+        }
+        (None, Some(c), false) => (c.clone(), p.files.clone(), None),
+        _ => return Err(bad("docs.invalid_input", "give a linked material, or a connection_id and files")),
+    };
+    let raw = json!({ "files": files, "schema": set.schema, "instructions": set.instructions, "cache": cache });
+    let mut pubn = publication(app, &conn, &set)?;
+    let mut answer = None;
+    for _ in 0..2 {
+        let Some(ps) = &pubn.prompt_set else { break };
+        let body = json!({ "files": files, "prompt_set": ps.id, "revision": ps.revision, "cache": cache });
+        match app.fileengine.with(&conn, |c| Ok(c.extract(&body, EXTRACT_TIMEOUT)))? {
+            Ok(v) => {
+                answer = Some(v);
+                break;
+            }
+            // The set went (retired, or the server was reset) since it was published: publish again.
+            Err(e) if matches!(e.status, Some(404 | 410)) && e.code().is_some() => {
+                app.fileengine.forget_publications(&conn);
+                pubn = publish(app, &conn, &set)?;
+            }
+            Err(e) => return Err(crate::fileengine::failed(e)),
+        }
+    }
+    let v = match answer {
+        Some(v) => v,
+        None => app.fileengine.with(&conn, |c| c.extract(&raw, EXTRACT_TIMEOUT))?,
+    };
+    let mut run = to_run(&v, &set, &conn, material);
+    run.note = pubn.note.clone().or_else(|| (pubn.prompt_set.is_some() && run.prompt_set.is_none()).then(|| "the set was not used, so the field set's schema was sent".to_owned()));
+    if let Some(ps) = &run.prompt_set
+        && let (Some(r), Some(cur)) = (ps["revision"].as_u64(), ps["current_revision"].as_u64())
+        && cur > r
+    {
+        run.note = Some(format!("{}; the server has a newer revision ({cur}) than the one Riviera published ({r})", run.note.take().unwrap_or_else(|| format!("{} ran at revision {r}", pubn.slug))));
+    }
+    app.fileengine.keep_run(run.clone());
+    Ok(run)
+});
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ApplyParams {
+    pub run_id: String,
+    /// The material to write onto (default: the run's).
+    pub material: Option<String>,
+    /// The fields accepted (default: every field found).
+    pub fields: Option<Vec<String>>,
+    /// The document to take them from, when the run read several that disagree.
+    pub file_uid: Option<String>,
+    /// Also write them into the folder's metadata under each field's key (product.*, epd.*, hpd.*).
+    #[serde(default)]
+    pub to_folder: bool,
+    /// For an EPD: make its GWP A1-A3 the material's embodied-carbon factor (needs the GWP, the
+    /// declared unit and the EPD number among the values).
+    #[serde(default)]
+    pub carbon: bool,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct Applied {
+    pub material: String,
+    pub written: Vec<String>,
+    /// The carbon factor made, its value and unit (kg CO2e per m2, m3, kg or piece).
+    pub factor_ref: Option<String>,
+    pub factor_per_unit: Option<f64>,
+    pub factor_unit: Option<riviera_core::embodied_carbon::Unit>,
+    /// The folder metadata keys written.
+    pub folder_keys: Vec<String>,
+}
+
+host!(DocsApplyExtracted, "docs.apply_extracted", "Write extracted product data onto a material",
+    "Writes the accepted fields of a docs.extract run onto a material (COL-FE-007), in one undo step: each \
+     value with its source (document, version, run), exported as the field set's IfcMaterialProperties. With \
+     `to_folder`, also into the documentation folder's metadata; with `carbon`, an EPD's GWP A1-A3 becomes the \
+     material's embodied-carbon factor in the Product EPDs library, converted to per m2, m3, kg or piece from \
+     the declared unit (1,000 ft2 is 92.903 m2). When the run read several documents that disagree on a \
+     field, name the one to take with `file_uid`.",
+    [Edit, Network], ApplyParams, Applied, |app, caller, p| {
+    let run = app.fileengine.run(&p.run_id).ok_or_else(|| bad("docs.no_run", format!("no extraction run {:?} in this session; docs.extract makes one", p.run_id)))?;
+    let set = field_set(&run.set)?;
+    let material = p.material.clone().or_else(|| run.material.clone()).ok_or_else(|| bad("docs.invalid_input", "name the material to write onto"))?;
+    let wanted: Vec<String> = match &p.fields {
+        Some(f) => f.clone(),
+        None => set.fields.iter().filter(|f| run.documents.iter().any(|d| d.fields.iter().any(|v| v.field == f.field && v.found))).map(|f| f.field.clone()).collect(),
+    };
+    if wanted.is_empty() {
+        return Err(bad("docs.nothing_found", "the run found none of the fields"));
+    }
+    let mut values: BTreeMap<String, Option<Taken>> = BTreeMap::new();
+    let mut plain: HashMap<String, Value> = HashMap::new();
+    for field in &wanted {
+        let f = set.fields.iter().find(|f| &f.field == field).ok_or_else(|| bad("docs.invalid_input", format!("{field:?} is not a field of {}", set.id)))?;
+        let hits: Vec<(&DocumentResult, &FieldValue)> = run.documents.iter().filter(|d| p.file_uid.as_ref().is_none_or(|u| *u == d.file_uid)).filter_map(|d| d.fields.iter().find(|v| v.field == *field && v.found).map(|v| (d, v))).collect();
+        let Some((d, v)) = hits.first() else {
+            return Err(bad("docs.not_found", format!("{} was not found in {}", f.label, if p.file_uid.is_some() { "that document" } else { "the documents" })));
+        };
+        if let Some((other, _)) = hits.iter().find(|(_, w)| w.value != v.value) {
+            return Err(bad("docs.ambiguous", format!("{} reads {} in {:?} but {} in {:?}; choose one with file_uid", f.label, v.value, d.name, hits.iter().find(|(o, _)| o.file_uid == other.file_uid).map_or(String::new(), |(_, w)| w.value.to_string()), other.name)));
+        }
+        plain.insert(field.clone(), v.value.clone());
+        values.insert(
+            field.clone(),
+            Some(Taken { value: v.value.clone(), unit: v.unit.clone(), label: f.label.clone(), property: f.property.clone(), source: DocSource { file_uid: d.file_uid.clone(), file_name: d.name.clone(), version: d.version.clone(), run_id: run.run_id.clone(), cached: d.cached } }),
+        );
+    }
+    let carbon = if p.carbon {
+        if set.id != "epd" {
+            return Err(bad("docs.invalid_input", "only an EPD's values make a carbon factor"));
+        }
+        let get = |k: &str| plain.get(k).cloned().ok_or_else(|| bad("docs.invalid_input", format!("a carbon factor needs the EPD's {k} among the values")));
+        let gwp = get("gwp_a1a3")?.as_f64().ok_or_else(|| bad("docs.invalid_input", "the GWP is not a number"))?;
+        let s = |v: Option<Value>| v.and_then(|v| v.as_str().map(str::to_owned)).unwrap_or_default();
+        Some(json!({ "gwp_a1a3": gwp, "declared_unit": s(Some(get("declared_unit")?)), "epd_number": s(Some(get("epd_number")?)), "program_operator": s(plain.get("program_operator").cloned()), "product": s(plain.get("product").cloned()), "valid_until": plain.get("valid_until").and_then(Value::as_str) }))
+    } else {
+        None
+    };
+    let out = app.execute("docs.set_values", json!({ "material": material, "set": set.id, "pset": set.pset, "values": values, "carbon": carbon }), caller)?;
+    let o = &out.result;
+    let mut folder_keys = Vec::new();
+    if p.to_folder && link_of(app, &material).is_ok_and(|l| !l.is_local()) {
+        let link = link_of(app, &material)?;
+        let pairs: Vec<(String, String)> = wanted
+            .iter()
+            .filter_map(|field| {
+                let key = set.fields.iter().find(|f| &f.field == field)?.folder_key.clone()?;
+                let v = plain.get(field)?;
+                Some((key, v.as_str().map_or_else(|| v.to_string(), str::to_owned)))
+            })
+            .collect();
+        app.fileengine.with(&link.connection_id, |c| {
+            for (k, v) in &pairs {
+                c.set_metadata(&link.folder_uid, k, v)?;
+            }
+            Ok(())
+        })?;
+        folder_keys = pairs.into_iter().map(|(k, _)| k).collect();
+    }
+    Ok(Applied {
+        material,
+        written: serde_json::from_value(o["written"].clone()).unwrap_or_default(),
+        factor_ref: o["factor_ref"].as_str().map(str::to_owned),
+        factor_per_unit: o["factor_per_unit"].as_f64(),
+        factor_unit: serde_json::from_value(o["factor_unit"].clone()).ok(),
+        folder_keys,
+    })
+});
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct UsageParams {
+    pub connection_id: String,
+}
+
+host!(DocsUsage, "docs.usage", "Product data extraction usage",
+    "The connection's key's usage of the conversion service (COL-FE-007): `state` (ok, warning, limited), the \
+     limits (requests per minute, tokens per day, concurrent runs, files per run) with what is used and when \
+     each resets, and a message to show.",
+    [Network, Read], UsageParams, Value, |app, caller, p| {
+    app.fileengine.with(&p.connection_id, |c| c.usage())
+});
+
+/// `riviera.products`, the documented materials and their values, for the model's metadata.
+pub(crate) fn products_metadata(store: &riviera_core::Store) -> Option<String> {
+    let d = riviera_core::product_docs::data(store);
+    if d.materials.is_empty() {
+        return None;
+    }
+    let list: Vec<Value> = d
+        .materials
+        .iter()
+        .map(|(name, m)| {
+            let values: BTreeMap<String, BTreeMap<String, &Value>> = m.values.iter().map(|(set, f)| (set.clone(), f.iter().map(|(k, t)| (k.clone(), &t.value)).collect())).collect();
+            json!({ "material": name, "folder_uid": m.link.as_ref().map(|l| &l.folder_uid), "values": values })
+        })
+        .collect();
+    Some(serde_json::to_string(&list).expect("serialises"))
+}
+
+// ---- The report (COL-FE-008) ----
+
+fn esc(s: &str) -> String {
+    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
+}
+
+/// Today (UTC) as YYYY-MM-DD.
+fn today() -> String {
+    let t = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs() as i64);
+    let z = t.div_euclid(86_400) + 719_468;
+    let (era, doe) = (z.div_euclid(146_097), z.rem_euclid(146_097));
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let (d, m) = (doy - (153 * mp + 2) / 5 + 1, if mp < 10 { mp + 3 } else { mp - 9 });
+    format!("{}-{m:02}-{d:02}", yoe + era * 400 + i64::from(m <= 2))
+}
+
+/// The date a year after `day` (YYYY-MM-DD), for "expiring soon".
+fn a_year_on(day: &str) -> String {
+    match day.get(..4).and_then(|y| y.parse::<i32>().ok()) {
+        Some(y) => format!("{}{}", y + 1, &day[4..]),
+        None => day.to_owned(),
+    }
+}
+
+/// `expired`, `expires within a year` or empty, for a validity date.
+fn validity(until: Option<&str>, today: &str) -> &'static str {
+    match until.filter(|d| d.len() == 10) {
+        Some(d) if d < today => "expired",
+        Some(d) if d < a_year_on(today).as_str() => "expires within a year",
+        _ => "",
+    }
+}
+
+/// A FileEngine version (`20261030_230012.883`) as `2026-10-30 23:00:12 UTC`.
+fn version_stamp(v: &str) -> String {
+    let b = v.as_bytes();
+    if b.len() >= 15 && b[8] == b'_' && v.is_char_boundary(15) {
+        format!("{}-{}-{} {}:{}:{} UTC", &v[0..4], &v[4..6], &v[6..8], &v[9..11], &v[11..13], &v[13..15])
+    } else {
+        v.to_owned()
+    }
+}
+
+fn shown(v: &Value) -> String {
+    match v {
+        Value::String(s) => s.clone(),
+        Value::Number(n) => n.as_f64().map_or_else(|| n.to_string(), |f| if f.fract() == 0.0 && f.abs() < 1e15 { format!("{f:.0}") } else { format!("{f}") }),
+        Value::Bool(b) => if *b { "yes".into() } else { "no".into() },
+        _ => String::new(),
+    }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ReportParams {
+    /// The HTML file to write.
+    pub path: std::path::PathBuf,
+    /// The embodied carbon run to include (default: the latest, if any).
+    pub carbon_run_id: Option<String>,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct ReportOut {
+    pub path: std::path::PathBuf,
+    pub materials: usize,
+    pub documented: usize,
+    /// Warnings: expired or expiring documents, materials in use without documentation.
+    pub warnings: Vec<String>,
+}
+
+/// The report's HTML and its warnings.
+pub(crate) fn report_html(app: &mut App, caller: &Caller, carbon_run_id: Option<&str>) -> Result<(String, usize, usize, Vec<String>)> {
+    let id = app.active().ok_or_else(|| bad("document.none", "no document is open"))?;
+    let store = app.get(id)?.doc.store();
+    let project = store.iter().find(|e| e.class == "IfcProject").and_then(|p| p.name.clone()).unwrap_or_default();
+    let data = riviera_core::product_docs::data(store);
+    let materials = run_materials(app, caller)?;
+    let carbon = app.execute("embodied_carbon.results", json!({ "run_id": carbon_run_id }), caller).ok().map(|o| o.result);
+    let today = today();
+    let mut warnings = Vec::new();
+    let mut h = String::from(
+        "<!doctype html><html><head><meta charset=\"utf-8\"><title>Material documentation and embodied carbon</title><style>\
+         body{font-family:sans-serif;margin:2em;max-width:72em}table{border-collapse:collapse;margin:.5em 0 1.5em}\
+         td,th{border:1px solid #bbb;padding:.25em .6em;text-align:left;vertical-align:top}th{background:#eee}\
+         td.n{text-align:right}.warn{color:#a40}.muted{color:#666;font-size:90%}</style></head><body>",
+    );
+    h.push_str(&format!("<h1>Material documentation and embodied carbon</h1><p class=\"muted\">{}Written by BIM Riviera {} on {today} (UTC).</p>", if project.is_empty() { String::new() } else { format!("Project: <b>{}</b>. ", esc(&project)) }, env!("CARGO_PKG_VERSION")));
+
+    // Summary: one row per material.
+    h.push_str("<h2>Materials</h2><table><tr><th>Material</th><th>In use</th><th>Documentation folder</th><th>EPD</th><th>GWP A1–A3</th><th>HPD</th></tr>");
+    let mut documented = 0;
+    for m in &materials {
+        let md = data.materials.get(&m.material);
+        let epd = md.and_then(|d| d.values.get("epd"));
+        let hpd = md.and_then(|d| d.values.get("hpd"));
+        let get = |set: Option<&BTreeMap<String, Taken>>, k: &str| set.and_then(|s| s.get(k)).map(|t| shown(&t.value));
+        if md.is_some_and(|d| d.link.is_some() || !d.values.is_empty()) {
+            documented += 1;
+        } else if m.in_use {
+            warnings.push(format!("{}: in use, with no product documentation", m.label));
+        }
+        let mut cell = |set: &str, number: Option<String>, until: Option<String>| -> String {
+            let Some(n) = number else { return "<span class=\"muted\">none</span>".into() };
+            let state = validity(until.as_deref(), &today);
+            if !state.is_empty() {
+                warnings.push(format!("{}: the {set} {n} {state} ({})", m.label, until.clone().unwrap_or_default()));
+            }
+            format!("{}<br><span class=\"muted\">valid until {}</span>{}", esc(&n), esc(until.as_deref().unwrap_or("?")), if state.is_empty() { String::new() } else { format!(" <span class=\"warn\">{state}</span>") })
+        };
+        let epd_cell = cell("EPD", get(epd, "epd_number"), get(epd, "valid_until"));
+        let hpd_cell = cell("HPD", get(hpd, "hpd_id"), get(hpd, "valid_until"));
+        let gwp = match (epd.and_then(|s| s.get("gwp_a1a3")), get(epd, "declared_unit")) {
+            (Some(t), unit) => format!("{} {} per {}", esc(&shown(&t.value)), esc(t.unit.as_deref().unwrap_or("kg CO2e")), esc(&unit.unwrap_or_else(|| "declared unit".into()))),
+            _ => String::new(),
+        };
+        let folder = md.and_then(|d| d.link.as_ref()).map_or_else(String::new, |l| esc(&l.folder_name));
+        h.push_str(&format!("<tr><td>{}</td><td>{}</td><td>{folder}</td><td>{epd_cell}</td><td>{gwp}</td><td>{hpd_cell}</td></tr>", esc(&m.label), if m.in_use { "yes" } else { "no" }));
+    }
+    h.push_str("</table>");
+
+    // Each documented material's values, with where they came from.
+    for (name, md) in &data.materials {
+        h.push_str(&format!("<h2>{}</h2>", esc(name)));
+        if let Some(l) = &md.link {
+            h.push_str(&format!("<p>Documentation folder: <b>{}</b> <span class=\"muted\">({}, folder {})</span></p>", esc(&l.folder_name), esc(&l.url), esc(&l.folder_uid)));
+        }
+        for (set, values) in &md.values {
+            h.push_str(&format!("<h3>{}</h3><table><tr><th>Value</th><th></th><th>Unit</th><th>From</th></tr>", esc(&set.to_uppercase())));
+            for t in values.values() {
+                h.push_str(&format!(
+                    "<tr><td>{}</td><td>{}</td><td>{}</td><td>{} <span class=\"muted\">version of {}{}</span></td></tr>",
+                    esc(&t.label),
+                    esc(&shown(&t.value)),
+                    esc(t.unit.as_deref().unwrap_or("")),
+                    esc(if t.source.file_name.is_empty() { &t.source.file_uid } else { &t.source.file_name }),
+                    esc(&version_stamp(&t.source.version)),
+                    if t.source.run_id.is_empty() { String::new() } else { format!(", read in run {}", esc(&t.source.run_id)) }
+                ));
+            }
+            h.push_str("</table>");
+        }
+    }
+
+    // Embodied carbon.
+    h.push_str("<h2>Embodied carbon</h2>");
+    match carbon.as_ref().filter(|c| c["run"].is_object()) {
+        Some(c) => {
+            let r = &c["run"];
+            let f = |v: &Value| format!("{:.1}", v.as_f64().unwrap_or(0.0));
+            h.push_str(&format!(
+                "<p>Run {}{}: A1–A3 <b>{} kg CO₂e</b>, A–C total {} kg CO₂e; module D {} and biogenic {} reported apart.</p>",
+                esc(r["id"].as_str().unwrap_or("")),
+                if c["stale"] == true { " <span class=\"warn\">(out of date: the model or factors changed since)</span>" } else { "" },
+                f(&r["totals"]["a1_a3"]),
+                f(&r["totals"]["total"]),
+                f(&r["totals"]["d"]),
+                f(&r["totals"]["biogenic"])
+            ));
+            h.push_str("<table><tr><th>Material</th><th>Factor</th><th>Volume (m³)</th><th>A1–A3 (kg CO₂e)</th><th>A–C total</th></tr>");
+            for l in r["by_material"].as_array().into_iter().flatten() {
+                let key = l["key"].as_str().unwrap_or("");
+                let factor = r["factors"][key]["name"].as_str().unwrap_or("");
+                h.push_str(&format!("<tr><td>{}</td><td>{}</td><td class=\"n\">{:.3}</td><td class=\"n\">{}</td><td class=\"n\">{}</td></tr>", esc(key), esc(factor), l["volume"].as_f64().unwrap_or(0.0), f(&l["gwp"]["a1_a3"]), f(&l["gwp"]["total"])));
+            }
+            h.push_str("</table>");
+            for x in r["excluded"].as_array().into_iter().flatten() {
+                warnings.push(format!("{}: left out of the carbon run ({})", x["material"].as_str().unwrap_or(""), x["reason"].as_str().unwrap_or("")));
+            }
+        }
+        None => h.push_str("<p class=\"muted\">No embodied carbon run yet (Sustainability › Embodied Carbon).</p>"),
+    }
+
+    h.push_str("<h2>To check</h2>");
+    if warnings.is_empty() {
+        h.push_str("<p>Nothing: every material in use is documented and every document is in date.</p>");
+    } else {
+        h.push_str("<ul>");
+        for w in &warnings {
+            h.push_str(&format!("<li class=\"warn\">{}</li>", esc(w)));
+        }
+        h.push_str("</ul>");
+    }
+    h.push_str("<p class=\"muted\">Values were read from the documents named, by FileEngine's conversion service, and accepted in Riviera; each one's quote is kept with its run on the server.</p></body></html>");
+    Ok((h, materials.len(), documented, warnings))
+}
+
+fn run_materials(app: &mut App, caller: &Caller) -> Result<Vec<riviera_core::product_docs::MaterialOut>> {
+    let v = app.execute("docs.materials", json!({}), caller)?.result;
+    Ok(v.as_array().into_iter().flatten().map(|m| riviera_core::product_docs::MaterialOut { material: m["material"].as_str().unwrap_or("").to_owned(), label: m["label"].as_str().or(m["material"].as_str()).unwrap_or("").to_owned(), type_id: serde_json::from_value(m["type_id"].clone()).ok(), in_use: m["in_use"] == true, link: None, values: BTreeMap::new() }).collect())
+}
+
+host!(DocsReport, "docs.report", "Write the material documentation report",
+    "Writes an HTML report of the project's materials (COL-FE-008): each with its documentation folder, its EPD \
+     (number, validity, GWP A1-A3 per declared unit) and HPD (identifier, validity), every value taken from \
+     documents with the document and version it came from, the embodied carbon run (`carbon_run_id`, else the \
+     latest) by material, and what to check: expired documents or ones expiring within a year, materials in use \
+     with no documentation, materials left out of the carbon run. fileengine.publish puts it on FileEngine.",
+    [Read, FileWrite], ReportParams, ReportOut, |app, caller, p| {
+    let (html, materials, documented, warnings) = report_html(app, caller, p.carbon_run_id.as_deref())?;
+    std::fs::write(&p.path, html).map_err(|e| bad("docs.write", format!("{}: {e}", p.path.display())))?;
+    Ok(ReportOut { path: p.path, materials, documented, warnings })
+});
+
+// ---- Publishing local collections to FileEngine (COL-FE-006) ----
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct LocalCollection {
+    /// The folder on this computer, and the materials linked to it.
+    pub path: String,
+    pub folder_name: String,
+    pub materials: Vec<String>,
+    pub documents: usize,
+}
+
+/// The project's local-only document collections: each local folder materials link to.
+pub(crate) fn local_collections(store: &riviera_core::Store) -> Vec<LocalCollection> {
+    let d = riviera_core::product_docs::data(store);
+    let mut out: Vec<LocalCollection> = Vec::new();
+    for (name, m) in &d.materials {
+        let Some(l) = m.link.as_ref().filter(|l| l.is_local()) else { continue };
+        let path = l.path.clone().unwrap_or_default();
+        match out.iter_mut().find(|c| c.path == path) {
+            Some(c) => c.materials.push(name.clone()),
+            None => out.push(LocalCollection { documents: local_documents(l).map_or(0, |d| d.len()), folder_name: l.folder_name.clone(), path, materials: vec![name.clone()] }),
+        }
+    }
+    out
+}
+
+host!(DocsLocalCollections, "docs.local_collections", "The project's local document folders",
+    "The folders on this computer that the project's materials link their documents to (COL-FE-006), each with \
+     its materials and number of documents: the collections docs.publish_local can put on FileEngine.",
+    [Read], riviera_core::embodied_carbon::Empty, Vec<LocalCollection>, |app, caller, p| {
+    let id = app.active().ok_or_else(|| bad("document.none", "no document is open"))?;
+    Ok(local_collections(app.get(id)?.doc.store()))
+});
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PublishLocalParams {
+    pub connection_id: String,
+    /// The FileEngine folder to publish into: each local folder becomes a folder of its name in it.
+    pub parent_uid: String,
+    /// The local folders to publish (default: every local collection).
+    #[serde(default)]
+    pub paths: Vec<String>,
+    /// Also point the model's links (and the values' sources) at the published folders (default false:
+    /// the model keeps referring to the local files).
+    #[serde(default)]
+    pub relink: bool,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct PublishedCollection {
+    pub path: String,
+    pub folder_uid: String,
+    pub folder_name: String,
+    /// Files uploaded as new, and as new versions of files of the same name already there.
+    pub uploaded: usize,
+    pub updated: usize,
+    pub relinked: Vec<String>,
+}
+
+host!(DocsPublishLocal, "docs.publish_local", "Publish local document folders to FileEngine",
+    "Puts the project's local document collections (docs.local_collections) on FileEngine (COL-FE-006): each \
+     local folder becomes a folder of its name in `parent_uid` (made if missing), every file uploaded (a new \
+     version of one of the same name already there) with its type as doc.type. With `relink`, the materials \
+     linked to it are linked to the FileEngine folder instead and their values' sources point at the uploaded \
+     files, in one undo step; otherwise the model is unchanged. FileEngine stays optional: without it, local \
+     folders work as they are.",
+    [Network, FileRead, Edit], PublishLocalParams, Vec<PublishedCollection>, |app, caller, p| {
+    let id = app.active().ok_or_else(|| bad("document.none", "no document is open"))?;
+    let store = app.get(id)?.doc.store().clone();
+    let data = riviera_core::product_docs::data(&store);
+    let mut collections = local_collections(&store);
+    if !p.paths.is_empty() {
+        collections.retain(|c| p.paths.contains(&c.path));
+    }
+    if collections.is_empty() {
+        return Err(bad("docs.nothing_local", "no material links to a folder on this computer"));
+    }
+    let url = app.fileengine.profile_url(&p.connection_id)?;
+    let mut out = Vec::new();
+    let mut new_data = data.clone();
+    for c in collections {
+        let link = data.materials.get(&c.materials[0]).and_then(|m| m.link.clone()).expect("a local collection's material is linked");
+        let docs = local_documents(&link)?;
+        let dir = std::path::PathBuf::from(&c.path);
+        // Upload: file name → (uid, version).
+        let (folder_uid, uploaded, updated, map) = app.fileengine.with(&p.connection_id, |cl| {
+            let folder = cl.ensure_dir(&p.parent_uid, &c.folder_name)?;
+            let there: HashMap<String, String> = cl.list(&folder, false)?.into_iter().filter(|e| !e.deleted && !e.is_dir()).map(|e| (e.name, e.uid)).collect();
+            let (mut uploaded, mut updated) = (0, 0);
+            let mut map: HashMap<String, (String, String)> = HashMap::new();
+            for d in &docs {
+                let uid = match there.get(&d.name) {
+                    Some(u) => {
+                        updated += 1;
+                        u.clone()
+                    }
+                    None => {
+                        uploaded += 1;
+                        cl.create_file(&folder, &d.name)?
+                    }
+                };
+                cl.write_file(&uid, &dir.join(&d.name))?;
+                if let Some(t) = &d.doc_type {
+                    cl.set_metadata(&uid, "doc.type", t)?;
+                }
+                let version = cl.stat(&uid)?.version;
+                map.insert(d.name.clone(), (uid, version));
+            }
+            Ok((folder, uploaded, updated, map))
+        })?;
+        let mut relinked = Vec::new();
+        if p.relink {
+            for name in &c.materials {
+                let Some(m) = new_data.materials.get_mut(name) else { continue };
+                m.link = Some(Link { connection_id: p.connection_id.clone(), url: url.clone(), folder_uid: folder_uid.clone(), folder_name: c.folder_name.clone(), ..Link::default() });
+                for fields in m.values.values_mut() {
+                    for t in fields.values_mut() {
+                        if let Some((uid, version)) = map.get(&t.source.file_uid).or_else(|| map.get(&t.source.file_name)) {
+                            t.source.file_uid = uid.clone();
+                            t.source.version = version.clone();
+                        }
+                    }
+                }
+                relinked.push(name.clone());
+            }
+        }
+        out.push(PublishedCollection { path: c.path, folder_uid, folder_name: c.folder_name, uploaded, updated, relinked });
+    }
+    if p.relink {
+        app.execute("docs.replace_all", json!({ "data": new_data }), caller)?;
+    }
+    Ok(out)
+});

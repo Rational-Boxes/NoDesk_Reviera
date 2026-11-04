@@ -4,7 +4,7 @@
 
 ## 8.0 Scope and provenance
 
-This is Reviera's own design, from owner directives given on 2026-10-15. It has no counterpart in the reference product, which links to a proprietary structural solver and vendor cloud services. The only outside inputs are the scopes and licences of open-source engines (sources S0711–S0719) and the names of published standards and libraries.
+This is Riviera's own design, from owner directives given on 2026-10-15. It has no counterpart in the reference product, which links to a proprietary structural solver and vendor cloud services. The only outside inputs are the scopes and licences of open-source engines (sources S0711–S0719) and the names of published standards and libraries.
 
 ## 8.1 Goals
 
@@ -13,14 +13,14 @@ This is Reviera's own design, from owner directives given on 2026-10-15. It has 
 3. **Any eventual use case.** One foundational subsystem abstracts calculation workloads from where and how they run. Analysis is its first user, not its only one.
 4. **Send only what is needed.** A job carries a distillation of the model, never the model.
 5. **Future-forward.** Compression and encryption are negotiated, so new techniques arrive without changing the contract.
-6. **Contained failures.** A crash or runaway fails its job, never Reviera or the machine.
-7. **Disconnect-safe.** A long job outlives its client: a durable job registry on every server and a record of submitted jobs in the model let Reviera reconnect, follow the job from where it left off and collect its results, even after quitting or moving to another machine.
-8. **Licence freedom at the boundary.** Runners and hosted services are separate programs behind a published, arm's-length contract, so Reviera can connect to any of them regardless of licence, and their authors can implement the contract without taking on Reviera's licence (DM-RPC-002, TECH_STACK §4.2).
+6. **Contained failures.** A crash or runaway fails its job, never Riviera or the machine.
+7. **Disconnect-safe.** A long job outlives its client: a durable job registry on every server and a record of submitted jobs in the model let Riviera reconnect, follow the job from where it left off and collect its results, even after quitting or moving to another machine.
+8. **Licence freedom at the boundary.** Runners and hosted services are separate programs behind a published, arm's-length contract, so Riviera can connect to any of them regardless of licence, and their authors can implement the contract without taking on Riviera's licence (DM-RPC-002, TECH_STACK §4.2).
 
 ## 8.2 Architecture at a glance
 
 ```
- Reviera (workstation)                                     Where jobs run
+ Riviera (workstation)                                     Where jobs run
  ┌──────────────────────────────────────────┐
  │ Live calculations (in-process, ≤ 50 ms   │
  │ per edit): duct sizing, voltage drop,    │
@@ -30,7 +30,7 @@ This is Reviera's own design, from owner directives given on 2026-10-15. It has 
  │ (any kind)   (IFC filter  compress,      │                  │ (on demand, OS limits)│
  │              profile +    encrypt        │                  └───────────────────────┘
  │              transforms)     │           │   TLS (LAN)      ┌───────────────────────┐
- │                              └─ blobs ──►│ ───────────────► │ reviera-compute-host  │
+ │                              └─ blobs ──►│ ───────────────► │ riviera-compute-host  │
  │                                          │                  │ (paired, on demand)   │
  │ Result applier ◄─ results (signed) ◄─────│   TLS (cloud)    ┌───────────────────────┐
  │ (parameters, packages, display styles)   │ ───────────────► │ Cloud cluster: gateway│
@@ -54,16 +54,16 @@ Other users of the subsystem are rendering (Chapter 7), tessellation of large mo
 2. **Distil.** The kind's distiller filters the IFC model down to what the job needs (DM-RPC-003), applies any transforms, splits the result into deterministic chunks and, for remote destinations, anonymises it. The dialog shows the size and destination, and the first remote job asks for consent.
 3. **Negotiate.** Client and server agree on compression, encryption, key encapsulation, signature and hash techniques (DM-RPC-001).
 4. **Upload what is missing.** `HasBlobs` reports which chunks the server holds; only the rest are sent, compressed and encrypted.
-5. **Run.** The server records the job in its registry, starts a runner on demand under memory and CPU limits, and streams numbered progress events. A cloud cluster sizes a worker to the job. Reviera can disconnect, close or crash; the job continues, and Reviera reattaches later from its own record of the job, resuming events and downloads where they stopped (DM-RPC-009).
+5. **Run.** The server records the job in its registry, starts a runner on demand under memory and CPU limits, and streams numbered progress events. A cloud cluster sizes a worker to the job. Riviera can disconnect, close or crash; the job continues, and Riviera reattaches later from its own record of the job, resuming events and downloads where they stopped (DM-RPC-009).
 6. **Return.** Signed results come back, keyed to the distillation; the result applier attaches them to the right elements, as parameters, result packages or display styles, with their provenance.
 7. **Idle.** The runner exits after its idle timeout; a cloud cluster scales back to zero.
 
 ## 8.4a Real-time sessions
 
-Some simulations are better explored than run: a heavy simulation runs on a cloud cluster or LAN host while Reviera, a game engine or a VR headset shows it live, and the user changes scenario data and sees the result respond at once (DM-RPC-010).
+Some simulations are better explored than run: a heavy simulation runs on a cloud cluster or LAN host while Riviera, a game engine or a VR headset shows it live, and the user changes scenario data and sees the result respond at once (DM-RPC-010).
 
 ```
- Reviera (controller)          ── scenario inputs, model patches ──►   Cloud / LAN host
+ Riviera (controller)          ── scenario inputs, model patches ──►   Cloud / LAN host
  viewport + scenario panel     ◄── keyframes + delta frames ───────    simulation session
         │  Render Scene (simulation layer)                              (workers reserved
         ▼                                                                while open)
@@ -90,7 +90,7 @@ Some simulations are better explored than run: a heavy simulation runs on a clou
 | External wind | Wind flow and facade pressures | Simplified envelope with site context | OpenFOAM |
 | Clash | Project-wide clash test | Bodies of chosen categories | Built-in overlap engine |
 
-Live calculations that update while the user models stay in Reviera's process (ANA-PLUG-008).
+Live calculations that update while the user models stay in Riviera's process (ANA-PLUG-008).
 
 ## 8.6 Negotiation, compression and encryption
 

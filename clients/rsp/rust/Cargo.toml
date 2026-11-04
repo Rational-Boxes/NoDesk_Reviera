@@ -1,6 +1,6 @@
 [package]
-name = "reviera-rsp"
-description = "Reviera Scene Protocol types (glTF 2.0 + REVIERA_scene extension, streamed deltas)"
+name = "riviera-rsp"
+description = "Riviera Scene Protocol types (glTF 2.0 + RIVIERA_scene extension, streamed deltas)"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

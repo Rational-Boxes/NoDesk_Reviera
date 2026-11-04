@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
-// Copyright (C) 2026 Reviera contributors
+// Copyright (C) 2026 Riviera contributors
 
-//! Against a real FileEngine, when one is named: `REVIERA_FILEENGINE_URL` (the tenant's address)
-//! with `REVIERA_FILEENGINE_KEY` and `REVIERA_FILEENGINE_SECRET` (a service credential). Skipped
-//! otherwise. Writes only inside `REVIERA_FILEENGINE_FOLDER` (default `Engineering/Reviera test`,
+//! Against a real FileEngine, when one is named: `RIVIERA_FILEENGINE_URL` (the tenant's address)
+//! with `RIVIERA_FILEENGINE_KEY` and `RIVIERA_FILEENGINE_SECRET` (a service credential). Skipped
+//! otherwise. Writes only inside `RIVIERA_FILEENGINE_FOLDER` (default `Engineering/Riviera test`,
 //! which must exist), in a folder of its own that it deletes at the end.
 
-use reviera_fileengine::{Client, ErrorKind};
+use riviera_fileengine::{Client, ErrorKind};
 
 fn var(k: &str) -> Option<String> {
     std::env::var(k).ok().filter(|v| !v.trim().is_empty())
@@ -14,15 +14,15 @@ fn var(k: &str) -> Option<String> {
 
 #[test]
 fn a_real_server_signs_in_writes_versions_and_restores() {
-    let (Some(url), Some(key), Some(secret)) = (var("REVIERA_FILEENGINE_URL"), var("REVIERA_FILEENGINE_KEY"), var("REVIERA_FILEENGINE_SECRET")) else {
-        eprintln!("REVIERA_FILEENGINE_URL, _KEY and _SECRET are not all set: skipped");
+    let (Some(url), Some(key), Some(secret)) = (var("RIVIERA_FILEENGINE_URL"), var("RIVIERA_FILEENGINE_KEY"), var("RIVIERA_FILEENGINE_SECRET")) else {
+        eprintln!("RIVIERA_FILEENGINE_URL, _KEY and _SECRET are not all set: skipped");
         return;
     };
     let c = Client::new(&url, false).unwrap();
     assert_eq!(c.sign_in(&key, "not the secret").unwrap_err().kind, ErrorKind::Auth);
     let who = c.sign_in(&key, &secret).unwrap();
     assert!(!who.user.is_empty() && !who.tenant.is_empty(), "{who:?}");
-    let folder = var("REVIERA_FILEENGINE_FOLDER").unwrap_or_else(|| "Engineering/Reviera test".to_owned());
+    let folder = var("RIVIERA_FILEENGINE_FOLDER").unwrap_or_else(|| "Engineering/Riviera test".to_owned());
     let base = c.resolve(&folder).unwrap();
     assert!(base.is_dir() && c.can(&base.uid, "w").unwrap(), "{folder} must be a folder we may write in");
 

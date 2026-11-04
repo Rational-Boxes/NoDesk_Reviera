@@ -1,0 +1,73 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Riviera contributors -->
+<h1>Stairlifts and platform stairlifts</h1>
+<p class="lead">A stairlift runs on a rail along one side of a stair: a <b>seated stairlift</b>,
+or a <b>wheelchair platform lift</b> (an inclined platform lift). Riviera sizes it from the
+<b>vertical-transport rule packs</b> in use, makes it as one element following the stair, and
+checks what it leaves of the stair. The sample <a href="riviera:sample/stairlifts">Stairlifts and
+platform stairlifts in a parish hall and its house</a> shows the tools.</p>
+<nav class="toc">
+  <a href="#place">Placing one</a>
+  <a href="#sizes">How it is sized</a>
+  <a href="#width">The width the stair keeps</a>
+  <a href="#zones">Running envelope, head box and landings</a>
+  <a href="#check">Check Stairlifts</a>
+  <a href="#limits">Limits and what to check</a>
+  <a href="#scripts">Scripts and agents</a>
+</nav>
+
+<h2 id="place">Placing one</h2>
+<p>Select a stair and choose <b>Architecture › Circulation › Stairlift</b>. Choose a seated lift
+or a wheelchair platform lift, the side it runs on going up (usually the wall), and what the
+stair serves: a dwelling, an exit enclosure, or anything else with the number of people. For a
+platform lift choose a platform size, or leave the family's largest. <b>Parks clear of the
+stair</b> is for a rail end that hinges or slides away, or runs round a corner.</p>
+
+<h2 id="sizes">How it is sized</h2>
+<ul>
+  <li><b>Seated</b>: makers' generic sizes, folding to 320 mm from the wall and 530 mm in use, its
+  rail standing 160 mm in. It suits stairs of 25–50° and straight rails up to 7.06 m.</li>
+  <li><b>Platform, straight rails</b>: 800 × 1250 down to 675 × 1000 mm platforms, 250 kg,
+  folding to 260–299 mm. A stair that turns takes the <b>curved</b> family instead: tubes that
+  follow the landings, 800 × 1220 down to 700 × 750 mm, 300 kg, with a drive box at the top.</li>
+  <li>How far the platform reaches past the bottom nosing, and how high its deck rises above the
+  nosings, come from the makers' tables for the stair's angle. Wall loads at a support are
+  recorded for the structure (<code>Riviera_Stairlift</code>).</li>
+</ul>
+<p>The rail runs along the flights and landings, down to the floor before the first riser and on
+past the top nosing. The unit is shown parked at the foot of the stair.</p>
+
+<h2 id="width">The width the stair keeps</h2>
+<p>Under the IBC a lift on a dwelling's stair (R-3, or within an R-2 unit) leaves at least 20 in
+(508 mm) beside the folded seat or platform; any other stair keeps its required width (44 in, or
+36 in serving fewer than 50 people). In England the escape stair keeps its width with the unit
+parked (800 mm for up to 50 people), and the rail itself is ignored. A unit that parks clear of
+the stair leaves only its rail beside it.</p>
+
+<h2 id="zones">Running envelope, head box and landings</h2>
+<p>Each lift has virtual volumes: its <b>running envelope</b> over each straight flight, as deep
+as the unit in use and as high as a seated rider or, for a platform, its deck plus the 1524 mm
+<b>head box</b> A18.1 asks; and a <b>landing zone</b> at each end, with a wheelchair space beyond
+a platform's (30 × 48 in under ADA, 1500 × 1500 mm in England). View › Coordination › Check
+Clearances lists anything in them, such as the floor above a stair whose opening was cut for
+walking headroom only.</p>
+
+<h2 id="check">Check Stairlifts</h2>
+<p><b>Architecture › Circulation › Check Stairlifts</b> checks the width left beside the unit, a
+unit in an exit enclosure (NFPA 101's reading: a note for the authority), the platform's size
+(England asks 800 × 1250 mm) and speed (0.15 m/s), and the generic model's limits: the stair's
+angle, the longest straight rail, the makers' recommended stair width, and the width a turn
+needs on its inside. The makers' limits are <b>notes</b>.</p>
+
+<h2 id="limits">Limits and what to check</h2>
+<p>The lift is made for its stair as it is: if the stair changes, delete the lift and place it
+again (the checks and zones follow the stair as it is now). Not yet built: running envelopes
+over winders, spirals and the landings of a turning stair; the head box over a curved rail's
+turns; the backrest and footrest clearances; the charger outlet or dedicated circuit; and
+outdoor units.</p>
+
+<h2 id="scripts">Scripts and agents</h2>
+<p>Everything above is a command: <code>stairlift.create</code>, <code>stairlift.list</code>,
+<code>stairlift.delete</code> and <code>stairlift.check</code>; <code>clearance.list</code> and
+<code>clearance.check</code> include the zones. Lua scripts and AI agents (MCP, the
+<i>modeling</i> toolset) can use them.</p>
