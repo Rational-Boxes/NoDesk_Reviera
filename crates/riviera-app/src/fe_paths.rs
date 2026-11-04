@@ -216,6 +216,24 @@ fn nonce() -> String {
     format!("{}-{}", d.as_secs(), d.subsec_nanos())
 }
 
+/// The items of the library at `dir` that the active model's types were placed from.
+fn linked_items(app: &App, dir: &Path) -> Vec<String> {
+    let Ok(Some(m)) = riviera_core::library::Manifest::read(dir) else { return Vec::new() };
+    let Some(open) = app.active().and_then(|id| app.document(id)) else { return Vec::new() };
+    riviera_core::mesh_objects::types(open.doc.store())
+        .into_iter()
+        .filter_map(|(_, t, _)| t.library.filter(|l| l.library_id == m.id))
+        .map(|l| {
+            if !l.item_guid.is_empty()
+                && let Some((k, _)) = m.items.iter().find(|(_, d)| d.guid == l.item_guid)
+            {
+                return k.clone();
+            }
+            l.item
+        })
+        .collect()
+}
+
 /// The commands that take a Component Library's folder, which may be a FileEngine library's
 /// mirror given by its local path (COL-FE-013).
 pub(crate) fn takes_library(name: &str) -> bool {
@@ -299,6 +317,18 @@ fn run(app: &mut App, name: &str, mut args: Value, caller: &Caller, found: Vec<(
                 }
                 if write && !libraries.contains(&dir) {
                     libraries.push(dir.clone());
+                }
+                // Large items wait on the server: fetch what this command needs (COL-FE-017).
+                let mut items: Vec<String> = Vec::new();
+                let parent = at.rsplit_once('/').map_or("", |(p, _)| p);
+                if let Some(i) = args.pointer(&format!("{parent}/item")).and_then(Value::as_str) {
+                    items.push(i.to_owned());
+                }
+                if matches!(name, "library.updates" | "library.reload_item") {
+                    items.extend(linked_items(app, &dir));
+                }
+                if !items.is_empty() {
+                    crate::fe_library::fetch(app, &dir, &items)?;
                 }
             }
             if let Some(v) = args.pointer_mut(&at) {

@@ -608,7 +608,7 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 - [x] Against the fake server: a library made on FileEngine (`library.create` with an address) uploads its manifest; `library.import_files` of an OBJ uploads the item, its MTL and the manifest entry; a second machine's `library.open` mirrors it, lists and places the item; items added from both machines all stay in the manifest; a manifest changed on the server between a pull and a push is merged entry by entry (the description from one side, an item's name from the other); `library.delete_items` moves the item into `.deleted` on the server.
 - [x] Live (Proxima File Vault, 2026-11-04, `fileengine_live`): a library made in a FileEngine folder, an OBJ with its MTL imported, opened and placed from on a second machine.
 
-*Built (2026-11-04):* `riviera_app::fe_library` (mirror, pull, push, merge) and the `library_read`/`library_write` marks resolved in `fe_paths`, for 11 more commands; the panel's FileEngine Open and New. *Not yet:* downloading items on demand instead of the whole library (updates: COL-FE-016), the Incoming review folder.
+*Built (2026-11-04):* `riviera_app::fe_library` (mirror, pull, push, merge) and the `library_read`/`library_write` marks resolved in `fe_paths`, for 11 more commands; the panel's FileEngine Open and New. *Not yet:* the Incoming review folder (items on demand: COL-FE-017; updates: COL-FE-016).
 
 ### Parameter libraries, scripts and keynotes on FileEngine
 **ID:** COL-FE-014 · **Priority:** P2 · **Ref:** FILEENGINE_INTEGRATION §7a, §7b; owner requirement (2026-11-04, as COL-FE-012)
@@ -662,6 +662,21 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 - [x] Live (2026-11-04): an item changed on the server is seen as changed on another machine and reloaded.
 
 *Built (2026-11-04):* `library.updates`, `library.reload_item`, and the window's Library Updates. Not yet: the Properties palette's *Update available* on a selected type, the comparison shown before reloading (DM-LIB-001), IFC model fragments.
+
+### Library items fetched on demand
+**ID:** COL-FE-017 · **Priority:** P2 · **Ref:** FILEENGINE_INTEGRATION §7b (*Reading*)
+
+**Purpose.** A large shared library opens quickly: only what a model uses is downloaded.
+
+**Behaviour & rules.**
+- When a FileEngine library's mirror is brought up to date (COL-FE-013), files over 2 MB (`ON_DEMAND`, the manifest excepted) are not downloaded: an empty placeholder stands in for each, marked *pending* in the mirror's record.
+- A command that needs an item fetches it first, with the other pending files of its folder (an OBJ's MTL and textures, a glTF's buffers): `component.place`, `component.place_fragment` and the array sources (their `item`), and `library.updates` and `library.reload_item` (the items the model's types came from). The window's Place Component fetches the item before drawing its outline. A thumbnail is drawn once its item is fetched.
+- A placeholder is never uploaded and never counts as changed when the mirror is sent back.
+
+**Acceptance criteria.**
+- [x] Against the fake server: an OBJ over 2 MB in a FileEngine library stays a placeholder on a second machine (its MTL downloaded) until placed; placing it fetches it whole; it is then current; a change to the library sends nothing for it and the server keeps it.
+
+*Built (2026-11-04):* in `riviera_app::fe_library` (`fetch`) and `fe_paths`. Not yet: a size limit set per library or per user, fetching in the background, thumbnails from FileEngine's renditions.
 
 *Not yet (later phases):* a thumbnail with each save; the Documents pane (a dockable pane with document previews, uploads and expiry warnings); publish sets and share links (exports themselves: COL-FE-012); BCF over BCF-API; Component Libraries; field sets beyond EPD and HPD (§7c); live updates through the discussion service.
 

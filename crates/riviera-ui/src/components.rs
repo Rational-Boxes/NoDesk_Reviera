@@ -1052,6 +1052,15 @@ impl Gui {
         if self.doc.is_none() {
             return frame.set_status_text("Open or create a project first (File > New)", 0);
         }
+        // A large item of a FileEngine library is fetched before its outline is drawn (COL-FE-017).
+        if let Source::Item { library, item } = &source
+            && riviera_app::fe_library::origin(library).is_some()
+        {
+            frame.set_status_text(&format!("Fetching {item} from FileEngine…"), 0);
+            if let Err(e) = riviera_app::fe_library::fetch(&mut self.app, library, std::slice::from_ref(item)) {
+                return error(&frame, &format!("{item} could not be fetched from FileEngine:\n{e}"));
+            }
+        }
         let (outline, scale) = match &source {
             Source::Item { library, item } => match item_mesh(library, item) {
                 Ok(m) => (outline_of(m.positions.iter().copied()), 1.0),

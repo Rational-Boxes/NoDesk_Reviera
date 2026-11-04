@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Riviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Riviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 888 numbered requirements (320 P0 · 343 P1 · 218 P2 · 7 P3), 2,332 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 889 numbered requirements (320 P0 · 343 P1 · 219 P2 · 7 P3), 2,332 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Riviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Riviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,332 commands; 888 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,332 commands; 889 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -27744,7 +27744,7 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 - [x] Against the fake server: a library made on FileEngine (`library.create` with an address) uploads its manifest; `library.import_files` of an OBJ uploads the item, its MTL and the manifest entry; a second machine's `library.open` mirrors it, lists and places the item; items added from both machines all stay in the manifest; a manifest changed on the server between a pull and a push is merged entry by entry (the description from one side, an item's name from the other); `library.delete_items` moves the item into `.deleted` on the server.
 - [x] Live (Proxima File Vault, 2026-11-04, `fileengine_live`): a library made in a FileEngine folder, an OBJ with its MTL imported, opened and placed from on a second machine.
 
-*Built (2026-11-04):* `riviera_app::fe_library` (mirror, pull, push, merge) and the `library_read`/`library_write` marks resolved in `fe_paths`, for 11 more commands; the panel's FileEngine Open and New. *Not yet:* downloading items on demand instead of the whole library (updates: COL-FE-016), the Incoming review folder.
+*Built (2026-11-04):* `riviera_app::fe_library` (mirror, pull, push, merge) and the `library_read`/`library_write` marks resolved in `fe_paths`, for 11 more commands; the panel's FileEngine Open and New. *Not yet:* the Incoming review folder (items on demand: COL-FE-017; updates: COL-FE-016).
 
 ### Parameter libraries, scripts and keynotes on FileEngine
 **ID:** COL-FE-014 · **Priority:** P2 · **Ref:** FILEENGINE_INTEGRATION §7a, §7b; owner requirement (2026-11-04, as COL-FE-012)
@@ -27798,6 +27798,21 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 - [x] Live (2026-11-04): an item changed on the server is seen as changed on another machine and reloaded.
 
 *Built (2026-11-04):* `library.updates`, `library.reload_item`, and the window's Library Updates. Not yet: the Properties palette's *Update available* on a selected type, the comparison shown before reloading (DM-LIB-001), IFC model fragments.
+
+### Library items fetched on demand
+**ID:** COL-FE-017 · **Priority:** P2 · **Ref:** FILEENGINE_INTEGRATION §7b (*Reading*)
+
+**Purpose.** A large shared library opens quickly: only what a model uses is downloaded.
+
+**Behaviour & rules.**
+- When a FileEngine library's mirror is brought up to date (COL-FE-013), files over 2 MB (`ON_DEMAND`, the manifest excepted) are not downloaded: an empty placeholder stands in for each, marked *pending* in the mirror's record.
+- A command that needs an item fetches it first, with the other pending files of its folder (an OBJ's MTL and textures, a glTF's buffers): `component.place`, `component.place_fragment` and the array sources (their `item`), and `library.updates` and `library.reload_item` (the items the model's types came from). The window's Place Component fetches the item before drawing its outline. A thumbnail is drawn once its item is fetched.
+- A placeholder is never uploaded and never counts as changed when the mirror is sent back.
+
+**Acceptance criteria.**
+- [x] Against the fake server: an OBJ over 2 MB in a FileEngine library stays a placeholder on a second machine (its MTL downloaded) until placed; placing it fetches it whole; it is then current; a change to the library sends nothing for it and the server keeps it.
+
+*Built (2026-11-04):* in `riviera_app::fe_library` (`fetch`) and `fe_paths`. Not yet: a size limit set per library or per user, fetching in the background, thumbnails from FileEngine's renditions.
 
 *Not yet (later phases):* a thumbnail with each save; the Documents pane (a dockable pane with document previews, uploads and expiry warnings); publish sets and share links (exports themselves: COL-FE-012); BCF over BCF-API; Component Libraries; field sets beyond EPD and HPD (§7c); live updates through the discussion service.
 
@@ -29894,9 +29909,9 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 28 | 0 | 29 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
-| COL | 8 | 52 | 15 | 1 | 76 |
+| COL | 8 | 52 | 16 | 1 | 77 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **343** | **218** | **7** | **888** |
+| **Total** | **320** | **343** | **219** | **7** | **889** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -29951,7 +29966,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.2a Riviera-originated features
 
-143 requirements are Riviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
+144 requirements are Riviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
 
 | Requirement | Ch | Feature |
 |-------------|----|---------|
@@ -30091,6 +30106,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | COL-FE-014 | 6 | Parameter libraries, scripts and keynotes on FileEngine |
 | COL-FE-015 | 6 | Publish sets |
 | COL-FE-016 | 6 | Library updates |
+| COL-FE-017 | 6 | Library items fetched on demand |
 | COL-MRG-001 | 6 | Three-way merge by GlobalId and RXD id |
 | COL-OWN-002 | 6 | Live ownership document and sync lock |
 | COL-OWN-004 | 6 | Enforced ownership through a server plugin (optional) |

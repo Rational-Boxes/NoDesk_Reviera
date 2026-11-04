@@ -164,3 +164,51 @@ fn parameter_libraries_scripts_and_keynotes_on_fileengine() {
     let k = ok(&mut ann, "keynotes.load", json!({ "path": format!("fileengine://{conn}/{eng}/keynotes.txt") }));
     assert!(k.to_string().contains('2') || k.to_string().contains("A1"), "{k:#}");
 }
+
+/// Large library items are fetched when placed, not when the library is read (COL-FE-017).
+#[test]
+fn large_items_wait_until_placed() {
+    let dir = tempfile::tempdir().unwrap();
+    let fake = Fake::start("fesk_test", "fesks_secret", "ann@acme.test");
+    let eng = fake.uid_of("Engineering").unwrap();
+    let mut ann = new_app(&dir.path().join("ann"));
+    let conn = connected(&mut ann, &fake);
+    ok(&mut ann, "file.new", json!({}));
+    let lib = ok(&mut ann, "fileengine.make_folder", json!({ "connection_id": conn, "parent_uid": eng, "name": "Big" })).as_str().unwrap().to_owned();
+    let address = format!("fileengine://{conn}/{lib}");
+    ok(&mut ann, "library.create", json!({ "path": address, "name": "Big things" }));
+    // An OBJ over 2 MB: a strip of many small triangles.
+    let src = dir.path().join("src");
+    std::fs::create_dir_all(&src).unwrap();
+    let mut obj = String::from("mtllib hall.mtl\nusemtl m\n");
+    let n = 40_000;
+    for i in 0..n {
+        let x = f64::from(i) * 0.001;
+        obj.push_str(&format!("v {x:.6} 0.000000 0.000000\nv {x:.6} 1.000000 0.000000\n"));
+    }
+    for i in 0..n - 1 {
+        let a = 2 * i + 1;
+        obj.push_str(&format!("f {a} {} {}\nf {} {} {}\n", a + 2, a + 1, a + 1, a + 2, a + 3));
+    }
+    assert!(obj.len() > 2 * 1024 * 1024);
+    std::fs::write(src.join("hall.obj"), &obj).unwrap();
+    std::fs::write(src.join("hall.mtl"), "newmtl m\nKd 0.3 0.3 0.6\n").unwrap();
+    ok(&mut ann, "library.import_files", json!({ "library": address, "files": [src.join("hall.obj")] }));
+
+    // Bob reads the library: the big item is a placeholder, the small MTL is there.
+    let mut bob = new_app(&dir.path().join("bob"));
+    let bconn = connected(&mut bob, &fake);
+    ok(&mut bob, "file.new", json!({}));
+    let opened = ok(&mut bob, "library.open", json!({ "path": format!("fileengine://{bconn}/{lib}") }));
+    let mirror = std::path::PathBuf::from(opened["path"].as_str().unwrap());
+    assert_eq!(std::fs::metadata(mirror.join("hall.obj")).unwrap().len(), 0, "not downloaded yet");
+    assert!(std::fs::metadata(mirror.join("hall.mtl")).unwrap().len() > 0);
+    // Placing it fetches it.
+    let level = ok(&mut bob, "level.list", json!({}))[0]["id"].clone();
+    ok(&mut bob, "component.place", json!({ "library": mirror, "item": "hall.obj", "points": [[0.0, 0.0]], "level": level }));
+    assert_eq!(std::fs::metadata(mirror.join("hall.obj")).unwrap().len(), obj.len() as u64);
+    assert_eq!(ok(&mut bob, "library.updates", json!({ "library": mirror }))[0]["state"], "current");
+    // A change Bob makes to the library sends nothing for an item still waiting, and keeps it.
+    ok(&mut bob, "library.set_meta", json!({ "library": mirror, "paths": ["hall.obj"], "details": { "description": "The hall" } }));
+    assert_eq!(fake.content(&fake.uid_of("Engineering/Big/hall.obj").unwrap()).unwrap().len(), obj.len());
+}

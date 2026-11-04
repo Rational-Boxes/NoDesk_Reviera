@@ -28,7 +28,14 @@ pub struct Synced {
     pub uid: String,
     pub version: String,
     pub sha256: String,
+    /// Not downloaded yet: an empty placeholder stands in for it (a large item, fetched when a
+    /// command needs it).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub pending: bool,
 }
+
+/// Files larger than this are fetched when a command needs them, not when the library is read.
+pub const ON_DEMAND: u64 = 2 * 1024 * 1024;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Sync {
@@ -125,10 +132,15 @@ pub fn pull(app: &mut App, root: &Path, conn: &str, folder_uid: &str) -> Result<
         let had = s.files.get(&path).filter(|x| x.uid == n.uid && x.version == token(&n) && local.is_file());
         let entry = match had {
             Some(x) => x.clone(),
+            // A large item waits, as an empty placeholder, until a command needs it.
+            None if n.size > ON_DEMAND && path != MANIFEST => {
+                std::fs::write(&local, b"").map_err(io)?;
+                Synced { uid: n.uid.clone(), version: token(&n), sha256: String::new(), pending: true }
+            }
             None => {
                 let bytes = app.fileengine.with(conn, |c| c.read(&n.uid))?;
                 std::fs::write(&local, &bytes).map_err(io)?;
-                Synced { uid: n.uid.clone(), version: token(&n), sha256: sha(&bytes) }
+                Synced { uid: n.uid.clone(), version: token(&n), sha256: sha(&bytes), pending: false }
             }
         };
         synced.insert(path, entry);
@@ -141,6 +153,28 @@ pub fn pull(app: &mut App, root: &Path, conn: &str, folder_uid: &str) -> Result<
     s.folders = folders;
     s.manifest = manifest_value(root);
     save(root, &s)
+}
+
+/// Downloads the items at `paths` (from the library's root) that are still placeholders, with
+/// the other placeholders of their folders (an OBJ's MTL and textures, a glTF's buffers).
+pub fn fetch(app: &mut App, root: &Path, paths: &[String]) -> Result<usize> {
+    let Some(mut s) = origin(root) else { return Ok(0) };
+    let folder = |p: &str| p.rsplit_once('/').map_or(String::new(), |(d, _)| d.to_owned());
+    let wanted: std::collections::BTreeSet<String> = paths.iter().map(|p| folder(p)).collect();
+    let due: Vec<String> = s.files.iter().filter(|(p, x)| x.pending && wanted.contains(&folder(p))).map(|(p, _)| p.clone()).collect();
+    let conn = s.connection_id.clone();
+    for p in &due {
+        let uid = s.files[p].uid.clone();
+        let bytes = app.fileengine.with(&conn, |c| c.read(&uid))?;
+        std::fs::write(root.join(p), &bytes).map_err(io)?;
+        let x = s.files.get_mut(p).expect("listed");
+        x.sha256 = sha(&bytes);
+        x.pending = false;
+    }
+    if !due.is_empty() {
+        save(root, &s)?;
+    }
+    Ok(due.len())
 }
 
 /// Every file in the mirror, by path (the record left out).
@@ -199,7 +233,7 @@ fn upload(app: &mut App, s: &mut Sync, path: &str, local: &Path) -> Result<Synce
         };
         c.write_file(&uid, local)?;
         let version = token(&c.stat(&uid)?);
-        Ok(Synced { uid, version, sha256: sha(&bytes) })
+        Ok(Synced { uid, version, sha256: sha(&bytes), pending: false })
     })
 }
 
@@ -267,6 +301,10 @@ pub fn push(app: &mut App, root: &Path) -> Result<Pushed> {
     let locals = local_files(root);
     for (path, local) in &locals {
         if path == MANIFEST {
+            continue;
+        }
+        // A placeholder is never sent.
+        if s.files.get(path).is_some_and(|x| x.pending) {
             continue;
         }
         let bytes = std::fs::read(local).map_err(io)?;
