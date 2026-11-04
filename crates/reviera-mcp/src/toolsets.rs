@@ -213,6 +213,7 @@ pub fn toolset_of(command: &str) -> String {
             | "bath"
             | "vt"
             | "elevator"
+            | "escalator"
             | "grab_bar"
             | "tile"
             | "vent"

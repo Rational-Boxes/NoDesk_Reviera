@@ -9,7 +9,10 @@ and landing zones (ARC-VT-003) and Check Elevators (ARC-VT-004), with the sample
 office core*; then step 3: hospital, freight and vehicle elevators (ARC-VT-005) and small lifts
 (ARC-VT-006), with the sample *Hospital, freight and small lifts*; then step 4: power and heat
 estimates (ARC-VT-007), machine spaces and equipment (ARC-VT-008) and the elevator schedule
-(ARC-VT-009), shown in *Elevators in an office core*. What is left is listed under each requirement's *Not yet*.
+(ARC-VT-009), shown in *Elevators in an office core*; then step 5: escalators and moving walks
+(ARC-VT-010), their headroom and landing zones (ARC-VT-011) and Check Escalators (ARC-VT-012),
+with the sample *Escalators and moving walks in a department store* (the airport and transit
+context is still to come). What is left is listed under each requirement's *Not yet*.
 **Owner's requests:**
 - 2026-11-01: "Elevators, both passenger and freight." and "For elevators include ornamental
   version like glass enclosed."

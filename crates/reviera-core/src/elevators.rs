@@ -50,6 +50,7 @@ const SHIPPED: &[&str] = &[
     include_str!("../../../schemas/vt/packs/practice_us.json"),
     include_str!("../../../schemas/vt/packs/en81.json"),
     include_str!("../../../schemas/vt/packs/en81_70.json"),
+    include_str!("../../../schemas/vt/packs/en115.json"),
     include_str!("../../../schemas/vt/packs/england_adm.json"),
     include_str!("../../../schemas/vt/packs/practice_en.json"),
 ];
@@ -503,6 +504,10 @@ pub struct Pack {
     pub limits: Vec<Limit>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub freight_classes: Option<FreightClasses>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub escalator: Option<crate::escalators::Rules>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub escalator_sizing: Option<crate::escalators::Sizing>,
 }
 
 fn validator() -> &'static jsonschema::Validator {
@@ -580,8 +585,8 @@ pub fn automatic(store: &Store) -> Vec<String> {
     use crate::codes::Code;
     let ids: &[&str] = match crate::codes::settings(store).code {
         Code::Ibc | Code::Irc => &["us_ibc_ada", "us_a17", "us_a18", "practice_us"],
-        Code::UkAdk => &["en81", "en81_70", "england_adm", "practice_en"],
-        _ => &["en81", "en81_70", "practice_en"],
+        Code::UkAdk => &["en81", "en81_70", "en115", "england_adm", "practice_en"],
+        _ => &["en81", "en81_70", "en115", "practice_en"],
     };
     ids.iter().map(|s| (*s).to_owned()).collect()
 }
@@ -1077,7 +1082,7 @@ pub fn elevators(store: &Store) -> Vec<(ElementId, Elevator)> {
     store.iter().filter_map(|e| Some((e.id(), elevator(e)?))).collect()
 }
 
-fn by_guid(store: &Store, guid: &str) -> Option<ElementId> {
+pub(crate) fn by_guid(store: &Store, guid: &str) -> Option<ElementId> {
     store.resolve(&ElementRef::Guid(GlobalId::parse(guid)?))
 }
 
@@ -1091,7 +1096,6 @@ pub struct CreateParams {
     #[schemars(extend("x-reviera-data-type" = "angle"))]
     pub rotation: f64,
     /// The lowest level served.
-    #[serde(alias = "level")]
     pub base_level: ElementRef,
     /// The highest level served; every level between is served too.
     pub top_level: ElementRef,
@@ -1195,7 +1199,7 @@ fn entrance_type(txn: &mut Transaction<'_>) -> Result<ElementId> {
 }
 
 /// The levels from `base` to `top`, lowest first.
-fn served(store: &Store, base: &ElementRef, top: &ElementRef) -> Result<Vec<crate::levels::LevelInfo>> {
+pub(crate) fn served(store: &Store, base: &ElementRef, top: &ElementRef) -> Result<Vec<crate::levels::LevelInfo>> {
     let level = |r: &ElementRef| {
         store.resolve(r).filter(|id| store.get(*id).is_some_and(|e| e.class == crate::levels::CLASS)).ok_or_else(|| bad("vt.no_level", "no such level"))
     };
@@ -1209,7 +1213,7 @@ fn served(store: &Store, base: &ElementRef, top: &ElementRef) -> Result<Vec<crat
     Ok(all.into_iter().filter(|l| l.elevation >= z0 - 1e-6 && l.elevation <= z1 + 1e-6).collect())
 }
 
-fn measure(kind: &str, v: impl Into<Value>) -> Value {
+pub(crate) fn measure(kind: &str, v: impl Into<Value>) -> Value {
     json!({ "type": kind, "value": v.into() })
 }
 
@@ -1776,7 +1780,14 @@ mod tests {
         let register = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../design_documents/SOURCE_REGISTER.md")).expect("the register is there");
         for p in shipped() {
             let sources = [p.car_area.as_ref().map(|a| &a.source), p.sizing.as_ref().map(|a| &a.source), p.stretcher.as_ref().map(|a| &a.source), p.landing.as_ref().map(|a| &a.source), p.call_buttons.as_ref().map(|a| &a.source), p.sizing.as_ref().map(|a| &a.source)];
-            let more = p.accessible_cars.iter().map(|a| &a.source).chain(p.limits.iter().map(|l| &l.source)).chain(p.freight_classes.as_ref().map(|f| &f.source));
+            let more = p
+                .accessible_cars
+                .iter()
+                .map(|a| &a.source)
+                .chain(p.limits.iter().map(|l| &l.source))
+                .chain(p.freight_classes.as_ref().map(|f| &f.source))
+                .chain(p.escalator.as_ref().map(|f| &f.source))
+                .chain(p.escalator_sizing.as_ref().map(|f| &f.source));
             for s in sources.into_iter().flatten().chain(more).flat_map(|s| s.split(' ')) {
                 assert!(register.contains(&format!("| {s} |")), "{}: {s} is not in the register", p.id);
             }

@@ -785,6 +785,297 @@
           "$ref": "#/$defs/confidence"
         }
       }
+    },
+    "escalator": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Rules for escalators and moving walks (ARC-VT-010).",
+      "required": [
+        "id",
+        "max_inclination",
+        "max_speed",
+        "flat_steps",
+        "headroom",
+        "landing_measure",
+        "landing_width_add",
+        "side_clearance",
+        "source",
+        "confidence"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "max_inclination": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Degrees."
+        },
+        "steep_inclination": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "A steeper inclination allowed where the rise and speed are no more than steep_max_rise and steep_max_speed."
+        },
+        "steep_max_rise": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "steep_max_speed": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "max_speed": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "flat_steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "min"
+            ],
+            "properties": {
+              "min": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "rise_over": {
+                "type": "number",
+                "minimum": 0
+              },
+              "speed_over": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          },
+          "description": "The least flat steps at each landing: the largest min whose conditions (rise over, speed over) hold."
+        },
+        "headroom": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Clear height above the steps, pallets and landings."
+        },
+        "landing_measure": {
+          "enum": [
+            "outer",
+            "centreline"
+          ],
+          "description": "Whether the landing zone's width and depth start from the handrails' outer edges or their centrelines."
+        },
+        "landing_width_add": {
+          "type": "number",
+          "minimum": 0
+        },
+        "landing_depth": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Depth of the landing zone; or landing_depth_factor × the handrail distance."
+        },
+        "landing_depth_factor": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "side_clearance": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Clearance beside the handrails' outer edges, up to the headroom."
+        },
+        "step_width_min": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "step_width_max": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "walk_max_inclination": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "walk_max_speed": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "source": {
+          "$ref": "#/$defs/source"
+        },
+        "confidence": {
+          "$ref": "#/$defs/confidence"
+        }
+      }
+    },
+    "escalator_sizing": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Generic, maker-style sizes of escalators and moving walks (ARC-VT-010).",
+      "required": [
+        "handrail_centres_add",
+        "handrail_outer_add",
+        "truss_add",
+        "pit_add",
+        "truss_depth",
+        "pit_depth",
+        "ends",
+        "walk_ends",
+        "balustrade",
+        "capacity",
+        "source",
+        "confidence"
+      ],
+      "properties": {
+        "handrail_centres_add": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "handrail_outer_add": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "truss_add": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "transit_truss_add": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "pit_add": {
+          "type": "number",
+          "minimum": 0
+        },
+        "truss_depth": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "pit_depth": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "transit_pit_depth": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "ends": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "flat",
+              "lower",
+              "upper"
+            ],
+            "properties": {
+              "flat": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "lower": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "upper": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            }
+          },
+          "description": "From each working point to the truss end, by the number of flat steps."
+        },
+        "walk_ends": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "lower",
+            "upper"
+          ],
+          "properties": {
+            "lower": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "upper": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "walk_pit_depth": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "walk_deck": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "balustrade": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "support_span": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Beyond this span between the end supports, an intermediate support is needed."
+        },
+        "capacity": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            ],
+            "items": false,
+            "minItems": 3
+          },
+          "description": "Step width (m), speed (m/s) and practical capacity (persons per hour)."
+        },
+        "reaction_per_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "reaction_upper": {
+          "type": "number",
+          "minimum": 0
+        },
+        "reaction_lower": {
+          "type": "number",
+          "minimum": 0
+        },
+        "power_per_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "power_base": {
+          "type": "number",
+          "minimum": 0
+        },
+        "source": {
+          "$ref": "#/$defs/source"
+        },
+        "confidence": {
+          "$ref": "#/$defs/confidence"
+        }
+      }
     }
   },
   "$defs": {

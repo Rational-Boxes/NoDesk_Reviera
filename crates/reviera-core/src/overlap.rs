@@ -42,6 +42,9 @@ pub struct Options {
     pub min_volume: f64,
     /// Lines across the common box, each way (at most).
     pub resolution: usize,
+    /// Lines across the common box, each way (at least): more finds thin parts along a long thin
+    /// box, such as a balustrade beside an escalator's headroom (ARC-VT-011).
+    pub min_lines: usize,
 }
 
 impl Default for Options {
@@ -50,6 +53,7 @@ impl Default for Options {
             tolerance: 0.001,
             min_volume: 1e-6,
             resolution: 48,
+            min_lines: 1,
         }
     }
 }
@@ -171,11 +175,12 @@ fn measure(a: &Prepared<'_>, b: &Prepared<'_>, o: &Options) -> Option<Overlap> {
     if (0..3).any(|k| hi[k] - lo[k] <= o.tolerance) {
         return None;
     }
-    // Cells: square-ish, at most `resolution` each way.
+    // Cells: square-ish, at most `resolution` each way, and at least `min_lines`.
     let (wx, wy) = (hi[0] - lo[0], hi[1] - lo[1]);
     let cell = (wx.max(wy) / o.resolution as f64).max(1e-6);
-    let nx = ((wx / cell).ceil() as usize).clamp(1, o.resolution);
-    let ny = ((wy / cell).ceil() as usize).clamp(1, o.resolution);
+    let least = o.resolution.min(o.min_lines.max(1));
+    let nx = ((wx / cell).ceil() as usize).max(least).clamp(1, o.resolution);
+    let ny = ((wy / cell).ceil() as usize).max(least).clamp(1, o.resolution);
     let (dx, dy) = (wx / nx as f64, wy / ny as f64);
     let ta = candidates(a.body, [lo[0], lo[1]], [hi[0], hi[1]]);
     let tb = candidates(b.body, [lo[0], lo[1]], [hi[0], hi[1]]);

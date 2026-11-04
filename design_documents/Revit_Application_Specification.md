@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Reviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Reviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 873 numbered requirements (320 P0 · 335 P1 · 211 P2 · 7 P3), 2,315 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 876 numbered requirements (320 P0 · 338 P1 · 211 P2 · 7 P3), 2,320 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,315 commands; 873 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,320 commands; 876 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -13896,10 +13896,11 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 | `practice_us` | recommended | US maker-style cars of each kind (passenger 2000–4000 lb; hospital 5000 lb; freight 2500–10,000 lb; vehicle 8000 lb; LULA, home elevator, platform lift, dumbwaiter), hoistway allowances (+559 mm width, +457 mm depth) or each car's own hoistway, pit and overhead |
 | `en81` | minimum (advisory) | EN 81-20 Table 6 maximum car area, 100–2500 kg, +0.16 m² per 100 kg beyond |
 | `en81_70` | accessible | EN 81-70:2021 type 2 car, 1100 × 1400 mm, 900 mm door |
+| `en115` | minimum | EN 115-1:2017 escalators and moving walks through KONE's guides (ARC-VT-010) |
 | `england_adm` | accessible | Approved Document M vol. 2: car 1100 × 1400 mm, 800 mm door; 1500 × 1500 mm landing; call buttons 900–1100 mm |
 | `practice_en` | recommended | EN maker-style cars (450–2500 kg), allowances, pit and headroom by speed |
 
-- **Choosing packs.** A project uses the packs it names (`vt.set_rule_packs`), or by default packs chosen from its building code (DM-CODE-001): `us_ibc_ada`, `us_a17`, `us_a18` and `practice_us` under the IBC or IRC; `en81`, `en81_70`, `england_adm` and `practice_en` under England's; `en81`, `en81_70` and `practice_en` otherwise.
+- **Choosing packs.** A project uses the packs it names (`vt.set_rule_packs`), or by default packs chosen from its building code (DM-CODE-001): `us_ibc_ada`, `us_a17`, `us_a18` and `practice_us` under the IBC or IRC; `en81`, `en81_70`, `en115`, `england_adm` and `practice_en` under England's; `en81`, `en81_70`, `en115` and `practice_en` otherwise. `us_a17` also carries A17.1's escalator rules, and the `practice_*` packs escalator sizes (ARC-VT-010).
 - **Project packs.** `vt.add_rule_pack` adds a pack to the project (checked against the schema; an `id` that ships replaces the shipped one for this project), and `vt.remove_rule_pack` removes it. They are kept in RXD on the project (`rxd:vt_rule_packs`). A pack whose car-area rows fall in load or area, whose call-button band is upside down, or whose pit and overhead rows give neither or both overhead forms, is refused (`vt.pack_range`).
 
 **Data (IFC mapping).** RXD only: `rxd:vt_rules` and `rxd:vt_rule_packs` on `IfcProject`.
@@ -14073,6 +14074,67 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 - [x] A schedule of *Transport Elements* lists each car with its hoistway (for example "2591 × 2108") and its estimated motor power.
 
 *Built (2026-11-03):* in `schedules`. Not yet: hoistway section and plan sheets dimensioned automatically (plan §10).
+
+### 3.7a.10 Escalators and moving walks
+**ID:** ARC-VT-010 · **Priority:** P1 · **Ref:** owner requirement (2026-11-03: "Escalators should be included in elevator type equipment research"; "Include moving walks in airports and transit stations too"); `VERTICAL_TRANSPORT_PLAN.md` §6; research/16 Part E, Part P
+
+**Purpose.** Lay out escalators and moving walks from the rise between two floors, with the pits and floor openings they need, sized as makers build them.
+
+**Behaviour & rules.**
+- **Sizing** (`escalator.size`, and inside `escalator.create`) from the packs' `escalator_sizing` (generic, maker-style; research/16 P3.1):
+  - **Escalators**: 30° unless given; step width 1000 mm unless given (600, 800, 1000); 0.5 m/s; flat steps the least the rules ask for the rise and speed (`escalator.flat_steps`), unless given.
+  - **Length in plan** = lower end + rise ÷ tan(inclination) + upper end, the ends by the number of flat steps (2: 2210 + 2490 mm; 3: 2610 + 2950 mm; 4: 3610 + 4525 mm, after TKE), so a 30°, 2-flat escalator is 1.732 × rise + 4700 mm.
+  - Handrail centreline distance = step + 246 mm, outer edges = step + 344 mm; truss = step + 540 mm (transit duty + 640 mm), 1050 mm deep; pits 1150 mm (transit 1220 mm); balustrades 1000 mm.
+  - **Moving walks**: inclined between two levels at 12° unless given, with ends of 2000 and 2600 mm; or **horizontal** on one level with its `length` between working points, on the floor (pallets 150 mm up) or in a pit (`pit`, 380 mm, flush).
+  - **Practical capacity** from the EN table by width and speed (6000 persons an hour for 1000 mm at 0.5 m/s), and **planning estimates** of the motor (3 kW + 1.5 kW per metre of rise, scaled by width and speed) and of each end's support reaction (4.75 kN per metre of length shared between the ends, plus 7.5 kN lower and 21 kN upper), flagged with a note where the span between end supports exceeds 16.4 m and needs an intermediate support. The estimates are recorded for expert review (E-86).
+- **The object** (`escalator.create`): one custom object (`IfcTransportElement` ESCALATOR or MOVINGWALKWAY, category *Transport Element*) of its own shape: the truss below the step line and the two balustrades along it. `point` is the middle of the truss's lower end on the lower level; at rotation 0 it rises toward +x.
+- **Floor openings** (members, deleted with it): a shaft opening (ARC-OPEN-004) cutting only the lower floor over the lower pit, to where the truss's underside rises above the floor; and one cutting only the upper floor from where the headroom over the steps meets the underside of the thickest floor on that level to the truss's upper end. A walk in a pit is open along its length. The openings are as wide as the truss plus the pack's pit margin. Openings keep the size they were made with: a change of rule packs to a greater headroom leaves them short, and `clearance.check` reports it.
+- Overlapping openings (a pair of escalators side by side) now each cut the floor: a floor subtracts its openings one after another, not as one even-odd set.
+- `escalator.list` lists them; `escalator.delete`, given the unit or one of its openings, deletes it with its openings.
+
+**Data (IFC mapping).** `IfcTransportElement` ESCALATOR or MOVINGWALKWAY with `Pset_TransportElementCommon` (CapacityPeople as persons an hour, FireExit false) and `Reviera_Escalator` (Rise, Inclination, StepWidth, Speed, FlatSteps, Length, TrussWidth, PitDepth, MotorPower, SupportReactionLower, SupportReactionUpper, SizingPack), published in `schemas/psets/reviera-psets-1.json`.
+
+**Acceptance criteria.**
+- [x] A 30° escalator of 4.5 m rise with 2 flat steps is 1.732 × 4.5 + 4.70 m long, its truss 1540 mm wide, good for 6000 persons an hour; at 7 m rise under EN 115-1 it has 3 flat steps and the longer ends.
+- [x] An escalator between two 300 mm floors 5 m apart cuts both, and nothing overlaps or stands in its zones; a pair 200 mm apart is clean; the file has ESCALATOR and MOVINGWALKWAY elements with `Reviera_Escalator`.
+
+*Built (2026-11-03):* `reviera_core::escalators`; Architecture › Circulation › Escalator; the sample *Escalators and moving walks in a department store*. Not yet: crisscross and scissor arrangements as one command, transition radii, intermediate supports as elements, outdoor units, the airport and transit context (station run-off, unit counts, NFPA 130), wellway protection (draft curtains and sprinklers, shutters), intersection guards and deck barricades.
+
+### 3.7a.11 Escalator headroom, side clearance and landing zones
+**ID:** ARC-VT-011 · **Priority:** P1 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §6; research/16 L3 (Z29–Z32), P2, P4
+
+**Purpose.** Keep clear the space people ride and step off into, and keep neighbouring units and walls their distance from the handrails.
+
+**Behaviour & rules.**
+- Under the first pack in use with escalator rules (`escalator` in a pack):
+  - **Headroom** (kind *escalator headroom*): over the whole step band from the lower truss end to the upper, from the step line up to the headroom (A17.1 2130 mm; EN 115-1 2300 mm), as wide as the handrails' outer edges plus the side clearance each side (A17.1 100 mm; EN 80 mm). A wall, a slab edge or a neighbouring unit's balustrade inside it is reported, which keeps adjacent units apart.
+  - **Landing zones** (kind *escalator landing*) beyond each end, up to the headroom: under A17.1 the handrail centreline distance + 200 mm wide and twice that distance deep; under EN 115-1 the handrails' outer edges + 160 mm wide and 2500 mm deep.
+- Only the unit itself and its own openings may stand in them. `clearance.check` and `clearance.list` include them; views show headroom violet and landings green.
+- Long, thin intrusions are no longer missed: `clearance.check` samples at least eight lines across each way of the box a virtual volume shares with a body (ARC-MOD-031), so a 30 mm balustrade along a 13 m escalator is found. `overlap.find` samples as before.
+
+**Acceptance criteria.**
+- [x] A second escalator 50 mm from the first (under A17.1) stands in the first's side clearance; 200 mm apart, neither does.
+- [x] After switching to EN 115-1's 2300 mm headroom, an escalator made under A17.1's 2130 mm finds the upper slab in its headroom.
+
+*Built (2026-11-03):* in `clearances::all`. Not yet: EN 115-1's reduced 2.0 m landing depth, the transit run-off zone, the landing void barrier zone (Z33).
+
+### 3.7a.12 The escalator check
+**ID:** ARC-VT-012 · **Priority:** P1 · **Ref:** research/16 E1, P2, P3.2
+
+**Purpose.** Say which escalator or walk breaks which rule, from which pack.
+
+**Behaviour & rules.**
+- **`escalator.check`** checks every unit (or those given) against each pack in use with escalator rules:
+  - **inclination**: at most the pack's maximum (A17.1 30°; EN 115-1 30°, or 35° where the rise is at most 6 m and the speed at most 0.5 m/s); walks at most the walk maximum (EN 12°);
+  - **speed**: A17.1 0.5 m/s; EN 0.75 m/s;
+  - **flat steps** (escalators): the least for the rise and speed (EN: 2, or 3 above 6 m or 0.5 m/s, 4 above 0.65 m/s);
+  - **step width**: within the pack's range (A17.1 560–1020 mm; EN 580–1100 mm) for escalators and walks steeper than 6°.
+- Findings give the unit, pack, edition, rule, confidence, source, and the measured and allowed values; an advisory rule's are notes. Headroom, side clearance and landings are `clearance.check`'s.
+
+**Acceptance criteria.**
+- [x] A 35° escalator of 5 m rise at 0.5 m/s is a note under A17.1 and passes under EN 115-1; at 0.65 m/s with 2 flat steps EN 115-1 reports the inclination and the flat steps.
+
+*Built (2026-11-03):* `escalator.check`, and Architecture › Circulation › Check Escalators. Not yet: the transit packs (unit counts from flows, one unit out, NFPA 130 egress credit), US wellway opening limits (IBC 712.1.3).
 
 ---
 
@@ -16412,6 +16474,11 @@ All commands below are registered once in the command registry and exposed autom
 | `elevator.list` | — | [{elevator, name, levels, sizes, members}] | No (query) | ARC-VT-002 |
 | `elevator.delete` | elevator | count | Yes | ARC-VT-002 |
 | `elevator.check` | elevators? | finding[] | No (query) | ARC-VT-004 |
+| `escalator.size` | kind?, rise?, length?, step_width?, inclination?, speed?, flat_steps?, duty?, pit? | {kind, rise, inclination, step_width, speed, flat_steps, handrail_centres, handrail_outer, truss_width, truss_depth, pit_depth, lower_end, run, upper_end, capacity, motor_kw, reactions, intermediate_support, sizing_pack, notes} | No (query) | ARC-VT-010 |
+| `escalator.create` | point, rotation?, base_level, top_level?, (as `escalator.size`) | {escalator, openings, sizes} | Yes | ARC-VT-010 |
+| `escalator.list` | — | [{escalator, name, sizes, levels, openings}] | No (query) | ARC-VT-010 |
+| `escalator.delete` | escalator | count | Yes | ARC-VT-010 |
+| `escalator.check` | escalators? | finding[] | No (query) | ARC-VT-012 |
 | `enclosure.create` | form, footprint \| host_wall_ids, level_id, params | element_id | Yes | ARC-GLZ-001 |
 | `enclosure.set` | enclosure_id, params | — | Yes | ARC-GLZ-001 |
 | `enclosure.get` | enclosure_id | {form, params, parts} | No (query) | ARC-GLZ-001 |
@@ -29579,14 +29646,14 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 39 | 8 | 0 | 123 |
 | DM | 91 | 65 | 34 | 3 | 193 |
-| ARC | 77 | 95 | 23 | 1 | 196 |
+| ARC | 77 | 98 | 23 | 1 | 199 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 28 | 0 | 29 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
 | COL | 8 | 50 | 12 | 1 | 71 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **335** | **211** | **7** | **873** |
+| **Total** | **320** | **338** | **211** | **7** | **876** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -29786,7 +29853,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2315 unique commands** in 432 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2320 unique commands** in 433 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -29918,6 +29985,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `energy_settings` | 3 |
 | `equipment_load` | 1 |
 | `equipment_set` | 1 |
+| `escalator` | 5 |
 | `export` | 25 |
 | `external_props` | 2 |
 | `fabric_area` | 1 |
@@ -30845,6 +30913,11 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `energy_settings.show` | 4 | — | — | No | ANA-EM-002 |
 | `equipment_load.create` | 4 | point \ | space_id, classification, voltage, pf, apparent_load | id | Yes |
 | `equipment_set.create` | 4 | equipment_ids[], duty_ids[] | id | Yes | MEP-DUCT-009 |
+| `escalator.check` | 3 | escalators? | finding[] | No (query) | ARC-VT-012 |
+| `escalator.create` | 3 | point, rotation?, base_level, top_level?, (as `escalator.size`) | {escalator, openings, sizes} | Yes | ARC-VT-010 |
+| `escalator.delete` | 3 | escalator | count | Yes | ARC-VT-010 |
+| `escalator.list` | 3 | — | [{escalator, name, sizes, levels, openings}] | No (query) | ARC-VT-010 |
+| `escalator.size` | 3 | kind?, rise?, length?, step_width?, inclination?, speed?, flat_steps?, duty?, pit? | {kind, rise, inclination, step_width, speed, flat_steps, handrail_centres, handrail_outer, truss_width, truss_depth, pit_depth, lower_end, run, upper_end, capacity, motor_kw, reactions, intermediate_support, sizing_pack, notes} | No (query) | ARC-VT-010 |
 | `export.animation` | 5 | view_id, kind: walkthrough\ | solar_study, path, frames?, fps?, size, style?, format: images\ | webm\ | mp4 |
 | `export.batch` | 2 | set_name \ | set | report | No |
 | `export.cad_setup_load_layer_standard` | 5 | setup_id, standard | () | Yes | DOC-OUT-005 |

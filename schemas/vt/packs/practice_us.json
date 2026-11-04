@@ -374,5 +374,94 @@
       "source": "S1506 S1512 S1521 S1606 S2386 S1678",
       "confidence": "advisory"
     }
+  },
+  "escalator_sizing": {
+    "handrail_centres_add": 0.246,
+    "handrail_outer_add": 0.344,
+    "truss_add": 0.54,
+    "transit_truss_add": 0.64,
+    "pit_add": 0.06,
+    "truss_depth": 1.05,
+    "pit_depth": 1.15,
+    "transit_pit_depth": 1.22,
+    "ends": [
+      {
+        "flat": 2,
+        "lower": 2.21,
+        "upper": 2.49
+      },
+      {
+        "flat": 3,
+        "lower": 2.61,
+        "upper": 2.95
+      },
+      {
+        "flat": 4,
+        "lower": 3.61,
+        "upper": 4.525
+      }
+    ],
+    "walk_ends": {
+      "lower": 2.0,
+      "upper": 2.6
+    },
+    "walk_pit_depth": 0.38,
+    "walk_deck": 0.15,
+    "balustrade": 1.0,
+    "support_span": 16.4,
+    "capacity": [
+      [
+        0.6,
+        0.5,
+        3600
+      ],
+      [
+        0.6,
+        0.65,
+        4400
+      ],
+      [
+        0.6,
+        0.75,
+        4900
+      ],
+      [
+        0.8,
+        0.5,
+        4800
+      ],
+      [
+        0.8,
+        0.65,
+        5900
+      ],
+      [
+        0.8,
+        0.75,
+        6600
+      ],
+      [
+        1.0,
+        0.5,
+        6000
+      ],
+      [
+        1.0,
+        0.65,
+        7300
+      ],
+      [
+        1.0,
+        0.75,
+        8200
+      ]
+    ],
+    "reaction_per_m": 4.75,
+    "reaction_upper": 21,
+    "reaction_lower": 7.5,
+    "power_per_m": 1.5,
+    "power_base": 3.0,
+    "source": "S2416 S2417 S2418 S2419 S1650 S1534 S1413 S1649 S2414",
+    "confidence": "secondary"
   }
 }

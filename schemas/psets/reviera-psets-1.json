@@ -130,6 +130,25 @@
         { "name": "SupplyVoltage", "measure": "IfcElectricVoltageMeasure", "unit": "V", "description": "Supply voltage." },
         { "name": "HeatRelease", "measure": "IfcPowerMeasure", "unit": "W", "description": "Heat released into the machine space or hoistway (planning estimate) for its ventilation or cooling." }
       ]
+    },
+    {
+      "name": "Reviera_Escalator",
+      "description": "An escalator's or moving walk's sizes as Reviera sized them (spec ARC-VT-010), on the IfcTransportElement (ESCALATOR or MOVINGWALKWAY). Pset_TransportElementCommon holds its capacity (persons per hour). A chosen product's own values replace these.",
+      "applicable_classes": ["IfcTransportElement", "IfcTransportElementType"],
+      "properties": [
+        { "name": "Rise", "measure": "IfcLengthMeasure", "unit": "m", "description": "Between the lower and upper landings (0 for a horizontal walk)." },
+        { "name": "Inclination", "measure": "IfcPlaneAngleMeasure", "unit": "°", "description": "Of the steps or pallets." },
+        { "name": "StepWidth", "measure": "IfcPositiveLengthMeasure", "unit": "m", "description": "Nominal step or pallet width." },
+        { "name": "Speed", "measure": "IfcLinearVelocityMeasure", "unit": "m/s", "description": "Rated speed." },
+        { "name": "FlatSteps", "measure": "IfcCountMeasure", "description": "Flat steps at each landing (0 for a walk)." },
+        { "name": "Length", "measure": "IfcPositiveLengthMeasure", "unit": "m", "description": "Plan length between the truss ends." },
+        { "name": "TrussWidth", "measure": "IfcPositiveLengthMeasure", "unit": "m", "description": "Width of the truss." },
+        { "name": "PitDepth", "measure": "IfcLengthMeasure", "unit": "m", "description": "Depth of the pits below the floors (0 for a walk on the floor)." },
+        { "name": "MotorPower", "measure": "IfcPowerMeasure", "unit": "W", "description": "Planning estimate from the rise, width and speed (ARC-VT-010) until the maker's figure replaces it." },
+        { "name": "SupportReactionLower", "measure": "IfcForceMeasure", "unit": "N", "description": "Planning estimate of the reaction at the lower end support." },
+        { "name": "SupportReactionUpper", "measure": "IfcForceMeasure", "unit": "N", "description": "Planning estimate of the reaction at the upper end support." },
+        { "name": "SizingPack", "measure": "IfcLabel", "description": "The vertical-transport rule pack the sizes came from (ARC-VT-010)." }
+      ]
     }
   ]
 }

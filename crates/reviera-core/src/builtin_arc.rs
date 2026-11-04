@@ -565,6 +565,11 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ElevatorList),
         registry.add(ElevatorDelete),
         registry.add(ElevatorCheck),
+        registry.add(EscalatorSize),
+        registry.add(EscalatorCreate),
+        registry.add(EscalatorList),
+        registry.add(EscalatorDelete),
+        registry.add(EscalatorCheck),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -7227,4 +7232,67 @@ read_command!(
     Option<crate::elevators::CheckParams>,
     Vec<crate::elevators::Finding>,
     crate::elevators::check
+);
+
+read_command!(
+    EscalatorSize,
+    "escalator.size",
+    "Size an escalator or moving walk",
+    "Gives the sizes an escalator or moving walk would get under the rule packs in use, without making it \
+     (ARC-VT-010): inclination, flat steps (the least the rules ask), handrail distances, truss width and depth, \
+     pit depth, the lengths of its ends and incline, practical capacity, and planning estimates of its motor \
+     power and support reactions. A horizontal walk needs its `length`.",
+    crate::escalators::SizeParams,
+    crate::escalators::Sized,
+    crate::escalators::size_command
+);
+
+edit_command!(
+    EscalatorCreate,
+    "escalator.create",
+    "Make an escalator or moving walk",
+    "Makes an escalator from `base_level` up to `top_level`, or a moving walk (inclined between two levels, or \
+     horizontal on one with its `length`) (ARC-VT-010): one transport element (IfcTransportElement ESCALATOR or \
+     MOVINGWALKWAY) shaped from its rise, with a floor opening over its lower pit and another over its upper pit \
+     and as far down the incline as the headroom reaches the upper floor. `point` is the middle of the truss's \
+     lower end; at rotation 0 it rises toward +x.",
+    "Escalator",
+    crate::escalators::CreateParams,
+    crate::escalators::Created,
+    crate::escalators::create
+);
+
+read_command!(
+    EscalatorList,
+    "escalator.list",
+    "List the escalators and moving walks",
+    "Lists the model's escalators and moving walks with their sizes and openings (ARC-VT-010).",
+    Option<crate::elevators::NoParams>,
+    Vec<crate::escalators::Listed>,
+    crate::escalators::list
+);
+
+edit_command!(
+    EscalatorDelete,
+    "escalator.delete",
+    "Delete an escalator or moving walk",
+    "Deletes an escalator or moving walk, given it or one of its floor openings, with its openings \
+     (ARC-VT-010). Returns how many elements were deleted.",
+    "Delete Escalator",
+    crate::escalators::EscalatorParams,
+    usize,
+    crate::escalators::delete
+);
+
+read_command!(
+    EscalatorCheck,
+    "escalator.check",
+    "Check escalators and moving walks against the rule packs",
+    "Checks escalators and moving walks against the rule packs in use (ARC-VT-012): inclination (with a steeper \
+     one allowed only for a low rise and slow speed), speed, flat steps at the landings, and step or pallet \
+     width. A finding from an advisory rule is a note. Headroom, side clearance and landing zones are checked \
+     by `clearance.check`.",
+    Option<crate::escalators::CheckParams>,
+    Vec<crate::escalators::Finding>,
+    crate::escalators::check
 );

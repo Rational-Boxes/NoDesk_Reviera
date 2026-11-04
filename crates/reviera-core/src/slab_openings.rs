@@ -167,25 +167,31 @@ fn to_shapes(profiles: &[Profile]) -> Vec<Shape> {
 /// A floor's or ceiling's profiles less its vertical openings and the shafts through it (for
 /// display and measuring).
 pub fn cut_profiles(store: &Store, host: &Element, profiles: &[Profile]) -> Vec<Profile> {
-    let mut loops: Vec<Ring> = of_host(store, host.guid().as_str())
+    // Each opening's own loops together (a loop inside another is an island), one opening after
+    // another, so that openings that overlap (a pair of escalators, ARC-VT-010) each still cut.
+    let mut groups: Vec<Vec<Ring>> = of_host(store, host.guid().as_str())
         .into_iter()
-        .flat_map(|(_, r)| r.loops)
+        .map(|(_, r)| r.loops)
         .collect();
     // MEP runs passing through (MEP-PEN-001).
-    loops.extend(crate::mep_penetrations::slab_loops(store, host.id()));
+    groups.extend(crate::mep_penetrations::slab_loops(store, host.id()).into_iter().map(|l| vec![l]));
     if store.iter().any(|e| shaft_recipe(e).is_some())
         && let Ok(f) = crate::floors::regenerate(store, host)
     {
-        loops.extend(
+        groups.extend(
             shafts_through(store, f.top - f.thickness, f.top)
                 .into_iter()
-                .flat_map(|(_, r)| r.loops),
+                .map(|(_, r)| r.loops),
         );
     }
-    if loops.is_empty() {
+    if groups.is_empty() {
         return profiles.to_vec();
     }
-    polygons::difference(&to_shapes(profiles), &loops)
+    let mut shapes = to_shapes(profiles);
+    for g in &groups {
+        shapes = polygons::difference(&shapes, g);
+    }
+    shapes
         .into_iter()
         .map(|s| Profile {
             outer: s.outer,

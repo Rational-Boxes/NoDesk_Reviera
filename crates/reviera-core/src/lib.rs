@@ -46,6 +46,7 @@ pub mod display_colors;
 pub mod document;
 pub mod dormers;
 pub mod elevators;
+pub mod escalators;
 pub mod enclosures;
 pub mod grab_bars;
 pub mod tiles;

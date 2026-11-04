@@ -156,6 +156,7 @@ impl HostCommand for OverlapFind {
             tolerance: p.tolerance.unwrap_or(0.001),
             min_volume: p.min_volume.unwrap_or(1e-6),
             resolution: p.resolution.unwrap_or(48).clamp(4, 1024),
+            min_lines: 1,
         };
         let skip = |a: ElementId, b: ElementId| {
             (!p.include_related && reviera_core::bodies::related(store, a, b))
@@ -252,8 +253,10 @@ impl HostCommand for ClearanceCheck {
                     .collect::<Result<Vec<_>>>()
             })
             .transpose()?;
+        // Virtual volumes are long and thin beside what they keep clear: sample them finely.
         let o = Options {
             tolerance: p.tolerance.unwrap_or(0.001),
+            min_lines: 8,
             ..Options::default()
         };
         let clearances: Vec<_> = reviera_core::clearances::all(store)

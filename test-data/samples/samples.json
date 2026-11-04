@@ -139,6 +139,19 @@
     ]
   },
   {
+    "name": "escalators",
+    "title": "Escalators and moving walks in a department store",
+    "group": "Architecture",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "escalators.lua"
+        }
+      }
+    ]
+  },
+  {
     "name": "washrooms",
     "title": "Washrooms and a locker room",
     "group": "Architecture",

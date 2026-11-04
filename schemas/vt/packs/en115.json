@@ -1,0 +1,46 @@
+{
+  "format": "reviera.vt-rules-1",
+  "id": "en115",
+  "title": "EN 115-1 escalators and moving walks (through KONE's guides)",
+  "jurisdiction": "EU",
+  "edition": "EN 115-1:2017 as given in KONE's planning guides (2020 and 2008+A1 editions)",
+  "layer": "minimum",
+  "notes": "EN 115-1 itself was not read; the values come from KONE's planning guides, which state them for the 2017 edition. The unrestricted area may be 2.0 m deep where it is twice as wide (not used yet).",
+  "escalator": {
+    "id": "EN 115-1:2017 5.2, Annex A",
+    "description": "Escalators at most 30°, or 35° where the rise is at most 6 m and the speed at most 0.5 m/s; speed at most 0.75 m/s; at least 2 flat steps, 3 above 6 m of rise or 0.5 m/s, 4 above 0.65 m/s; headroom 2300 mm; an unrestricted area at each landing 2500 mm deep and as wide as the handrails' outer edges + 80 mm each side; 80 mm from the handrails' outer edges to walls up to 2100 mm; moving walks at most 12° and 0.75 m/s",
+    "max_inclination": 30,
+    "steep_inclination": 35,
+    "steep_max_rise": 6,
+    "steep_max_speed": 0.5,
+    "max_speed": 0.75,
+    "flat_steps": [
+      {
+        "min": 2
+      },
+      {
+        "min": 3,
+        "rise_over": 6
+      },
+      {
+        "min": 3,
+        "speed_over": 0.5
+      },
+      {
+        "min": 4,
+        "speed_over": 0.65
+      }
+    ],
+    "headroom": 2.3,
+    "landing_measure": "outer",
+    "landing_width_add": 0.16,
+    "landing_depth": 2.5,
+    "side_clearance": 0.08,
+    "step_width_min": 0.58,
+    "step_width_max": 1.1,
+    "walk_max_inclination": 12,
+    "walk_max_speed": 0.75,
+    "source": "S1413 S1534",
+    "confidence": "secondary"
+  }
+}

@@ -1042,6 +1042,21 @@ fn the_lifts_sample_keeps_each_kind() {
 }
 
 #[test]
+fn the_escalators_sample_keeps_its_units_and_openings() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "escalators");
+    let list = ok(&mut app, "escalator.list", json!({}));
+    let mut units: Vec<(String, f64, usize)> = list.as_array().unwrap().iter().map(|e| (e["kind"].as_str().unwrap().to_owned(), (f(&e["inclination"]) * 10.0).round() / 10.0, e["openings"].as_array().unwrap().len())).collect();
+    units.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    assert_eq!(units, [("escalator".to_owned(), 30.0, 2), ("escalator".to_owned(), 30.0, 2), ("escalator".to_owned(), 30.0, 2), ("moving_walk".to_owned(), 0.0, 0), ("moving_walk".to_owned(), 12.0, 2)]);
+    // The pair's capacity, and nothing in the way of any of them.
+    let cap: Vec<f64> = list.as_array().unwrap().iter().filter(|e| e["kind"] == "escalator").map(|e| f(&e["capacity"])).collect();
+    assert_eq!(cap, [6000.0; 3]);
+    assert_eq!(ok(&mut app, "escalator.check", json!({})), json!([]));
+    assert_eq!(ok(&mut app, "clearance.check", json!({})), json!([]));
+}
+
+#[test]
 fn the_washrooms_sample_keeps_its_core_and_lockers() {
     let work = tempfile::tempdir().unwrap();
     let mut app = open(work.path(), "washrooms");

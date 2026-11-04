@@ -730,7 +730,18 @@ tools and the datums.
   landing (MRL), a pump room at the lowest (hydraulic) or a machine room over the hoistway
   (traction). Motor power, full-load current and heat are planning estimates from the load and
   speed, marked as such (no maker tables were found). Schedules of *Transport Elements* list
-  each car with its sizes and estimates. Not built yet for elevators: editing in place, rear
+  each car with its sizes and estimates.
+- **Escalators and moving walks** (ARC-VT-010…012): Architecture › Circulation › Escalator makes
+  an escalator, an inclined walk or a horizontal walk (`IfcTransportElement` ESCALATOR or
+  MOVINGWALKWAY) shaped from the rise, sized from makers' generic envelopes (1.732 × rise + 4.70
+  m at 30° with 2 flat steps), with shaft openings cutting the lower floor for its pit and the
+  upper floor as far down the incline as its headroom reaches. Its headroom, side clearance and
+  landing zones (A17.1 or EN 115-1, `us_a17` / new `en115` pack) are virtual volumes; Check
+  Escalators reports inclination (35° only for a low rise under EN 115-1), speed, flat steps
+  and step width. Capacity, motor power and support reactions are planning estimates. Floors
+  now subtract overlapping openings one by one, and Check Clearances samples long thin
+  intrusions more finely. Not built yet: crisscross arrangements, wellway protection, the airport
+  and transit context, intersection guards. Not built yet for elevators: editing in place, rear
   entrances, vertical bi-parting and telescopic doors, machine rooms, hall fixtures, banks,
   panoramic cars; escalators and moving walks, stairlifts, people movers, funiculars and ropeways
   (planned).
@@ -1760,6 +1771,9 @@ sample:
 - **Hospital, freight and small lifts** (`lifts.ifc`): a four-storey clinic and service building
   with a hospital elevator, freight and vehicle elevators, a LULA, a home elevator, a platform lift
   and a dumbwaiter; Check Elevators gives one note.
+- **Escalators and moving walks in a department store** (`escalators.ifc`): three floors under
+  the IBC with an up-and-down pair, a single escalator, an inclined trolley walk and a horizontal
+  walk, each with its floor openings; Check Escalators and Check Clearances find nothing.
 - **Editing tools** (`modify_tools.ifc`): every Modify tab tool's result side by side, from align,
   mirror and the arrays to trim/extend, split and pinning, a component created and placed
   again, and a layered wall's parts divided, merged and excluded.

@@ -192,6 +192,7 @@ impl Kind for ClashKind {
             } else {
                 48
             },
+            min_lines: 1,
         };
         let mut found = overlap::find(&bodies, None, &skip, &opts);
         if o.limit > 0 {

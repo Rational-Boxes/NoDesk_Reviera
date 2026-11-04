@@ -4771,6 +4771,11 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "overlap.find" => with(gui, Gui::check_overlaps),
         "bath.check" => with(gui, Gui::check_bathrooms),
         "elevator.check" => with(gui, Gui::check_elevators),
+        "escalator.check" => with(gui, Gui::check_escalators),
+        "ui.escalator" => with(gui, |g| {
+            g.place_escalator();
+            focus(g);
+        }),
         "ui.elevator" => with(gui, |g| {
             g.place_elevator();
             focus(g);

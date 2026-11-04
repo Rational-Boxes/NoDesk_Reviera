@@ -115,5 +115,25 @@
       "source": "S1596",
       "confidence": "verified"
     }
-  ]
+  ],
+  "escalator": {
+    "id": "ASME A17.1 6.1.3, 6.2.3",
+    "description": "Escalators: inclination at most 30°, speed at most 0.5 m/s, 2–4 flat steps, treads 560–1020 mm; headroom 2130 mm; a safety zone at each landing the handrail centreline distance + 200 mm wide and twice that distance deep; handrails at least 100 mm from adjacent surfaces. Moving walks alike for headroom and safety zones.",
+    "max_inclination": 30,
+    "max_speed": 0.5,
+    "flat_steps": [
+      {
+        "min": 2
+      }
+    ],
+    "headroom": 2.13,
+    "landing_measure": "centreline",
+    "landing_width_add": 0.2,
+    "landing_depth_factor": 2.0,
+    "side_clearance": 0.1,
+    "step_width_min": 0.56,
+    "step_width_max": 1.02,
+    "source": "S2423 S2424 S2416",
+    "confidence": "advisory"
+  }
 }

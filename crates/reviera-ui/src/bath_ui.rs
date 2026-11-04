@@ -195,10 +195,20 @@ impl Gui {
         // The Locker Room, Sauna and Steam Room tools ride on the same click, with their own
         // commands.
         let command = args.as_object_mut().and_then(|o| o.remove("command")).and_then(|c| c.as_str().map(str::to_owned)).unwrap_or_else(|| "bath.layout".to_owned());
+        // Elevators and escalators stand on the clicked plan's level as their lowest.
+        if matches!(command.as_str(), "elevator.create" | "escalator.create")
+            && let Some(o) = args.as_object_mut()
+            && let Some(l) = o.remove("level")
+        {
+            o.insert("base_level".into(), l);
+        }
         match self.app.execute(&command, args, &super::user()) {
             Ok(out) => {
                 if command == "elevator.create" {
                     return self.elevator_made(&out.result);
+                }
+                if command == "escalator.create" {
+                    return self.escalator_made(&out.result);
                 }
                 if out.result.is_u64() {
                     // A tile layout: its counts.
