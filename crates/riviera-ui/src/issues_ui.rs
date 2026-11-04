@@ -13,11 +13,7 @@ impl Gui {
     /// File › Import BCF…: topics from a .bcf archive, merged by GUID.
     pub(crate) fn bcf_import(&mut self) {
         let frame = self.frame;
-        let fd = FileDialog::builder(&frame).with_message("Import BCF").with_wildcard("BCF (*.bcf;*.bcfzip)|*.bcf;*.bcfzip").with_style(FileDialogStyle::Open | FileDialogStyle::FileMustExist).build();
-        if fd.show_modal() != ID_OK {
-            return;
-        }
-        let Some(path) = fd.get_path() else { return };
+        let Some(path) = self.open_target("Import BCF", "BCF (*.bcf;*.bcfzip)|*.bcf;*.bcfzip") else { return };
         match self.run("bcf.import", json!({ "path": path })) {
             Ok(r) => {
                 let mut msg = format!(
@@ -51,11 +47,7 @@ impl Gui {
         if !ok {
             return;
         }
-        let fd = FileDialog::builder(&frame).with_message("Export BCF").with_wildcard("BCF (*.bcf)|*.bcf|BCF zip (*.bcfzip)|*.bcfzip").with_style(FileDialogStyle::Save | FileDialogStyle::OverwritePrompt).build();
-        if fd.show_modal() != ID_OK {
-            return;
-        }
-        let Some(path) = fd.get_path() else { return };
+        let Some(path) = self.save_target("Export BCF", "BCF (*.bcf)|*.bcf|BCF zip (*.bcfzip)|*.bcfzip", "issues.bcf") else { return };
         match self.run("bcf.export", json!({ "path": path, "version": version })) {
             Ok(r) => frame.set_status_text(&format!("Wrote {} issues, {} comments, {} viewpoints and {} snapshots (BCF {version}) to {path}", r["topics"], r["comments"], r["viewpoints"], r["snapshots"]), 0),
             Err(e) => error(&frame, &e),

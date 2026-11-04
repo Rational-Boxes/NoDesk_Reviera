@@ -681,6 +681,7 @@ fn live_options(app: &App) -> Result<riviera_livestore::Options> {
 #[serde(deny_unknown_fields)]
 pub struct RestoreParams {
     pub store_key: String,
+    #[schemars(extend("x-riviera-file" = "write"))]
     pub as_copy_path: Option<PathBuf>,
 }
 

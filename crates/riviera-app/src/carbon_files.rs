@@ -23,6 +23,7 @@ fn bad(code: &'static str, msg: impl Into<String>) -> Error {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ImportParams {
+    #[schemars(extend("x-riviera-file" = "read"))]
     pub path: String,
     /// `csv` (the default); ILCD+EPD is not read yet.
     pub format: Option<String>,
@@ -70,6 +71,7 @@ impl HostCommand for ImportFactors {
 pub struct ExportParams {
     /// The run; the latest when omitted.
     pub run_id: Option<String>,
+    #[schemars(extend("x-riviera-file" = "write"))]
     pub path: String,
     /// `csv` (the default) or `json`.
     pub format: Option<String>,

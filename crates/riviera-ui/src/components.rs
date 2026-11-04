@@ -858,15 +858,9 @@ impl Gui {
                 )
             }
             None => {
-                let d = FileDialog::builder(&frame)
-                    .with_message("Create Component")
-                    .with_wildcard("IFC components (*.ifc)|*.ifc")
-                    .with_style(FileDialogStyle::Save | FileDialogStyle::OverwritePrompt)
-                    .build();
-                if d.show_modal() != ID_OK {
-                    return;
-                }
-                let Some(path) = d.get_path() else { return };
+                let Some(path) = self.save_target("Create Component", "IFC components (*.ifc)|*.ifc", "") else {
+            return;
+        };
                 args["path"] = json!(path);
                 path
             }
@@ -1544,17 +1538,18 @@ impl Gui {
         if self.doc.is_none() {
             return error(&frame, "Open or create a project first.");
         }
-        let d = FileDialog::builder(&frame)
-            .with_message("Import Object")
-            .with_wildcard("3D models (*.obj;*.stl;*.ply;*.gltf;*.glb)|*.obj;*.stl;*.ply;*.gltf;*.glb|All files (*.*)|*.*")
-            .with_style(FileDialogStyle::Open | FileDialogStyle::FileMustExist)
-            .build();
-        if d.show_modal() != ID_OK {
-            return;
-        }
-        let Some(path) = d.get_path() else { return };
+        let Some(path) = self.open_target("Import Object", "3D models (*.obj;*.stl;*.ply;*.gltf;*.glb)|*.obj;*.stl;*.ply;*.gltf;*.glb|All files (*.*)|*.*") else { return };
+        // A FileEngine file is downloaded first, so that the options can be previewed.
+        let local = if path.starts_with("fileengine://") {
+            match riviera_app::fe_paths::fetch(&mut self.app, &path, true) {
+                Ok(p) => p.to_string_lossy().into_owned(),
+                Err(e) => return error(&frame, &format!("The file could not be downloaded:\n{e}")),
+            }
+        } else {
+            path.clone()
+        };
         let Some(choice) = import_options_dialog(&frame, std::slice::from_ref(&path), {
-            let file = path.clone();
+            let file = local;
             Some(Box::new(move |o: &ImportOptions| {
                 let raw = riviera_core::mesh_io::read(Path::new(&file)).map_err(|e| e.message)?;
                 mesh_objects::prepare(raw, o)

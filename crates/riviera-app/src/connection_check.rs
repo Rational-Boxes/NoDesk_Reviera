@@ -267,6 +267,7 @@ impl HostCommand for Presize {
 pub struct ReportParams {
     pub connection_ids: Vec<ElementRef>,
     /// The HTML file to write.
+    #[schemars(extend("x-riviera-file" = "write"))]
     pub path: PathBuf,
 }
 

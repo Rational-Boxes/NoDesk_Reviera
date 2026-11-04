@@ -764,11 +764,7 @@ impl Gui {
         if !ok {
             return;
         }
-        let fd = FileDialog::builder(&frame).with_message("Export BCF").with_wildcard("BCF (*.bcf)|*.bcf|BCF zip (*.bcfzip)|*.bcfzip").with_style(FileDialogStyle::Save | FileDialogStyle::OverwritePrompt).build();
-        if fd.show_modal() != ID_OK {
-            return;
-        }
-        let Some(path) = fd.get_path() else { return };
+        let Some(path) = self.save_target("Export BCF", "BCF (*.bcf)|*.bcf|BCF zip (*.bcfzip)|*.bcfzip", "issues.bcf") else { return };
         let mut args = json!({ "path": path, "version": version });
         if only_shown && let Some(p) = &self.issues_pane {
             args["ids"] = json!(p.rows.iter().map(|r| r.id.clone()).collect::<Vec<_>>());

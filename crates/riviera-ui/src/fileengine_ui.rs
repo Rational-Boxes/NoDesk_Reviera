@@ -41,6 +41,8 @@ enum Mode<'a> {
     Save,
     /// Choosing a folder, with the dialog's title.
     Pick(&'a str),
+    /// Choosing a file to read, with the dialog's title (COL-FE-012).
+    PickFile(&'a str),
 }
 
 /// A folder chosen with [`Gui::fileengine_pick_folder`].
@@ -185,7 +187,7 @@ fn browser(frame: &Frame, s: &Shown<'_>, nav: Option<riviera_app::fileengine::Br
     let title = match s.mode {
         Mode::Save => "Save to FileEngine",
         Mode::Open => "Open From FileEngine",
-        Mode::Pick(t) => t,
+        Mode::Pick(t) | Mode::PickFile(t) => t,
     };
     let dialog = Dialog::builder(frame, title).with_style(DialogStyle::DefaultDialogStyle | DialogStyle::ResizeBorder).build();
     let top = BoxSizer::builder(Orientation::Horizontal).build();
@@ -243,6 +245,10 @@ fn browser(frame: &Frame, s: &Shown<'_>, nav: Option<riviera_app::fileengine::Br
         last.add_sizer(&row, 0, SizerFlag::empty(), 0);
     } else if let Mode::Pick(_) = s.mode {
         let (row, b) = buttons_kept(&dialog, &[(PICK, "Choose This Folder", "Choose the folder shown (double-click a folder to go into it)", connected && s.folder.is_some() && !s.stack.is_empty())]);
+        kept.extend(b);
+        last.add_sizer(&row, 0, SizerFlag::empty(), 0);
+    } else if let Mode::PickFile(_) = s.mode {
+        let (row, b) = buttons_kept(&dialog, &[(OPEN, "Choose", "Choose the selected file (it is downloaded when the command runs)", connected && !entries.is_empty())]);
         kept.extend(b);
         last.add_sizer(&row, 0, SizerFlag::empty(), 0);
     } else {
@@ -345,6 +351,80 @@ impl Gui {
         self.fileengine_browser(Mode::Pick(title))
     }
 
+    /// A FileEngine file to read, chosen by browsing: its connection, folder uid and name.
+    pub(crate) fn fileengine_pick_file(&mut self, title: &str) -> Option<(String, String, String)> {
+        let p = self.fileengine_browser(Mode::PickFile(title))?;
+        Some((p.connection_id, p.folder_uid, p.folder_name))
+    }
+
+    /// A file to read for an import (COL-FE-012): chosen in the system's dialog, or, where a
+    /// FileEngine connection exists and FileEngine is chosen, a FileEngine file as a
+    /// `fileengine://` address the command takes in place of a path.
+    pub(crate) fn open_target(&mut self, title: &str, wildcard: &str) -> Option<String> {
+        let frame = self.frame;
+        let connections = self.run("fileengine.list_connections", Value::Null).ok().and_then(|v| v.as_array().cloned()).unwrap_or_default();
+        if !connections.is_empty() {
+            let places = ["This computer…", "FileEngine…"];
+            let d = SingleChoiceDialog::builder(&frame, &format!("{title}: from where?"), title, &places).build();
+            if d.show_modal() != ID_OK {
+                return None;
+            }
+            let picked = d.get_selection();
+            d.destroy();
+            if picked == 1 {
+                let (conn, folder, name) = self.fileengine_pick_file(title)?;
+                return Some(format!("fileengine://{conn}/{folder}/{name}"));
+            }
+        }
+        let dialog = FileDialog::builder(&frame).with_message(title).with_wildcard(wildcard).with_style(FileDialogStyle::Open | FileDialogStyle::FileMustExist).build();
+        if dialog.show_modal() != ID_OK {
+            return None;
+        }
+        dialog.get_path()
+    }
+
+    /// Where to save an export or report (COL-FE-012): a file chosen in the system's dialog, or,
+    /// where a FileEngine connection exists and FileEngine is chosen, a FileEngine folder and a
+    /// name, as a `fileengine://` address the command takes in place of a path. A file of that
+    /// name already in the folder gets a new version.
+    pub(crate) fn save_target(&mut self, title: &str, wildcard: &str, default_file: &str) -> Option<String> {
+        let frame = self.frame;
+        let connections = self.run("fileengine.list_connections", Value::Null).ok().and_then(|v| v.as_array().cloned()).unwrap_or_default();
+        if !connections.is_empty() {
+            let places = ["This computer…", "FileEngine…"];
+            let d = SingleChoiceDialog::builder(&frame, &format!("{title}: where to?"), title, &places).build();
+            if d.show_modal() != ID_OK {
+                return None;
+            }
+            let picked = d.get_selection();
+            d.destroy();
+            if picked == 1 {
+                let pick = self.fileengine_pick_folder(title)?;
+                let name = TextEntryDialog::builder(&frame, &format!("Name in {} (a file of that name gets a new version):", pick.folder_name), title).with_default_value(default_file).build();
+                if name.show_modal() != ID_OK {
+                    return None;
+                }
+                let n = name.get_value().unwrap_or_default().trim().to_owned();
+                name.destroy();
+                if n.is_empty() || n.contains('/') {
+                    error(&frame, "Give a file name, without '/'.");
+                    return None;
+                }
+                return Some(format!("fileengine://{}/{}/{n}", pick.connection_id, pick.folder_uid));
+            }
+        }
+        let dialog = FileDialog::builder(&frame)
+            .with_message(title)
+            .with_wildcard(wildcard)
+            .with_style(FileDialogStyle::Save | FileDialogStyle::OverwritePrompt)
+            .with_default_file(default_file)
+            .build();
+        if dialog.show_modal() != ID_OK {
+            return None;
+        }
+        dialog.get_path()
+    }
+
     /// File › Save to FileEngine…: a new version of the open FileEngine model (with a comment),
     /// or the project saved into a FileEngine folder.
     pub(crate) fn fileengine_save(&mut self) {
@@ -407,6 +487,8 @@ impl Gui {
                     "The project is saved as a new model in this folder; Ctrl+S then saves new versions of it.".into()
                 } else if let Mode::Pick(_) = mode {
                     "Double-click a folder to go into it, then Choose This Folder.".into()
+                } else if let Mode::PickFile(_) = mode {
+                    "Double-click a folder to go into it; double-click a file, or select it and Choose.".into()
                 } else {
                     "Double-click a folder to open it. Open downloads the chosen model and opens it; Ctrl+S saves it back as a new version.".into()
                 };
@@ -486,6 +568,12 @@ impl Gui {
                     }
                     if let Mode::Pick(_) = mode {
                         continue;
+                    }
+                    if let Mode::PickFile(_) = mode {
+                        // The file's folder, and the file's name in place of the folder's (see
+                        // `fileengine_pick_file`).
+                        let at = folder.as_ref().and_then(|f| f["folder_uid"].as_str()).unwrap_or("").to_owned();
+                        return Some(Pick { connection_id: id, folder_uid: at, folder_name: e["name"].as_str().unwrap_or("").to_owned() });
                     }
                     if self.fileengine_open_model(json!({ "connection_id": id, "uid": e["uid"] }), e["name"].as_str().unwrap_or("")) {
                         return None;

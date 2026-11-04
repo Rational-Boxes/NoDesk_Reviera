@@ -783,6 +783,7 @@ pub enum CurrentRange {
 pub struct ExportPdfParams {
     pub range: ExportRange,
     /// The PDF file (combined), or the folder for separate files.
+    #[schemars(extend("x-riviera-file" = "write_any"))]
     pub path_or_folder: PathBuf,
     /// One file with a page per view (default), or one file per view named after it.
     #[serde(default = "yes")]

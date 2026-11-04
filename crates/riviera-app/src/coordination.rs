@@ -1494,6 +1494,7 @@ host!(Publish, "issues.publish", "Put the model's own issues on the server",
 #[serde(deny_unknown_fields)]
 pub struct ExportParams {
     pub document_id: Option<DocumentId>,
+    #[schemars(extend("x-riviera-file" = "write"))]
     pub path: String,
     /// The issues to write; all when omitted.
     pub ids: Option<Vec<String>>,

@@ -74,6 +74,7 @@ pub enum Format {
 #[serde(deny_unknown_fields)]
 pub struct ExportParams {
     /// The workbook to write, or the folder for CSV files.
+    #[schemars(extend("x-riviera-file" = "write_any"))]
     pub path: PathBuf,
     #[serde(default)]
     pub version: Version,

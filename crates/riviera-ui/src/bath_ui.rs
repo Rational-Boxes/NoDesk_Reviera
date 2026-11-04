@@ -261,15 +261,7 @@ impl Gui {
             .filter_map(|e| e.name.clone().filter(|n| order.contains(&n.as_str())).map(|n| (e.id(), n)))
             .collect();
         generics.sort_by_key(|g| order.iter().position(|n| *n == g.1).unwrap_or(usize::MAX));
-        let fd = FileDialog::builder(&frame)
-            .with_message("The manufacturer's model")
-            .with_wildcard("3D models (*.obj;*.stl;*.ply;*.gltf;*.glb)|*.obj;*.stl;*.ply;*.gltf;*.glb")
-            .with_style(FileDialogStyle::Open | FileDialogStyle::FileMustExist)
-            .build();
-        if fd.show_modal() != ID_OK {
-            return;
-        }
-        let Some(path) = fd.get_path() else { return };
+        let Some(path) = self.open_target("The manufacturer's model", "3D models (*.obj;*.stl;*.ply;*.gltf;*.glb)|*.obj;*.stl;*.ply;*.gltf;*.glb") else { return };
         let stem = std::path::Path::new(&path).file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
         let f = super::reinforcement_ui::Form::new(&frame, "Make Product");
         let names: Vec<String> = generics.iter().map(|g| g.1.clone()).collect();
@@ -659,22 +651,16 @@ impl Gui {
     /// opened in the browser.
     pub(crate) fn bath_report(&mut self) {
         let frame = self.frame;
-        let fd = FileDialog::builder(&frame)
-            .with_message("Bathroom Compliance Report")
-            .with_wildcard("HTML (*.html)|*.html")
-            .with_style(FileDialogStyle::Save | FileDialogStyle::OverwritePrompt)
-            .build();
-        if fd.show_modal() != ID_OK {
-            return;
-        }
-        let Some(mut path) = fd.get_path() else { return };
+        let Some(mut path) = self.save_target("Bathroom Compliance Report", "HTML (*.html)|*.html", "bathroom report.html") else { return };
         if !path.to_lowercase().ends_with(".html") {
             path.push_str(".html");
         }
         match self.run("bath.report", json!({ "path": path })) {
             Ok(r) => {
                 frame.set_status_text(&format!("Bathroom report: {} error(s), {} note(s), written to {path}", r["errors"], r["notes"]), 0);
-                launch_default_browser(&format!("file://{path}"), BrowserLaunchFlags::Default);
+                if !path.starts_with("fileengine://") {
+                    launch_default_browser(&format!("file://{path}"), BrowserLaunchFlags::Default);
+                }
             }
             Err(e) => error(&frame, &e),
         }

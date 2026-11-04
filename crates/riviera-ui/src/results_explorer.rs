@@ -450,16 +450,7 @@ impl Gui {
     }
 
     fn export_results(&mut self) {
-        let dialog = FileDialog::builder(&self.frame)
-            .with_message("Export Results")
-            .with_wildcard("Riviera results (*.riviera-results)|*.riviera-results")
-            .with_style(FileDialogStyle::Save | FileDialogStyle::OverwritePrompt)
-            .with_default_file("analysis.riviera-results")
-            .build();
-        if dialog.show_modal() != ID_OK {
-            return;
-        }
-        let Some(path) = dialog.get_path() else {
+        let Some(path) = self.save_target("Export Results", "Riviera results (*.riviera-results)|*.riviera-results", "analysis.riviera-results") else {
             return;
         };
         match self.run("results.export_package", json!({ "path": path })) {
@@ -471,17 +462,7 @@ impl Gui {
     }
 
     fn import_results(&mut self) {
-        let dialog = FileDialog::builder(&self.frame)
-            .with_message("Import Results")
-            .with_wildcard("Riviera results (*.riviera-results)|*.riviera-results")
-            .with_style(FileDialogStyle::Open | FileDialogStyle::FileMustExist)
-            .build();
-        if dialog.show_modal() != ID_OK {
-            return;
-        }
-        let Some(path) = dialog.get_path() else {
-            return;
-        };
+        let Some(path) = self.open_target("Import Results", "Riviera results (*.riviera-results)|*.riviera-results") else { return };
         match self.run(
             "structural_analysis.import_results",
             json!({ "path": path }),

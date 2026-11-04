@@ -449,6 +449,7 @@ impl HostCommand for ParamlibGroupRename {
 #[serde(deny_unknown_fields)]
 pub struct ImportParams {
     /// A legacy shared-parameter text file.
+    #[schemars(extend("x-riviera-file" = "read"))]
     pub path: String,
     pub target_library_id: String,
     /// Data types for tokens Riviera does not know (`{"FOO": "number"}`).
@@ -513,6 +514,7 @@ impl HostCommand for ParamlibImportLegacy {
 pub struct ExportParams {
     pub library_id: String,
     /// The `.ifc` file to write.
+    #[schemars(extend("x-riviera-file" = "write"))]
     pub path: String,
 }
 

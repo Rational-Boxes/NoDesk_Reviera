@@ -542,15 +542,7 @@ impl Gui {
         let Some(ty) = ty else {
             return frame.set_status_text("Photometry: select a lighting fixture", 0);
         };
-        let d = FileDialog::builder(&frame)
-            .with_message("Photometric File")
-            .with_wildcard("Photometric files (*.ies;*.ldt)|*.ies;*.IES;*.ldt;*.LDT|All files (*.*)|*.*")
-            .with_style(FileDialogStyle::Open | FileDialogStyle::FileMustExist)
-            .build();
-        if d.show_modal() != ID_OK {
-            return;
-        }
-        let Some(file) = d.get_path() else { return };
+        let Some(file) = self.open_target("Photometric File", "Photometric files (*.ies;*.ldt)|*.ies;*.IES;*.ldt;*.LDT|All files (*.*)|*.*") else { return };
         match self.run("lighting_fixture_type.set_photometry", json!({ "type_id": ty, "file": file })) {
             Ok(v) => frame.set_status_text(
                 &format!(

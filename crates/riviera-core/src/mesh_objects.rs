@@ -978,6 +978,7 @@ pub fn color_hex(c: [f32; 4]) -> String {
 #[serde(deny_unknown_fields)]
 pub struct InspectParams {
     /// The mesh file (OBJ, STL, PLY, glTF, GLB).
+    #[schemars(extend("x-riviera-file" = "read_set"))]
     pub path: String,
     #[serde(default)]
     pub options: ImportOptions,
@@ -993,6 +994,7 @@ pub(crate) fn inspect(_: &Store, p: InspectParams) -> Result<Report> {
 #[serde(deny_unknown_fields)]
 pub struct ImportParams {
     /// The mesh file (OBJ, STL, PLY, glTF, GLB).
+    #[schemars(extend("x-riviera-file" = "read_set"))]
     pub path: String,
     /// The type's name; the file's name without extension when omitted.
     pub name: Option<String>,
@@ -1149,6 +1151,7 @@ pub(crate) fn import(txn: &mut crate::txn::Transaction<'_>, p: ImportParams) -> 
 pub struct ReloadParams {
     pub type_id: ElementRef,
     /// Another file; the type's source file when omitted.
+    #[schemars(extend("x-riviera-file" = "read_set"))]
     pub path: Option<String>,
     /// New import options; the type's own when omitted.
     pub options: Option<ImportOptions>,

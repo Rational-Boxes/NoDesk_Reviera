@@ -256,16 +256,9 @@ impl Gui {
             return error(&frame, &e);
         }
         let (wildcard, file) = if html { ("HTML files (*.html)|*.html", "pressure loss.html") } else { ("CSV files (*.csv)|*.csv", "pressure loss.csv") };
-        let d = FileDialog::builder(&frame)
-            .with_message("Pressure Loss Report")
-            .with_wildcard(wildcard)
-            .with_style(FileDialogStyle::Save | FileDialogStyle::OverwritePrompt)
-            .with_default_file(file)
-            .build();
-        if d.show_modal() != ID_OK {
+        let Some(path) = self.save_target("Pressure Loss Report", wildcard, file) else {
             return;
-        }
-        let Some(path) = d.get_path() else { return };
+        };
         let args = json!({ "system_ids": chosen, "settings": settings, "path": path, "format": if html { "html" } else { "csv" }, "overwrite": true });
         match self.run("pressure_loss_report.export", args) {
             Ok(r) => {

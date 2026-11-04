@@ -242,6 +242,7 @@ impl HostCommand for SolarStatus {
 #[serde(deny_unknown_fields)]
 pub struct ExportParams {
     pub study_id: Option<String>,
+    #[schemars(extend("x-riviera-file" = "write"))]
     pub path: String,
 }
 

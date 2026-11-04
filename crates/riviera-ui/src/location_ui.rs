@@ -177,15 +177,7 @@ impl Gui {
             if !want_import {
                 return;
             }
-            let fd = FileDialog::builder(&frame)
-                .with_message("Import EPW Weather File")
-                .with_wildcard("EnergyPlus weather (*.epw)|*.epw;*.EPW|All files (*.*)|*.*")
-                .with_style(FileDialogStyle::Open | FileDialogStyle::FileMustExist)
-                .build();
-            if fd.show_modal() != ID_OK {
-                return;
-            }
-            let Some(path) = fd.get_path() else { return };
+            let Some(path) = self.open_target("Import EPW Weather File", "EnergyPlus weather (*.epw)|*.epw;*.EPW|All files (*.*)|*.*") else { return };
             match self.run("weather.import", json!({ "path": path })) {
                 Ok(r) => {
                     let warns: Vec<String> = r["warnings"].as_array().into_iter().flatten().filter_map(|w| w.as_str().map(str::to_owned)).collect();

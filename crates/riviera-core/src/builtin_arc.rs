@@ -3437,7 +3437,7 @@ edit_command!(
     "Replaces the precast configuration (STR-PRE-001) with a file's, after checking its rules; \
      returns the new version and the components it names that the project does not have.",
     "Import Precast Configuration",
-    crate::precast::FileParams,
+    crate::precast::ImportFileParams,
     crate::precast::Imported,
     crate::precast::import
 );

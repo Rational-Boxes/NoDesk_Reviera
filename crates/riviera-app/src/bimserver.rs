@@ -675,6 +675,7 @@ host!(BimCreateProject, "bimserver.create_project", "Create a BIMserver project"
 pub struct DownloadParams {
     pub server_id: String,
     pub roid: i64,
+    #[schemars(extend("x-riviera-file" = "write"))]
     pub path: PathBuf,
     /// The revision's schema, for the serialiser (default ifc4).
     pub schema: Option<String>,
@@ -1310,9 +1311,13 @@ host!(BimLockStatus, "bimserver.lock_status", "Tell whether the project is being
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ThreeWayParams {
+    #[schemars(extend("x-riviera-file" = "read"))]
     pub base_path: PathBuf,
+    #[schemars(extend("x-riviera-file" = "read"))]
     pub local_path: PathBuf,
+    #[schemars(extend("x-riviera-file" = "read"))]
     pub remote_path: PathBuf,
+    #[schemars(extend("x-riviera-file" = "write"))]
     pub out_path: PathBuf,
     #[serde(default)]
     pub policy: riviera_core::merge::Policy,

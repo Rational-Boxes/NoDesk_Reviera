@@ -214,6 +214,7 @@ impl HostCommand for StructuralAnalysisCollect {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ExportParams {
+    #[schemars(extend("x-riviera-file" = "write"))]
     pub path: std::path::PathBuf,
 }
 
@@ -259,6 +260,15 @@ const PACKAGE_FORMAT: &str = "riviera-results/1";
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PackagePathParams {
+    #[schemars(extend("x-riviera-file" = "write"))]
+    pub path: std::path::PathBuf,
+}
+
+/// A package to read (`structural_analysis.import_results`).
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PackageReadParams {
+    #[schemars(extend("x-riviera-file" = "read"))]
     pub path: std::path::PathBuf,
 }
 
@@ -316,7 +326,7 @@ pub(crate) struct StructuralAnalysisImportResults;
 
 impl HostCommand for StructuralAnalysisImportResults {
     type Host = App;
-    type Params = PackagePathParams;
+    type Params = PackageReadParams;
     type Output = PackageOut;
     const META: CommandMeta = CommandMeta {
         name: "structural_analysis.import_results",
@@ -329,7 +339,7 @@ impl HostCommand for StructuralAnalysisImportResults {
         transaction_name: "",
     };
 
-    fn run(&self, app: &mut App, caller: &Caller, p: PackagePathParams) -> Result<PackageOut> {
+    fn run(&self, app: &mut App, caller: &Caller, p: PackageReadParams) -> Result<PackageOut> {
         let text = std::fs::read_to_string(&p.path)
             .map_err(|e| Error::new("file.read_failed", format!("{}: {e}", p.path.display())))?;
         let v: serde_json::Value = serde_json::from_str(&text)

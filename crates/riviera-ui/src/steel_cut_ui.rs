@@ -351,16 +351,9 @@ impl Gui {
         if ids.is_empty() {
             return frame.set_status_text("Select the connections for the report first", 0);
         }
-        let d = FileDialog::builder(&frame)
-            .with_message("Save the Connection Check Report")
-            .with_wildcard("HTML files (*.html)|*.html")
-            .with_style(FileDialogStyle::Save | FileDialogStyle::OverwritePrompt)
-            .with_default_file("connection checks.html")
-            .build();
-        if d.show_modal() != ID_OK {
+        let Some(path) = self.save_target("Save the Connection Check Report", "HTML files (*.html)|*.html", "connection checks.html") else {
             return;
-        }
-        let Some(path) = d.get_path() else { return };
+        };
         match self.run("structural_connection.check_report", json!({ "connection_ids": ids, "path": path })) {
             Ok(_) => frame.set_status_text(&format!("Connection check report written to {path}"), 0),
             Err(e) => error(&frame, &format!("The report was not written:\n{e}")),

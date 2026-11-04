@@ -108,6 +108,7 @@ pub enum Format {
 #[serde(deny_unknown_fields)]
 pub struct ExportParams {
     pub schedule_id: ElementRef,
+    #[schemars(extend("x-riviera-file" = "write"))]
     pub path: PathBuf,
     #[serde(default)]
     pub format: Format,

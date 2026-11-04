@@ -20,6 +20,7 @@ fn bad(code: &'static str, msg: impl Into<String>) -> Error {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ExportParams {
+    #[schemars(extend("x-riviera-file" = "write"))]
     pub path: String,
     /// `energy_model` (the default) or `spaces`; both write the energy model's spaces so far.
     pub source: Option<String>,
@@ -55,6 +56,7 @@ impl HostCommand for GbxmlExport {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ImportParams {
+    #[schemars(extend("x-riviera-file" = "read"))]
     pub path: String,
 }
 
@@ -85,6 +87,7 @@ impl HostCommand for GbxmlImportLoads {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct HbjsonParams {
+    #[schemars(extend("x-riviera-file" = "write"))]
     pub path: String,
 }
 

@@ -282,11 +282,7 @@ impl Gui {
     /// File › Export gbXML… (ANA-EM-004): the energy model as gbXML 8.01.
     pub(crate) fn gbxml_export(&mut self) {
         let frame = self.frame;
-        let fd = FileDialog::builder(&frame).with_message("Export gbXML").with_wildcard("gbXML (*.xml)|*.xml").with_style(FileDialogStyle::Save | FileDialogStyle::OverwritePrompt).build();
-        if fd.show_modal() != ID_OK {
-            return;
-        }
-        let Some(path) = fd.get_path() else { return };
+        let Some(path) = self.save_target("Export gbXML", "gbXML (*.xml)|*.xml", "model.xml") else { return };
         match self.run("gbxml.export", json!({ "path": path })) {
             Ok(r) => {
                 let mut msg = format!("Wrote {} spaces, {} surfaces and {} openings to {path}.", r["spaces"], r["surfaces"], r["openings"]);
@@ -302,11 +298,7 @@ impl Gui {
     /// View › Coordination › Export Viewpoint… (COL-BCF-003): the active 3D view as a .bcfv.
     pub(crate) fn bcf_export_viewpoint(&mut self) {
         let frame = self.frame;
-        let fd = FileDialog::builder(&frame).with_message("Export BCF Viewpoint").with_wildcard("BCF viewpoint (*.bcfv)|*.bcfv").with_style(FileDialogStyle::Save | FileDialogStyle::OverwritePrompt).build();
-        if fd.show_modal() != ID_OK {
-            return;
-        }
-        let Some(path) = fd.get_path() else { return };
+        let Some(path) = self.save_target("Export BCF Viewpoint", "BCF viewpoint (*.bcfv)|*.bcfv", "viewpoint.bcfv") else { return };
         match self.run("bcf.export_viewpoint", json!({ "path": path })) {
             Ok(r) => {
                 let shown = if r["default_visibility"] == false { format!("{} elements isolated", r["exceptions"]) } else { format!("{} hidden", r["exceptions"]) };
@@ -320,11 +312,7 @@ impl Gui {
     /// View › Coordination › Show Viewpoint… (COL-BCF-003): a .bcfv in the 3D view.
     pub(crate) fn bcf_import_viewpoint(&mut self) {
         let frame = self.frame;
-        let fd = FileDialog::builder(&frame).with_message("Show BCF Viewpoint").with_wildcard("BCF viewpoint (*.bcfv)|*.bcfv").with_style(FileDialogStyle::Open | FileDialogStyle::FileMustExist).build();
-        if fd.show_modal() != ID_OK {
-            return;
-        }
-        let Some(path) = fd.get_path() else { return };
+        let Some(path) = self.open_target("Show BCF Viewpoint", "BCF viewpoint (*.bcfv)|*.bcfv") else { return };
         match self.run("bcf.import_viewpoint", json!({ "path": path })) {
             Ok(r) => {
                 if let (Some(v), Some(doc)) = (r["view_id"].as_u64(), self.doc) {
@@ -343,11 +331,7 @@ impl Gui {
     /// File › Export HBJSON… (ANA-ENV-009): the energy model for Ladybug Tools.
     pub(crate) fn hbjson_export(&mut self) {
         let frame = self.frame;
-        let fd = FileDialog::builder(&frame).with_message("Export HBJSON").with_wildcard("HBJSON (*.hbjson)|*.hbjson").with_style(FileDialogStyle::Save | FileDialogStyle::OverwritePrompt).build();
-        if fd.show_modal() != ID_OK {
-            return;
-        }
-        let Some(path) = fd.get_path() else { return };
+        let Some(path) = self.save_target("Export HBJSON", "HBJSON (*.hbjson)|*.hbjson", "model.hbjson") else { return };
         match self.run("hbjson.export", json!({ "path": path })) {
             Ok(r) => {
                 let mut msg = format!("Wrote {} rooms, {} faces, {} apertures and {} doors to {path}.", r["rooms"], r["faces"], r["apertures"], r["doors"]);
@@ -363,11 +347,7 @@ impl Gui {
     /// File › Import gbXML Loads… (ANA-EM-004): design loads from another tool onto the spaces.
     pub(crate) fn gbxml_import_loads(&mut self) {
         let frame = self.frame;
-        let fd = FileDialog::builder(&frame).with_message("Import Loads from gbXML").with_wildcard("gbXML (*.xml;*.gbxml)|*.xml;*.gbxml").with_style(FileDialogStyle::Open | FileDialogStyle::FileMustExist).build();
-        if fd.show_modal() != ID_OK {
-            return;
-        }
-        let Some(path) = fd.get_path() else { return };
+        let Some(path) = self.open_target("Import Loads from gbXML", "gbXML (*.xml;*.gbxml)|*.xml;*.gbxml") else { return };
         match self.run("gbxml.import_loads", json!({ "path": path })) {
             Ok(r) => {
                 let list = |k: &str| r[k].as_array().map(|a| a.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>().join(", ")).unwrap_or_default();

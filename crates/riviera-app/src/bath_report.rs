@@ -68,6 +68,7 @@ fn value(f: &Finding, v: Option<f64>) -> String {
 #[serde(deny_unknown_fields)]
 pub struct ReportParams {
     /// Where to write the HTML report.
+    #[schemars(extend("x-riviera-file" = "write"))]
     pub path: String,
     /// The report's title (default `Bathroom compliance`).
     pub title: Option<String>,

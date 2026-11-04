@@ -686,19 +686,10 @@ impl Gui {
     }
 
     fn export_clash_report(&mut self) {
-        let dialog = FileDialog::builder(&self.frame)
-            .with_message("Export Clash Report")
-            .with_wildcard("CSV files (*.csv)|*.csv|HTML pages (*.html)|*.html")
-            .with_style(FileDialogStyle::Save | FileDialogStyle::OverwritePrompt)
-            .with_default_file("clash report.csv")
-            .build();
-        if dialog.show_modal() != ID_OK {
-            return;
-        }
-        let Some(path) = dialog.get_path() else {
+        let Some(path) = self.save_target("Export Clash Report", "CSV files (*.csv)|*.csv|HTML pages (*.html)|*.html", "clash report.csv") else {
             return;
         };
-        let format = if dialog.get_filter_index() == 1 || path.ends_with(".html") {
+        let format = if path.to_ascii_lowercase().ends_with(".html") {
             "html"
         } else {
             "csv"

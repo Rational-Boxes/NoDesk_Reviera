@@ -747,6 +747,7 @@ pub struct MakeProductParams {
     /// The generic component it stands for (a type from `bath.load_components`).
     pub generic: ElementRef,
     /// The manufacturer's mesh (OBJ, STL, PLY, glTF, GLB).
+    #[schemars(extend("x-riviera-file" = "read_set"))]
     pub path: String,
     /// The product type's name; the file's name when omitted.
     pub name: Option<String>,

@@ -120,6 +120,7 @@ pub struct PhotometryParams {
     /// A lighting fixture type.
     pub type_id: ElementRef,
     /// The .ies or .ldt file; none clears it.
+    #[schemars(extend("x-riviera-file" = "read"))]
     pub file: Option<String>,
     /// Kelvin (3000 by default).
     pub colour_temperature: Option<f64>,

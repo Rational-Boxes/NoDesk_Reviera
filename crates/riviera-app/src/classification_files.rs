@@ -91,6 +91,7 @@ fn read_ifc(path: &Path, want: Option<&str>) -> Result<(String, String, String, 
 #[serde(deny_unknown_fields)]
 pub struct LoadParams {
     /// A `.csv` (`code,parent_code,title`) or `.ifc` file.
+    #[schemars(extend("x-riviera-file" = "read"))]
     pub path_or_url: String,
     /// The system's name (a CSV's file name by default; for an IFC file, which classification).
     pub name: Option<String>,

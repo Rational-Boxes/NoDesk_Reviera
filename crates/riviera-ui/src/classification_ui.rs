@@ -46,15 +46,7 @@ impl Gui {
             let chosen = at.and_then(|k| list.get(k)).cloned();
             let result = match (code, chosen) {
                 (LOAD, _) => {
-                    let d = FileDialog::builder(&frame)
-                        .with_message("Load Classification")
-                        .with_wildcard("Classification tables (*.csv;*.ifc)|*.csv;*.ifc|All files (*.*)|*.*")
-                        .with_style(FileDialogStyle::Open | FileDialogStyle::FileMustExist)
-                        .build();
-                    if d.show_modal() != ID_OK {
-                        continue;
-                    }
-                    let Some(path) = d.get_path() else { continue };
+                    let Some(path) = self.open_target("Load Classification", "Classification tables (*.csv;*.ifc)|*.csv;*.ifc|All files (*.*)|*.*") else { continue };
                     let stem = std::path::Path::new(&path).file_stem().and_then(|s| s.to_str()).unwrap_or("").to_owned();
                     let n = TextEntryDialog::builder(&frame, "System name:", "Load Classification").with_default_value(&stem).build();
                     if n.show_modal() != ID_OK {

@@ -16,6 +16,7 @@ use crate::App;
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct ExportParams {
     /// The folder the files go in (made if missing).
+    #[schemars(extend("x-riviera-file" = "write_folder"))]
     pub folder: PathBuf,
     /// Only `dstv` (NC1).
     #[serde(default = "dstv")]

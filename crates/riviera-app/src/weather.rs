@@ -29,6 +29,7 @@ const HIGH_M: f64 = 300.0;
 #[serde(deny_unknown_fields)]
 pub struct ImportParams {
     /// The .epw file.
+    #[schemars(extend("x-riviera-file" = "read"))]
     pub path: String,
 }
 

@@ -638,7 +638,11 @@ Commands:
      - the client is tested against an in-memory fake (feature `fake`) and live, not against a local stack;
      - it does not use `riviera-net`, because it has its own rustls set-up, as `clients/bimserver` does;
   2. publishing: FileEngine destinations for every export, publish sets, and public share links
-     made in the window (once FileEngine's share door is live);
+     made in the window (once FileEngine's share door is live). **Destinations and sources built
+     2026-11-04** (COL-FE-012): every command that reads or writes a file takes a `fileengine://`
+     address through its marked path parameters, resolved in one place (`riviera_app::fe_paths`),
+     and the export and import dialogs offer FileEngine. Publish sets and share links are still to
+     come;
   3. BCF issues over BCF-API, once FileEngine's persistent BCF store lands;
   4. Component Libraries on FileEngine (read, place, cache, updates; then writing, with the
      manifest merge);

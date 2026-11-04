@@ -123,6 +123,11 @@ impl Connections {
         self.settings.clone().or_else(|| crate::subscriptions::config_dir().map(|d| d.join("fileengine.json"))).ok_or_else(|| bad("fileengine.no_settings", "there is no per-user settings folder"))
     }
 
+    /// The cache of files read from and written to FileEngine by other commands (COL-FE-012).
+    pub(crate) fn cache_root(&self) -> Result<PathBuf> {
+        self.root()
+    }
+
     fn root(&self) -> Result<PathBuf> {
         self.data.clone().or_else(|| crate::bimserver::data_dir().map(|d| d.join("fileengine"))).ok_or_else(|| bad("fileengine.no_settings", "there is no per-user data folder"))
     }
@@ -182,6 +187,11 @@ impl Connections {
         if self.keychain() {
             crate::keychain::forget(KEYCHAIN_SERVICE, id);
         }
+    }
+
+    /// Whether `id` names a connection (its error otherwise).
+    pub(crate) fn known(&self, id: &str) -> Result<()> {
+        self.profile(id).map(|_| ())
     }
 
     fn profile(&self, id: &str) -> Result<Profile> {
@@ -282,7 +292,7 @@ pub struct Link {
     pub synced_at: i64,
 }
 
-fn now() -> i64 {
+pub(crate) fn now() -> i64 {
     std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs() as i64)
 }
 

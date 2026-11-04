@@ -187,6 +187,7 @@ pub struct RunParams {
     /// Lua source to run.
     pub code: Option<String>,
     /// Or a `.lua` file.
+    #[schemars(extend("x-riviera-file" = "read_set"))]
     pub file: Option<PathBuf>,
     /// A name for messages and the undo step (default the file's name, or "script").
     pub name: Option<String>,

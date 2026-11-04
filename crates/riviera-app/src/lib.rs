@@ -10,6 +10,7 @@
 pub mod bcf_files;
 pub mod bimserver;
 pub mod fileengine;
+pub mod fe_paths;
 mod keychain;
 pub mod docs;
 pub mod model_issues;
@@ -345,7 +346,24 @@ impl App {
     }
 
     /// Runs any command: application commands against the app, the rest against the active document.
+    /// A `fileengine://` address in a parameter marked as a path is resolved first (COL-FE-012).
     pub fn execute(
+        &mut self,
+        name: &str,
+        args: serde_json::Value,
+        caller: &Caller,
+    ) -> Result<Outcome> {
+        if !matches!(name, "file.open" | "file.save_as")
+            && args.to_string().contains(fileengine::SCHEME)
+            && let Some(out) = fe_paths::execute(self, name, &args, caller)
+        {
+            return out;
+        }
+        self.execute_local(name, args, caller)
+    }
+
+    /// Runs a command with its arguments as they are.
+    pub(crate) fn execute_local(
         &mut self,
         name: &str,
         args: serde_json::Value,

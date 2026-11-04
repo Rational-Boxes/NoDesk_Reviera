@@ -137,6 +137,7 @@ pub struct CreateParams {
     #[serde(default)]
     pub folder: String,
     /// … or a file path.
+    #[schemars(extend("x-riviera-file" = "write"))]
     pub path: Option<String>,
     /// The base point in plan (the point placed later); the selection's bottom centre when
     /// omitted.
@@ -340,6 +341,7 @@ pub struct PlaceParams {
     pub library: Option<String>,
     pub item: Option<String>,
     /// … or an IFC file.
+    #[schemars(extend("x-riviera-file" = "read"))]
     pub path: Option<String>,
     /// Where its base point goes (plan, metres).
     pub point: [f64; 2],

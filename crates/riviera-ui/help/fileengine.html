@@ -11,6 +11,7 @@ each folder.</p>
   <a href="#save">Saving</a>
   <a href="#conflict">When someone else saved first</a>
   <a href="#versions">Version history</a>
+  <a href="#exports">Exports, reports and imports</a>
   <a href="#issues">Issues on the model</a>
   <a href="#readonly">Read-only models</a>
   <a href="#security">How the credential is kept</a>
@@ -77,6 +78,25 @@ comment, and which one is open.</p>
   nothing is lost, and the model reopens at it. Save or discard your changes first.</li>
 </ul>
 
+<h2 id="exports">Exports, reports and imports</h2>
+<p>Anything Riviera writes to a file can go to FileEngine instead, and anything it reads from a
+file can come from there. When a FileEngine connection exists, export and import dialogs first
+ask <b>This computer…</b> or <b>FileEngine…</b>:</p>
+<ul>
+  <li><b>Exports and reports</b> (BCF, COBie, PDF, schedules, clash, carbon, pressure-loss,
+  connection-check and bathroom reports, gbXML, HBJSON, viewpoints, results packages, solar
+  results, Create Component): choose a folder in the FileEngine browser and a name. A file of that
+  name already there gets a new version, so a link to it always shows the latest; FileEngine keeps
+  the earlier ones. Each file is marked with the command that made it, the model it came from and
+  when.</li>
+  <li><b>Imports</b> (BCF and viewpoints, gbXML loads, emission factors, classifications, weather,
+  photometry, results, 3D objects and manufacturers' models): choose the file in the browser.
+  It is downloaded into a cache on this computer and read from there; an OBJ comes with its MTL
+  and textures, and a glTF with its buffers, from the same folder.</li>
+</ul>
+<p>If an upload fails after the export was made, the message says where the file was kept on this
+computer, so it can be uploaded with <code>fileengine.publish</code>.</p>
+
 <h2 id="issues">Issues on the model</h2>
 <p>People raise issues on a model in FileEngine's 3D viewer: a comment anchored to a viewpoint,
 with a snapshot, the elements it is about and any measurements. When you open the model, Riviera
@@ -120,14 +140,22 @@ again.</p>
 <code>fileengine.versions</code>. Lua scripts and AI agents (MCP) can use them, acting as you.
 <code>file.open</code> accepts <code>fileengine://&lt;connection&gt;/&lt;uid&gt;</code>, and
 <code>file.save_as</code> accepts
-<code>fileengine://&lt;connection&gt;/&lt;folder uid&gt;/&lt;name&gt;.ifc</code>.</p>
+<code>fileengine://&lt;connection&gt;/&lt;folder uid&gt;/&lt;name&gt;.ifc</code>. Every other
+command that reads or writes a file takes a FileEngine address in place of its path too:
+<code>fileengine://&lt;connection&gt;/&lt;folder uid&gt;/&lt;name&gt;</code> to write (or to read
+by name), <code>fileengine://&lt;connection&gt;/&lt;uid&gt;</code> to read, and
+<code>fileengine://&lt;connection&gt;/&lt;folder uid&gt;</code> for a folder of outputs, for
+example <code>riviera.schedule.export{ schedule_id = s, path = "fileengine://acme/F12/rooms.csv" }</code>.
+A command whose answer is a table of values gains <code>fileengine</code>: each uploaded file's
+uid, name and version.</p>
 <p>Agents can't give a credential or remove a connection. They can only use one you have
 stored.</p>
 
 <h2 id="later">Coming later</h2>
 <p>Later phases will add:</p>
 <ul>
-  <li>publishing reports and exports to FileEngine folders, with share links;</li>
+  <li>publish sets (several outputs published together, and again with one click) and share
+  links;</li>
   <li>live updates of issues while the model is open, and BCF-API for other tools;</li>
   <li>Component Libraries hosted on FileEngine;</li>
   <li>product documentation folders linked to types and materials, with product data read from

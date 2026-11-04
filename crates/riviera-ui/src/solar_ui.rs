@@ -137,9 +137,7 @@ impl Gui {
                 self.refresh_scene(&frame);
             }
             EXPORT => {
-                let fd = FileDialog::builder(&frame).with_message("Export Solar Results").with_wildcard("CSV (*.csv)|*.csv").with_style(FileDialogStyle::Save | FileDialogStyle::OverwritePrompt).build();
-                if fd.show_modal() == ID_OK
-                    && let Some(path) = fd.get_path()
+                if let Some(path) = self.save_target("Export Solar Results", "CSV (*.csv)|*.csv", "solar.csv")
                     && let Err(e) = self.run("solar.export", json!({ "path": path }))
                 {
                     error(&frame, &e);

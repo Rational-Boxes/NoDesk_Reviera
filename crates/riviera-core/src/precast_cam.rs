@@ -236,6 +236,7 @@ pub struct ExportParams {
     #[serde(default)]
     pub assembly_ids: Vec<ElementRef>,
     pub writer_id: String,
+    #[schemars(extend("x-riviera-file" = "write_folder"))]
     pub folder: String,
     /// Overrides the configuration's rule for this export.
     #[serde(default)]

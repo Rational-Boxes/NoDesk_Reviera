@@ -447,16 +447,7 @@ impl Gui {
             .current_path()
             .and_then(|p| p.file_stem().map(|s| s.to_string_lossy().into_owned()))
             .unwrap_or_else(|| "Project".into());
-        let dialog = FileDialog::builder(&frame)
-            .with_message("Export COBie")
-            .with_wildcard("Excel workbook (*.xlsx)|*.xlsx")
-            .with_style(FileDialogStyle::Save | FileDialogStyle::OverwritePrompt)
-            .with_default_file(&format!("{name} COBie.xlsx"))
-            .build();
-        if dialog.show_modal() != ID_OK {
-            return;
-        }
-        let Some(path) = dialog.get_path() else {
+        let Some(path) = self.save_target("Export COBie", "Excel workbook (*.xlsx)|*.xlsx", &format!("{name} COBie.xlsx")) else {
             return;
         };
         match self.run("export.cobie", json!({ "path": path, "overwrite": true })) {
@@ -506,16 +497,7 @@ impl Gui {
             .active_view()
             .map(|v| self.view_name(v))
             .unwrap_or_else(|| "Schedule".into());
-        let dialog = FileDialog::builder(&frame)
-            .with_message("Export Schedule")
-            .with_wildcard("CSV files (*.csv)|*.csv|Tab-separated text (*.txt)|*.txt")
-            .with_style(FileDialogStyle::Save | FileDialogStyle::OverwritePrompt)
-            .with_default_file(&format!("{name}.csv"))
-            .build();
-        if dialog.show_modal() != ID_OK {
-            return;
-        }
-        let Some(path) = dialog.get_path() else {
+        let Some(path) = self.save_target("Export Schedule", "CSV files (*.csv)|*.csv|Tab-separated text (*.txt)|*.txt", &format!("{name}.csv")) else {
             return;
         };
         let format = if path.to_ascii_lowercase().ends_with(".txt") {

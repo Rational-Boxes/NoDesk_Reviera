@@ -230,6 +230,7 @@ impl HostCommand for BcfApplyViewpoint {
 #[serde(deny_unknown_fields)]
 pub struct ExportParams {
     /// The `.bcf` (or `.bcfzip`) file to write.
+    #[schemars(extend("x-riviera-file" = "write"))]
     pub path: String,
     /// The topics (all when omitted).
     pub topic_ids: Option<Vec<TopicRef>>,
@@ -345,6 +346,7 @@ pub(crate) fn write_archive(path: &str, version: Version, lists: &issues::Lists,
 #[serde(deny_unknown_fields)]
 pub struct ImportParams {
     /// A `.bcf` or `.bcfzip` archive (BCF 2.1 or 3.0).
+    #[schemars(extend("x-riviera-file" = "read"))]
     pub path: String,
 }
 

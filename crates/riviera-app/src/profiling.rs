@@ -143,6 +143,7 @@ host!(ProfilerReset, "profiler.reset", "Forget what the profiler recorded",
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PathParams {
+    #[schemars(extend("x-riviera-file" = "write"))]
     pub path: PathBuf,
 }
 

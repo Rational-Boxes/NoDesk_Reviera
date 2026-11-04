@@ -120,6 +120,7 @@ pub struct ExportParams {
     /// A 3D view; the active view when omitted (it must be 3D).
     pub view_id: Option<ElementRef>,
     /// The `.bcfv` file to write.
+    #[schemars(extend("x-riviera-file" = "write"))]
     pub path: String,
 }
 
@@ -173,6 +174,7 @@ impl HostCommand for BcfExportViewpoint {
 #[serde(deny_unknown_fields)]
 pub struct ImportParams {
     /// The `.bcfv` file to read.
+    #[schemars(extend("x-riviera-file" = "read"))]
     pub path: String,
     /// The 3D view to show it in; the active view when it is 3D, else the default 3D view.
     pub view_id: Option<ElementRef>,

@@ -359,6 +359,7 @@ pub enum ExportFormat {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ExportParams {
+    #[schemars(extend("x-riviera-file" = "write"))]
     pub path: std::path::PathBuf,
     pub format: Option<ExportFormat>,
 }

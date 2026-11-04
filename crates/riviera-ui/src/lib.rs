@@ -5419,18 +5419,11 @@ fn export_pdf(gui: &Rc<RefCell<Gui>>, f: &Frame) {
     let Some((view, name, model_path)) = target else {
         return error(f, "Open a plan, section or elevation to export it as PDF.");
     };
-    let mut dialog = FileDialog::builder(f)
-        .with_message("Export PDF")
-        .with_wildcard("PDF files (*.pdf)|*.pdf")
-        .with_style(FileDialogStyle::Save | FileDialogStyle::OverwritePrompt)
-        .with_default_file(&format!("{name}.pdf"));
-    if let Some(dir) = model_path.as_ref().and_then(|p| p.parent()) {
-        dialog = dialog.with_default_dir(&dir.to_string_lossy());
-    }
-    let dialog = dialog.build();
-    if dialog.show_modal() == ID_OK
-        && let Some(path) = dialog.get_path()
-    {
+    // A file on this computer (beside the model), or a FileEngine folder (COL-FE-012).
+    let _ = model_path;
+    let mut chosen = None;
+    with(gui, |g| chosen = g.save_target("Export PDF", "PDF files (*.pdf)|*.pdf", &format!("{name}.pdf")));
+    if let Some(path) = chosen {
         let mut path = PathBuf::from(path);
         if path.extension().is_none() {
             path.set_extension("pdf");

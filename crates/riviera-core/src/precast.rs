@@ -449,6 +449,14 @@ pub(crate) fn apply(txn: &mut Transaction<'_>, p: ApplyParams) -> Result<u32> {
 
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct FileParams {
+    #[schemars(extend("x-riviera-file" = "write"))]
+    pub file: String,
+}
+
+/// The file `precast_config.import` reads.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct ImportFileParams {
+    #[schemars(extend("x-riviera-file" = "read"))]
     pub file: String,
 }
 
@@ -466,7 +474,7 @@ pub struct Imported {
 }
 
 /// Replaces the configuration with a file's (`precast_config.import`).
-pub(crate) fn import(txn: &mut Transaction<'_>, p: FileParams) -> Result<Imported> {
+pub(crate) fn import(txn: &mut Transaction<'_>, p: ImportFileParams) -> Result<Imported> {
     let text = std::fs::read_to_string(&p.file).map_err(|e| Error::new("precast_config.read", format!("{}: {e}", p.file)))?;
     let v: Value = serde_json::from_str(&text).map_err(|e| Error::new("precast_config.read", format!("{}: {e}", p.file)))?;
     // "reviera.precast_configuration": the old spelling, still read.

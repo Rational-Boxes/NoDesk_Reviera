@@ -78,15 +78,7 @@ impl Gui {
             let material = at.and_then(|k| rows.get(k)).and_then(|m| m["material"].as_str()).map(str::to_owned);
             let result: Result<(), String> = match code {
                 IMPORT => {
-                    let fd = FileDialog::builder(&frame)
-                        .with_message("Import Emission Factors")
-                        .with_wildcard("CSV files (*.csv)|*.csv;*.CSV|All files (*.*)|*.*")
-                        .with_style(FileDialogStyle::Open | FileDialogStyle::FileMustExist)
-                        .build();
-                    if fd.show_modal() != ID_OK {
-                        continue;
-                    }
-                    let Some(path) = fd.get_path() else { continue };
+                    let Some(path) = self.open_target("Import Emission Factors", "CSV files (*.csv)|*.csv;*.CSV|All files (*.*)|*.*") else { continue };
                     self.run("embodied_carbon.import_factors", json!({ "path": path })).map(|v| frame.set_status_text(&format!("{} factors imported", v["factors"]), 0))
                 }
                 MATCH => {
@@ -200,15 +192,9 @@ impl Gui {
             None,
         );
         if code == EXPORT {
-            let fd = FileDialog::builder(&frame)
-                .with_message("Export Embodied Carbon")
-                .with_wildcard("CSV (*.csv)|*.csv|JSON (*.json)|*.json")
-                .with_style(FileDialogStyle::Save | FileDialogStyle::OverwritePrompt)
-                .build();
-            if fd.show_modal() != ID_OK {
-                return;
-            }
-            let Some(path) = fd.get_path() else { return };
+            let Some(path) = self.save_target("Export Embodied Carbon", "CSV (*.csv)|*.csv|JSON (*.json)|*.json", "") else {
+            return;
+        };
             let format = if path.to_lowercase().ends_with(".json") { "json" } else { "csv" };
             match self.run("embodied_carbon.export", json!({ "run_id": run.id, "path": path, "format": format })) {
                 Ok(_) => frame.set_status_text("Embodied carbon exported", 0),

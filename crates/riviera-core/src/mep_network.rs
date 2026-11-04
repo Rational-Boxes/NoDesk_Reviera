@@ -979,6 +979,7 @@ pub struct ReportParams {
     pub system_ids: Vec<ElementRef>,
     #[serde(default)]
     pub settings: ReportSettings,
+    #[schemars(extend("x-riviera-file" = "write"))]
     pub path: PathBuf,
     #[serde(default)]
     pub format: ReportFormat,

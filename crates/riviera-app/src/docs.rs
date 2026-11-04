@@ -965,6 +965,7 @@ fn shown(v: &Value) -> String {
 #[serde(deny_unknown_fields)]
 pub struct ReportParams {
     /// The HTML file to write.
+    #[schemars(extend("x-riviera-file" = "write"))]
     pub path: std::path::PathBuf,
     /// The embodied carbon run to include (default: the latest, if any).
     pub carbon_run_id: Option<String>,
