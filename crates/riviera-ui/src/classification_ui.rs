@@ -111,15 +111,7 @@ impl Gui {
     /// Manage › Settings › Load Keynotes.
     pub(crate) fn load_keynotes(&mut self) {
         let frame = self.frame;
-        let d = FileDialog::builder(&frame)
-            .with_message("Load Keynotes")
-            .with_wildcard("Keynote files (*.txt)|*.txt|All files (*.*)|*.*")
-            .with_style(FileDialogStyle::Open | FileDialogStyle::FileMustExist)
-            .build();
-        if d.show_modal() != ID_OK {
-            return;
-        }
-        let Some(path) = d.get_path() else { return };
+        let Some(path) = self.open_target("Load Keynotes", "Keynote files (*.txt)|*.txt|All files (*.*)|*.*") else { return };
         match self.run("keynotes.load", json!({ "path": path })) {
             Ok(v) => frame.set_status_text(&format!("{} keynotes from {}", v["entries"], v["path"].as_str().unwrap_or("")), 0),
             Err(e) => error(&frame, &e),

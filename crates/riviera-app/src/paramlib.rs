@@ -78,6 +78,9 @@ impl App {
         let dir = cache_dir(self);
         let _ = std::fs::create_dir_all(&dir);
         let _ = std::fs::write(dir.join(format!("{id}.json")), paramlib::write(&l.lib));
+        // A library opened from FileEngine goes back as a new version (COL-FE-014).
+        let path = self.libraries.get(id).expect("open").path.clone();
+        crate::fe_files::push(self, &path)?;
         Ok(())
     }
 }
@@ -109,6 +112,7 @@ fn summary(l: &OpenLibrary) -> LibrarySummary {
 #[serde(deny_unknown_fields)]
 pub struct OpenParams {
     /// A `.rplib.json` file.
+    #[schemars(extend("x-riviera-file" = "read_sync"))]
     pub path_or_url: String,
 }
 
@@ -163,6 +167,7 @@ impl HostCommand for ParamlibOpen {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CreateParams {
+    #[schemars(extend("x-riviera-file" = "write_sync"))]
     pub path: String,
     pub name: String,
 }

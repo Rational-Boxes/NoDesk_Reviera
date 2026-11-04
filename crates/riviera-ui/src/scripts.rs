@@ -253,14 +253,7 @@ impl Gui {
         if self.doc.is_none() {
             return error(&frame, "Open or create a project first.");
         }
-        let dialog = FileDialog::builder(&frame)
-            .with_message("Run Script")
-            .with_wildcard("Lua scripts (*.lua)|*.lua|All files (*.*)|*.*")
-            .build();
-        if dialog.show_modal() != ID_OK {
-            return;
-        }
-        let Some(path) = dialog.get_path() else {
+        let Some(path) = self.open_target("Run Script", "Lua scripts (*.lua)|*.lua|All files (*.*)|*.*") else {
             return;
         };
         let name = Path::new(&path)
@@ -287,20 +280,9 @@ impl Gui {
             return;
         }
         let path = if choose.get_selection() == 0 {
-            let d = FileDialog::builder(&frame)
-                .with_message("Import Script")
-                .with_wildcard("Lua scripts (*.lua)|*.lua")
-                .build();
-            if d.show_modal() != ID_OK {
-                return;
-            }
-            d.get_path()
+            self.open_target("Import Script", "Lua scripts (*.lua)|*.lua")
         } else {
-            let d = DirDialog::builder(&frame, "Import Plugin Folder", "").build();
-            if d.show_modal() != ID_OK {
-                return;
-            }
-            d.get_path()
+            self.open_folder_target("Import Plugin Folder")
         };
         let Some(path) = path else { return };
         let mut result = self.run("script.import", json!({ "path": path }));

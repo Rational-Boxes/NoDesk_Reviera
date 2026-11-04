@@ -23,11 +23,6 @@ const D_PROJECT: i32 = 7614;
 const D_IMPORT: i32 = 7615;
 const D_EXPORT: i32 = 7616;
 
-fn file(frame: &Frame, message: &str, wildcard: &str, save: bool) -> Option<String> {
-    let style = if save { FileDialogStyle::Save | FileDialogStyle::OverwritePrompt } else { FileDialogStyle::Open | FileDialogStyle::FileMustExist };
-    let d = FileDialog::builder(frame).with_message(message).with_wildcard(wildcard).with_style(style).build();
-    (d.show_modal() == ID_OK).then(|| d.get_path()).flatten()
-}
 
 impl Gui {
     /// Manage › Settings › Parameter Libraries.
@@ -59,12 +54,12 @@ impl Gui {
             selected = at;
             let chosen = at.and_then(|k| list.get(k)).cloned();
             let result = match (code, chosen) {
-                (OPEN, _) => match file(&frame, "Open Parameter Library", "Parameter libraries (*.rplib.json)|*.rplib.json|All files (*.*)|*.*", false) {
+                (OPEN, _) => match self.open_target("Open Parameter Library", "Parameter libraries (*.rplib.json)|*.rplib.json|All files (*.*)|*.*") {
                     Some(p) => self.run("paramlib.open", json!({ "path_or_url": p })).map(|_| ()),
                     None => continue,
                 },
                 (NEW, _) => {
-                    let Some(p) = file(&frame, "New Parameter Library", "Parameter libraries (*.rplib.json)|*.rplib.json", true) else { continue };
+                    let Some(p) = self.save_target("New Parameter Library", "Parameter libraries (*.rplib.json)|*.rplib.json", "library.rplib.json") else { continue };
                     let p = if p.ends_with(".rplib.json") { p } else { format!("{}.rplib.json", p.trim_end_matches(".json")) };
                     let d = TextEntryDialog::builder(&frame, "Library name:", "New Parameter Library").build();
                     if d.show_modal() != ID_OK {
@@ -158,13 +153,13 @@ impl Gui {
                         other => other.map(|_| ()),
                     }
                 }
-                (D_IMPORT, _) => match file(&frame, "Import Shared Parameters", "Text files (*.txt)|*.txt|All files (*.*)|*.*", false) {
+                (D_IMPORT, _) => match self.open_target("Import Shared Parameters", "Text files (*.txt)|*.txt|All files (*.*)|*.*") {
                     Some(p) => self.run("paramlib.import_legacy", json!({ "path": p, "target_library_id": id })).map(|v| {
                         frame.set_status_text(&format!("{} imported, {} already there", v["added"], v["skipped"]), 0);
                     }),
                     None => continue,
                 },
-                (D_EXPORT, _) => match file(&frame, "Export IFC Templates", "IFC files (*.ifc)|*.ifc", true) {
+                (D_EXPORT, _) => match self.save_target("Export IFC Templates", "IFC files (*.ifc)|*.ifc", "parameter templates.ifc") {
                     Some(p) => self.run("paramlib.export_ifc_templates", json!({ "library_id": id, "path": p })).map(|n| {
                         frame.set_status_text(&format!("{n} property templates written"), 0);
                     }),

@@ -383,6 +383,32 @@ impl Gui {
         dialog.get_path()
     }
 
+    /// A folder to read (a plugin folder): chosen in the system's dialog, or, where a FileEngine
+    /// connection exists and FileEngine is chosen, a FileEngine folder as a `fileengine://`
+    /// address.
+    pub(crate) fn open_folder_target(&mut self, title: &str) -> Option<String> {
+        let frame = self.frame;
+        let connections = self.run("fileengine.list_connections", Value::Null).ok().and_then(|v| v.as_array().cloned()).unwrap_or_default();
+        if !connections.is_empty() {
+            let places = ["This computer…", "FileEngine…"];
+            let d = SingleChoiceDialog::builder(&frame, &format!("{title}: from where?"), title, &places).build();
+            if d.show_modal() != ID_OK {
+                return None;
+            }
+            let picked = d.get_selection();
+            d.destroy();
+            if picked == 1 {
+                let p = self.fileengine_pick_folder(title)?;
+                return Some(format!("fileengine://{}/{}", p.connection_id, p.folder_uid));
+            }
+        }
+        let d = DirDialog::builder(&frame, title, "").build();
+        if d.show_modal() != ID_OK {
+            return None;
+        }
+        d.get_path()
+    }
+
     /// Where to save an export or report (COL-FE-012): a file chosen in the system's dialog, or,
     /// where a FileEngine connection exists and FileEngine is chosen, a FileEngine folder and a
     /// name, as a `fileengine://` address the command takes in place of a path. A file of that

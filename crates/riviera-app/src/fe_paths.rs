@@ -37,6 +37,13 @@ pub enum Role {
     LibraryRead,
     /// A Component Library's folder that the command changes.
     LibraryWrite,
+    /// A file the command opens and keeps (saving it again later): a stable synced copy
+    /// (COL-FE-014).
+    ReadSync,
+    /// A file the command makes and keeps: written to the stable synced copy, then uploaded.
+    WriteSync,
+    /// A file, or a folder of files, the command reads.
+    ReadAny,
 }
 
 impl Role {
@@ -49,6 +56,9 @@ impl Role {
             "write_any" => Role::WriteAny,
             "library_read" => Role::LibraryRead,
             "library_write" => Role::LibraryWrite,
+            "read_sync" => Role::ReadSync,
+            "write_sync" => Role::WriteSync,
+            "read_any" => Role::ReadAny,
             _ => return None,
         })
     }
@@ -256,6 +266,8 @@ fn run(app: &mut App, name: &str, mut args: Value, caller: &Caller, found: Vec<(
     let cache = app.fileengine.cache_root()?;
     let mut outgoing = Vec::new();
     let mut libraries: Vec<PathBuf> = Vec::new();
+    // Files made in their synced place, to upload and record after the command.
+    let mut synced: Vec<(String, String, String, PathBuf)> = Vec::new();
     for (at, role, text) in found {
         if matches!(role, Role::LibraryRead | Role::LibraryWrite) {
             let write = role == Role::LibraryWrite;
@@ -296,6 +308,41 @@ fn run(app: &mut App, name: &str, mut args: Value, caller: &Caller, found: Vec<(
         app.fileengine.known(&a.connection_id)?;
         let local = match role {
             Role::Read | Role::ReadSet => fetch(app, &text, role == Role::ReadSet)?,
+            Role::ReadSync => {
+                let uid = match &a.name {
+                    Some(n) => find(app, &a.connection_id, &a.uid, n)?.ok_or_else(|| bad("fileengine.not_found", format!("{n} is not in that FileEngine folder")))?,
+                    None => a.uid.clone(),
+                };
+                crate::fe_files::pull(app, &a.connection_id, &uid)?
+            }
+            Role::WriteSync => {
+                let Some(n) = &a.name else {
+                    return Err(bad("fileengine.bad_address", format!("{text}: a file to make is fileengine://<connection>/<folder uid>/<name>")));
+                };
+                let local = crate::fe_files::local_path(app, &a.connection_id, &a.uid, n)?;
+                if local.exists() && crate::fe_files::record(&local).is_none() {
+                    let _ = std::fs::remove_file(&local);
+                }
+                if let Some(d) = local.parent() {
+                    std::fs::create_dir_all(d).map_err(|e| bad("fileengine.cache", e.to_string()))?;
+                }
+                synced.push((at.clone(), a.connection_id.clone(), a.uid.clone(), local.clone()));
+                local
+            }
+            Role::ReadAny => {
+                let uid = match &a.name {
+                    Some(n) => app.fileengine.with(&a.connection_id, |c| c.find(&a.uid, n))?.map(|x| x.uid).ok_or_else(|| bad("fileengine.not_found", format!("{n} is not in that FileEngine folder")))?,
+                    None => a.uid.clone(),
+                };
+                let node = app.fileengine.with(&a.connection_id, |c| c.stat(&uid))?;
+                if node.is_dir() {
+                    let dir = cache.join("folders").join(safe(&a.connection_id)).join(safe(&uid)).join(safe(&node.name));
+                    crate::fe_library::pull(app, &dir, &a.connection_id, &uid)?;
+                    dir
+                } else {
+                    fetch(app, &format!("{SCHEME}{}/{uid}", a.connection_id), true)?
+                }
+            }
             Role::LibraryRead | Role::LibraryWrite => unreachable!("handled above"),
             Role::Write | Role::WriteFolder | Role::WriteAny => {
                 let dir = cache.join("outgoing").join(nonce());
@@ -326,6 +373,32 @@ fn run(app: &mut App, name: &str, mut args: Value, caller: &Caller, found: Vec<(
     }
     if let (Value::Object(m), false) = (&mut out.result, pushed.is_empty()) {
         m.insert("fileengine_library".into(), serde_json::to_value(&pushed).expect("serialises"));
+    }
+    let mut made = Vec::new();
+    for (at, conn, folder, local) in &synced {
+        if !local.is_file() {
+            continue;
+        }
+        let name = local.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+        let there = find(app, conn, folder, &name)?;
+        let up = app
+            .fileengine
+            .with(conn, |c| {
+                let replaced = there.is_some();
+                let uid = match there {
+                    Some(u) => u,
+                    None => c.create_file(folder, &name)?,
+                };
+                c.write_file(&uid, local)?;
+                let version = c.stat(&uid)?.version;
+                Ok(Upload { parameter: at.clone(), uid, name: name.clone(), version, replaced })
+            })
+            .map_err(|e| bad("fileengine.upload_failed", format!("the command ran, but {name} was not uploaded ({}); it is kept at {}", e.message, local.display())))?;
+        crate::fe_files::adopt(app, local, conn, &up.uid)?;
+        made.push(up);
+    }
+    if let (Value::Object(m), false) = (&mut out.result, made.is_empty()) {
+        m.insert("fileengine".into(), serde_json::to_value(&made).expect("serialises"));
     }
     if outgoing.is_empty() {
         return Ok(out);

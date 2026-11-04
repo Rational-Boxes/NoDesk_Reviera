@@ -102,3 +102,51 @@ fn a_library_shared_on_fileengine() {
     assert!(fake.uid_of("Engineering/Library/lamp.obj").is_none());
     assert!(fake.uid_of("Engineering/Library/.deleted/lamp.obj").is_some());
 }
+
+/// Parameter libraries, script folders and keynote files on FileEngine (COL-FE-014).
+#[test]
+fn parameter_libraries_scripts_and_keynotes_on_fileengine() {
+    let dir = tempfile::tempdir().unwrap();
+    let fake = Fake::start("fesk_test", "fesks_secret", "ann@acme.test");
+    let eng = fake.uid_of("Engineering").unwrap();
+
+    // Made on FileEngine and edited: each change goes back as a new version.
+    let mut ann = new_app(&dir.path().join("ann"));
+    let conn = connected(&mut ann, &fake);
+    let made = ok(&mut ann, "paramlib.create", json!({ "path": format!("fileengine://{conn}/{eng}/acme.rplib.json"), "name": "Acme parameters" }));
+    let lib = made.as_str().unwrap().to_owned();
+    let uid = fake.uid_of("Engineering/acme.rplib.json").expect("uploaded");
+    ok(&mut ann, "paramlib.definition.add", json!({ "library_id": lib, "def": { "name": "Acoustic Class", "data_type": "text", "ifc": { "pset": "ACME_Common", "property": "AcousticClass" } } }));
+    assert!(String::from_utf8(fake.content(&uid).unwrap()).unwrap().contains("Acoustic Class"));
+
+    // Opened on another machine from FileEngine, by folder and name.
+    let mut bob = new_app(&dir.path().join("bob"));
+    let bconn = connected(&mut bob, &fake);
+    let opened = ok(&mut bob, "paramlib.open", json!({ "path_or_url": format!("fileengine://{bconn}/{eng}/acme.rplib.json") }));
+    assert_eq!((opened["name"].as_str(), opened["definitions"].as_u64()), (Some("Acme parameters"), Some(1)));
+    // Bob adds one; Ann, who opened the older version, is refused rather than overwriting it.
+    ok(&mut bob, "paramlib.definition.add", json!({ "library_id": lib, "def": { "name": "Fire Rating", "data_type": "text", "ifc": { "pset": "ACME_Common", "property": "FireRating" } } }));
+    let e = run(&mut ann, "paramlib.definition.add", json!({ "library_id": lib, "def": { "name": "Finish", "data_type": "text", "ifc": { "pset": "ACME_Common", "property": "Finish" } } })).unwrap_err();
+    assert_eq!(e.code, "fileengine.conflict", "{e:?}");
+    assert!(String::from_utf8(fake.content(&uid).unwrap()).unwrap().contains("Fire Rating"));
+
+    // A plugin folder imported from FileEngine, and a keynote file.
+    let src = dir.path().join("plugin");
+    std::fs::create_dir_all(&src).unwrap();
+    std::fs::write(src.join("plugin.lua"), "return { title = \"Hello\", run = function() return 1 end }\n").unwrap();
+    let plugins = ok(&mut ann, "fileengine.make_folder", json!({ "connection_id": conn, "parent_uid": eng, "name": "Hello" })).as_str().unwrap().to_owned();
+    ok(&mut ann, "fileengine.publish", json!({ "connection_id": conn, "folder_uid": plugins, "path": src.join("plugin.lua") }));
+    // Into a script library of the test's own, never the user's.
+    let scripts = dir.path().join("scripts");
+    // SAFETY: no other test in this binary reads the variable.
+    unsafe { std::env::set_var("RIVIERA_LIBRARY", &scripts) };
+    let imported = run(&mut ann, "script.import", json!({ "path": format!("fileengine://{conn}/{plugins}") }));
+    assert!(imported.is_ok(), "{imported:?}");
+    assert!(scripts.join("Hello").join("plugin.lua").is_file());
+    let notes = dir.path().join("keynotes.txt");
+    std::fs::write(&notes, "A\tGeneral\t\nA1\tSee specification\tA\n").unwrap();
+    ok(&mut ann, "fileengine.publish", json!({ "connection_id": conn, "folder_uid": eng, "path": notes }));
+    ok(&mut ann, "file.new", json!({}));
+    let k = ok(&mut ann, "keynotes.load", json!({ "path": format!("fileengine://{conn}/{eng}/keynotes.txt") }));
+    assert!(k.to_string().contains('2') || k.to_string().contains("A1"), "{k:#}");
+}

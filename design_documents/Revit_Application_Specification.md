@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Riviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Riviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 885 numbered requirements (320 P0 · 343 P1 · 215 P2 · 7 P3), 2,326 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 886 numbered requirements (320 P0 · 343 P1 · 216 P2 · 7 P3), 2,326 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Riviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Riviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,326 commands; 885 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,326 commands; 886 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -27708,7 +27708,7 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
   - Each uploaded file gets metadata: `riviera.output` (the command), `riviera.source_name` (the active model's file name), `riviera.source_uid` and `riviera.source_version` when that model is on FileEngine, `riviera.published_at`, and `ifc.project_guid`.
 - **Result.** A command whose result is an object gains `fileengine`: for each upload, the parameter, the file's uid, name and version, and whether it replaced an earlier version.
 - **Failures.** An address that does not parse, an unknown connection, or a download that fails stops the command before it runs. An upload that fails after the command has run reports `fileengine.upload_failed` with the local copy's path, which is kept.
-- `file.open` and `file.save_as` keep their own FileEngine handling (COL-FE-002, COL-FE-003). Component Libraries (`library.*`, `component.place`) and parameter libraries come with the next phase (FILEENGINE_INTEGRATION §7b); `docs.link` and `docs.publish_local` take FileEngine folders through their own fields.
+- `file.open` and `file.save_as` keep their own FileEngine handling (COL-FE-002, COL-FE-003). Component Libraries are COL-FE-013 and parameter libraries COL-FE-014; `docs.link` and `docs.publish_local` take FileEngine folders through their own fields.
 
 **Acceptance criteria.**
 - **In the window.** Export dialogs (BCF, COBie, PDF, schedules, clash, carbon, pressure-loss, connection-check and bathroom reports, gbXML, HBJSON, viewpoints, results packages, solar results, Create Component) and import dialogs (BCF and viewpoints, gbXML loads, emission factors, classifications, weather, photometry, results, 3D objects and manufacturers' models) ask *This computer…* or *FileEngine…* when a FileEngine connection exists. FileEngine shows the folder browser: a folder and a name to save (a new version of a file of that name), or a file to read. Without a connection they show the system's dialog as before.
@@ -27741,6 +27741,24 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 - [x] Against the fake server: a library made on FileEngine (`library.create` with an address) uploads its manifest; `library.import_files` of an OBJ uploads the item, its MTL and the manifest entry; a second machine's `library.open` mirrors it, lists and places the item; items added from both machines all stay in the manifest; a manifest changed on the server between a pull and a push is merged entry by entry (the description from one side, an item's name from the other); `library.delete_items` moves the item into `.deleted` on the server.
 
 *Built (2026-11-04):* `riviera_app::fe_library` (mirror, pull, push, merge) and the `library_read`/`library_write` marks resolved in `fe_paths`, for 11 more commands; the panel's FileEngine Open and New. *Not yet:* downloading items on demand instead of the whole library, *Update available* and `library.updates`/`library.reload_item`, the Incoming review folder, parameter libraries on FileEngine.
+
+### Parameter libraries, scripts and keynotes on FileEngine
+**ID:** COL-FE-014 · **Priority:** P2 · **Ref:** FILEENGINE_INTEGRATION §7a, §7b; owner requirement (2026-11-04, as COL-FE-012)
+
+**Purpose.** The files Riviera keeps open and saves again, and the folders it reads whole, work from FileEngine as they do from this computer.
+
+**Behaviour & rules.**
+- **Files kept open** (`x-riviera-file` `read_sync`, `write_sync`): a parameter library opened from FileEngine (`paramlib.open`) or made there (`paramlib.create`) has a stable copy in the per-user cache (`<data>/riviera/fileengine/synced/<connection>/<folder uid>/<name>`) with a sidecar naming its connection, uid, version and SHA-256.
+  - Opening brings the copy up to date, unless it holds changes not yet sent, which are kept.
+  - Every save of the library (each definition or group edit) sends it back as a new version, only over the version it was opened at. When someone saved meanwhile, the save is refused with `fileengine.conflict` and the change is kept in the copy, to be made again after opening the newer one.
+- **Files or folders** (`read_any`): `script.import` takes a `.lua` file or a plugin folder on FileEngine; a folder is mirrored as COL-FE-013's libraries are and imported from the mirror.
+- **Also read from FileEngine** (`read`): `keynotes.load` (the cached copy is kept as the keynote file, so `keynotes.reload` re-reads it; loading from FileEngine again takes the newest), and a remote-analysis subscription's CA certificate.
+- **In the window:** Parameter Libraries' *Open…*, *New…*, *Import* and *Export*, *Load Keynotes*, *Run Script…* and *Import into Library* (a script, or a plugin folder) offer FileEngine when a connection exists.
+
+**Acceptance criteria.**
+- [x] Against the fake server: a parameter library made on FileEngine uploads, and a definition added goes back as a new version; another machine opens it by folder and name and adds one; the first machine's next edit, made over the older version, is refused with `fileengine.conflict` and the server keeps the second machine's; a plugin folder on FileEngine imports into the script library; a keynote file loads from FileEngine.
+
+*Built (2026-11-04):* `riviera_app::fe_files` and the three marks; 60 commands marked in all. Not yet: merging parameter-library edits by definition GUID instead of refusing, `keynotes.reload` fetching the newest from FileEngine, `docs.link` and `docs.publish_local` (they take FileEngine folders through their own fields).
 
 *Not yet (later phases):* a thumbnail with each save; the Documents pane (a dockable pane with document previews, uploads and expiry warnings); publish sets and share links (exports themselves: COL-FE-012); BCF over BCF-API; Component Libraries; field sets beyond EPD and HPD (§7c); live updates through the discussion service.
 
@@ -29833,9 +29851,9 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 28 | 0 | 29 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
-| COL | 8 | 52 | 12 | 1 | 73 |
+| COL | 8 | 52 | 13 | 1 | 74 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **343** | **215** | **7** | **885** |
+| **Total** | **320** | **343** | **216** | **7** | **886** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -29890,7 +29908,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.2a Riviera-originated features
 
-140 requirements are Riviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
+141 requirements are Riviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
 
 | Requirement | Ch | Feature |
 |-------------|----|---------|
@@ -30027,6 +30045,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | COL-FE-008 | 6 | Publishing files and the material documentation report |
 | COL-FE-012 | 6 | FileEngine wherever a file is read or written |
 | COL-FE-013 | 6 | Component Libraries hosted on FileEngine |
+| COL-FE-014 | 6 | Parameter libraries, scripts and keynotes on FileEngine |
 | COL-MRG-001 | 6 | Three-way merge by GlobalId and RXD id |
 | COL-OWN-002 | 6 | Live ownership document and sync lock |
 | COL-OWN-004 | 6 | Enforced ownership through a server plugin (optional) |

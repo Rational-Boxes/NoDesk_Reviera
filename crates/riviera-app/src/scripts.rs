@@ -324,6 +324,7 @@ impl HostCommand for PluginRun {
 #[serde(deny_unknown_fields)]
 pub struct ImportParams {
     /// A `.lua` script, or a plugin folder (holding `plugin.lua`).
+    #[schemars(extend("x-riviera-file" = "read_any"))]
     pub path: PathBuf,
     /// Replace one of the same name.
     #[serde(default)]

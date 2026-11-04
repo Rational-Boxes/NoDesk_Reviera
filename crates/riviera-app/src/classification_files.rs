@@ -142,6 +142,7 @@ impl HostCommand for ClassificationLoad {
 #[serde(deny_unknown_fields)]
 pub struct KeynotesParams {
     /// A tab-separated keynote file (`key`, `text`, `parent_key`).
+    #[schemars(extend("x-riviera-file" = "read"))]
     pub path: String,
 }
 

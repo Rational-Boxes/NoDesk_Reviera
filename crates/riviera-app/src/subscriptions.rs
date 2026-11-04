@@ -390,6 +390,7 @@ pub struct AddParams {
     pub key: String,
     pub secret: Option<String>,
     /// An extra CA certificate: PEM text or the path of a PEM file.
+    #[schemars(extend("x-riviera-file" = "read"))]
     pub ca: Option<String>,
     /// The SHA-256 of the service's certificate (hex).
     pub pin: Option<String>,
@@ -486,6 +487,7 @@ pub struct SetParams {
     /// A new secret: it replaces the stored one, which is never shown.
     pub secret: Option<String>,
     /// An extra CA certificate (PEM text or a file path); empty removes it.
+    #[schemars(extend("x-riviera-file" = "read"))]
     pub ca: Option<String>,
     /// The certificate's SHA-256 pin; empty removes it.
     pub pin: Option<String>,
