@@ -4006,6 +4006,36 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 
 *Built (2026-11-04):* in `elevator.check`. Not yet: pane sizes against the glass's largest pane when a type is edited, IBC 2409.3 vision-panel areas, and the exterior-shaft thermal check.
 
+### 3.7a.18 Elevator up-peak traffic
+**ID:** ARC-VT-018 · **Priority:** P2 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §9, §12a answer 7; research/16 I1–I4
+
+**Purpose.** Say whether a group of elevators moves its building's people fast enough in the morning peak.
+
+**Behaviour & rules.**
+- **`elevator.traffic`** takes a `building_use` (office, residential, hotel, hospital, clinic), and optionally the `elevators` of one group, the `population` above the lobby, the floor `area_per_person`, and the coefficients. Without `elevators`, each group is the passenger elevators serving the same levels at the same speed with the same car.
+- For each group, from the lowest level served (the lobby): N floors above it; the average floor height; the slowest car's speed; persons by mass (the car's) and by area (car area over the use's area per passenger: 0.21 m² offices, 0.3 m² hotels and homes, 0.4 m² healthcare); P = loading (80 %) × the lesser; S = N·(1 − (1 − 1/N)^P) probable stops; H = N − Σ (i/N)^P the highest reversal floor; RTT = 2·H·t_v + (S + 1)·t_s + 2·P·t_p (t_s 10 s, t_p 1.2 s); interval = RTT / L; HC5 = 300·P·L / RTT; handling = HC5 / population; average waiting 65–85 % of the interval.
+- **Population**: as given, or for offices the floors' area on the levels served above the lobby over 10 m² a person (gross area, noted). Other uses need it given.
+- **Targets** (the pack's `traffic`): office ≤ 30 s and ≥ 12 %; residential ≤ 60 s, ≥ 6 %; hotel ≤ 40 s, ≥ 12 %; hospital ≤ 35 s, ≥ 15 %; clinic ≤ 40 s, ≥ 15 %. Where another group serves some of the same floors, the handling target is 120 % of the use's (migration). Each group reports whether it meets both, and notes when persons by area are fewer than by mass.
+- The coefficients and targets are advisory (the relations' primary source is still unread; E-89).
+
+**Acceptance criteria.**
+- [x] Four 3500 lb cars at 1.0 m/s over ten 3.5 m office floors miss the 30 s interval; the figures satisfy interval = RTT / 4 and HC5 = 300·P·4 / RTT; the population is estimated from the floors; a residential check without a population is refused; a second group sharing floors raises both groups' handling targets to 14.4 %.
+
+*Built (2026-11-04):* `reviera_core::traffic`, and Architecture › Circulation › Elevator Traffic; the sample *Elevator traffic in an office tower*. Not yet: lunchtime and two-way traffic and destination dispatch (a simulation, a compute-job provider; Question 7), zoned and sky-lobby banks, express zones, the absenteeism and stair allowances, and counting evacuation lifts in egress (§9).
+
+### 3.7a.19 Escalator and walk capacity against demand
+**ID:** ARC-VT-019 · **Priority:** P2 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §9; research/16 E2, I4
+
+**Purpose.** Say whether the escalators and walks each way carry the peak, with one out of service.
+
+**Behaviour & rules.**
+- **`escalator.traffic`** takes the units carrying people `up` and `down` and each direction's peak `demand` (persons an hour). Each direction's capacity is the sum of its units' practical capacity (ARC-VT-010); with `one_out` (default) the largest unit is out of service. It reports the capacity, the capacity with one out, the utilisation of the capacity counted, and whether the demand is met; a direction left with no unit notes that its demand falls to the stairs.
+
+**Acceptance criteria.**
+- [x] One escalator each way at about 6000 persons an hour carries 3000 up at 50 %; with one out each way nothing is left, and both directions are noted.
+
+*Built (2026-11-04):* `escalator.traffic`. Not yet: a window dialog, the transit packs (unit counts from flows, NFPA 130 egress credit; plan §6), reversing a unit to cover the one out, and the airport and transit context.
+
 ---
 
 ## 3.8 Openings
@@ -6353,6 +6383,8 @@ All commands below are registered once in the command registry and exposed autom
 | `stairlift.list` | — | [{stairlift, name, sizes, stair, side}] | No (query) | ARC-VT-013 |
 | `stairlift.delete` | stairlift | count | Yes | ARC-VT-013 |
 | `stairlift.check` | stairlifts? | finding[] | No (query) | ARC-VT-015 |
+| `elevator.traffic` | building_use?, elevators?, population?, area_per_person?, loading?, stop_time?, transfer_time? | [{elevators, cars, floors, population, passengers, probable_stops, highest_reversal, rtt, interval, hc5, handling, waiting, targets, meets, notes}] | No (query) | ARC-VT-018 |
+| `escalator.traffic` | up, down, demand_up, demand_down?, one_out? | {up, down, one_out, notes} | No (query) | ARC-VT-019 |
 | `enclosure.create` | form, footprint \| host_wall_ids, level_id, params | element_id | Yes | ARC-GLZ-001 |
 | `enclosure.set` | enclosure_id, params | — | Yes | ARC-GLZ-001 |
 | `enclosure.get` | enclosure_id | {form, params, parts} | No (query) | ARC-GLZ-001 |

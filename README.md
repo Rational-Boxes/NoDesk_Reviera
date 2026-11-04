@@ -752,6 +752,13 @@ tools and the datums.
   notes IBC 2409's fire-rated glazing for glass hoistways over two levels. Not built yet: glazed
   fronts and glass landing doors, partially enclosed hoistways and their guard heights,
   counterweight screens, solar gain of exterior shafts.
+- **Elevator traffic** (ARC-VT-018/019): Architecture › Circulation › Elevator Traffic gives each
+  group of elevators' up-peak round trip, interval, handling capacity in 5 minutes and waiting
+  time against the targets for the building's use (office 30 s and 12 %, hotel, residential,
+  hospital, clinic), with the population given or estimated from the floors; `escalator.traffic`
+  compares escalators' and walks' capacity each way with the peak demand, one unit out. Planning
+  check only (coefficients flagged for review). Not built yet: lunchtime and two-way simulation,
+  zoned banks, lifts and escalators in egress, the transit context.
 - **Stairlifts and platform stairlifts** (ARC-VT-013…015): Architecture › Circulation › Stairlift
   puts a seated stairlift or a wheelchair platform lift (`IfcTransportElement` USERDEFINED
   STAIRLIFT or INCLINEDPLATFORMLIFT) on one side of the selected stair, its rail following the
@@ -1801,6 +1808,9 @@ sample:
   panoramic car glazed at the rear and sides in a glass hoistway, a rear-glazed car in a walled
   hoistway, and a glass hydraulic lift to the mezzanine; Check Elevators gives one note (the
   glass hoistway's fire-rated glazing).
+- **Elevator traffic in an office tower** (`traffic.ifc`): eleven storeys with a bank of four
+  cars at 1.0 m/s that misses the office up-peak targets, a bank of six at 2.5 m/s that meets
+  them for its population, and an escalator pair checked against its peak.
 - **Editing tools** (`modify_tools.ifc`): every Modify tab tool's result side by side, from align,
   mirror and the arrays to trim/extend, split and pinning, a component created and placed
   again, and a layered wall's parts divided, merged and excluded.

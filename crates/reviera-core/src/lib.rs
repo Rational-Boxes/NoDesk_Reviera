@@ -50,6 +50,7 @@ pub mod escalators;
 pub mod enclosures;
 pub mod grab_bars;
 pub mod tiles;
+pub mod traffic;
 pub mod growing;
 pub mod hothouse;
 pub mod merge;

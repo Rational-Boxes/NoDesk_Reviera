@@ -574,6 +574,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(StairliftList),
         registry.add(StairliftDelete),
         registry.add(StairliftCheck),
+        registry.add(ElevatorTraffic),
+        registry.add(EscalatorTraffic),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -7351,4 +7353,32 @@ read_command!(
     Option<crate::stairlifts::CheckParams>,
     Vec<crate::stairlifts::Finding>,
     crate::stairlifts::check
+);
+
+read_command!(
+    ElevatorTraffic,
+    "elevator.traffic",
+    "Up-peak traffic of the elevator groups",
+    "Calculates each group of elevators' up-peak (ARC-VT-018): every group of passenger elevators serving the \
+     same levels at the same speed with the same car, or the `elevators` given as one group, from the lowest level served. Average passengers \
+     (the pack's loading × the lesser of persons by mass and by car area for the `building_use`), probable \
+     stops, highest reversal floor, round-trip time, average interval, handling capacity per 5 minutes and as \
+     a share of the `population` (estimated from the floors served for offices when omitted), average waiting \
+     time, and whether the use's targets are met (more where another group serves the same floors). Every \
+     coefficient can be given; the defaults are the pack's and flagged for expert review.",
+    Option<crate::traffic::TrafficParams>,
+    Vec<crate::traffic::Group>,
+    crate::traffic::elevator_traffic
+);
+
+read_command!(
+    EscalatorTraffic,
+    "escalator.traffic",
+    "Escalator and walk capacity against a demand",
+    "Compares the practical capacity of the escalators and walks carrying people `up` and `down` with each \
+     direction's peak `demand` in persons an hour (ARC-VT-019), by default with the largest unit each way out \
+     of service (`one_out`).",
+    crate::traffic::EscalatorTrafficParams,
+    crate::traffic::EscalatorTraffic,
+    crate::traffic::escalator_traffic
 );

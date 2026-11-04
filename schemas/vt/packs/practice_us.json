@@ -707,5 +707,52 @@
     "glass_density": 2.5,
     "source": "S1509 S1678 S2401 S2402",
     "confidence": "secondary"
+  },
+  "traffic": {
+    "id": "Up-peak (textbook relations; NRC CBD-190, VA, EMSD, CIBSE/ISO 8100-32 car loading)",
+    "description": "Round-trip time 2·H·t_v + (S + 1)·t_s + 2·P·t_p; interval RTT / L; handling 300·P·L / RTT a 5 minutes. Targets: office ≤ 30 s and ≥ 12 %; residential ≤ 60 s and ≥ 6 %; hotel ≤ 40 s and ≥ 12 %; hospital ≤ 35 s and ≥ 15 %; clinic ≤ 40 s and ≥ 15 %. Car loading 80 % of the persons by area (0.21 m² a passenger in offices, 0.3 in hotels and homes, 0.4 in healthcare). Groups serving the same floors need 120 %.",
+    "targets": [
+      {
+        "use": "office",
+        "interval": 30,
+        "handling": 0.12,
+        "car_area_per_person": 0.21,
+        "floor_area_per_person": 10
+      },
+      {
+        "use": "residential",
+        "interval": 60,
+        "handling": 0.06,
+        "car_area_per_person": 0.3
+      },
+      {
+        "use": "hotel",
+        "interval": 40,
+        "handling": 0.12,
+        "car_area_per_person": 0.3
+      },
+      {
+        "use": "hospital",
+        "interval": 35,
+        "handling": 0.15,
+        "car_area_per_person": 0.4
+      },
+      {
+        "use": "clinic",
+        "interval": 40,
+        "handling": 0.15,
+        "car_area_per_person": 0.4
+      }
+    ],
+    "loading": 0.8,
+    "stop_time": 10,
+    "transfer_time": 1.2,
+    "overlap": 1.2,
+    "waiting": [
+      0.65,
+      0.85
+    ],
+    "source": "S1521 S1522 S1552 S1656 S1658",
+    "confidence": "advisory"
   }
 }

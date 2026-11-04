@@ -816,6 +816,12 @@ icon = "escalator_check"
 help = "Check escalators and moving walks under the rule packs in use: inclination, speed, flat steps and step width; pick a finding to select and frame it. Check Clearances lists what stands in their headroom, side clearance and landing zones (ARC-VT-012)"
 
 [[action]]
+id = "ui.elevator_traffic"
+label = "Elevator Traffic"
+icon = "elevator_traffic"
+help = "Up-peak traffic of each group of elevators: round trip, interval, handling capacity in 5 minutes and waiting time, against the targets for the building's use, with the population given or estimated from the floors (ARC-VT-018)"
+
+[[action]]
 id = "ui.stairlift"
 label = "Stairlift"
 icon = "stairlift"
@@ -3575,6 +3581,7 @@ tools = [
   { action = "deck.create", size = "large" },
   { action = "ui.elevator", size = "large" },
   { action = "elevator.check", size = "small" },
+  { action = "ui.elevator_traffic", size = "small" },
   { action = "ui.escalator", size = "large" },
   { action = "escalator.check", size = "small" },
   { action = "ui.stairlift", size = "large" },
@@ -4771,7 +4778,7 @@ items = [
   "room.place", "room.place_automatically", "-",
   "roof.create_extrusion", "slabedge.create", "enclosure.create", "roof.create_geodesic", "growing.layout", "growing.lights", "-",
   "ui.place_bathroom_component", "ui.bathroom_layout", "ui.toilet_core", "ui.locker_room", "ui.sauna", "ui.steam_room", "ui.tiles", "ui.shower_falls", "ui.waterproofing", "ui.make_product", "ui.swap_for_product", "ui.product_documents", "bath.place_grab_bars", "bath.check", "ui.fixture_count", "-",
-  "ui.elevator", "elevator.check", "ui.escalator", "escalator.check", "ui.stairlift", "stairlift.check", "-",
+  "ui.elevator", "elevator.check", "ui.elevator_traffic", "ui.escalator", "escalator.check", "ui.stairlift", "stairlift.check", "-",
   "opening.create_wall", "opening.create_vertical", "opening.create_by_face", "opening.create_shaft", "-",
   "grid.create", "level.create", "refplane.create", "modelline.create", "-",
   "workplane.set", "workplane.show",

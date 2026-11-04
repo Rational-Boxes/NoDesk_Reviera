@@ -15,6 +15,7 @@ serves. <b>Check Elevators</b> then says which rule a car breaks. The sample
   <a href="#services">Controller, machine space and power</a>
   <a href="#schedule">Elevator schedule</a>
   <a href="#glass">Panoramic cars and glass hoistways</a>
+  <a href="#traffic">Elevator traffic</a>
   <a href="#zones">Hoistway and landing zones</a>
   <a href="#check">Check Elevators</a>
   <a href="#packs">Rule packs</a>
@@ -105,6 +106,25 @@ current and heat.</p>
   <li>Under the IBC, Check Elevators notes a glass hoistway serving more than two levels: glass in
   a rated hoistway must be fire-rated glazing, unless the authority accepts the elevator
   unenclosed, as in an atrium.</li>
+</ul>
+
+<h2 id="traffic">Elevator traffic</h2>
+<p><b>Architecture › Circulation › Elevator Traffic</b> checks whether each group of elevators
+moves the building's people fast enough in the morning peak. A group is the passenger elevators
+serving the same levels at the same speed with the same car. The sample
+<a href="reviera:sample/traffic">Elevator traffic in an office tower</a> shows one bank that
+misses the targets and one that meets them.</p>
+<ul>
+  <li>Choose the building's use, and give the people above the lobby; for offices it can be
+  estimated from the floors served at 10 m² a person.</li>
+  <li>Each car carries 80 % of its persons on average, the lesser of its load's persons and its
+  floor area's (0.21 m² a passenger in offices, 0.3 in hotels and homes, 0.4 in healthcare).</li>
+  <li>The report gives the round trip, the interval between cars, the people moved in 5 minutes as
+  a share of the population, and the average wait, against the use's targets (offices: 30 s and
+  12 %). Where two groups serve the same floors, each needs 120 % of the target.</li>
+  <li>It is a planning check with the textbook up-peak relations: the coefficients are flagged for
+  expert review, and lunchtime or two-way traffic needs a simulation. Escalators' capacity against
+  a demand, with one unit out, is <code>escalator.traffic</code> (no dialog yet).</li>
 </ul>
 
 <h2 id="zones">Hoistway and landing zones</h2>

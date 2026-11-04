@@ -152,6 +152,19 @@
     ]
   },
   {
+    "name": "traffic",
+    "title": "Elevator traffic in an office tower",
+    "group": "Architecture",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "traffic.lua"
+        }
+      }
+    ]
+  },
+  {
     "name": "escalators",
     "title": "Escalators and moving walks in a department store",
     "group": "Architecture",

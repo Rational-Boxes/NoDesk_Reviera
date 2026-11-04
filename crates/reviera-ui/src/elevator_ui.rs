@@ -399,4 +399,66 @@ impl Gui {
         self.zoom_to_fit();
         frame.set_status_text(&format!("{} — {} ({}, {})", f["rule"].as_str().unwrap_or_default(), f["description"].as_str().unwrap_or_default(), f["edition"].as_str().unwrap_or_default(), f["source"].as_str().unwrap_or_default()), 0);
     }
+
+    /// Architecture › Circulation › Elevator Traffic (ARC-VT-018): each group's up-peak against
+    /// the targets for the building's use.
+    pub(crate) fn elevator_traffic(&mut self) {
+        let frame = self.frame;
+        let uses = ["office", "residential", "hotel", "hospital", "clinic"];
+        let f = super::reinforcement_ui::Form::new(&frame, "Elevator Traffic");
+        let usage = f.choice("Use", &["Office".to_owned(), "Residential".to_owned(), "Hotel".to_owned(), "Hospital".to_owned(), "Outpatient clinic".to_owned()], 0);
+        let population = f.text("People above the lobby", "", "Empty: estimated from the floors served (offices only)");
+        let area = f.text("Floor area per person (m²)", "", "Empty: the rule pack's (10 m² for offices)");
+        let ok = f.show("Each group is the passenger elevators serving the same levels at the same speed with the same car. The up-peak is a planning check; its coefficients are flagged for expert review.", "Calculate");
+        let building_use = uses[usage.get_selection().unwrap_or(0) as usize];
+        let mut args = json!({ "building_use": building_use });
+        if let Ok(n) = population.get_value().trim().parse::<f64>() {
+            args["population"] = json!(n);
+        }
+        if let Ok(a) = area.get_value().trim().parse::<f64>() {
+            args["area_per_person"] = json!(a);
+        }
+        f.dialog.destroy();
+        if !ok {
+            return;
+        }
+        let groups = match self.run("elevator.traffic", args) {
+            Ok(v) => v.as_array().cloned().unwrap_or_default(),
+            Err(e) => return error(&frame, &format!("The traffic was not calculated:\n{e}")),
+        };
+        if groups.is_empty() {
+            return error(&frame, "There are no passenger elevators serving two levels or more.");
+        }
+        let n = |v: &Value| v.as_f64().unwrap_or(0.0);
+        let text: Vec<String> = groups
+            .iter()
+            .enumerate()
+            .map(|(k, g)| {
+                format!(
+                    "Group {}: {} car(s), {} floors above the lobby, {:.1} m/s\n  {:.0} people{}; {:.1} passengers a trip ({} by load, {} by area)\n  round trip {:.0} s, interval {:.1} s (target {:.0} s), waiting about {:.0}–{:.0} s\n  {:.0} people in 5 minutes = {:.1} % (target {:.1} %): {}{}",
+                    k + 1,
+                    g["cars"],
+                    g["floors"],
+                    n(&g["speed"]),
+                    n(&g["population"]),
+                    if g["estimated"] == true { " (estimated)" } else { "" },
+                    n(&g["passengers"]),
+                    g["persons_by_mass"],
+                    g["persons_by_area"],
+                    n(&g["rtt"]),
+                    n(&g["interval"]),
+                    n(&g["target_interval"]),
+                    n(&g["waiting"][0]),
+                    n(&g["waiting"][1]),
+                    n(&g["hc5"]),
+                    n(&g["handling"]) * 100.0,
+                    n(&g["target_handling"]) * 100.0,
+                    if g["meets"] == true { "meets the targets" } else { "does not meet the targets" },
+                    g["notes"].as_array().map(|a| a.iter().filter_map(Value::as_str).map(|s| format!("\n  note: {s}")).collect::<String>()).unwrap_or_default(),
+                )
+            })
+            .collect();
+        let d = MessageDialog::builder(&frame, &text.join("\n\n"), "Elevator Traffic").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build();
+        d.show_modal();
+    }
 }

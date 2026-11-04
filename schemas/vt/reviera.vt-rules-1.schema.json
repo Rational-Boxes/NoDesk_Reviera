@@ -1547,6 +1547,111 @@
           "$ref": "#/$defs/confidence"
         }
       }
+    },
+    "traffic": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Traffic targets by building use and the up-peak coefficients (ARC-VT-018).",
+      "required": [
+        "id",
+        "targets",
+        "loading",
+        "stop_time",
+        "transfer_time",
+        "overlap",
+        "waiting",
+        "source",
+        "confidence"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "targets": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "use",
+              "interval",
+              "handling",
+              "car_area_per_person"
+            ],
+            "properties": {
+              "use": {
+                "enum": [
+                  "office",
+                  "residential",
+                  "hotel",
+                  "hospital",
+                  "clinic"
+                ]
+              },
+              "interval": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "The longest average interval (s)."
+              },
+              "handling": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "The least handling capacity: a fraction of the population in the peak 5 minutes."
+              },
+              "car_area_per_person": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Car floor area per passenger (m²)."
+              },
+              "floor_area_per_person": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "Floor area per person, to estimate a population (m²)."
+              }
+            }
+          }
+        },
+        "loading": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Average car load as a fraction of its persons."
+        },
+        "stop_time": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Time per stop (s)."
+        },
+        "transfer_time": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Passenger transfer time each way (s)."
+        },
+        "overlap": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "The handling a group needs where another serves the same floors, as a multiple."
+        },
+        "waiting": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "Average waiting time as a fraction of the interval, low and high."
+        },
+        "source": {
+          "$ref": "#/$defs/source"
+        },
+        "confidence": {
+          "$ref": "#/$defs/confidence"
+        }
+      }
     }
   },
   "$defs": {

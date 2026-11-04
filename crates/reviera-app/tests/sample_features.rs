@@ -1065,6 +1065,25 @@ fn the_panoramic_sample_keeps_its_glass_cars_and_hoistways() {
 }
 
 #[test]
+fn the_traffic_sample_has_a_slow_bank_and_a_fast_one() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "traffic");
+    // Two groups by speed: four cars at 1.0 m/s and six at 2.5 m/s, both over ten floors.
+    let groups = ok(&mut app, "elevator.traffic", json!({}));
+    let mut seen: Vec<(u64, f64)> = groups.as_array().unwrap().iter().map(|g| (g["cars"].as_u64().unwrap(), f(&g["speed"]))).collect();
+    seen.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    assert_eq!(seen, [(4, 1.0), (6, 2.5)]);
+    // Sharing floors, both need 120 % of 12 %; the slow bank's interval is over 30 s.
+    let slow = groups.as_array().unwrap().iter().find(|g| g["cars"] == 4).unwrap();
+    assert!(f(&slow["interval"]) > 30.0 && (f(&slow["target_handling"]) - 0.144).abs() < 1e-9, "{slow:#}");
+    // The fast bank alone, for 1,200 people, meets the office targets.
+    let fast: Vec<Value> = groups.as_array().unwrap().iter().find(|g| g["cars"] == 6).unwrap()["elevators"].as_array().unwrap().clone();
+    let b = ok(&mut app, "elevator.traffic", json!({ "elevators": fast, "population": 1200 }));
+    assert_eq!(b[0]["meets"], true, "{b:#}");
+    assert_eq!(ok(&mut app, "clearance.check", json!({})), json!([]));
+}
+
+#[test]
 fn the_escalators_sample_keeps_its_units_and_openings() {
     let work = tempfile::tempdir().unwrap();
     let mut app = open(work.path(), "escalators");

@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Reviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Reviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 881 numbered requirements (320 P0 · 341 P1 · 213 P2 · 7 P3), 2,324 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 883 numbered requirements (320 P0 · 341 P1 · 215 P2 · 7 P3), 2,326 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,324 commands; 881 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,326 commands; 883 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -14230,6 +14230,36 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 
 *Built (2026-11-04):* in `elevator.check`. Not yet: pane sizes against the glass's largest pane when a type is edited, IBC 2409.3 vision-panel areas, and the exterior-shaft thermal check.
 
+### 3.7a.18 Elevator up-peak traffic
+**ID:** ARC-VT-018 · **Priority:** P2 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §9, §12a answer 7; research/16 I1–I4
+
+**Purpose.** Say whether a group of elevators moves its building's people fast enough in the morning peak.
+
+**Behaviour & rules.**
+- **`elevator.traffic`** takes a `building_use` (office, residential, hotel, hospital, clinic), and optionally the `elevators` of one group, the `population` above the lobby, the floor `area_per_person`, and the coefficients. Without `elevators`, each group is the passenger elevators serving the same levels at the same speed with the same car.
+- For each group, from the lowest level served (the lobby): N floors above it; the average floor height; the slowest car's speed; persons by mass (the car's) and by area (car area over the use's area per passenger: 0.21 m² offices, 0.3 m² hotels and homes, 0.4 m² healthcare); P = loading (80 %) × the lesser; S = N·(1 − (1 − 1/N)^P) probable stops; H = N − Σ (i/N)^P the highest reversal floor; RTT = 2·H·t_v + (S + 1)·t_s + 2·P·t_p (t_s 10 s, t_p 1.2 s); interval = RTT / L; HC5 = 300·P·L / RTT; handling = HC5 / population; average waiting 65–85 % of the interval.
+- **Population**: as given, or for offices the floors' area on the levels served above the lobby over 10 m² a person (gross area, noted). Other uses need it given.
+- **Targets** (the pack's `traffic`): office ≤ 30 s and ≥ 12 %; residential ≤ 60 s, ≥ 6 %; hotel ≤ 40 s, ≥ 12 %; hospital ≤ 35 s, ≥ 15 %; clinic ≤ 40 s, ≥ 15 %. Where another group serves some of the same floors, the handling target is 120 % of the use's (migration). Each group reports whether it meets both, and notes when persons by area are fewer than by mass.
+- The coefficients and targets are advisory (the relations' primary source is still unread; E-89).
+
+**Acceptance criteria.**
+- [x] Four 3500 lb cars at 1.0 m/s over ten 3.5 m office floors miss the 30 s interval; the figures satisfy interval = RTT / 4 and HC5 = 300·P·4 / RTT; the population is estimated from the floors; a residential check without a population is refused; a second group sharing floors raises both groups' handling targets to 14.4 %.
+
+*Built (2026-11-04):* `reviera_core::traffic`, and Architecture › Circulation › Elevator Traffic; the sample *Elevator traffic in an office tower*. Not yet: lunchtime and two-way traffic and destination dispatch (a simulation, a compute-job provider; Question 7), zoned and sky-lobby banks, express zones, the absenteeism and stair allowances, and counting evacuation lifts in egress (§9).
+
+### 3.7a.19 Escalator and walk capacity against demand
+**ID:** ARC-VT-019 · **Priority:** P2 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §9; research/16 E2, I4
+
+**Purpose.** Say whether the escalators and walks each way carry the peak, with one out of service.
+
+**Behaviour & rules.**
+- **`escalator.traffic`** takes the units carrying people `up` and `down` and each direction's peak `demand` (persons an hour). Each direction's capacity is the sum of its units' practical capacity (ARC-VT-010); with `one_out` (default) the largest unit is out of service. It reports the capacity, the capacity with one out, the utilisation of the capacity counted, and whether the demand is met; a direction left with no unit notes that its demand falls to the stairs.
+
+**Acceptance criteria.**
+- [x] One escalator each way at about 6000 persons an hour carries 3000 up at 50 %; with one out each way nothing is left, and both directions are noted.
+
+*Built (2026-11-04):* `escalator.traffic`. Not yet: a window dialog, the transit packs (unit counts from flows, NFPA 130 egress credit; plan §6), reversing a unit to cover the one out, and the airport and transit context.
+
 ---
 
 ## 3.8 Openings
@@ -16577,6 +16607,8 @@ All commands below are registered once in the command registry and exposed autom
 | `stairlift.list` | — | [{stairlift, name, sizes, stair, side}] | No (query) | ARC-VT-013 |
 | `stairlift.delete` | stairlift | count | Yes | ARC-VT-013 |
 | `stairlift.check` | stairlifts? | finding[] | No (query) | ARC-VT-015 |
+| `elevator.traffic` | building_use?, elevators?, population?, area_per_person?, loading?, stop_time?, transfer_time? | [{elevators, cars, floors, population, passengers, probable_stops, highest_reversal, rtt, interval, hc5, handling, waiting, targets, meets, notes}] | No (query) | ARC-VT-018 |
+| `escalator.traffic` | up, down, demand_up, demand_down?, one_out? | {up, down, one_out, notes} | No (query) | ARC-VT-019 |
 | `enclosure.create` | form, footprint \| host_wall_ids, level_id, params | element_id | Yes | ARC-GLZ-001 |
 | `enclosure.set` | enclosure_id, params | — | Yes | ARC-GLZ-001 |
 | `enclosure.get` | enclosure_id | {form, params, parts} | No (query) | ARC-GLZ-001 |
@@ -29744,14 +29776,14 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 39 | 8 | 0 | 123 |
 | DM | 91 | 65 | 34 | 3 | 193 |
-| ARC | 77 | 101 | 25 | 1 | 204 |
+| ARC | 77 | 101 | 27 | 1 | 206 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 28 | 0 | 29 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
 | COL | 8 | 50 | 12 | 1 | 71 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **341** | **213** | **7** | **881** |
+| **Total** | **320** | **341** | **215** | **7** | **883** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -29951,7 +29983,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2324 unique commands** in 434 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2326 unique commands** in 434 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -30075,7 +30107,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `electrical_settings` | 2 |
 | `element` | 39 |
 | `elevationmarker` | 1 |
-| `elevator` | 5 |
+| `elevator` | 6 |
 | `embodied_carbon` | 5 |
 | `enclosure` | 16 |
 | `energy_location` | 1 |
@@ -30083,7 +30115,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `energy_settings` | 3 |
 | `equipment_load` | 1 |
 | `equipment_set` | 1 |
-| `escalator` | 5 |
+| `escalator` | 6 |
 | `export` | 25 |
 | `external_props` | 2 |
 | `fabric_area` | 1 |
@@ -30981,6 +31013,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `elevator.delete` | 3 | elevator | count | Yes | ARC-VT-002 |
 | `elevator.list` | 3 | — | [{elevator, name, levels, sizes, members}] | No (query) | ARC-VT-002 |
 | `elevator.size` | 3 | kind?, class?, load?, speed?, drive?, door?, car_width?, car_depth?, car_height?, door_width?, door_height?, storeys?, car_glass?, space_below? | {kind, class, load, persons, speed, drive, door, car, door_size, entrance, sill, hoistway, pit, overhead, sizing_pack, glazing, power, notes} | No (query) | ARC-VT-002, ARC-VT-016 |
+| `elevator.traffic` | 3 | building_use?, elevators?, population?, area_per_person?, loading?, stop_time?, transfer_time? | [{elevators, cars, floors, population, passengers, probable_stops, highest_reversal, rtt, interval, hc5, handling, waiting, targets, meets, notes}] | No (query) | ARC-VT-018 |
 | `embodied_carbon.compare` | 4 | job_id_a, job_id_b | report | No | ANA-CARB-001 |
 | `embodied_carbon.export` | 4 | job_id, path, format: "csv"\ | "json"\ | "html" | — |
 | `embodied_carbon.import_factors` | 4 | path, format: "ilcd"\ | "csv" | library_id | Yes |
@@ -31017,6 +31050,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `escalator.delete` | 3 | escalator | count | Yes | ARC-VT-010 |
 | `escalator.list` | 3 | — | [{escalator, name, sizes, levels, openings}] | No (query) | ARC-VT-010 |
 | `escalator.size` | 3 | kind?, rise?, length?, step_width?, inclination?, speed?, flat_steps?, duty?, pit? | {kind, rise, inclination, step_width, speed, flat_steps, handrail_centres, handrail_outer, truss_width, truss_depth, pit_depth, lower_end, run, upper_end, capacity, motor_kw, reactions, intermediate_support, sizing_pack, notes} | No (query) | ARC-VT-010 |
+| `escalator.traffic` | 3 | up, down, demand_up, demand_down?, one_out? | {up, down, one_out, notes} | No (query) | ARC-VT-019 |
 | `export.animation` | 5 | view_id, kind: walkthrough\ | solar_study, path, frames?, fps?, size, style?, format: images\ | webm\ | mp4 |
 | `export.batch` | 2 | set_name \ | set | report | No |
 | `export.cad_setup_load_layer_standard` | 5 | setup_id, standard | () | Yes | DOC-OUT-005 |

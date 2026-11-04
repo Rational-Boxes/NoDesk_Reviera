@@ -516,6 +516,8 @@ pub struct Pack {
     pub glass: Option<crate::panoramic::Rules>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub glass_sizing: Option<crate::panoramic::Sizing>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub traffic: Option<crate::traffic::Rules>,
 }
 
 fn validator() -> &'static jsonschema::Validator {
@@ -1885,6 +1887,7 @@ mod tests {
                 .chain(p.stairlift.as_ref().map(|f| &f.source))
                 .chain(p.glass.as_ref().map(|f| &f.source))
                 .chain(p.glass_sizing.as_ref().map(|f| &f.source))
+                .chain(p.traffic.as_ref().map(|f| &f.source))
                 .chain(p.stairlift_sizing.iter().flat_map(|f| std::iter::once(&f.source).chain(std::iter::once(&f.seated.source)).chain(f.platforms.iter().map(|x| &x.source))));
             for s in sources.into_iter().flatten().chain(more).flat_map(|s| s.split(' ')) {
                 assert!(register.contains(&format!("| {s} |")), "{}: {s} is not in the register", p.id);

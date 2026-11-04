@@ -19,8 +19,12 @@ are `stairlift.create` (with a `kind`) rather than §5's `stairlift.place` and
 `platform_stairlift.place`, matching `elevator.create` and `escalator.create`; then step 7:
 panoramic cars and glass hoistways (ARC-VT-016) and the glass checks (ARC-VT-017), with the
 sample *Panoramic lifts in a hotel atrium*, as `car_glass` and `hoistway` options of
-`elevator.create` rather than a separate `elevator.panoramic` (banks wait for ARC-GRP-004). What
-is left is listed under each requirement's *Not yet*.
+`elevator.create` rather than a separate `elevator.panoramic` (banks wait for ARC-GRP-004); then
+step 8: elevator up-peak traffic (ARC-VT-018) and escalator capacity against demand with one unit
+out (ARC-VT-019), with the sample *Elevator traffic in an office tower*. This completes the first
+build's steps 1–8, except the egress modes and the airport and transit context, which are listed
+as *Not yet*; the owner's next priority is FileEngine support (2026-11-04). What is left is
+listed under each requirement's *Not yet*.
 **Owner's requests:**
 - 2026-11-01: "Elevators, both passenger and freight." and "For elevators include ornamental
   version like glass enclosed."
