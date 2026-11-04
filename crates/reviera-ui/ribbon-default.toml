@@ -816,6 +816,18 @@ icon = "escalator_check"
 help = "Check escalators and moving walks under the rule packs in use: inclination, speed, flat steps and step width; pick a finding to select and frame it. Check Clearances lists what stands in their headroom, side clearance and landing zones (ARC-VT-012)"
 
 [[action]]
+id = "ui.stairlift"
+label = "Stairlift"
+icon = "stairlift"
+help = "A seated stairlift or a wheelchair platform lift on one side of the selected stair, sized under the vertical-transport rule packs in use, with its rail along the flight and the unit parked at the bottom (ARC-VT-013)"
+
+[[action]]
+id = "stairlift.check"
+label = "Check Stairlifts"
+icon = "stairlift_check"
+help = "Check stairlifts and their stairs under the rule packs in use: the width left beside the folded unit, exit enclosures, platform size and speed, and the generic model's limits; pick a finding to select and frame it. Check Clearances lists what stands in their running envelopes, head boxes and landings (ARC-VT-015)"
+
+[[action]]
 id = "ui.toilet_core"
 label = "Toilet Core"
 icon = "bathroom_layout"
@@ -3565,6 +3577,8 @@ tools = [
   { action = "elevator.check", size = "small" },
   { action = "ui.escalator", size = "large" },
   { action = "escalator.check", size = "small" },
+  { action = "ui.stairlift", size = "large" },
+  { action = "stairlift.check", size = "small" },
 ]
 
 [[tab.panel]]
@@ -4757,7 +4771,7 @@ items = [
   "room.place", "room.place_automatically", "-",
   "roof.create_extrusion", "slabedge.create", "enclosure.create", "roof.create_geodesic", "growing.layout", "growing.lights", "-",
   "ui.place_bathroom_component", "ui.bathroom_layout", "ui.toilet_core", "ui.locker_room", "ui.sauna", "ui.steam_room", "ui.tiles", "ui.shower_falls", "ui.waterproofing", "ui.make_product", "ui.swap_for_product", "ui.product_documents", "bath.place_grab_bars", "bath.check", "ui.fixture_count", "-",
-  "ui.elevator", "elevator.check", "ui.escalator", "escalator.check", "-",
+  "ui.elevator", "elevator.check", "ui.escalator", "escalator.check", "ui.stairlift", "stairlift.check", "-",
   "opening.create_wall", "opening.create_vertical", "opening.create_by_face", "opening.create_shaft", "-",
   "grid.create", "level.create", "refplane.create", "modelline.create", "-",
   "workplane.set", "workplane.show",

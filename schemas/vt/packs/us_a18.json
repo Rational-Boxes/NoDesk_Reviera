@@ -18,5 +18,13 @@
       "source": "S1574 S1575",
       "confidence": "secondary"
     }
-  ]
+  ],
+  "stairlift": {
+    "id": "ASME A18.1 §3, §4",
+    "description": "Inclined platform lifts and stairway chairlifts: rated speed at most 0.15 m/s (30 fpm); a 1524 mm (60 in) head box above any point of a platform's deck along the run, as makers quote it.",
+    "head_box": 1.524,
+    "max_speed": 0.15,
+    "source": "S1574 S1575 S2460 S2461",
+    "confidence": "secondary"
+  }
 }

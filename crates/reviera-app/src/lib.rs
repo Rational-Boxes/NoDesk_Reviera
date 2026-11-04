@@ -505,6 +505,8 @@ impl App {
                 reviera_core::clearances::ClearanceKind::MachineSpace => [0.95, 0.55, 0.2, 0.2],
                 reviera_core::clearances::ClearanceKind::EscalatorHeadroom => [0.55, 0.35, 0.85, 0.12],
                 reviera_core::clearances::ClearanceKind::EscalatorLanding => [0.2, 0.75, 0.35, 0.22],
+                reviera_core::clearances::ClearanceKind::StairliftRun => [0.85, 0.55, 0.2, 0.14],
+                reviera_core::clearances::ClearanceKind::StairliftLanding => [0.25, 0.7, 0.55, 0.2],
                 reviera_core::clearances::ClearanceKind::Waterproofing => [0.15, 0.45, 0.95, 0.3],
                 _ => [0.1, 0.62, 1.0, 0.22],
             };

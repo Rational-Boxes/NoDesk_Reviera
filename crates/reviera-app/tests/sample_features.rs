@@ -1057,6 +1057,22 @@ fn the_escalators_sample_keeps_its_units_and_openings() {
 }
 
 #[test]
+fn the_stairlifts_sample_keeps_its_lifts_on_their_stairs() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "stairlifts");
+    let list = ok(&mut app, "stairlift.list", json!({}));
+    let mut lifts: Vec<(String, String, Value)> = list.as_array().unwrap().iter().map(|e| (e["kind"].as_str().unwrap().to_owned(), e["family"].as_str().unwrap_or("").to_owned(), e["platform"].clone())).collect();
+    lifts.sort_by(|a, b| (&a.0, &a.1).cmp(&(&b.0, &b.1)));
+    assert_eq!(lifts, [("platform".to_owned(), "curved".to_owned(), json!([0.8, 1.22])), ("platform".to_owned(), "straight".to_owned(), json!([0.8, 1.25])), ("seated".to_owned(), String::new(), Value::Null)]);
+    // Each follows its stair, the stairs keep their widths, and the head boxes clear Level 2.
+    assert_eq!(ok(&mut app, "stairlift.check", json!({})), json!([]));
+    assert_eq!(ok(&mut app, "clearance.check", json!({})), json!([]));
+    // The house's lift is on a dwelling's stair, where 20 in beside the folded seat is enough.
+    let seated = list.as_array().unwrap().iter().find(|e| e["kind"] == "seated").unwrap();
+    assert_eq!(seated["stair_use"], "dwelling");
+}
+
+#[test]
 fn the_washrooms_sample_keeps_its_core_and_lockers() {
     let work = tempfile::tempdir().unwrap();
     let mut app = open(work.path(), "washrooms");

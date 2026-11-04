@@ -152,6 +152,19 @@
     ]
   },
   {
+    "name": "stairlifts",
+    "title": "Stairlifts and platform stairlifts in a parish hall and its house",
+    "group": "Architecture",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "stairlifts.lua"
+        }
+      }
+    ]
+  },
+  {
     "name": "washrooms",
     "title": "Washrooms and a locker room",
     "group": "Architecture",

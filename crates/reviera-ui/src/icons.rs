@@ -1410,6 +1410,14 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "escalator_check" => format!(
             r#"<path d="M3 23h5l10-12h6" fill="none" {s} stroke-width="3"/><path d="M18 22l4 4 7-9" fill="none" {sa} stroke-width="2.5"/>"#
         ),
+        // A stair from the side with a rail along it and a seat parked at its foot.
+        "stairlift" => format!(
+            r#"<path d="M3 28h6v-4h5v-4h5v-4h5v-4h5" fill="none" {s}/><path d="M5 22l22-14" fill="none" {sa} stroke-width="2.5"/><path d="M6 21v-8h4v6" fill="{f}" {s}/>"#
+        ),
+        // A stair and rail with a tick.
+        "stairlift_check" => format!(
+            r#"<path d="M3 28h5v-4h5v-4h5v-4h5" fill="none" {s}/><path d="M4 21l16-11" fill="none" {sa} stroke-width="2.5"/><path d="M18 22l4 4 7-9" fill="none" {sa} stroke-width="2.5"/>"#
+        ),
         // An elevator car with a tick.
         "elevator_check" => format!(
             r#"<rect x="4" y="3" width="18" height="24" fill="none" {s}/><rect x="7" y="8" width="12" height="14" fill="{f}" {s}/><path d="M18 22l4 4 7-9" fill="none" {sa} stroke-width="2.5"/>"#

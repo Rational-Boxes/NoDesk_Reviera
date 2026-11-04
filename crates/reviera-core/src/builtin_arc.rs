@@ -570,6 +570,10 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(EscalatorList),
         registry.add(EscalatorDelete),
         registry.add(EscalatorCheck),
+        registry.add(StairliftCreate),
+        registry.add(StairliftList),
+        registry.add(StairliftDelete),
+        registry.add(StairliftCheck),
     ];
     for r in results {
         r.expect("architecture commands are valid");
@@ -7295,4 +7299,56 @@ read_command!(
     Option<crate::escalators::CheckParams>,
     Vec<crate::escalators::Finding>,
     crate::escalators::check
+);
+
+edit_command!(
+    StairliftCreate,
+    "stairlift.create",
+    "Make a stairlift or platform stairlift on a stair",
+    "Makes a seated stairlift or an inclined wheelchair platform lift on one `side` of a Reviera stair (left or \
+     right going up) (ARC-VT-013), sized from the rule packs in use: one transport element (IfcTransportElement \
+     USERDEFINED STAIRLIFT or INCLINEDPLATFORMLIFT) with its rail along the stair, down to the floor before \
+     the first riser and on past the top nosing, and the unit parked at the bottom. A platform lift takes its \
+     `family` (`straight`, or `curved` for a stair that turns, chosen by default) and a `platform` size from it. \
+     `stair_use` (dwelling, exit or other) and `occupants` choose the width the stair must keep beside the \
+     folded unit; `parks_clear` marks a rail end that parks the unit clear of the stair.",
+    "Stairlift",
+    crate::stairlifts::CreateParams,
+    crate::stairlifts::Created,
+    crate::stairlifts::create
+);
+
+read_command!(
+    StairliftList,
+    "stairlift.list",
+    "List the stairlifts",
+    "Lists the model's stairlifts and platform stairlifts with their stairs and sizes (ARC-VT-013).",
+    Option<crate::elevators::NoParams>,
+    Vec<crate::stairlifts::Listed>,
+    crate::stairlifts::list
+);
+
+edit_command!(
+    StairliftDelete,
+    "stairlift.delete",
+    "Delete a stairlift",
+    "Deletes a stairlift or platform stairlift with its own type (ARC-VT-013). Returns how many elements were deleted.",
+    "Delete Stairlift",
+    crate::stairlifts::StairliftParams,
+    usize,
+    crate::stairlifts::delete
+);
+
+read_command!(
+    StairliftCheck,
+    "stairlift.check",
+    "Check stairlifts and their stairs against the rule packs",
+    "Checks stairlifts and their stairs against the rule packs in use (ARC-VT-015): the width the stair keeps \
+     beside the folded or parked unit (by stair use and occupants), units in exit enclosures, platform size and \
+     speed, and the generic model's incline range, longest straight rail, recommended stair width and \
+     inside-bend width. A finding from a recommended pack or an advisory rule is a note. The running envelope, \
+     head box and landings are checked by `clearance.check`.",
+    Option<crate::stairlifts::CheckParams>,
+    Vec<crate::stairlifts::Finding>,
+    crate::stairlifts::check
 );

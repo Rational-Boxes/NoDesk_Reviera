@@ -5,7 +5,8 @@
 //! levels it serves, then a click in a plan at the middle of its entrance (or a typed point).
 //! Check Elevators (ARC-VT-004) lists `elevator.check`'s findings and selects and frames the
 //! elevator picked. Escalator (ARC-VT-010) and Check Escalators (ARC-VT-012) do the same for
-//! escalators and moving walks.
+//! escalators and moving walks; Stairlift (ARC-VT-013) puts a seated or platform lift on the
+//! selected stair, and Check Stairlifts (ARC-VT-015) lists `stairlift.check`'s findings.
 
 use serde_json::{Value, json};
 use wxdragon::prelude::*;
@@ -288,5 +289,109 @@ impl Gui {
         self.selection_changed();
         self.zoom_to_fit();
         frame.set_status_text(&format!("{} — {} ({})", f["rule"].as_str().unwrap_or_default(), f["edition"].as_str().unwrap_or_default(), f["source"].as_str().unwrap_or_default()), 0);
+    }
+
+    /// Architecture › Circulation › Stairlift (ARC-VT-013): a seated stairlift or a wheelchair
+    /// platform lift on the selected stair.
+    pub(crate) fn place_stairlift(&mut self) {
+        let frame = self.frame;
+        let stair = {
+            let selected = self.selection();
+            let Some(store) = self.doc.and_then(|d| self.app.document(d)).map(|d| d.doc.store()) else {
+                return;
+            };
+            selected.into_iter().find(|id| store.get(*id).is_some_and(|e| reviera_core::stairs::stair_recipe(e).is_some()))
+        };
+        let Some(stair) = stair else {
+            return error(&frame, "Select the stair for the stairlift first.");
+        };
+        let sizes = ["800 × 1250 (straight)", "800 × 1000 (straight)", "750 × 900 (straight)", "725 × 1000 (straight)", "675 × 1000 (straight)", "800 × 1220 (curved)", "800 × 1050 (curved)", "800 × 900 (curved)", "700 × 750 (curved)"];
+        let mut platforms = vec!["The family's largest".to_owned()];
+        platforms.extend(sizes.iter().map(|s| (*s).to_owned()));
+        let f = super::reinforcement_ui::Form::new(&frame, "Stairlift");
+        let kind = f.choice("Kind", &["Seated stairlift".to_owned(), "Wheelchair platform lift".to_owned()], 0);
+        let side = f.choice("Side, going up", &["Left".to_owned(), "Right".to_owned()], 0);
+        let platform = f.choice("Platform (mm)", &platforms, 0);
+        let family = f.choice("Rail", &["Straight, or curved where the stair turns".to_owned(), "Straight".to_owned(), "Curved".to_owned()], 0);
+        let usage = f.choice("Stair", &["Other (keeps its required width)".to_owned(), "In a dwelling (R-3, or within an R-2 unit)".to_owned(), "In an exit enclosure".to_owned()], 0);
+        let occupants = f.text("People served", "", "Fewer than 50 lets a stair keep the smaller required width");
+        let parks = f.choice("Parks", &["At the foot of the stair".to_owned(), "Clear of the stair (hinged or slide-track rail end, or round a corner)".to_owned()], 0);
+        let ok = f.show("Sized under the vertical-transport rule packs in use. Its running envelope, head box and landings show as virtual volumes.", "Place");
+        let stair_use = ["other", "dwelling", "exit"][usage.get_selection().unwrap_or(0) as usize];
+        let mut args = json!({
+            "stair": stair,
+            "side": if side.get_selection() == Some(1) { "right" } else { "left" },
+            "kind": if kind.get_selection() == Some(1) { "platform" } else { "seated" },
+            "stair_use": stair_use,
+            "parks_clear": parks.get_selection() == Some(1),
+        });
+        if let Ok(n) = occupants.get_value().trim().parse::<u32>() {
+            args["occupants"] = json!(n);
+        }
+        if kind.get_selection() == Some(1) {
+            let pick = platform.get_selection().unwrap_or(0) as usize;
+            if let Some(label) = pick.checked_sub(1).and_then(|k| sizes.get(k)) {
+                let mm: Vec<f64> = label.split([' ', '×']).filter_map(|t| t.parse().ok()).collect();
+                args["platform"] = json!([mm[0] / 1000.0, mm[1] / 1000.0]);
+                args["family"] = json!(if label.contains("curved") { "curved" } else { "straight" });
+            } else if let Some(k) = family.get_selection().filter(|k| *k > 0) {
+                args["family"] = json!(if k == 2 { "curved" } else { "straight" });
+            }
+        }
+        f.dialog.destroy();
+        if !ok {
+            return;
+        }
+        let made = match self.run("stairlift.create", args) {
+            Ok(v) => v,
+            Err(e) => return error(&frame, &format!("No stairlift was placed:\n{e}")),
+        };
+        self.refresh_scene(&frame);
+        let found = self.run("stairlift.check", json!({ "stairlifts": [made["stairlift"]] })).ok().and_then(|v| v.as_array().cloned()).unwrap_or_default();
+        let errors = found.iter().filter(|x| x["severity"] == "error").count();
+        let mm = |k: &str| made[k].as_f64().unwrap_or(0.0) * 1000.0;
+        let what = match made["platform"].as_array() {
+            Some(p) => format!("{} platform lift, {:.0} × {:.0} mm", made["family"].as_str().unwrap_or_default(), p[0].as_f64().unwrap_or(0.0) * 1000.0, p[1].as_f64().unwrap_or(0.0) * 1000.0),
+            None => "Seated stairlift".to_owned(),
+        };
+        frame.set_status_text(
+            &format!("{what}: {:.0} mm folded, {:.0} mm in use, {:.2} m rail at {:.1}°; Check Stairlifts finds {errors} error(s) and {} note(s)", mm("folded"), mm("unfolded"), made["rail_length"].as_f64().unwrap_or(0.0), made["incline"].as_f64().unwrap_or(0.0), found.len() - errors),
+            0,
+        );
+    }
+
+    /// Architecture › Circulation › Check Stairlifts (ARC-VT-015).
+    pub(crate) fn check_stairlifts(&mut self) {
+        let frame = self.frame;
+        let found = match self.run("stairlift.check", json!({})) {
+            Ok(v) => v.as_array().cloned().unwrap_or_default(),
+            Err(e) => return error(&frame, &format!("The check did not run:\n{e}")),
+        };
+        if found.is_empty() {
+            let d = MessageDialog::builder(&frame, "No problems found.\nRunning envelopes, head boxes and landings are checked by Check Clearances.", "Check Stairlifts")
+                .with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation)
+                .build();
+            d.show_modal();
+            return;
+        }
+        let rows: Vec<String> = found
+            .iter()
+            .enumerate()
+            .map(|(k, f)| format!("{}. {}: {} — {} [{}]", k + 1, if f["severity"] == "note" { "Note" } else { "Error" }, f["pack"].as_str().unwrap_or_default(), f["message"].as_str().unwrap_or_default(), f["confidence"].as_str().unwrap_or_default()))
+            .collect();
+        let labels: Vec<&str> = rows.iter().map(String::as_str).collect();
+        let dialog = SingleChoiceDialog::builder(&frame, "Pick one to select and frame it:", "Check Stairlifts", &labels).build();
+        if dialog.show_modal() != ID_OK {
+            return;
+        }
+        let picked = usize::try_from(dialog.get_selection()).ok();
+        dialog.destroy();
+        let Some(f) = picked.and_then(|i| found.get(i)) else {
+            return;
+        };
+        let _ = self.run("selection.set", json!({ "ids": [f["stairlift"]] }));
+        self.selection_changed();
+        self.zoom_to_fit();
+        frame.set_status_text(&format!("{} — {} ({}, {})", f["rule"].as_str().unwrap_or_default(), f["description"].as_str().unwrap_or_default(), f["edition"].as_str().unwrap_or_default(), f["source"].as_str().unwrap_or_default()), 0);
     }
 }

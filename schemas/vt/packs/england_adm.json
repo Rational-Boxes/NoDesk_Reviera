@@ -38,5 +38,22 @@
     "max": 1.1,
     "source": "S1034",
     "confidence": "verified"
+  },
+  "stairlift": {
+    "id": "ADM vol. 2 3.49; ADB stair width",
+    "description": "A wheelchair platform stairlift has a platform of at least 800 × 1250 mm and runs at most 0.15 m/s; the escape stair keeps its clear width with the unit parked (800 mm for a stair serving up to 50 people, as makers restate Approved Document B). Rails guiding a stairlift are left out of the width. A 1500 × 1500 mm clear landing in front of each lifting device.",
+    "required_width": 0.8,
+    "rail_ignored": true,
+    "platform_min": [
+      0.8,
+      1.25
+    ],
+    "max_speed": 0.15,
+    "wheelchair_space": [
+      1.5,
+      1.5
+    ],
+    "source": "S1034 S2477 S2478",
+    "confidence": "secondary"
   }
 }

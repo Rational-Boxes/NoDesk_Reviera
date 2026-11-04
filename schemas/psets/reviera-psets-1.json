@@ -149,6 +149,31 @@
         { "name": "SupportReactionUpper", "measure": "IfcForceMeasure", "unit": "N", "description": "Planning estimate of the reaction at the upper end support." },
         { "name": "SizingPack", "measure": "IfcLabel", "description": "The vertical-transport rule pack the sizes came from (ARC-VT-010)." }
       ]
+    },
+    {
+      "name": "Reviera_Stairlift",
+      "description": "A stairlift's or inclined platform lift's sizes as Reviera sized them (spec ARC-VT-013), on the IfcTransportElement (USERDEFINED STAIRLIFT or INCLINEDPLATFORMLIFT). A chosen product's own values replace these.",
+      "applicable_classes": ["IfcTransportElement", "IfcTransportElementType"],
+      "properties": [
+        { "name": "Kind", "measure": "IfcLabel", "description": "STAIRLIFT (seated) or INCLINEDPLATFORMLIFT (wheelchair platform)." },
+        { "name": "Side", "measure": "IfcLabel", "description": "LEFT or RIGHT side of the stair, going up." },
+        { "name": "CurvedRail", "measure": "IfcBoolean", "description": "The rail follows turns and landings." },
+        { "name": "FoldedDepth", "measure": "IfcPositiveLengthMeasure", "unit": "m", "description": "From the wall to the folded unit's face." },
+        { "name": "UnfoldedDepth", "measure": "IfcPositiveLengthMeasure", "unit": "m", "description": "From the wall to the unit's face in use." },
+        { "name": "RailDepth", "measure": "IfcPositiveLengthMeasure", "unit": "m", "description": "How far the rail stands in from the wall." },
+        { "name": "RailLength", "measure": "IfcPositiveLengthMeasure", "unit": "m", "description": "Along the rail as made." },
+        { "name": "Incline", "measure": "IfcPlaneAngleMeasure", "unit": "°", "description": "Of the stair." },
+        { "name": "Speed", "measure": "IfcLinearVelocityMeasure", "unit": "m/s", "description": "Rated speed." },
+        { "name": "RatedLoad", "measure": "IfcMassMeasure", "unit": "kg", "description": "Rated load." },
+        { "name": "ParksClear", "measure": "IfcBoolean", "description": "It parks clear of the stair (a hinged or slide-track rail end, or round a corner)." },
+        { "name": "Supply", "measure": "IfcLabel", "description": "The power it needs." },
+        { "name": "SizingPack", "measure": "IfcLabel", "description": "The rule pack whose generic sizes were used." },
+        { "name": "PlatformWidth", "measure": "IfcPositiveLengthMeasure", "unit": "m", "description": "A platform lift's platform width." },
+        { "name": "PlatformLength", "measure": "IfcPositiveLengthMeasure", "unit": "m", "description": "A platform lift's platform length." },
+        { "name": "WallLoadFirst", "measure": "IfcForceMeasure", "unit": "N", "description": "Load on the wall at a support (the maker's F1); planning value." },
+        { "name": "WallLoadSecond", "measure": "IfcForceMeasure", "unit": "N", "description": "Load on the wall at a support (the maker's F2); planning value." },
+        { "name": "WallMoment", "measure": "IfcTorqueMeasure", "unit": "N·m", "description": "Moment at a support; planning value." }
+      ]
     }
   ]
 }

@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Reviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Reviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 876 numbered requirements (320 P0 · 338 P1 · 211 P2 · 7 P3), 2,320 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 879 numbered requirements (320 P0 · 341 P1 · 211 P2 · 7 P3), 2,324 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,320 commands; 876 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,324 commands; 879 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -13900,7 +13900,7 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 | `england_adm` | accessible | Approved Document M vol. 2: car 1100 × 1400 mm, 800 mm door; 1500 × 1500 mm landing; call buttons 900–1100 mm |
 | `practice_en` | recommended | EN maker-style cars (450–2500 kg), allowances, pit and headroom by speed |
 
-- **Choosing packs.** A project uses the packs it names (`vt.set_rule_packs`), or by default packs chosen from its building code (DM-CODE-001): `us_ibc_ada`, `us_a17`, `us_a18` and `practice_us` under the IBC or IRC; `en81`, `en81_70`, `en115`, `england_adm` and `practice_en` under England's; `en81`, `en81_70`, `en115` and `practice_en` otherwise. `us_a17` also carries A17.1's escalator rules, and the `practice_*` packs escalator sizes (ARC-VT-010).
+- **Choosing packs.** A project uses the packs it names (`vt.set_rule_packs`), or by default packs chosen from its building code (DM-CODE-001): `us_ibc_ada`, `us_a17`, `us_a18` and `practice_us` under the IBC or IRC; `en81`, `en81_70`, `en115`, `england_adm` and `practice_en` under England's; `en81`, `en81_70`, `en115` and `practice_en` otherwise. `us_a17` also carries A17.1's escalator rules, and the `practice_*` packs escalator sizes (ARC-VT-010). Stairlift rules come from `us_ibc_ada`, `us_a18`, `england_adm` and `practice_us`, and stairlift sizes from the `practice_*` packs (ARC-VT-013).
 - **Project packs.** `vt.add_rule_pack` adds a pack to the project (checked against the schema; an `id` that ships replaces the shipped one for this project), and `vt.remove_rule_pack` removes it. They are kept in RXD on the project (`rxd:vt_rule_packs`). A pack whose car-area rows fall in load or area, whose call-button band is upside down, or whose pit and overhead rows give neither or both overhead forms, is refused (`vt.pack_range`).
 
 **Data (IFC mapping).** RXD only: `rxd:vt_rules` and `rxd:vt_rule_packs` on `IfcProject`.
@@ -14020,7 +14020,7 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 - [x] A LULA rising 10.5 m and a dumbwaiter car 1.5 m high are reported against their limits.
 - [x] The file has the platform lift's and dumbwaiter's object types.
 
-*Built (2026-11-03):* as ARC-VT-005. Not yet: A18.1's 1500 mm limit for an unenclosed platform, inclined platform lifts and stairlifts (plan §5), home lifts to England's M4(3) through-floor liftway, counter-height landing zones for dumbwaiters.
+*Built (2026-11-03):* as ARC-VT-005. Not yet: A18.1's 1500 mm limit for an unenclosed platform, home lifts to England's M4(3) through-floor liftway, counter-height landing zones for dumbwaiters.
 
 ### 3.7a.7 Power and heat estimates
 **ID:** ARC-VT-007 · **Priority:** P2 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §4.4; research/16 H3, H4, O (N-D1, N-D3); owner direction on logical extrapolations (2026-10-25)
@@ -14135,6 +14135,62 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 - [x] A 35° escalator of 5 m rise at 0.5 m/s is a note under A17.1 and passes under EN 115-1; at 0.65 m/s with 2 flat steps EN 115-1 reports the inclination and the flat steps.
 
 *Built (2026-11-03):* `escalator.check`, and Architecture › Circulation › Check Escalators. Not yet: the transit packs (unit counts from flows, one unit out, NFPA 130 egress credit), US wellway opening limits (IBC 712.1.3).
+
+### 3.7a.13 Stairlifts and inclined platform lifts
+**ID:** ARC-VT-013 · **Priority:** P1 · **Ref:** owner requirement (2026-11-03: "Include people movers and stairlifts too"); `VERTICAL_TRANSPORT_PLAN.md` §5; research/16 Q2, Q5
+
+**Purpose.** Put a seated stairlift or a wheelchair platform lift on a stair, sized as makers build them, following the stair.
+
+**Behaviour & rules.**
+- **`stairlift.create`** on a Reviera stair (ARC-STAIR-001) and a `side` (left or right going up), sized from the packs' `stairlift_sizing` (generic, maker-style; research/16 Q2 A3, A4):
+  - **Seated** (`kind` seated): folds to 320 mm from the wall and is 530 mm deep in use; rail 160 mm in; 0.08 m/s, 140 kg; stairs of 25–50°; straight rails up to 7.06 m.
+  - **Platform** (`kind` platform), by `family`: **straight** rack rails (800 × 1250, 800 × 1000, 750 × 900, 725 × 1000, 675 × 1000 mm platforms; 250 kg; 0.067 m/s; 10–45°), or **curved** tubes that follow turns and landings (800 × 1220, 800 × 1050, 800 × 900, 700 × 750 mm; 300 kg; 0.10 m/s; up to 45°; a drive box at the top). A stair that turns (winders, a spiral, or runs at an angle) takes the curved family unless one is given; the platform is the family's largest unless given. Each size carries its folded and in-use depth from the wall, the maker's recommended stair width and (curved) the inside-bend width.
+  - From the makers' tables at the stair's angle: the platform's **run-out** beyond the bottom nosing and its **deck rise** above the nosing line (linear between rows, held at the ends).
+- **The object**: one custom object (`IfcTransportElement` USERDEFINED, ObjectType STAIRLIFT or INCLINEDPLATFORMLIFT, category *Transport Element*) of its own shape, on the stair's base level: the rail (two tubes for a platform) along the stair's side path (ARC-RAIL-001's), down to the floor before the first riser and on past the top nosing, the unit parked at the foot of the stair, and a curved family's drive box at the top.
+- `stair_use` (dwelling, exit or other), `occupants` and `parks_clear` (a hinged or slide-track rail end, or parking round a corner) are kept for the checks. `stairlift.list` lists the lifts; `stairlift.delete` deletes one with its type.
+- Wall loads at a support (F1, F2 and the moment; maker's planning values) are recorded for the structure.
+
+**Data (IFC mapping).** `IfcTransportElement` USERDEFINED with `Pset_TransportElementCommon` (CapacityPeople 1, FireExit false) and `Reviera_Stairlift` (Kind, Side, CurvedRail, FoldedDepth, UnfoldedDepth, RailDepth, RailLength, Incline, Speed, RatedLoad, ParksClear, Supply, SizingPack, PlatformWidth, PlatformLength, WallLoadFirst, WallLoadSecond, WallMoment), published in `schemas/psets/reviera-psets-1.json`.
+
+**Acceptance criteria.**
+- [x] A platform lift on a straight 32.7° stair takes the straight family's 800 × 1250 mm platform, its head box riding on the deck rise interpolated between the 30° and 35° rows; on a turning stair it takes the curved family's 800 × 1220 mm with a 1225 mm inside bend; an unknown platform size is refused.
+- [x] A seated lift on a 1100 mm dwelling stair with its opening for walking headroom overlaps nothing and has nothing in its zones; the file has STAIRLIFT and INCLINEDPLATFORMLIFT elements with `Reviera_Stairlift`.
+
+*Built (2026-11-04):* `reviera_core::stairlifts`; Architecture › Circulation › Stairlift (on the selected stair); the sample *Stairlifts and platform stairlifts in a parish hall and its house*. Not yet: the lift following later changes to its stair (it is made for the stair as it is), outdoor units, the charger outlet or dedicated circuit as an MEP connector, the backrest and footrest clearances (A18.1 values not public), maker products replacing the generic sizes.
+
+### 3.7a.14 Stairlift running envelope and landings
+**ID:** ARC-VT-014 · **Priority:** P1 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §5; research/16 Q2 A3, Q5 (Z26e, Z26f)
+
+**Purpose.** Keep clear the space a lift and its rider travel through, and the space to get on and off.
+
+**Behaviour & rules.**
+- **Running envelope** (kind *stairlift running envelope*) over each straight run of the stair as it is now: from the lift's edge of the stair as deep as the unit in use, from the nosing line up to a seated rider's 1.4 m, or a platform's deck rise plus the **head box** of the first pack in use that gives one (A18.1 1524 mm, as makers quote it; 1500 mm when none does).
+- **Landing zones** (kind *stairlift landing*): before the first riser as deep as the run-out (a seated lift's parked carriage), and beyond the last nosing as deep as the top space (a seated lift's overrun and swivel; a platform's 1.2 m), each followed for a platform by the wheelchair space of the first pack that gives one (ADA 30 × 48 in; England 1500 × 1500 mm), as wide as the unit in use or the wheelchair space, as high as a seated rider or the head box over a deck at the floor.
+- Stairs, railings (a wall handrail beside a seated lift stays), floor and shaft openings may stand in them. `clearance.check` and `clearance.list` include them; views show running envelopes amber and landings teal.
+
+**Acceptance criteria.**
+- [x] A platform lift on a stair whose upper-floor opening was cut for walking headroom finds the upper slab in its running envelope; with an open stairwell as long as the flight it finds nothing.
+
+*Built (2026-11-04):* in `clearances::all`. Not yet: envelopes over winders, spirals and the landings of a turning stair; the Canadian 1500 mm head box over the platform's centreline; the stair's own 2032 mm headroom as a stairlift rule.
+
+### 3.7a.15 The stairlift check
+**ID:** ARC-VT-015 · **Priority:** P1 · **Ref:** research/16 Q2 A1, A2, A5, Q5 (Z26a–d, g, h), Conflicts N1, N2
+
+**Purpose.** Say what a lift leaves of its stair, and which lift breaks which rule.
+
+**Behaviour & rules.**
+- **`stairlift.check`** checks every lift (or those given) against each pack in use with stairlift rules (`stairlift` in a pack):
+  - **clear width** beside the unit: the stair's narrowest run less the folded unit (or, where it parks clear, its rail; nothing where the pack ignores rails), at least: on a dwelling's stair the pack's dwelling width (IBC 1011.2 exc. 3: 508 mm); elsewhere its required width (IBC 1118 mm, or 914 mm serving fewer than 50 people; England 800 mm with the unit parked, as makers restate ADB);
+  - **exit enclosure**: a unit on an exit stair, where the pack keeps them out (NFPA 101's published reading, advisory);
+  - **platform size** at least the pack's (England ADM 3.49: 800 × 1250 mm), and **speed** at most its (A18.1, ADM: 0.15 m/s);
+  - the generic model's limits, as notes: the stair's angle within the model's range, a straight flight no longer than the longest straight rail, the stair at least the maker's recommended width, a straight-rail platform on a stair that turns, and the inside-bend width at a turn.
+- Findings give the lift, pack, edition, rule, confidence, source, and the measured and required values; a recommended pack's or an advisory rule's are notes. A lift whose stair is gone is reported.
+
+**Acceptance criteria.**
+- [x] On a 1100 mm stair, a platform lift for 30 people leaves 840 mm, short of 914 mm; parked clear, its 81 mm rail leaves enough; under England's packs an 800 × 1000 mm platform is short of 800 × 1250 mm; a seated lift on an exit stair is noted.
+- [x] A curved platform lift on a 1100 mm turning stair is noted as short of its 1225 mm inside bend.
+
+*Built (2026-11-04):* `stairlift.check`, and Architecture › Circulation › Check Stairlifts. Not yet: the stair width measured between handrails where they project more than 100 mm, the LA plan-check fields (top overrun, footrest gap), per-occupancy NFPA 101 widths, Australia's 810 × 1200 mm platform (NCC), and the Canadian packs.
 
 ---
 
@@ -16479,6 +16535,10 @@ All commands below are registered once in the command registry and exposed autom
 | `escalator.list` | — | [{escalator, name, sizes, levels, openings}] | No (query) | ARC-VT-010 |
 | `escalator.delete` | escalator | count | Yes | ARC-VT-010 |
 | `escalator.check` | escalators? | finding[] | No (query) | ARC-VT-012 |
+| `stairlift.create` | stair, side?, kind?, family?, platform?, speed?, stair_use?, occupants?, parks_clear? | {stairlift, sizes, stair, side, rail_length} | Yes | ARC-VT-013 |
+| `stairlift.list` | — | [{stairlift, name, sizes, stair, side}] | No (query) | ARC-VT-013 |
+| `stairlift.delete` | stairlift | count | Yes | ARC-VT-013 |
+| `stairlift.check` | stairlifts? | finding[] | No (query) | ARC-VT-015 |
 | `enclosure.create` | form, footprint \| host_wall_ids, level_id, params | element_id | Yes | ARC-GLZ-001 |
 | `enclosure.set` | enclosure_id, params | — | Yes | ARC-GLZ-001 |
 | `enclosure.get` | enclosure_id | {form, params, parts} | No (query) | ARC-GLZ-001 |
@@ -29646,14 +29706,14 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 39 | 8 | 0 | 123 |
 | DM | 91 | 65 | 34 | 3 | 193 |
-| ARC | 77 | 98 | 23 | 1 | 199 |
+| ARC | 77 | 101 | 23 | 1 | 202 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 28 | 0 | 29 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
 | COL | 8 | 50 | 12 | 1 | 71 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **338** | **211** | **7** | **876** |
+| **Total** | **320** | **341** | **211** | **7** | **879** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -29853,7 +29913,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2320 unique commands** in 433 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2324 unique commands** in 434 domains. Every command is exposed automatically to the UI, to Lua (`reviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -30215,6 +30275,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `sprinkler` | 1 |
 | `stackedwall` | 1 |
 | `stair` | 15 |
+| `stairlift` | 4 |
 | `standards` | 2 |
 | `stash` | 3 |
 | `steel_cut` | 7 |
@@ -32016,6 +32077,10 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `stair.number_treads` | 3 | view_id, stair_id, start_number?, type_id? | element_id | Yes | ARC-STAIR-006 |
 | `stair.set_rules` | 3 | type_id, max_riser, min_tread, min_width, calculator?: {m,n,min,max} | — | Yes | ARC-STAIR-003 |
 | `stair.set_run_risers` | 3 | session_id, run_key, n | — | Within session; one step on finish | ARC-STAIR-002 |
+| `stairlift.check` | 3 | stairlifts? | finding[] | No (query) | ARC-VT-015 |
+| `stairlift.create` | 3 | stair, side?, kind?, family?, platform?, speed?, stair_use?, occupants?, parks_clear? | {stairlift, sizes, stair, side, rail_length} | Yes | ARC-VT-013 |
+| `stairlift.delete` | 3 | stairlift | count | Yes | ARC-VT-013 |
+| `stairlift.list` | 3 | — | [{stairlift, name, sizes, stair, side}] | No (query) | ARC-VT-013 |
 | `standards.list` | 2 | source_document_id | {kind, items[]}[] | No | DM-XFER-001 |
 | `standards.transfer` | 2 | source_document_id, selection[{kind, item_ids?}], on_conflict: overwrite\ | new_only\ | rename | transfer_report |
 | `stash.discard` | 6 | entry_ids[] | () | No | COL-MRG-002 |

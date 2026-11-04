@@ -82,6 +82,10 @@ pub enum ClearanceKind {
     EscalatorHeadroom,
     /// The landing zone beyond each end of an escalator or walk (ARC-VT-011).
     EscalatorLanding,
+    /// A stairlift's running envelope over its stair (ARC-VT-014).
+    StairliftRun,
+    /// The run-out and landing space at each end of a stairlift (ARC-VT-014).
+    StairliftLanding,
 }
 
 impl ClearanceKind {
@@ -100,6 +104,8 @@ impl ClearanceKind {
             Self::MachineSpace => "Clearance:machine_space/3d",
             Self::EscalatorHeadroom => "Clearance:escalator_headroom/3d",
             Self::EscalatorLanding => "Clearance:escalator_landing/3d",
+            Self::StairliftRun => "Clearance:stairlift_run/3d",
+            Self::StairliftLanding => "Clearance:stairlift_landing/3d",
         }
     }
 
@@ -117,6 +123,8 @@ impl ClearanceKind {
             Self::MachineSpace => "elevator machine space",
             Self::EscalatorHeadroom => "escalator headroom",
             Self::EscalatorLanding => "escalator landing",
+            Self::StairliftRun => "stairlift running envelope",
+            Self::StairliftLanding => "stairlift landing",
         }
     }
 }
@@ -305,6 +313,7 @@ pub fn all(store: &Store) -> Vec<Clearance> {
     }));
     out.extend(crate::elevators::zones(store));
     out.extend(crate::escalators::zones(store));
+    out.extend(crate::stairlifts::zones(store));
     out
 }
 
@@ -313,6 +322,9 @@ pub fn all(store: &Store) -> Vec<Clearance> {
 pub fn may_share(store: &Store, kind: ClearanceKind, other: ElementId) -> bool {
     if matches!(kind, ClearanceKind::EscalatorHeadroom | ClearanceKind::EscalatorLanding) {
         return crate::escalators::may_share(store, other);
+    }
+    if matches!(kind, ClearanceKind::StairliftRun | ClearanceKind::StairliftLanding) {
+        return crate::stairlifts::may_share(store, other);
     }
     if matches!(kind, ClearanceKind::Hoistway | ClearanceKind::ElevatorLanding | ClearanceKind::MachineSpace) {
         return crate::elevators::may_share(store, other);

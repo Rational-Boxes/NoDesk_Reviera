@@ -743,8 +743,19 @@ tools and the datums.
   intrusions more finely. Not built yet: crisscross arrangements, wellway protection, the airport
   and transit context, intersection guards. Not built yet for elevators: editing in place, rear
   entrances, vertical bi-parting and telescopic doors, machine rooms, hall fixtures, banks,
-  panoramic cars; escalators and moving walks, stairlifts, people movers, funiculars and ropeways
-  (planned).
+  panoramic cars; people movers, funiculars and ropeways (planned).
+- **Stairlifts and platform stairlifts** (ARC-VT-013…015): Architecture › Circulation › Stairlift
+  puts a seated stairlift or a wheelchair platform lift (`IfcTransportElement` USERDEFINED
+  STAIRLIFT or INCLINEDPLATFORMLIFT) on one side of the selected stair, its rail following the
+  flights and landings, sized from makers' generic models (straight rack rails, or curved tubes
+  for a stair that turns). Its running envelope (a rider's height, or a platform's deck rise plus
+  A18.1's 1524 mm head box), run-out and landing wheelchair spaces are virtual volumes; Check
+  Stairlifts reports the width the stair keeps beside the folded unit (IBC 1011.2: 508 mm on a
+  dwelling's stair, otherwise the required width; England 800 mm with the unit parked), units in
+  exit enclosures (NFPA 101, a note), platform size (ADM 800 × 1250 mm) and speed, and the
+  makers' angle, length, width and inside-bend limits. Not built yet: the lift following later
+  changes to its stair, envelopes over winders, spirals and turning landings, the charger or
+  circuit as an MEP connector, outdoor units.
 - **Structural columns**: Column (`SC`) places load-bearing columns in plans; **At Grids** puts
   one at every crossing of the grid lines you select (a window in a plan now selects grids), in
   one undo step. Shapes are rectangular, round, I, channel, angle, tee and rectangular or round
@@ -1774,6 +1785,10 @@ sample:
 - **Escalators and moving walks in a department store** (`escalators.ifc`): three floors under
   the IBC with an up-and-down pair, a single escalator, an inclined trolley walk and a horizontal
   walk, each with its floor openings; Check Escalators and Check Clearances find nothing.
+- **Stairlifts and platform stairlifts in a parish hall and its house** (`stairlifts.ifc`): two
+  storeys under the IBC with a seated stairlift on the house's stair, a platform lift on straight
+  rails on the hall's stair and one on a curved rail on its turning back stair; each stair keeps
+  its width, and Check Stairlifts and Check Clearances find nothing.
 - **Editing tools** (`modify_tools.ifc`): every Modify tab tool's result side by side, from align,
   mirror and the arrays to trim/extend, split and pinning, a component created and placed
   again, and a layered wall's parts divided, merged and excluded.

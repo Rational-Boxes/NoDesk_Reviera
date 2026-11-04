@@ -4772,6 +4772,11 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "bath.check" => with(gui, Gui::check_bathrooms),
         "elevator.check" => with(gui, Gui::check_elevators),
         "escalator.check" => with(gui, Gui::check_escalators),
+        "stairlift.check" => with(gui, Gui::check_stairlifts),
+        "ui.stairlift" => with(gui, |g| {
+            g.place_stairlift();
+            focus(g);
+        }),
         "ui.escalator" => with(gui, |g| {
             g.place_escalator();
             focus(g);

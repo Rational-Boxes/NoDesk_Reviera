@@ -263,5 +263,225 @@
     "power_base": 3.0,
     "source": "S2416 S2417 S2418 S2419 S1650 S1534 S1413 S1649 S2414",
     "confidence": "secondary"
+  },
+  "stairlift_sizing": {
+    "seated": {
+      "folded": 0.32,
+      "unfolded": 0.53,
+      "rail_depth": 0.16,
+      "seat_width": 0.445,
+      "parked_height": 1.0,
+      "envelope_height": 1.4,
+      "carriage_length": 0.6,
+      "speed": 0.08,
+      "load": 140,
+      "min_incline": 25,
+      "max_incline": 50,
+      "max_length": 7.06,
+      "swivel_radius": 0.675,
+      "top_overrun": 0.5,
+      "supply": "100–240 V AC charger at a rail end; 24 V DC battery",
+      "source": "S2470 S2471 S2474 S2475 S2467"
+    },
+    "platforms": [
+      {
+        "id": "straight",
+        "description": "Straight rack-and-pinion rails (generic, from a maker's planning guide)",
+        "curved": false,
+        "load": 250,
+        "speed": 0.067,
+        "min_incline": 10,
+        "max_incline": 45,
+        "rail_depth": 0.081,
+        "deck_rise": [
+          [
+            10,
+            0.321
+          ],
+          [
+            20,
+            0.56
+          ],
+          [
+            30,
+            0.834
+          ],
+          [
+            35,
+            0.992
+          ],
+          [
+            45,
+            1.38
+          ]
+        ],
+        "runout": [
+          [
+            10,
+            2.863
+          ],
+          [
+            20,
+            2.163
+          ],
+          [
+            30,
+            1.924
+          ],
+          [
+            45,
+            1.756
+          ]
+        ],
+        "top_space": 1.2,
+        "folded_height": 1.4,
+        "wall_loads": [
+          1.179,
+          2.446,
+          2.086
+        ],
+        "supply": "208–240 V AC 1-phase, dedicated 20 A circuit",
+        "sizes": [
+          {
+            "platform": [
+              0.8,
+              1.25
+            ],
+            "folded": 0.26,
+            "unfolded": 1.02,
+            "stair_width": 1.04
+          },
+          {
+            "platform": [
+              0.8,
+              1.0
+            ],
+            "folded": 0.26,
+            "unfolded": 1.02,
+            "stair_width": 1.04
+          },
+          {
+            "platform": [
+              0.75,
+              0.9
+            ],
+            "folded": 0.299,
+            "unfolded": 0.927,
+            "stair_width": 0.947
+          },
+          {
+            "platform": [
+              0.725,
+              1.0
+            ],
+            "folded": 0.26,
+            "unfolded": 0.945,
+            "stair_width": 0.965
+          },
+          {
+            "platform": [
+              0.675,
+              1.0
+            ],
+            "folded": 0.26,
+            "unfolded": 0.895,
+            "stair_width": 0.915
+          }
+        ],
+        "source": "S2461"
+      },
+      {
+        "id": "curved",
+        "description": "Tube rails that follow turns and landings (generic, from a maker's planning guide)",
+        "curved": true,
+        "load": 300,
+        "speed": 0.1,
+        "min_incline": 0,
+        "max_incline": 45,
+        "rail_depth": 0.125,
+        "deck_rise": [
+          [
+            22,
+            0.562
+          ],
+          [
+            30,
+            0.796
+          ],
+          [
+            35,
+            0.956
+          ],
+          [
+            45,
+            1.356
+          ]
+        ],
+        "runout": [
+          [
+            30,
+            2.883
+          ]
+        ],
+        "top_space": 1.2,
+        "folded_height": 1.4,
+        "drive_box": [
+          0.597,
+          0.444,
+          0.192
+        ],
+        "wall_loads": [
+          1.231,
+          2.942,
+          2.787
+        ],
+        "supply": "208–240 V AC 1-phase, dedicated 20 A circuit",
+        "sizes": [
+          {
+            "platform": [
+              0.8,
+              1.22
+            ],
+            "folded": 0.32,
+            "unfolded": 1.015,
+            "stair_width": 1.035,
+            "inside_bend": 1.225
+          },
+          {
+            "platform": [
+              0.8,
+              1.05
+            ],
+            "folded": 0.32,
+            "unfolded": 1.015,
+            "stair_width": 1.035,
+            "inside_bend": 1.185
+          },
+          {
+            "platform": [
+              0.8,
+              0.9
+            ],
+            "folded": 0.32,
+            "unfolded": 1.015,
+            "stair_width": 1.035,
+            "inside_bend": 1.145
+          },
+          {
+            "platform": [
+              0.7,
+              0.75
+            ],
+            "folded": 0.33,
+            "unfolded": 0.9,
+            "stair_width": 0.92,
+            "inside_bend": 1.025
+          }
+        ],
+        "source": "S2460 S2463 S2464"
+      }
+    ],
+    "source": "S2460 S2461 S2470",
+    "confidence": "secondary"
   }
 }

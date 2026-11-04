@@ -185,6 +185,7 @@ pub mod skylights;
 pub mod slab_edges;
 pub mod slab_openings;
 pub mod stair_marks;
+pub mod stairlifts;
 pub mod stairs;
 pub mod standards;
 pub mod standards_transfer;

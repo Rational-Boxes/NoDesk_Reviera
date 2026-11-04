@@ -508,6 +508,10 @@ pub struct Pack {
     pub escalator: Option<crate::escalators::Rules>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub escalator_sizing: Option<crate::escalators::Sizing>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stairlift: Option<crate::stairlifts::Rules>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stairlift_sizing: Option<crate::stairlifts::Sizing>,
 }
 
 fn validator() -> &'static jsonschema::Validator {
@@ -1787,7 +1791,9 @@ mod tests {
                 .chain(p.limits.iter().map(|l| &l.source))
                 .chain(p.freight_classes.as_ref().map(|f| &f.source))
                 .chain(p.escalator.as_ref().map(|f| &f.source))
-                .chain(p.escalator_sizing.as_ref().map(|f| &f.source));
+                .chain(p.escalator_sizing.as_ref().map(|f| &f.source))
+                .chain(p.stairlift.as_ref().map(|f| &f.source))
+                .chain(p.stairlift_sizing.iter().flat_map(|f| std::iter::once(&f.source).chain(std::iter::once(&f.seated.source)).chain(f.platforms.iter().map(|x| &x.source))));
             for s in sources.into_iter().flatten().chain(more).flat_map(|s| s.split(' ')) {
                 assert!(register.contains(&format!("| {s} |")), "{}: {s} is not in the register", p.id);
             }

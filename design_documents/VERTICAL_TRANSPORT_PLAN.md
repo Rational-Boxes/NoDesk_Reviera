@@ -12,7 +12,12 @@ estimates (ARC-VT-007), machine spaces and equipment (ARC-VT-008) and the elevat
 (ARC-VT-009), shown in *Elevators in an office core*; then step 5: escalators and moving walks
 (ARC-VT-010), their headroom and landing zones (ARC-VT-011) and Check Escalators (ARC-VT-012),
 with the sample *Escalators and moving walks in a department store* (the airport and transit
-context is still to come). What is left is listed under each requirement's *Not yet*.
+context is still to come); then step 6 (2026-11-04): stairlifts and inclined platform lifts
+(ARC-VT-013), their running envelope and landings (ARC-VT-014) and Check Stairlifts (ARC-VT-015),
+with the sample *Stairlifts and platform stairlifts in a parish hall and its house*. The commands
+are `stairlift.create` (with a `kind`) rather than §5's `stairlift.place` and
+`platform_stairlift.place`, matching `elevator.create` and `escalator.create`. What is left is
+listed under each requirement's *Not yet*.
 **Owner's requests:**
 - 2026-11-01: "Elevators, both passenger and freight." and "For elevators include ornamental
   version like glass enclosed."

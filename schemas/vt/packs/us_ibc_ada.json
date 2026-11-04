@@ -130,5 +130,19 @@
     "max": 1.22,
     "source": "S1182",
     "confidence": "verified"
+  },
+  "stairlift": {
+    "id": "IBC 1011.2 exc. 3; ADA 2010 305.3",
+    "description": "A stairway chairlift or inclined platform lift on a stair serving R-3, or within an R-2 dwelling unit, leaves at least 20 in (508 mm) clear passage measured from the folded seat or platform; any other stair keeps its required width (44 in, or 36 in serving fewer than 50 occupants). A 30 × 48 in wheelchair space at each end of a platform lift.",
+    "dwelling_clear_width": 0.508,
+    "required_width": 1.1176,
+    "small_width": 0.9144,
+    "small_occupants": 50,
+    "wheelchair_space": [
+      0.762,
+      1.2192
+    ],
+    "source": "S2481 S0869",
+    "confidence": "verified"
   }
 }
