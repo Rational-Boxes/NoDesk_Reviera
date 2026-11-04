@@ -653,9 +653,86 @@ impl Gui {
         );
     }
 
+    /// A FileEngine library's mirror (COL-FE-013) brought up to date before a change made here
+    /// (best effort: offline, the change is made on the mirror as it is).
+    fn library_pull(&mut self, lib: &Path) {
+        if let Some(o) = riviera_app::fe_library::origin(lib) {
+            let _ = riviera_app::fe_library::pull(&mut self.app, lib, &o.connection_id, &o.folder_uid);
+        }
+    }
+
+    /// A change made here to a FileEngine library's mirror, sent back to the server.
+    fn library_push(&mut self, lib: &Path) {
+        if riviera_app::fe_library::origin(lib).is_some()
+            && let Err(e) = riviera_app::fe_library::push(&mut self.app, lib)
+        {
+            error(&self.frame, &format!("The change was made here but not sent to FileEngine; it is kept in {}:\n{e}", lib.display()));
+        }
+    }
+
+    /// Where a library is: `None` cancelled, `Some(None)` on this computer, `Some(Some(..))` a
+    /// FileEngine folder (only asked when a FileEngine connection exists).
+    fn library_place(&mut self, title: &str) -> Option<Option<super::fileengine_ui::Pick>> {
+        let has = self.run("fileengine.list_connections", serde_json::Value::Null).ok().and_then(|v| v.as_array().map(|a| !a.is_empty())).unwrap_or(false);
+        if !has {
+            return Some(None);
+        }
+        let places = ["This computer…", "FileEngine…"];
+        let d = SingleChoiceDialog::builder(&self.frame, &format!("{title}: where is it?"), title, &places).build();
+        if d.show_modal() != ID_OK {
+            return None;
+        }
+        let k = d.get_selection();
+        d.destroy();
+        if k != 1 {
+            return Some(None);
+        }
+        self.fileengine_pick_folder(title).map(Some)
+    }
+
+    /// A FileEngine folder as a library (COL-FE-013): mirrored into the cache, made a library when
+    /// asked, then shown as any library.
+    fn open_fileengine_library(&mut self, pick: super::fileengine_ui::Pick, new_name: Option<String>) {
+        let frame = self.frame;
+        let dir = match riviera_app::fe_library::mirror_dir(&self.app, &pick.connection_id, &pick.folder_uid) {
+            Ok(d) => d,
+            Err(e) => return error(&frame, &e.message),
+        };
+        frame.set_status_text(&format!("Reading the library in {} from FileEngine…", pick.folder_name), 0);
+        if let Err(e) = riviera_app::fe_library::pull(&mut self.app, &dir, &pick.connection_id, &pick.folder_uid) {
+            return error(&frame, &format!("The library could not be read from FileEngine:\n{e}"));
+        }
+        let name = match new_name {
+            Some(n) => Some(n),
+            None if !library::manifest_in(&dir).is_file() => {
+                let ask = MessageDialog::builder(&frame, &format!("{} has no {}. Make it a component library named \"{}\"?", pick.folder_name, library::MANIFEST, pick.folder_name), "Open Component Library")
+                    .with_style(MessageDialogStyle::YesNo | MessageDialogStyle::IconQuestion)
+                    .build();
+                if ask.show_modal() != ID_YES {
+                    return;
+                }
+                Some(pick.folder_name.clone())
+            }
+            None => None,
+        };
+        if let Some(name) = name {
+            if let Err(e) = library::create(&Store::default(), library::CreateParams { path: dir.to_string_lossy().into_owned(), name }) {
+                return error(&frame, &e.message);
+            }
+            self.library_push(&dir);
+        }
+        frame.set_status_text("", 0);
+        self.add_library(dir);
+    }
+
     /// The panel's Open…: a folder as a library (offering to make one).
     fn open_library_folder(&mut self) {
         let frame = self.frame;
+        match self.library_place("Open Component Library") {
+            None => return,
+            Some(Some(pick)) => return self.open_fileengine_library(pick, None),
+            Some(None) => {}
+        }
         let d = DirDialog::builder(&frame, "Open Component Library", "").build();
         if d.show_modal() != ID_OK {
             return;
@@ -697,6 +774,18 @@ impl Gui {
     /// The panel's New…: makes a library in a folder.
     fn new_library(&mut self) {
         let frame = self.frame;
+        match self.library_place("New Component Library") {
+            None => return,
+            Some(Some(pick)) => {
+                let ask = TextEntryDialog::builder(&frame, "Library name:", "New Component Library").with_default_value(&pick.folder_name).build();
+                if ask.show_modal() != ID_OK {
+                    return;
+                }
+                let name = ask.get_value().unwrap_or_else(|| pick.folder_name.clone());
+                return self.open_fileengine_library(pick, Some(name));
+            }
+            Some(None) => {}
+        }
         let d = DirDialog::builder(
             &frame,
             "New Component Library: choose or make its folder",
@@ -785,6 +874,7 @@ impl Gui {
         let Some(options) = import_options_dialog(&frame, &files, None) else {
             return;
         };
+        self.library_pull(&lib);
         let report = library::import_files(
             &Store::default(),
             library::ImportFilesParams {
@@ -799,6 +889,9 @@ impl Gui {
                 import_duplicates: false,
             },
         );
+        if report.is_ok() {
+            self.library_push(&lib);
+        }
         match report {
             Ok(r) => {
                 if !r.skipped.is_empty() {
@@ -1337,6 +1430,7 @@ impl Gui {
                     }
                     _ => return true,
                 };
+                self.library_pull(lib);
                 let r = library::set_meta(
                     &Store::default(),
                     library::SetMetaParams {
@@ -1346,8 +1440,9 @@ impl Gui {
                         settings: None,
                     },
                 );
-                if let Err(e) = r {
-                    error(&self.frame, &e.message);
+                match r {
+                    Ok(_) => self.library_push(lib),
+                    Err(e) => error(&self.frame, &e.message),
                 }
                 // The outline and thumbnail follow new units or axes.
                 if matches!(field, "units" | "up_axis" | "insertion" | "name") {

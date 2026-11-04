@@ -104,6 +104,8 @@ pub struct Connections {
     runs: HashMap<String, crate::docs::Run>,
     /// The field sets published as prompt sets this session, by connection and set.
     publications: HashMap<(String, String), crate::docs::Publication>,
+    /// When each FileEngine library's mirror was last brought up to date (COL-FE-013).
+    pulled: HashMap<PathBuf, std::time::Instant>,
 }
 
 impl std::fmt::Debug for Connections {
@@ -121,6 +123,19 @@ impl Connections {
 
     fn file(&self) -> Result<PathBuf> {
         self.settings.clone().or_else(|| crate::subscriptions::config_dir().map(|d| d.join("fileengine.json"))).ok_or_else(|| bad("fileengine.no_settings", "there is no per-user settings folder"))
+    }
+
+    /// Whether a FileEngine library's mirror at `dir` is due to be brought up to date before a
+    /// reading command (at most once a minute; COL-FE-013); marks it done when it is.
+    pub(crate) fn pull_due(&mut self, dir: &Path) -> bool {
+        let now = std::time::Instant::now();
+        match self.pulled.get(dir) {
+            Some(t) if now.duration_since(*t) < std::time::Duration::from_secs(60) => false,
+            _ => {
+                self.pulled.insert(dir.to_path_buf(), now);
+                true
+            }
+        }
     }
 
     /// The cache of files read from and written to FileEngine by other commands (COL-FE-012).

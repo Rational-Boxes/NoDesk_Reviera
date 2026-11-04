@@ -585,6 +585,29 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 
 *Built (2026-11-04):* `riviera_app::fe_paths` (at `App::execute`, so the window, Lua and agents alike), the `x-riviera-file` marks, `save_target` and `open_target` in the window with the browser's file pick. Not yet: Component and parameter libraries on FileEngine (§7b), `keynotes.load` (it keeps the file's path for reloading), `script.import` and `docs.link` folders, the analysis-tools and steel dialogs that choose folders, a FileEngine place in the PDF dialog's sheet sets, retrying a failed upload from the status bar, and publish sets and share links (§7a).
 
+### Component Libraries hosted on FileEngine
+**ID:** COL-FE-013 · **Priority:** P1 · **Ref:** FILEENGINE_INTEGRATION §7b; DM-LIB-001 … 004; owner requirement (2026-11-04: "Any file type operation/libraries/reports needs to support using FileEngine.")
+
+**Purpose.** An organisation keeps one shared, permissioned, versioned Component Library on its FileEngine server instead of copies on every machine; everyone places from it, and those allowed add to it.
+
+**Behaviour & rules.**
+- **A FileEngine folder is a library** when it holds a `riviera-library.json`, laid out as a local library (DM-LIB-001). Every library command takes `fileengine://<connection>/<folder uid>` where it takes a library folder: `library.create`, `library.open`, `library.list`, `library.get_meta`, `library.import_files`, `library.set_meta`, `library.delete_items`, `library.restore_items`, `component.place`, `component.create`, `component.place_fragment`, `array.along_path` and `array.set` (their `x-riviera-file` marks: `library_read`, `library_write`).
+- **The mirror.** The library is mirrored into the per-user cache (`<data>/riviera/fileengine/libraries/<connection>/<folder uid>/`), with a `.riviera-sync.json` naming its connection and folder and, per file, the uid, version and SHA-256 it was synced at. Commands then run on the mirror, and `library.open` returns its local path, so the window and later commands use it as a local library; a mirror is recognised as FileEngine-backed wherever its path is given.
+- **Reading** brings the mirror up to date with the server: new and changed files are downloaded, files removed on the server are removed (at most once a minute per library for reading commands).
+- **Writing** (by FileEngine's permission) brings it up to date first, runs the command, then sends back what changed: new and changed files are uploaded (a new version of a file already there; folders made as needed), removed files are deleted on the server (FileEngine's history keeps them), and the manifest is merged:
+  - if nobody changed it on the server since the mirror's copy, it is uploaded;
+  - otherwise it is merged entry by entry (items and folder settings by path, other fields by name): what this command changed is taken over the server's, everything else is the server's, and an entry both changed differently is reported in `conflicts` (this command's change kept).
+- The result of a writing command gains `fileengine_library`: files uploaded and deleted, whether the manifest was merged, and any conflicts.
+- Placed components embed their item in the model as for a local library, so a model opens anywhere without the server.
+
+**Acceptance criteria.**
+- **In the window.** The Component Library panel's *Open…* and *New…* ask *This computer…* or *FileEngine…* when a FileEngine connection exists; a FileEngine folder is mirrored and shown as any library (offering to make it one). *Import into Library* and item edits on a FileEngine library bring its mirror up to date first and send the change back after.
+
+**Acceptance criteria.**
+- [x] Against the fake server: a library made on FileEngine (`library.create` with an address) uploads its manifest; `library.import_files` of an OBJ uploads the item, its MTL and the manifest entry; a second machine's `library.open` mirrors it, lists and places the item; items added from both machines all stay in the manifest; a manifest changed on the server between a pull and a push is merged entry by entry (the description from one side, an item's name from the other); `library.delete_items` moves the item into `.deleted` on the server.
+
+*Built (2026-11-04):* `riviera_app::fe_library` (mirror, pull, push, merge) and the `library_read`/`library_write` marks resolved in `fe_paths`, for 11 more commands; the panel's FileEngine Open and New. *Not yet:* downloading items on demand instead of the whole library, *Update available* and `library.updates`/`library.reload_item`, the Incoming review folder, parameter libraries on FileEngine.
+
 *Not yet (later phases):* a thumbnail with each save; the Documents pane (a dockable pane with document previews, uploads and expiry warnings); publish sets and share links (exports themselves: COL-FE-012); BCF over BCF-API; Component Libraries; field sets beyond EPD and HPD (§7c); live updates through the discussion service.
 
 ## 6.3 Merging

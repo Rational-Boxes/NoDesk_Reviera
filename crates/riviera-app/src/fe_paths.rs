@@ -33,6 +33,10 @@ pub enum Role {
     Write,
     WriteFolder,
     WriteAny,
+    /// A Component Library's folder that the command reads (COL-FE-013).
+    LibraryRead,
+    /// A Component Library's folder that the command changes.
+    LibraryWrite,
 }
 
 impl Role {
@@ -43,6 +47,8 @@ impl Role {
             "write" => Role::Write,
             "write_folder" => Role::WriteFolder,
             "write_any" => Role::WriteAny,
+            "library_read" => Role::LibraryRead,
+            "library_write" => Role::LibraryWrite,
             _ => return None,
         })
     }
@@ -78,13 +84,25 @@ fn all<'a>(root: &'a Value, s: &'a Value) -> Vec<&'a Value> {
 pub fn marked(root: &Value, schema: &Value, value: &Value, at: &str, out: &mut Vec<(String, Role, String)>) {
     let schemas = all(root, schema);
     match value {
-        Value::String(s) if s.starts_with(SCHEME) => {
-            if let Some(r) = schemas.iter().find_map(|s| Role::of(s)) {
+        Value::String(s) => {
+            // A library's local folder may be a FileEngine library's mirror.
+            if let Some(r) = schemas.iter().find_map(|s| Role::of(s))
+                && (s.starts_with(SCHEME) || matches!(r, Role::LibraryRead | Role::LibraryWrite))
+            {
                 out.push((at.to_owned(), r, s.clone()));
             }
         }
         Value::Array(items) => {
-            if let Some(it) = schemas.iter().find_map(|s| s.get("items")) {
+            // A mark on a list applies to its items.
+            if let Some(r) = schemas.iter().find_map(|s| Role::of(s)) {
+                for (i, v) in items.iter().enumerate() {
+                    if let Value::String(s) = v
+                        && s.starts_with(SCHEME)
+                    {
+                        out.push((format!("{at}/{i}"), r, s.clone()));
+                    }
+                }
+            } else if let Some(it) = schemas.iter().find_map(|s| s.get("items")) {
                 for (i, v) in items.iter().enumerate() {
                     marked(root, it, v, &format!("{at}/{i}"), out);
                 }
@@ -188,6 +206,12 @@ fn nonce() -> String {
     format!("{}-{}", d.as_secs(), d.subsec_nanos())
 }
 
+/// The commands that take a Component Library's folder, which may be a FileEngine library's
+/// mirror given by its local path (COL-FE-013).
+pub(crate) fn takes_library(name: &str) -> bool {
+    name.starts_with("library.") || matches!(name, "component.place" | "component.create" | "component.place_fragment" | "array.along_path" | "array.set")
+}
+
 /// Runs `name` with the FileEngine addresses in its marked parameters resolved (COL-FE-012).
 /// `None` when it has none, for the caller to run it as it is.
 pub(crate) fn execute(app: &mut App, name: &str, args: &Value, caller: &Caller) -> Option<Result<Outcome>> {
@@ -231,11 +255,48 @@ pub fn fetch(app: &mut App, text: &str, set: bool) -> Result<PathBuf> {
 fn run(app: &mut App, name: &str, mut args: Value, caller: &Caller, found: Vec<(String, Role, String)>) -> Result<Outcome> {
     let cache = app.fileengine.cache_root()?;
     let mut outgoing = Vec::new();
+    let mut libraries: Vec<PathBuf> = Vec::new();
     for (at, role, text) in found {
+        if matches!(role, Role::LibraryRead | Role::LibraryWrite) {
+            let write = role == Role::LibraryWrite;
+            let (dir, source) = if text.starts_with(SCHEME) {
+                let a = address(&text)?;
+                if a.name.is_some() {
+                    return Err(bad("fileengine.bad_address", format!("{text}: a library is fileengine://<connection>/<folder uid>")));
+                }
+                app.fileengine.known(&a.connection_id)?;
+                (crate::fe_library::mirror_dir(app, &a.connection_id, &a.uid)?, Some((a.connection_id, a.uid, true)))
+            } else {
+                let p = PathBuf::from(&text);
+                match crate::fe_library::origin(&p) {
+                    Some(o) => (p, Some((o.connection_id, o.folder_uid, false))),
+                    None => continue,
+                }
+            };
+            if let Some((conn, folder, named)) = source {
+                // Brought up to date before a change, and before reading at most once a minute;
+                // a mirror given by its path is read as it is when the server cannot be reached.
+                if write || app.fileengine.pull_due(&dir) {
+                    match crate::fe_library::pull(app, &dir, &conn, &folder) {
+                        Ok(()) => {}
+                        Err(e) if write || named => return Err(e),
+                        Err(_) => {}
+                    }
+                }
+                if write && !libraries.contains(&dir) {
+                    libraries.push(dir.clone());
+                }
+            }
+            if let Some(v) = args.pointer_mut(&at) {
+                *v = Value::String(dir.to_string_lossy().into_owned());
+            }
+            continue;
+        }
         let a = address(&text)?;
         app.fileengine.known(&a.connection_id)?;
         let local = match role {
             Role::Read | Role::ReadSet => fetch(app, &text, role == Role::ReadSet)?,
+            Role::LibraryRead | Role::LibraryWrite => unreachable!("handled above"),
             Role::Write | Role::WriteFolder | Role::WriteAny => {
                 let dir = cache.join("outgoing").join(nonce());
                 std::fs::create_dir_all(&dir).map_err(|e| bad("fileengine.cache", e.to_string()))?;
@@ -258,6 +319,14 @@ fn run(app: &mut App, name: &str, mut args: Value, caller: &Caller, found: Vec<(
     }
 
     let mut out = app.execute_local(name, args, caller)?;
+    let mut pushed = Vec::new();
+    for dir in &libraries {
+        let p = crate::fe_library::push(app, dir).map_err(|e| bad("fileengine.upload_failed", format!("the command ran, but the library's changes were not all sent to FileEngine ({}); they are kept in {}", e.message, dir.display())))?;
+        pushed.push(p);
+    }
+    if let (Value::Object(m), false) = (&mut out.result, pushed.is_empty()) {
+        m.insert("fileengine_library".into(), serde_json::to_value(&pushed).expect("serialises"));
+    }
     if outgoing.is_empty() {
         return Ok(out);
     }

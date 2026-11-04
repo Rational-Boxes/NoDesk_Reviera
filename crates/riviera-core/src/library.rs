@@ -272,6 +272,7 @@ fn open(root: &Path) -> Result<Manifest> {
 pub struct CreateParams {
     /// The library's folder; made when missing. A folder that already has files becomes a
     /// library as it is.
+    #[schemars(extend("x-riviera-file" = "library_write"))]
     pub path: String,
     pub name: String,
 }
@@ -318,6 +319,7 @@ pub fn create(_: &Store, p: CreateParams) -> Result<LibraryInfo> {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct OpenParams {
+    #[schemars(extend("x-riviera-file" = "library_read"))]
     pub path: String,
 }
 
@@ -353,6 +355,7 @@ fn walk(root: &Path, dir: &Path, f: &mut dyn FnMut(&Path, ItemKind)) {
 #[serde(deny_unknown_fields)]
 pub struct ListParams {
     /// The library's folder.
+    #[schemars(extend("x-riviera-file" = "library_read"))]
     pub library: String,
     /// A folder in it (relative, `/` separated); the root when omitted.
     #[serde(default)]
@@ -548,11 +551,13 @@ pub fn companions(file: &Path) -> Vec<PathBuf> {
 #[serde(deny_unknown_fields)]
 pub struct ImportFilesParams {
     /// The library's folder.
+    #[schemars(extend("x-riviera-file" = "library_write"))]
     pub library: String,
     /// The folder to copy into (relative); the root when omitted. Made when missing.
     #[serde(default)]
     pub folder: String,
     /// The files to import, from anywhere.
+    #[schemars(extend("x-riviera-file" = "read_set"))]
     pub files: Vec<String>,
     /// Details given to every file imported (a name only when one file is imported).
     #[serde(default)]
@@ -695,6 +700,7 @@ pub fn import_files(_: &Store, p: ImportFilesParams) -> Result<ImportReport> {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct GetMetaParams {
+    #[schemars(extend("x-riviera-file" = "library_read"))]
     pub library: String,
     /// The item's path in the library.
     pub item: String,
@@ -733,6 +739,7 @@ pub fn get_meta(_: &Store, p: GetMetaParams) -> Result<ItemMeta> {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SetMetaParams {
+    #[schemars(extend("x-riviera-file" = "library_write"))]
     pub library: String,
     /// Items' paths, and folders' paths (ending in `/`) for folder settings.
     pub paths: Vec<String>,
@@ -797,6 +804,7 @@ pub fn set_meta(_: &Store, p: SetMetaParams) -> Result<()> {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DeleteItemsParams {
+    #[schemars(extend("x-riviera-file" = "library_write"))]
     pub library: String,
     /// Items' paths.
     pub items: Vec<String>,
@@ -909,6 +917,7 @@ pub struct PlaceParams {
     /// A type already in the project.
     pub type_id: Option<ElementRef>,
     /// Or a library item: the library's folder …
+    #[schemars(extend("x-riviera-file" = "library_read"))]
     pub library: Option<String>,
     /// … and the item's path in it.
     pub item: Option<String>,

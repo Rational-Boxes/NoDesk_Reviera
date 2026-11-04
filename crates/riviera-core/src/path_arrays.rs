@@ -726,6 +726,7 @@ pub fn uses(r: &PathArrayRecipe, guid: &str) -> bool {
 #[serde(deny_unknown_fields)]
 pub struct SourceArg {
     pub type_id: Option<ElementRef>,
+    #[schemars(extend("x-riviera-file" = "library_read"))]
     pub library: Option<String>,
     pub item: Option<String>,
     #[serde(default = "one")]

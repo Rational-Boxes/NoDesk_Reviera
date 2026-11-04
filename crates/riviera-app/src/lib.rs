@@ -11,6 +11,7 @@ pub mod bcf_files;
 pub mod bimserver;
 pub mod fileengine;
 pub mod fe_paths;
+pub mod fe_library;
 mod keychain;
 pub mod docs;
 pub mod model_issues;
@@ -354,7 +355,7 @@ impl App {
         caller: &Caller,
     ) -> Result<Outcome> {
         if !matches!(name, "file.open" | "file.save_as")
-            && args.to_string().contains(fileengine::SCHEME)
+            && (fe_paths::takes_library(name) || args.to_string().contains(fileengine::SCHEME))
             && let Some(out) = fe_paths::execute(self, name, &args, caller)
         {
             return out;

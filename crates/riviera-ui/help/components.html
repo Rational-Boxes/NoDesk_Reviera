@@ -29,6 +29,26 @@ column is a public-domain scan (see the library's README).</p>
 <code>library.import_files</code>, <code>library.get_meta</code>, <code>library.set_meta</code>,
 <code>library.delete_items</code>, <code>library.restore_items</code></p>
 
+<h3 id="fileengine">Libraries on FileEngine</h3>
+<p>A FileEngine folder can be a library, shared by everyone the server lets read it. When a
+FileEngine connection exists, the panel's <b>Open…</b> and <b>New…</b> ask <i>This computer…</i>
+or <i>FileEngine…</i>; choose a folder in the FileEngine browser (one without a
+<code>riviera-library.json</code> is offered to be made a library).</p>
+<ul>
+  <li>The library is copied into a cache on this computer and shown as any library; it is
+  brought up to date before a change, and at most once a minute when components are placed from
+  it.</li>
+  <li>Placing works as from a local library: the component is embedded in the model, so the
+  model opens without the server.</li>
+  <li>Where FileEngine lets you write, <b>Import into Library</b>, item edits and deletes go back
+  to the server. Two people adding different items both keep theirs: the library's manifest is
+  merged entry by entry, and an entry both changed is reported (your change kept). FileEngine
+  keeps every earlier version of each file.</li>
+  <li>Scripts and agents give <code>fileengine://&lt;connection&gt;/&lt;folder uid&gt;</code> as
+  the library to any <code>library.*</code> command, <code>component.place</code> or
+  <code>component.create</code>.</li>
+</ul>
+
 <h2 id="place">Placing components</h2>
 <p>Click a component in the panel: you pick it up, like a stamp. Its outline follows the cursor;
 click to place a copy, and again for each further copy, until <kbd>Esc</kbd>.</p>

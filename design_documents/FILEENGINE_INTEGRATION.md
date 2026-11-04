@@ -645,7 +645,9 @@ Commands:
      come;
   3. BCF issues over BCF-API, once FileEngine's persistent BCF store lands;
   4. Component Libraries on FileEngine (read, place, cache, updates; then writing, with the
-     manifest merge);
+     manifest merge). **Built 2026-11-04** (COL-FE-013) as a mirror of the whole library in the
+     per-user cache, read and written through every library command and the panel; not yet:
+     items on demand, *Update available* and `library.reload_item`, the Incoming review folder;
   5. documentation folders, the Documents pane and COBie *Document*; then extraction of product
      data (§7c), once the headless research API is deployed;
   6. the discussion service: live updates, mentions and reviews;

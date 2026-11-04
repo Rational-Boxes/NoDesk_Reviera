@@ -3197,6 +3197,7 @@ version = "0.1.0"
 dependencies = [
  "base64 0.23.1",
  "glam",
+ "hex",
  "keyring",
  "pdf-writer",
  "prost",
@@ -3218,6 +3219,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "sha2",
  "tempfile",
  "uuid",
  "zip",

@@ -133,6 +133,7 @@ pub struct CreateParams {
     /// The component's name (the file's name too).
     pub name: String,
     /// A Component Library to save into, and a folder in it …
+    #[schemars(extend("x-riviera-file" = "library_write"))]
     pub library: Option<String>,
     #[serde(default)]
     pub folder: String,
@@ -338,6 +339,7 @@ pub fn create(store: &Store, p: CreateParams) -> Result<Created> {
 #[serde(deny_unknown_fields)]
 pub struct PlaceParams {
     /// A Component Library and the fragment's path in it …
+    #[schemars(extend("x-riviera-file" = "library_read"))]
     pub library: Option<String>,
     pub item: Option<String>,
     /// … or an IFC file.
