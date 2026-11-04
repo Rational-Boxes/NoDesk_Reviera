@@ -4857,6 +4857,8 @@ All commands defined in this chapter. Every command in this table is also a Lua 
 | `library.source.add` | path_or_url, name? | source_id | No | DM-LIB-001 |
 | `library.source.remove` | source_id | — | No | DM-LIB-001 |
 | `library.refresh` | source_id? | — | No | DM-LIB-001 |
+| `library.updates` | library | [{type_id, name, item, state, uses}] | No (query) | COL-FE-016 |
+| `library.reload_item` | library, type_id | — | Yes | COL-FE-016 |
 | `library.load` | item_ref, type_names?, place=false | family_id | Yes | DM-LIB-001 |
 | `library.add_item` | element_or_type_id, library?, name?, tags? | item_ref | No | DM-LIB-002 |
 | `component.place_row` | type_id \| {library, item}, start, end, spacing?, count? | element_ids[] | Yes | DM-LIB-002 |

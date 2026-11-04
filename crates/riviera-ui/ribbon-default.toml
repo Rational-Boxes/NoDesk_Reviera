@@ -1670,6 +1670,12 @@ icon = "import_object"
 help = "Copy 3D files (OBJ, STL, PLY, glTF, GLB, IFC) into the folder shown in the Component Library"
 
 [[action]]
+id = "library.updates"
+label = "Library Updates"
+icon = "import_object"
+help = "The components placed from the open Component Libraries whose items have changed there (a FileEngine library is read as it is now on the server): pick them to reload from the library (COL-FE-016)"
+
+[[action]]
 id = "component.create"
 label = "Create Component"
 icon = "component_create"
@@ -3557,6 +3563,7 @@ tools = [
   { action = "ui.product_documents", size = "small" },
   { action = "ui.pane.components", size = "small" },
   { action = "library.import_files", size = "small" },
+  { action = "library.updates", size = "small" },
 ]
 
 [[tab.panel]]

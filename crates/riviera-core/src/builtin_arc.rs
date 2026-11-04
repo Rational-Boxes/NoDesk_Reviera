@@ -577,6 +577,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ElevatorTraffic),
         registry.add(EscalatorTraffic),
         registry.add(PublishSaveSet),
+        registry.add(LibraryUpdates),
+        registry.add(LibraryReloadItem),
         registry.add(PublishListSets),
         registry.add(PublishRemoveSet),
     ];
@@ -7419,4 +7421,29 @@ edit_command!(
     crate::publish_sets::RemoveParams,
     usize,
     crate::publish_sets::remove
+);
+
+read_command!(
+    LibraryUpdates,
+    "library.updates",
+    "Placed components with updates in their library",
+    "Lists each type in the project placed from the library at `library` (a folder, or a FileEngine library's \
+     address, brought up to date first) and whether its item has changed there since it was loaded \
+     (COL-FE-016): current, changed (*Update available*) or missing; an item that moved is found by its GUID.",
+    crate::library::UpdatesParams,
+    Vec<crate::library::Update>,
+    crate::library::updates
+);
+
+edit_command!(
+    LibraryReloadItem,
+    "library.reload_item",
+    "Reload a component from its library",
+    "Reads a placed type's mesh again from its item in the library at `library` (COL-FE-016): every copy \
+     changes, slot colours are kept where the slots' names still match, and the type's link follows an item \
+     that moved.",
+    "Reload from Library",
+    crate::library::ReloadItemParams,
+    (),
+    crate::library::reload_item
 );

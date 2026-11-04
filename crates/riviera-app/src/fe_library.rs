@@ -64,6 +64,12 @@ fn io(e: impl std::fmt::Display) -> Error {
     bad("fileengine.cache", e.to_string())
 }
 
+/// What marks a file's version in a folder listing (which gives no version stamp): its version
+/// count, modification time and size.
+fn token(n: &riviera_fileengine::Node) -> String {
+    format!("{}#{}#{}", n.version_count, n.modified_at, n.size)
+}
+
 fn sha(bytes: &[u8]) -> String {
     hex::encode(Sha256::digest(bytes))
 }
@@ -116,13 +122,13 @@ pub fn pull(app: &mut App, root: &Path, conn: &str, folder_uid: &str) -> Result<
     let mut synced = BTreeMap::new();
     for (path, n) in files {
         let local = root.join(&path);
-        let had = s.files.get(&path).filter(|x| x.uid == n.uid && x.version == n.version && local.is_file());
+        let had = s.files.get(&path).filter(|x| x.uid == n.uid && x.version == token(&n) && local.is_file());
         let entry = match had {
             Some(x) => x.clone(),
             None => {
                 let bytes = app.fileengine.with(conn, |c| c.read(&n.uid))?;
                 std::fs::write(&local, &bytes).map_err(io)?;
-                Synced { uid: n.uid.clone(), version: n.version.clone(), sha256: sha(&bytes) }
+                Synced { uid: n.uid.clone(), version: token(&n), sha256: sha(&bytes) }
             }
         };
         synced.insert(path, entry);
@@ -192,7 +198,7 @@ fn upload(app: &mut App, s: &mut Sync, path: &str, local: &Path) -> Result<Synce
             },
         };
         c.write_file(&uid, local)?;
-        let version = c.stat(&uid)?.version;
+        let version = token(&c.stat(&uid)?);
         Ok(Synced { uid, version, sha256: sha(&bytes) })
     })
 }
@@ -289,7 +295,7 @@ pub fn push(app: &mut App, root: &Path) -> Result<Pushed> {
             None => None,
         };
         let final_ = match server {
-            Some((x, n)) if n.version != x.version => {
+            Some((x, n)) if token(&n) != x.version => {
                 let theirs: Value = serde_json::from_slice(&app.fileengine.with(&conn, |c| c.read(&x.uid))?).map_err(|e| bad("fileengine.bad_manifest", e.to_string()))?;
                 let (merged, conflicts) = merge(s.manifest.as_ref().unwrap_or(&Value::Null), &mine, &theirs);
                 out.merged = true;

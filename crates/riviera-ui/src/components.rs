@@ -725,6 +725,59 @@ impl Gui {
         self.add_library(dir);
     }
 
+    /// Architecture › Component › Library Updates (COL-FE-016): the components placed from the open
+    /// libraries whose items changed there, reloaded from the library when picked.
+    pub(crate) fn library_updates(&mut self) {
+        let frame = self.frame;
+        if self.doc.is_none() {
+            return error(&frame, "Open a model first.");
+        }
+        let libraries: Vec<PathBuf> = self.library_pane.as_ref().map(|p| p.libraries.iter().map(|(l, _)| l.clone()).collect()).unwrap_or_default();
+        if libraries.is_empty() {
+            return error(&frame, "Open the Component Libraries the model's components came from (Window › Component Library) first.");
+        }
+        // (library, type, label)
+        let mut changed: Vec<(PathBuf, serde_json::Value, String)> = Vec::new();
+        let mut missing = 0;
+        for lib in &libraries {
+            match self.run("library.updates", json!({ "library": lib })) {
+                Ok(v) => {
+                    for u in v.as_array().into_iter().flatten() {
+                        match u["state"].as_str() {
+                            Some("changed") => changed.push((lib.clone(), u["type_id"].clone(), format!("{} ({}, {} placed)", u["name"].as_str().unwrap_or(""), u["item"].as_str().unwrap_or(""), u["uses"]))),
+                            Some("missing") => missing += 1,
+                            _ => {}
+                        }
+                    }
+                }
+                Err(e) => return error(&frame, &format!("{} could not be checked:\n{e}", lib.display())),
+            }
+        }
+        if changed.is_empty() {
+            let note = if missing > 0 { format!("\n{missing} component(s) are no longer in their library.") } else { String::new() };
+            MessageDialog::builder(&frame, &format!("Every component placed from the open libraries is up to date.{note}"), "Library Updates").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build().show_modal();
+            return;
+        }
+        let labels: Vec<&str> = changed.iter().map(|c| c.2.as_str()).collect();
+        let d = MultiChoiceDialog::builder(&frame, "Updates available in the library. Reload the ones ticked (every copy in the model changes):", "Library Updates", &labels).build();
+        d.set_selections(&(0..changed.len() as i32).collect::<Vec<_>>());
+        if d.show_modal() != ID_OK {
+            return;
+        }
+        let picked = d.get_selections();
+        d.destroy();
+        let mut n = 0;
+        for k in picked {
+            let Some((lib, ty, label)) = changed.get(k as usize) else { continue };
+            match self.run("library.reload_item", json!({ "library": lib, "type_id": ty })) {
+                Ok(_) => n += 1,
+                Err(e) => error(&frame, &format!("{label} was not reloaded:\n{e}")),
+            }
+        }
+        self.refresh_scene(&frame);
+        frame.set_status_text(&format!("Reloaded {n} component(s) from their library"), 0);
+    }
+
     /// The panel's Open…: a folder as a library (offering to make one).
     fn open_library_folder(&mut self) {
         let frame = self.frame;

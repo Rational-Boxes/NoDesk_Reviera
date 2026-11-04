@@ -72,6 +72,17 @@ fn a_library_shared_on_fileengine() {
     let level = ok(&mut bob, "level.list", json!({}))[0]["id"].clone();
     ok(&mut bob, "component.place", json!({ "library": mirror, "item": "chair.obj", "points": [[1.0, 1.0]], "level": level }));
 
+    // Ann changes the chair on the server: Bob sees *Update available*, and reloads it.
+    assert_eq!(ok(&mut bob, "library.updates", json!({ "library": mirror }))[0]["state"], "current");
+    let chair = fake.uid_of("Engineering/Library/chair.obj").unwrap();
+    let mut bigger = String::from_utf8(fake.content(&chair).unwrap()).unwrap();
+    bigger = bigger.replace("v 0 0 1", "v 0 0 2");
+    fake.write_as(&chair, bigger.as_bytes(), "ann@acme.test");
+    let up = ok(&mut bob, "library.updates", json!({ "library": mirror }));
+    assert_eq!((up[0]["item"].as_str(), up[0]["state"].as_str(), up[0]["uses"].as_u64()), (Some("chair.obj"), Some("changed"), Some(1)), "{up:#}");
+    ok(&mut bob, "library.reload_item", json!({ "library": mirror, "type_id": up[0]["type_id"] }));
+    assert_eq!(ok(&mut bob, "library.updates", json!({ "library": mirror }))[0]["state"], "current");
+
     // Bob adds an item through his mirror's path, while Ann's mirror still has the old manifest:
     // Ann's next change brings hers up to date first, so both items stay.
     ok(&mut bob, "library.import_files", json!({ "library": mirror, "files": [obj(&dir.path().join("src2"), "table", "0.2 0.8 0.2")] }));

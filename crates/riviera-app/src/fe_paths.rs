@@ -288,7 +288,9 @@ fn run(app: &mut App, name: &str, mut args: Value, caller: &Caller, found: Vec<(
             if let Some((conn, folder, named)) = source {
                 // Brought up to date before a change, and before reading at most once a minute;
                 // a mirror given by its path is read as it is when the server cannot be reached.
-                if write || app.fileengine.pull_due(&dir) {
+                // Checking for updates always looks at the server as it is now (COL-FE-016).
+                let fresh = write || matches!(name, "library.updates" | "library.reload_item");
+                if fresh || app.fileengine.pull_due(&dir) {
                     match crate::fe_library::pull(app, &dir, &conn, &folder) {
                         Ok(()) => {}
                         Err(e) if write || named => return Err(e),

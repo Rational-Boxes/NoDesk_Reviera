@@ -4626,6 +4626,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         }),
         "ui.pane.components" => with(gui, |g| g.toggle_pane("components")),
         "library.import_files" => with(gui, Gui::import_into_library),
+        "library.updates" => with(gui, Gui::library_updates),
         "array.along_path" => with(gui, |g| {
             g.start_array_tool();
             focus(g);

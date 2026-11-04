@@ -606,7 +606,7 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 **Acceptance criteria.**
 - [x] Against the fake server: a library made on FileEngine (`library.create` with an address) uploads its manifest; `library.import_files` of an OBJ uploads the item, its MTL and the manifest entry; a second machine's `library.open` mirrors it, lists and places the item; items added from both machines all stay in the manifest; a manifest changed on the server between a pull and a push is merged entry by entry (the description from one side, an item's name from the other); `library.delete_items` moves the item into `.deleted` on the server.
 
-*Built (2026-11-04):* `riviera_app::fe_library` (mirror, pull, push, merge) and the `library_read`/`library_write` marks resolved in `fe_paths`, for 11 more commands; the panel's FileEngine Open and New. *Not yet:* downloading items on demand instead of the whole library, *Update available* and `library.updates`/`library.reload_item`, the Incoming review folder, parameter libraries on FileEngine.
+*Built (2026-11-04):* `riviera_app::fe_library` (mirror, pull, push, merge) and the `library_read`/`library_write` marks resolved in `fe_paths`, for 11 more commands; the panel's FileEngine Open and New. *Not yet:* downloading items on demand instead of the whole library (updates: COL-FE-016), the Incoming review folder.
 
 ### Parameter libraries, scripts and keynotes on FileEngine
 **ID:** COL-FE-014 · **Priority:** P2 · **Ref:** FILEENGINE_INTEGRATION §7a, §7b; owner requirement (2026-11-04, as COL-FE-012)
@@ -641,6 +641,22 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 - [x] Against the fake server: a set of the BCF issues, COBie and a schedule is saved with the model and survives saving and reopening; publishing it uploads three files (COBie as one workbook); publishing it again adds a version of each; an output whose command fails is reported while the others publish.
 
 *Built (2026-11-04):* `riviera_core::publish_sets` (`publish.save_set`, `publish.list_sets`, `publish.remove_set`), `publish.run` in `riviera_app::publish`, and File › Publish to FileEngine…. *Not yet:* sheets as PDF in the window's choice (scripts can name `export.pdf`), share links in the publish step (FileEngine's share door is not deployed), a status-bar retry of failed uploads.
+
+### Library updates
+**ID:** COL-FE-016 · **Priority:** P2 · **Ref:** FILEENGINE_INTEGRATION §7b (*Updates*); DM-LIB-001
+
+**Purpose.** Know when a component placed from a library has changed there, and bring the change into the model when wanted, never by surprise.
+
+**Behaviour & rules.**
+- `library.updates` lists each type in the project placed from a library (a local folder, or a FileEngine library brought up to date with the server first) and its state: **current**, **changed** (the item's file differs from the one loaded, by SHA-256: *Update available*) or **missing**. An item that moved is found by its GUID.
+- `library.reload_item` reads a placed type's mesh again from its item: every copy changes, slot colours are kept where the slots' names still match, and the type's link follows an item that moved. One undo step. Nothing changes in a model until someone reloads.
+- **In the window:** Architecture › Component › *Library Updates* checks every library open in the Component Library panel and lists the changed components, ticked, to reload.
+- A FileEngine library's mirror notices files changed on the server by each file's version count, modification time and size in the folder listing (the listing gives no version stamp).
+
+**Acceptance criteria.**
+- [x] Against the fake server: a component placed from a FileEngine library is current; after the item changes on the server it is changed (one placed); reloading makes it current.
+
+*Built (2026-11-04):* `library.updates`, `library.reload_item`, and the window's Library Updates. Not yet: the Properties palette's *Update available* on a selected type, the comparison shown before reloading (DM-LIB-001), IFC model fragments.
 
 *Not yet (later phases):* a thumbnail with each save; the Documents pane (a dockable pane with document previews, uploads and expiry warnings); publish sets and share links (exports themselves: COL-FE-012); BCF over BCF-API; Component Libraries; field sets beyond EPD and HPD (§7c); live updates through the discussion service.
 

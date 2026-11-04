@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Riviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Riviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 887 numbered requirements (320 P0 · 343 P1 · 217 P2 · 7 P3), 2,330 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 888 numbered requirements (320 P0 · 343 P1 · 218 P2 · 7 P3), 2,332 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Riviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Riviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,330 commands; 887 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,332 commands; 888 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -8951,6 +8951,8 @@ All commands defined in this chapter. Every command in this table is also a Lua 
 | `library.source.add` | path_or_url, name? | source_id | No | DM-LIB-001 |
 | `library.source.remove` | source_id | — | No | DM-LIB-001 |
 | `library.refresh` | source_id? | — | No | DM-LIB-001 |
+| `library.updates` | library | [{type_id, name, item, state, uses}] | No (query) | COL-FE-016 |
+| `library.reload_item` | library, type_id | — | Yes | COL-FE-016 |
 | `library.load` | item_ref, type_names?, place=false | family_id | Yes | DM-LIB-001 |
 | `library.add_item` | element_or_type_id, library?, name?, tags? | item_ref | No | DM-LIB-002 |
 | `component.place_row` | type_id \| {library, item}, start, end, spacing?, count? | element_ids[] | Yes | DM-LIB-002 |
@@ -27740,7 +27742,7 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 **Acceptance criteria.**
 - [x] Against the fake server: a library made on FileEngine (`library.create` with an address) uploads its manifest; `library.import_files` of an OBJ uploads the item, its MTL and the manifest entry; a second machine's `library.open` mirrors it, lists and places the item; items added from both machines all stay in the manifest; a manifest changed on the server between a pull and a push is merged entry by entry (the description from one side, an item's name from the other); `library.delete_items` moves the item into `.deleted` on the server.
 
-*Built (2026-11-04):* `riviera_app::fe_library` (mirror, pull, push, merge) and the `library_read`/`library_write` marks resolved in `fe_paths`, for 11 more commands; the panel's FileEngine Open and New. *Not yet:* downloading items on demand instead of the whole library, *Update available* and `library.updates`/`library.reload_item`, the Incoming review folder, parameter libraries on FileEngine.
+*Built (2026-11-04):* `riviera_app::fe_library` (mirror, pull, push, merge) and the `library_read`/`library_write` marks resolved in `fe_paths`, for 11 more commands; the panel's FileEngine Open and New. *Not yet:* downloading items on demand instead of the whole library (updates: COL-FE-016), the Incoming review folder.
 
 ### Parameter libraries, scripts and keynotes on FileEngine
 **ID:** COL-FE-014 · **Priority:** P2 · **Ref:** FILEENGINE_INTEGRATION §7a, §7b; owner requirement (2026-11-04, as COL-FE-012)
@@ -27775,6 +27777,22 @@ FileEngine (Proxima File Vault) is a versioned document store with a REST door. 
 - [x] Against the fake server: a set of the BCF issues, COBie and a schedule is saved with the model and survives saving and reopening; publishing it uploads three files (COBie as one workbook); publishing it again adds a version of each; an output whose command fails is reported while the others publish.
 
 *Built (2026-11-04):* `riviera_core::publish_sets` (`publish.save_set`, `publish.list_sets`, `publish.remove_set`), `publish.run` in `riviera_app::publish`, and File › Publish to FileEngine…. *Not yet:* sheets as PDF in the window's choice (scripts can name `export.pdf`), share links in the publish step (FileEngine's share door is not deployed), a status-bar retry of failed uploads.
+
+### Library updates
+**ID:** COL-FE-016 · **Priority:** P2 · **Ref:** FILEENGINE_INTEGRATION §7b (*Updates*); DM-LIB-001
+
+**Purpose.** Know when a component placed from a library has changed there, and bring the change into the model when wanted, never by surprise.
+
+**Behaviour & rules.**
+- `library.updates` lists each type in the project placed from a library (a local folder, or a FileEngine library brought up to date with the server first) and its state: **current**, **changed** (the item's file differs from the one loaded, by SHA-256: *Update available*) or **missing**. An item that moved is found by its GUID.
+- `library.reload_item` reads a placed type's mesh again from its item: every copy changes, slot colours are kept where the slots' names still match, and the type's link follows an item that moved. One undo step. Nothing changes in a model until someone reloads.
+- **In the window:** Architecture › Component › *Library Updates* checks every library open in the Component Library panel and lists the changed components, ticked, to reload.
+- A FileEngine library's mirror notices files changed on the server by each file's version count, modification time and size in the folder listing (the listing gives no version stamp).
+
+**Acceptance criteria.**
+- [x] Against the fake server: a component placed from a FileEngine library is current; after the item changes on the server it is changed (one placed); reloading makes it current.
+
+*Built (2026-11-04):* `library.updates`, `library.reload_item`, and the window's Library Updates. Not yet: the Properties palette's *Update available* on a selected type, the comparison shown before reloading (DM-LIB-001), IFC model fragments.
 
 *Not yet (later phases):* a thumbnail with each save; the Documents pane (a dockable pane with document previews, uploads and expiry warnings); publish sets and share links (exports themselves: COL-FE-012); BCF over BCF-API; Component Libraries; field sets beyond EPD and HPD (§7c); live updates through the discussion service.
 
@@ -29871,9 +29889,9 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 28 | 0 | 29 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
-| COL | 8 | 52 | 14 | 1 | 75 |
+| COL | 8 | 52 | 15 | 1 | 76 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **343** | **217** | **7** | **887** |
+| **Total** | **320** | **343** | **218** | **7** | **888** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -29928,7 +29946,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.2a Riviera-originated features
 
-142 requirements are Riviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
+143 requirements are Riviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
 
 | Requirement | Ch | Feature |
 |-------------|----|---------|
@@ -30067,6 +30085,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | COL-FE-013 | 6 | Component Libraries hosted on FileEngine |
 | COL-FE-014 | 6 | Parameter libraries, scripts and keynotes on FileEngine |
 | COL-FE-015 | 6 | Publish sets |
+| COL-FE-016 | 6 | Library updates |
 | COL-MRG-001 | 6 | Three-way merge by GlobalId and RXD id |
 | COL-OWN-002 | 6 | Live ownership document and sync lock |
 | COL-OWN-004 | 6 | Enforced ownership through a server plugin (optional) |
@@ -30077,7 +30096,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2330 unique commands** in 434 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2332 unique commands** in 434 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -30281,7 +30300,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `keynotes` | 2 |
 | `legend` | 3 |
 | `level` | 5 |
-| `library` | 27 |
+| `library` | 29 |
 | `lighting` | 1 |
 | `lighting_fixture` | 1 |
 | `line` | 1 |
@@ -31544,6 +31563,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `library.open` | 2 | path | library_id | No | DM-LIB-004 |
 | `library.preview` | 2 | item_ref, view?, size? | image | No | DM-LIB-004 |
 | `library.refresh` | 2 | source_id? | — | No | DM-LIB-001 |
+| `library.reload_item` | 2 | library, type_id | — | Yes | COL-FE-016 |
 | `library.restore_deleted` | 2 | item_refs[] | — | No | DM-LIB-004 |
 | `library.search` | 2 | text?, filters?, source?, limit=100 | library_item[] | No | DM-LIB-001 |
 | `library.set_meta` | 2 | item_or_folder_refs[], meta | — | No | DM-LIB-004 |
@@ -31551,6 +31571,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `library.source.add` | 2 | path_or_url, name? | source_id | No | DM-LIB-001 |
 | `library.source.remove` | 2 | source_id | — | No | DM-LIB-001 |
 | `library.undo_import` | 2 | import_id | — | No | DM-LIB-004 |
+| `library.updates` | 2 | library | [{type_id, name, item, state, uses}] | No (query) | COL-FE-016 |
 | `library.write_meta_to_file` | 2 | item_ref | — | No | DM-LIB-004 |
 | `lighting.calc_average` | 4 | space_ids[] \ | "all" | results[] | Results only |
 | `lighting_fixture.place` | 4 | type_id, host_face_ref \ | point, level | id | Yes |

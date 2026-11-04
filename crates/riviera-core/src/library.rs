@@ -1085,3 +1085,99 @@ mod tests {
         assert!(relative("Chairs/a.obj").is_ok());
     }
 }
+
+// ---- Updates (COL-FE-016) ----
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct UpdatesParams {
+    /// The library's folder.
+    #[schemars(extend("x-riviera-file" = "library_read"))]
+    pub library: String,
+}
+
+/// Whether a placed type's item has changed in its library.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum UpdateState {
+    /// The item is as it was loaded.
+    Current,
+    /// The item's file has changed: *Update available*.
+    Changed,
+    /// The item is no longer in the library.
+    Missing,
+}
+
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct Update {
+    pub type_id: ElementId,
+    pub name: String,
+    /// The item's path in the library now (it may have moved, found by its GUID).
+    pub item: String,
+    pub state: UpdateState,
+    /// The copies placed.
+    pub uses: usize,
+}
+
+/// The item a type was loaded from, by GUID first (it may have moved), else by path.
+fn item_of(m: &Manifest, link: &LibraryLink) -> String {
+    if !link.item_guid.is_empty()
+        && let Some((k, _)) = m.items.iter().find(|(_, d)| d.guid == link.item_guid)
+    {
+        return k.clone();
+    }
+    link.item.clone()
+}
+
+/// `library.updates`: each type in the project placed from this library, and whether its item
+/// has changed there since it was loaded.
+pub fn updates(store: &Store, p: UpdatesParams) -> Result<Vec<Update>> {
+    let root = PathBuf::from(&p.library);
+    let m = open(&root)?;
+    let mut out = Vec::new();
+    for (id, t, uses) in mesh_objects::types(store) {
+        let Some(link) = t.library.as_ref().filter(|l| l.library_id == m.id) else { continue };
+        let item = item_of(&m, link);
+        let file = root.join(&item);
+        let state = if !file.is_file() {
+            UpdateState::Missing
+        } else if sha256(&file)? == t.source.sha256 {
+            UpdateState::Current
+        } else {
+            UpdateState::Changed
+        };
+        let name = store.get(id).and_then(|e| e.name.clone()).unwrap_or_default();
+        out.push(Update { type_id: id, name, item, state, uses });
+    }
+    Ok(out)
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ReloadItemParams {
+    /// The library's folder.
+    #[schemars(extend("x-riviera-file" = "library_read"))]
+    pub library: String,
+    /// A type placed from it.
+    pub type_id: ElementRef,
+}
+
+/// `library.reload_item`: a placed type's mesh read again from its library item (every copy
+/// changes; slot colours kept where the slots' names match), the link following a moved item.
+pub(crate) fn reload_item(txn: &mut crate::txn::Transaction<'_>, p: ReloadItemParams) -> Result<()> {
+    let root = PathBuf::from(&p.library);
+    let m = open(&root)?;
+    let store = txn.store().clone();
+    let id = store.resolve(&p.type_id).ok_or_else(|| Error::new("element.not_found", "no such type"))?;
+    let t = mesh_objects::mesh_object_type(store.get(id).expect("resolved")).ok_or_else(|| Error::new("mesh_object.not_a_type", format!("element {id} is not a custom object type")))?;
+    let link = t.library.clone().filter(|l| l.library_id == m.id).ok_or_else(|| Error::new("library.not_from_library", format!("the type was not placed from {}", m.name)))?;
+    let item = item_of(&m, &link);
+    let file = root.join(&item);
+    if !file.is_file() {
+        return Err(Error::new("library.no_item", format!("{item} is no longer in {}", m.name)));
+    }
+    mesh_objects::reload(txn, mesh_objects::ReloadParams { type_id: ElementRef::Id(id), path: Some(file.to_string_lossy().into_owned()), options: None })?;
+    mesh_objects::set_library_link(txn, id, LibraryLink { item, ..link })?;
+    mesh_objects::forget_source_path(txn, id)?;
+    Ok(())
+}
