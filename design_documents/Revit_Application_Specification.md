@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Reviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Reviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 868 numbered requirements (320 P0 · 333 P1 · 208 P2 · 7 P3), 2,315 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 870 numbered requirements (320 P0 · 335 P1 · 208 P2 · 7 P3), 2,315 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Reviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Reviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,315 commands; 868 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,315 commands; 870 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -13868,7 +13868,7 @@ These are view annotation and are specified in the DOC chapter. This chapter req
 
 ## 3.7a Vertical transportation: elevators
 
-Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-03: "Go with your recommended defaults and start building elevators"), planned in `VERTICAL_TRANSPORT_PLAN.md` and researched in `research/16_elevators.md` (sources S1505–S1684 and S2383–S2538). An elevator is made of ordinary elements sized by **rule packs**, as bathrooms are (§3.9a): the sizes, the accessibility minimums and the code limits are data with their jurisdiction, edition, source and confidence. This section covers passenger elevators. Freight, service and vehicle elevators, small lifts, panoramic cars, banks, escalators and moving walks, stairlifts, people movers, funiculars and ropeways follow, in the order of the plan's §11.
+Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-03: "Go with your recommended defaults and start building elevators"), planned in `VERTICAL_TRANSPORT_PLAN.md` and researched in `research/16_elevators.md` (sources S1505–S1684 and S2383–S2538). An elevator is made of ordinary elements sized by **rule packs**, as bathrooms are (§3.9a): the sizes, the accessibility minimums and the code limits are data with their jurisdiction, edition, source and confidence. This section covers passenger, hospital, freight and vehicle elevators and small lifts (LULAs, home elevators, vertical platform lifts, dumbwaiters). Panoramic cars, banks, escalators and moving walks, stairlifts, people movers, funiculars and ropeways follow, in the order of the plan's §11.
 
 ### 3.7a.1 Vertical-transport rule packs
 **ID:** ARC-VT-001 · **Priority:** P1 · **Ref:** owner requirement (2026-11-03); `VERTICAL_TRANSPORT_PLAN.md` §3, §12a; research/16 Parts A, D, K, L
@@ -13892,13 +13892,14 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 |---|---|---|
 | `us_ibc_ada` | accessible | ADA 2010 Table 407.4.1 car and door sizes (centred door 2030 × 1295 mm, 1065 mm door; side door 1725 × 1295 mm; any door 1370 × 2030 or 1525 × 1525 mm; 899 mm doors) and the 1525 mm turning circle; IBC 3002.4 stretcher 610 × 2134 mm, 127 mm corners, from 4 storeys; the 760 × 1220 mm clear floor space at the call buttons; call buttons 380–1220 mm |
 | `us_a17` | minimum (advisory) | ASME A17.1 Table 2.16.1.1 maximum car area, 2000–6000 lb, as restated by makers and the VA |
-| `practice_us` | recommended | US maker-style cars (2000–4000 lb), hoistway allowances (+559 mm width, +457 mm depth), pit and overhead by drive and speed |
+| `us_a18` | minimum (advisory) | ASME A18.1 vertical platform lifts with an enclosed runway: travel at most 4250 mm, load at most 475 kg (ARC-VT-006) |
+| `practice_us` | recommended | US maker-style cars of each kind (passenger 2000–4000 lb; hospital 5000 lb; freight 2500–10,000 lb; vehicle 8000 lb; LULA, home elevator, platform lift, dumbwaiter), hoistway allowances (+559 mm width, +457 mm depth) or each car's own hoistway, pit and overhead |
 | `en81` | minimum (advisory) | EN 81-20 Table 6 maximum car area, 100–2500 kg, +0.16 m² per 100 kg beyond |
 | `en81_70` | accessible | EN 81-70:2021 type 2 car, 1100 × 1400 mm, 900 mm door |
 | `england_adm` | accessible | Approved Document M vol. 2: car 1100 × 1400 mm, 800 mm door; 1500 × 1500 mm landing; call buttons 900–1100 mm |
 | `practice_en` | recommended | EN maker-style cars (450–2500 kg), allowances, pit and headroom by speed |
 
-- **Choosing packs.** A project uses the packs it names (`vt.set_rule_packs`), or by default packs chosen from its building code (DM-CODE-001): `us_ibc_ada`, `us_a17` and `practice_us` under the IBC or IRC; `en81`, `en81_70`, `england_adm` and `practice_en` under England's; `en81`, `en81_70` and `practice_en` otherwise.
+- **Choosing packs.** A project uses the packs it names (`vt.set_rule_packs`), or by default packs chosen from its building code (DM-CODE-001): `us_ibc_ada`, `us_a17`, `us_a18` and `practice_us` under the IBC or IRC; `en81`, `en81_70`, `england_adm` and `practice_en` under England's; `en81`, `en81_70` and `practice_en` otherwise.
 - **Project packs.** `vt.add_rule_pack` adds a pack to the project (checked against the schema; an `id` that ships replaces the shipped one for this project), and `vt.remove_rule_pack` removes it. They are kept in RXD on the project (`rxd:vt_rule_packs`). A pack whose car-area rows fall in load or area, whose call-button band is upside down, or whose pit and overhead rows give neither or both overhead forms, is refused (`vt.pack_range`).
 
 **Data (IFC mapping).** RXD only: `rxd:vt_rules` and `rxd:vt_rule_packs` on `IfcProject`.
@@ -13977,6 +13978,48 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 - [x] Under `en81`, a 630 kg car of 1400 × 1600 mm is a note (advisory), giving 1.66 m² allowed.
 
 *Built (2026-11-03):* `elevator.check`, and Architecture › Circulation › Check Elevators. Not yet: the HTML and BCF report (as `bath.report`), the door in the stretcher test, door widths alone, call buttons.
+
+### 3.7a.5 Hospital, freight and vehicle elevators
+**ID:** ARC-VT-005 · **Priority:** P1 · **Ref:** owner requirement (2026-11-01: "both passenger and freight"); `VERTICAL_TRANSPORT_PLAN.md` §4.2 step 3; research/16 B1–B7
+
+**Purpose.** Lay out the cars that carry beds, goods and vehicles, sized as their makers build them and checked against the loading class they are rated for.
+
+**Behaviour & rules.**
+- **Kinds.** `elevator.size` and `elevator.create` take a `kind`: `passenger` (default), `hospital`, `freight`, `vehicle`, and the small lifts of ARC-VT-006. Sizing uses only the sizing pack's catalogue cars of that kind; a kind the pack lists no car of needs the car's width and depth.
+- **Catalogue cars may carry their own** hoistway, pit, overhead, car and door heights, entrance and loading class, from the maker tables (research/16 B2–B7), in place of the pack's allowances and pit-and-overhead table. A car's own hoistway grows with any car width or depth given, by the same margins.
+- **Hospital** cars (`practice_us`: 5000 lb, 1727 × 2743 mm, 1372 mm two-speed door; `practice_en`: bed lifts of 1600–2500 kg) count for the stretcher rule and the passenger accessibility packs, like passenger cars.
+- **Freight** cars (2500–10,000 lb, class A by default) and **vehicle** cars (8000 lb, class B) carry no persons (CapacityPeople 0), have no landing zones, and are not counted for the stretcher or the accessibility packs. A `class` (`a`, `b`, `c1`, `c2`, `c3`) may be given.
+- **Entrances by kind.** A car's entrance is a sliding automatic door, a swinging door (opening onto the landing), or an **opening** in the hoistway wall for doors Reviera does not model yet: freight and vehicle cars' vertical bi-parting doors. Where a sliding door's leaves would not fit the front wall (a two-speed side-opening door, which stacks inside the hoistway), the entrance becomes an opening and the sizing says so in its notes.
+- **Freight loading classes** (`freight_classes` in a pack): a freight car's rated load must be at least its inside area times its class's least load per square metre (A and C 244 kg/m², B 146 kg/m², ASME A17.1 2.16.2.2 as California Title 8 §3101 restates it). `elevator.check` reports one below it.
+
+**Data (IFC mapping).** As ARC-VT-002, the car an `IfcTransportElement` ELEVATOR named for its kind; `Reviera_Elevator.Kind` and `Reviera_Elevator.LoadingClass`.
+
+**Acceptance criteria.**
+- [x] A freight elevator takes the 2500 lb class A car with no persons; a vehicle elevator the 8000 lb class B car; a hospital elevator the 5000 lb car, its entrances openings.
+- [x] A class C2 freight car of 2.4 × 3.0 m rated 1000 kg is reported: it needs at least 1757 kg.
+
+*Built (2026-11-03):* in `reviera_core::elevators`; the Elevator dialog's *Kind*; the sample *Hospital, freight and small lifts*. Defaults are E-84. Not yet: vertical bi-parting and telescopic doors, truck approach zones (Z24), freight door operating bands (Z23), jack holes, the DoD drive-by-travel rule.
+
+### 3.7a.6 Small lifts: LULAs, home elevators, platform lifts and dumbwaiters
+**ID:** ARC-VT-006 · **Priority:** P1 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §4.2 (`lift.small`); research/16 C1–C4; ADA 2010 §408–§410
+
+**Purpose.** Lay out the lifts that serve a few floors or a home, or carry goods between counters, with the limits their codes put on size, load and rise.
+
+**Behaviour & rules.**
+- **Kinds** `lula`, `residence`, `platform_lift` and `dumbwaiter`, sized from `practice_us`'s catalogue (LULA 1400 lb, 48 × 54 in, 14 in pit; home elevator 1000 lb, 36 × 54 in; vertical platform lift 750 lb, 36 × 60 in, 3 in pit; dumbwaiter 500 lb, 36 × 36 × 48 in). Their usual speeds are the defaults: 0.15 m/s for LULAs and home elevators, 0.1 m/s for platform lifts, 0.25 m/s for dumbwaiters.
+- **Entrances.** LULAs, home elevators and platform lifts have swinging entrances that open onto the landing. A dumbwaiter's entrances are openings at the catalogue car's **sill** (762 mm, counter loading) above each floor.
+- **Accessibility** (`accessible_cars` with `kinds`): ADA 408.4.1 (LULA 42 × 54 in with a 32 in door, or 51 × 51 in with a 36 in door), 409.4.1 (home elevator 36 × 48 in), 410 (platform lift 30 × 48 in clear floor, 32 in door), converted exactly from inches.
+- **Limits** (`limits` in a pack): car area, rated load, rise and car height by kind. LULA at most 18 ft², 1400 lb and 25 ft of rise; home elevator at most 15 ft² (advisory: later editions allow 18 ft²) and 50 ft; dumbwaiter at most 9 ft², 4 ft high and 500 lb (California Title 8 §3079); platform lift with an enclosed runway at most 4250 mm of travel and 475 kg (`us_a18`). `elevator.check` reports any beyond.
+- Small lifts carry people except dumbwaiters, so landing zones apply to LULAs, home elevators and platform lifts. None counts for the stretcher.
+
+**Data (IFC mapping).** LULAs and home elevators are `IfcTransportElement` ELEVATOR; platform lifts and dumbwaiters USERDEFINED with ObjectType `PLATFORMLIFT` and `DUMBWAITER` (`VERTICAL_TRANSPORT_PLAN.md` §12a, Question 4).
+
+**Acceptance criteria.**
+- [x] Each small kind takes its catalogue car; together with the other kinds in one building, nothing overlaps and nothing is in a hoistway.
+- [x] A LULA rising 10.5 m and a dumbwaiter car 1.5 m high are reported against their limits.
+- [x] The file has the platform lift's and dumbwaiter's object types.
+
+*Built (2026-11-03):* as ARC-VT-005. Not yet: A18.1's 1500 mm limit for an unenclosed platform, inclined platform lifts and stairlifts (plan §5), home lifts to England's M4(3) through-floor liftway, counter-height landing zones for dumbwaiters.
 
 ---
 
@@ -16311,7 +16354,7 @@ All commands below are registered once in the command registry and exposed autom
 | `vt.set_rule_packs` | packs? (none for automatic) | — | Yes | ARC-VT-001 |
 | `vt.add_rule_pack` | pack | id | Yes | ARC-VT-001 |
 | `vt.remove_rule_pack` | id | — | Yes | ARC-VT-001 |
-| `elevator.size` | load?, speed?, drive?, door?, car_width?, car_depth?, car_height?, door_width?, door_height?, storeys?, space_below? | {load, persons, speed, drive, door, car, door_size, hoistway, pit, overhead, sizing_pack, notes} | No (query) | ARC-VT-002 |
+| `elevator.size` | kind?, class?, load?, speed?, drive?, door?, car_width?, car_depth?, car_height?, door_width?, door_height?, storeys?, space_below? | {kind, class, load, persons, speed, drive, door, car, door_size, entrance, sill, hoistway, pit, overhead, sizing_pack, notes} | No (query) | ARC-VT-002 |
 | `elevator.create` | point, rotation?, base_level, top_level, (as `elevator.size`), walls?, wall_thickness? | {elevator, shaft, walls, entrances, sizes} | Yes | ARC-VT-002 |
 | `elevator.list` | — | [{elevator, name, levels, sizes, members}] | No (query) | ARC-VT-002 |
 | `elevator.delete` | elevator | count | Yes | ARC-VT-002 |
@@ -29483,14 +29526,14 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 39 | 8 | 0 | 123 |
 | DM | 91 | 65 | 34 | 3 | 193 |
-| ARC | 77 | 93 | 20 | 1 | 191 |
+| ARC | 77 | 95 | 20 | 1 | 193 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 28 | 0 | 29 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
 | COL | 8 | 50 | 12 | 1 | 71 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **333** | **208** | **7** | **868** |
+| **Total** | **320** | **335** | **208** | **7** | **870** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -30716,7 +30759,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `elevator.create` | 3 | point, rotation?, base_level, top_level, (as `elevator.size`), walls?, wall_thickness? | {elevator, shaft, walls, entrances, sizes} | Yes | ARC-VT-002 |
 | `elevator.delete` | 3 | elevator | count | Yes | ARC-VT-002 |
 | `elevator.list` | 3 | — | [{elevator, name, levels, sizes, members}] | No (query) | ARC-VT-002 |
-| `elevator.size` | 3 | load?, speed?, drive?, door?, car_width?, car_depth?, car_height?, door_width?, door_height?, storeys?, space_below? | {load, persons, speed, drive, door, car, door_size, hoistway, pit, overhead, sizing_pack, notes} | No (query) | ARC-VT-002 |
+| `elevator.size` | 3 | kind?, class?, load?, speed?, drive?, door?, car_width?, car_depth?, car_height?, door_width?, door_height?, storeys?, space_below? | {kind, class, load, persons, speed, drive, door, car, door_size, entrance, sill, hoistway, pit, overhead, sizing_pack, notes} | No (query) | ARC-VT-002 |
 | `embodied_carbon.compare` | 4 | job_id_a, job_id_b | report | No | ANA-CARB-001 |
 | `embodied_carbon.export` | 4 | job_id, path, format: "csv"\ | "json"\ | "html" | — |
 | `embodied_carbon.import_factors` | 4 | path, format: "ilcd"\ | "csv" | library_id | Yes |

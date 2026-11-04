@@ -24,10 +24,16 @@ impl Gui {
         }
         let names: Vec<String> = above.iter().map(|l| l["name"].as_str().unwrap_or_default().to_owned()).collect();
         let f = super::reinforcement_ui::Form::new(&frame, "Elevator");
+        let kinds = ["passenger", "hospital", "freight", "vehicle", "lula", "residence", "platform_lift", "dumbwaiter"];
+        let kind = f.choice(
+            "Kind",
+            &["Passenger".to_owned(), "Hospital or service".to_owned(), "Freight".to_owned(), "Vehicle".to_owned(), "LULA (limited use)".to_owned(), "Home (private residence)".to_owned(), "Vertical platform lift".to_owned(), "Dumbwaiter".to_owned()],
+            0,
+        );
         let top = f.choice("Serves up to", &names, names.len() - 1);
         let load = f.text("Rated load (kg)", "", "Empty: the smallest car that meets the accessibility rule packs and, where needed, takes the stretcher");
         let drive = f.choice("Drive", &["Traction, no machine room".to_owned(), "Traction, machine room".to_owned(), "Hydraulic".to_owned(), "Holeless hydraulic".to_owned()], 0);
-        let speed = f.text("Speed (m/s)", "1.0", "");
+        let speed = f.text("Speed (m/s)", "", "Empty: 1.0, or 0.5 for hydraulic drives; small lifts take their own");
         let door = f.choice("Doors", &["As the car comes".to_owned(), "Side opening".to_owned(), "Centre opening".to_owned()], 0);
         let rotation = f.text("Rotation (°)", "0", "0: the landing is toward the bottom of the plan; counter-clockwise");
         let walls = f.choice("Hoistway walls", &["Yes".to_owned(), "No".to_owned()], 0);
@@ -40,6 +46,7 @@ impl Gui {
         let drive = ["mrl_traction", "traction", "hydraulic", "holeless"][drive.get_selection().unwrap_or(0) as usize];
         let mut args = json!({
             "command": "elevator.create",
+            "kind": kinds[kind.get_selection().unwrap_or(0) as usize],
             "top_level": above[top.get_selection().unwrap_or(0) as usize]["id"],
             "drive": drive,
             "rotation": num(&rotation).unwrap_or(0.0).to_radians(),
@@ -85,7 +92,8 @@ impl Gui {
         let mm = |v: &Value| v.as_f64().map_or(0.0, |x| x * 1000.0);
         frame.set_status_text(
             &format!(
-                "Elevator: {} kg, {} persons; car {:.0} × {:.0} mm; hoistway {:.0} × {:.0} mm, pit {:.0} mm, overhead {:.0} mm ({}); Check Elevators finds {problems} error(s)",
+                "{}: {} kg, {} persons; car {:.0} × {:.0} mm; hoistway {:.0} × {:.0} mm, pit {:.0} mm, overhead {:.0} mm ({}); Check Elevators finds {problems} error(s)",
+                made["kind"].as_str().unwrap_or("elevator"),
                 made["load"],
                 made["persons"],
                 mm(&made["car"][0]),

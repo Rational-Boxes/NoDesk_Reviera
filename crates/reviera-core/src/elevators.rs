@@ -46,6 +46,7 @@ pub const SCHEMA: &str = include_str!("../../../schemas/vt/reviera.vt-rules-1.sc
 const SHIPPED: &[&str] = &[
     include_str!("../../../schemas/vt/packs/us_ibc_ada.json"),
     include_str!("../../../schemas/vt/packs/us_a17.json"),
+    include_str!("../../../schemas/vt/packs/us_a18.json"),
     include_str!("../../../schemas/vt/packs/practice_us.json"),
     include_str!("../../../schemas/vt/packs/en81.json"),
     include_str!("../../../schemas/vt/packs/en81_70.json"),
@@ -112,6 +113,84 @@ pub enum DoorKind {
     Centre,
 }
 
+/// What an elevator or lift is for (ARC-VT-002, ARC-VT-005, ARC-VT-006).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ElevatorKind {
+    #[default]
+    Passenger,
+    /// A hospital or service car, taking a bed or stretcher.
+    Hospital,
+    Freight,
+    /// A motor-vehicle car (freight class B).
+    Vehicle,
+    /// Limited-use/limited-application (A17.1 Part 5.2).
+    Lula,
+    /// A private-residence elevator (A17.1 Part 5.3).
+    Residence,
+    /// A vertical platform lift (A18.1).
+    PlatformLift,
+    Dumbwaiter,
+}
+
+impl ElevatorKind {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Passenger => "Elevator",
+            Self::Hospital => "Hospital Elevator",
+            Self::Freight => "Freight Elevator",
+            Self::Vehicle => "Vehicle Elevator",
+            Self::Lula => "LULA Elevator",
+            Self::Residence => "Home Elevator",
+            Self::PlatformLift => "Platform Lift",
+            Self::Dumbwaiter => "Dumbwaiter",
+        }
+    }
+
+    /// It carries people (so accessibility, landings and the stretcher can apply).
+    pub fn carries_people(self) -> bool {
+        !matches!(self, Self::Freight | Self::Vehicle | Self::Dumbwaiter)
+    }
+
+    /// The stretcher rule counts it.
+    pub fn stretcher_car(self) -> bool {
+        matches!(self, Self::Passenger | Self::Hospital)
+    }
+
+    /// IFC's predefined type, and the object type for a user-defined one.
+    pub fn ifc(self) -> (&'static str, Option<&'static str>) {
+        match self {
+            Self::PlatformLift => ("USERDEFINED", Some("PLATFORMLIFT")),
+            Self::Dumbwaiter => ("USERDEFINED", Some("DUMBWAITER")),
+            _ => ("ELEVATOR", None),
+        }
+    }
+}
+
+/// A freight car's loading class (A17.1 2.16.2.2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum LoadingClass {
+    A,
+    B,
+    C1,
+    C2,
+    C3,
+}
+
+/// What stands in each landing entrance.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Entrance {
+    /// A sliding automatic door.
+    #[default]
+    Sliding,
+    /// A swinging door.
+    Swing,
+    /// An opening, for doors or gates not modelled yet (vertical bi-parting, slide-up).
+    Opening,
+}
+
 /// Where an accessible-car option wants the door.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -164,7 +243,9 @@ pub struct CarOption {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
     pub door: DoorPosition,
-    pub door_width: f64,
+    /// Omitted: the door is not checked.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub door_width: Option<f64>,
     pub width: f64,
     pub depth: f64,
 }
@@ -174,6 +255,9 @@ pub struct AccessibleCar {
     pub id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    /// The kinds it applies to; empty for passenger and hospital cars.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub kinds: Vec<ElevatorKind>,
     pub options: Vec<CarOption>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub turning_circle: Option<f64>,
@@ -185,6 +269,10 @@ pub struct AccessibleCar {
 const TOL: f64 = 0.0005;
 
 impl AccessibleCar {
+    pub fn applies(&self, kind: ElevatorKind) -> bool {
+        if self.kinds.is_empty() { kind.stretcher_car() } else { self.kinds.contains(&kind) }
+    }
+
     /// The option a car meets, if any (a label, or "turning circle").
     pub fn met_by(&self, car: V2, door: DoorKind, door_width: f64) -> Option<String> {
         for o in &self.options {
@@ -193,11 +281,11 @@ impl AccessibleCar {
                 DoorPosition::Centred => door == DoorKind::Centre,
                 DoorPosition::Side => true,
             };
-            if placed && door_width + TOL >= o.door_width && car[0] + TOL >= o.width && car[1] + TOL >= o.depth {
+            if placed && door_width + TOL >= o.door_width.unwrap_or(0.0) && car[0] + TOL >= o.width && car[1] + TOL >= o.depth {
                 return Some(o.label.clone().unwrap_or_else(|| format!("{:.0} × {:.0} mm", o.width * 1000.0, o.depth * 1000.0)));
             }
         }
-        let narrowest = self.options.iter().map(|o| o.door_width).fold(f64::MAX, f64::min);
+        let narrowest = self.options.iter().map(|o| o.door_width.unwrap_or(0.0)).fold(f64::MAX, f64::min);
         self.turning_circle
             .filter(|d| car[0].min(car[1]) + TOL >= *d && door_width + TOL >= narrowest)
             .map(|d| format!("{:.0} mm turning circle", d * 1000.0))
@@ -251,13 +339,70 @@ pub struct MinWidth {
     pub confidence: Confidence,
 }
 
+/// A limit on a kind of elevator or lift.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct Limit {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub kinds: Vec<ElevatorKind>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_area: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_load: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_rise: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_height: Option<f64>,
+    pub source: String,
+    pub confidence: Confidence,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ClassRow {
+    pub class: LoadingClass,
+    pub min_load_per_m2: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+/// The least rated load per area for each freight loading class.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct FreightClasses {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub rows: Vec<ClassRow>,
+    pub source: String,
+    pub confidence: Confidence,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct CatalogueCar {
     pub load: f64,
+    #[serde(default)]
+    pub kind: ElevatorKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub class: Option<LoadingClass>,
     pub door: DoorKind,
     pub width: f64,
     pub depth: f64,
     pub door_width: f64,
+    /// Hoistway inside width and depth, in place of the allowances.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hoistway: Option<V2>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pit: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub overhead: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub car_height: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub door_height: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sill: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entrance: Option<Entrance>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub persons: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -314,8 +459,8 @@ pub struct Pack {
     pub notes: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub car_area: Option<CarArea>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub accessible_car: Option<AccessibleCar>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub accessible_cars: Vec<AccessibleCar>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stretcher: Option<Stretcher>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -326,6 +471,10 @@ pub struct Pack {
     pub door_width: Option<MinWidth>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sizing: Option<Sizing>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub limits: Vec<Limit>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub freight_classes: Option<FreightClasses>,
 }
 
 fn validator() -> &'static jsonschema::Validator {
@@ -402,7 +551,7 @@ pub fn chosen(store: &Store) -> Option<Vec<String>> {
 pub fn automatic(store: &Store) -> Vec<String> {
     use crate::codes::Code;
     let ids: &[&str] = match crate::codes::settings(store).code {
-        Code::Ibc | Code::Irc => &["us_ibc_ada", "us_a17", "practice_us"],
+        Code::Ibc | Code::Irc => &["us_ibc_ada", "us_a17", "us_a18", "practice_us"],
         Code::UkAdk => &["en81", "en81_70", "england_adm", "practice_en"],
         _ => &["en81", "en81_70", "practice_en"],
     };
@@ -523,10 +672,16 @@ pub(crate) fn remove_rule_pack(txn: &mut Transaction<'_>, p: RemovePackParams) -
 #[derive(Debug, Clone, Default, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SizeParams {
-    /// Rated load (kg). Omitted: the smallest car of the sizing pack that meets the
+    /// What it is for; default a passenger elevator.
+    #[serde(default)]
+    pub kind: ElevatorKind,
+    /// A freight car's loading class; default the catalogue car's (A, or B for vehicles).
+    pub class: Option<LoadingClass>,
+    /// Rated load (kg). Omitted: the smallest car of its kind in the sizing pack that meets the
     /// accessibility packs and, where one is needed, takes the stretcher.
     pub load: Option<f64>,
-    /// Rated speed (m/s); default 1.0.
+    /// Rated speed (m/s); default 1.0, 0.5 for hydraulic drives, and the usual speed of a small
+    /// lift (0.15 for LULAs and home elevators, 0.1 for platform lifts, 0.25 for dumbwaiters).
     pub speed: Option<f64>,
     #[serde(default)]
     pub drive: Drive,
@@ -553,6 +708,10 @@ pub struct SizeParams {
 /// An elevator's sizes.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Sized {
+    #[serde(default)]
+    pub kind: ElevatorKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub class: Option<LoadingClass>,
     /// Rated load (kg).
     pub load: f64,
     pub persons: u32,
@@ -563,6 +722,11 @@ pub struct Sized {
     pub car: [f64; 3],
     /// Door clear width and height.
     pub door_size: [f64; 2],
+    #[serde(default)]
+    pub entrance: Entrance,
+    /// The entrances' bottom above each landing floor.
+    #[serde(default)]
+    pub sill: f64,
     /// Hoistway inside width and depth.
     pub hoistway: [f64; 2],
     pub pit: f64,
@@ -583,13 +747,16 @@ fn sizing_pack(packs: &[Pack]) -> Result<(&Pack, &Sizing)> {
         .ok_or_else(|| bad("vt.no_sizing", "no rule pack in use gives sizing defaults (add practice_us or practice_en)"))
 }
 
-/// Whether a car meets every accessibility pack in use.
-fn accessible(packs: &[Pack], car: V2, door: DoorKind, door_width: f64) -> bool {
-    packs.iter().filter_map(|p| p.accessible_car.as_ref()).all(|a| a.met_by(car, door, door_width).is_some())
+/// Whether a car of `kind` meets every accessibility pack in use that applies to it.
+fn accessible(packs: &[Pack], kind: ElevatorKind, car: V2, door: DoorKind, door_width: f64) -> bool {
+    packs.iter().flat_map(|p| &p.accessible_cars).filter(|a| a.applies(kind)).all(|a| a.met_by(car, door, door_width).is_some())
 }
 
-/// The stretcher a car serving `storeys` must take, from the packs in use.
-fn stretcher_needed(packs: &[Pack], storeys: u32) -> Option<(&Pack, &Stretcher)> {
+/// The stretcher a car of `kind` serving `storeys` must take, from the packs in use.
+fn stretcher_needed(packs: &[Pack], kind: ElevatorKind, storeys: u32) -> Option<(&Pack, &Stretcher)> {
+    if !kind.stretcher_car() {
+        return None;
+    }
     packs.iter().find_map(|p| p.stretcher.as_ref().filter(|s| storeys >= s.min_storeys).map(|s| (p, s)))
 }
 
@@ -610,66 +777,112 @@ pub fn stretcher_fits(car: V2, length: f64, width: f64, radius: f64) -> bool {
 /// Sizes an elevator from the packs in use.
 pub fn size(packs: &[Pack], p: &SizeParams) -> Result<Sized> {
     let (pack, sz) = sizing_pack(packs)?;
-    let speed = p.speed.unwrap_or(1.0);
+    let kind = p.kind;
+    let hydraulic = matches!(p.drive, Drive::Hydraulic | Drive::Holeless);
+    // Small lifts' usual speeds (research/16 C1–C4): 30 fpm for LULAs and home elevators, 20 fpm
+    // for platform lifts, 50 fpm for dumbwaiters.
+    let usual = match kind {
+        ElevatorKind::Lula | ElevatorKind::Residence => 0.15,
+        ElevatorKind::PlatformLift => 0.1,
+        ElevatorKind::Dumbwaiter => 0.25,
+        _ if hydraulic => 0.5,
+        _ => 1.0,
+    };
+    let speed = p.speed.unwrap_or(usual);
     if speed <= 0.0 {
         return Err(bad("vt.params", "the speed must be positive"));
     }
     let storeys = p.storeys.unwrap_or(2);
     let mut notes = Vec::new();
-    let stretcher = stretcher_needed(packs, storeys);
-    let (load, door, car_w, car_d, door_w) = match (p.car_width, p.car_depth) {
-        (Some(w), Some(d)) => {
+    let stretcher = stretcher_needed(packs, kind, storeys);
+    let of_kind: Vec<&CatalogueCar> = sz.cars.iter().filter(|c| c.kind == kind).collect();
+    // The catalogue car it is, or the nearest to the sizes given.
+    let base: Option<&CatalogueCar> = match (p.car_width, p.car_depth) {
+        (Some(_), Some(_)) => {
             let load = p.load.ok_or_else(|| bad("vt.params", "give the rated load with the car's width and depth"))?;
-            let door = p.door.unwrap_or_default();
-            let door_w = p.door_width.or_else(|| sz.cars.iter().rev().find(|c| c.load <= load + 1e-9).map(|c| c.door_width)).unwrap_or(0.9).min(w);
-            (load, door, w, d, door_w)
+            of_kind.iter().rev().find(|c| c.load <= load + 1e-9).or(of_kind.first()).copied()
         }
         (None, None) => {
+            if of_kind.is_empty() {
+                return Err(bad("vt.no_sizing", format!("{} lists no {} car; give the car's width and depth", pack.id, kind.label().to_lowercase())));
+            }
             let fits = |c: &CatalogueCar| {
                 let door_w = p.door_width.unwrap_or(c.door_width);
-                accessible(packs, [c.width, c.depth], p.door.unwrap_or(c.door), door_w)
+                accessible(packs, kind, [c.width, c.depth], p.door.unwrap_or(c.door), door_w)
                     && stretcher.is_none_or(|(_, s)| stretcher_fits([c.width, c.depth], s.length, s.width, s.corner_radius))
             };
-            let wanted: Vec<&CatalogueCar> = sz.cars.iter().filter(|c| p.load.is_none_or(|l| c.load + 1e-9 >= l)).filter(|c| p.door.is_none_or(|d| c.door == d)).collect();
-            let pick = match wanted.iter().find(|c| fits(c)) {
+            let wanted: Vec<&CatalogueCar> = of_kind
+                .iter()
+                .copied()
+                .filter(|c| p.load.is_none_or(|l| c.load + 1e-9 >= l))
+                .filter(|c| p.door.is_none_or(|d| c.door == d))
+                .filter(|c| p.class.is_none_or(|k| c.class.is_none_or(|ck| ck == k || k != LoadingClass::B)))
+                .collect();
+            Some(match wanted.iter().find(|c| fits(c)) {
                 Some(c) => *c,
                 None => {
-                    let c = wanted.last().copied().or_else(|| sz.cars.last()).ok_or_else(|| bad("vt.no_sizing", "the sizing pack lists no cars"))?;
-                    notes.push(format!("no car of {} meets every accessibility pack in use{}; the largest that matches is used", pack.id, if stretcher.is_some() { " and takes the stretcher" } else { "" }));
+                    let c = wanted.last().copied().or_else(|| of_kind.last().copied()).expect("not empty");
+                    if wanted.is_empty() {
+                        notes.push(format!("{} lists no {} car of {:.0} kg; its largest is used", pack.id, kind.label().to_lowercase(), p.load.unwrap_or(0.0)));
+                    } else {
+                        notes.push(format!("no {} car of {} meets every accessibility pack in use{}; the largest that matches is used", kind.label().to_lowercase(), pack.id, if stretcher.is_some() { " and takes the stretcher" } else { "" }));
+                    }
                     c
                 }
-            };
-            let load = p.load.unwrap_or(pick.load);
-            if load > pick.load + 1e-9 {
-                notes.push(format!("{} lists no car for {:.0} kg; its largest is used", pack.id, load));
-            }
-            (load, p.door.unwrap_or(pick.door), pick.width, pick.depth, p.door_width.unwrap_or(pick.door_width))
+            })
         }
         _ => return Err(bad("vt.params", "give both the car's width and depth, or neither")),
     };
-    let car_h = p.car_height.or(sz.car_height).unwrap_or(2.2);
-    let door_h = p.door_height.or(sz.door_height).unwrap_or(2.1);
-    let allowance = match door {
-        DoorKind::Side => sz.hoistway.side_door_width,
-        DoorKind::Centre => sz.hoistway.centre_door_width,
+    let given = p.car_width.zip(p.car_depth);
+    let (car_w, car_d) = given.or(base.map(|c| (c.width, c.depth))).ok_or_else(|| bad("vt.no_sizing", "no car to size from"))?;
+    let load = p.load.or(base.map(|c| c.load)).unwrap_or_default();
+    let door = p.door.or(base.map(|c| c.door)).unwrap_or_default();
+    let door_w = p.door_width.or(base.map(|c| c.door_width)).unwrap_or(0.9).min(car_w);
+    let car_h = p.car_height.or(base.and_then(|c| c.car_height)).or(sz.car_height).unwrap_or(2.2);
+    let door_h = p.door_height.or(base.and_then(|c| c.door_height)).or(sz.door_height).unwrap_or(2.1);
+    // The catalogue car's own hoistway, pit and overhead hold only for its own car.
+    let own = base.filter(|_| given.is_none());
+    let hoistway = match own.and_then(|c| c.hoistway) {
+        Some(h) => [h[0], h[1] + if p.space_below { sz.hoistway.space_below_depth.unwrap_or(0.2) } else { 0.0 }],
+        None => {
+            let (cw, cd) = (base.map_or(car_w, |c| c.width), base.map_or(car_d, |c| c.depth));
+            let by_car = base.and_then(|c| c.hoistway).map(|h| [h[0] - cw, h[1] - cd]);
+            let allowance = by_car.unwrap_or([
+                match door {
+                    DoorKind::Side => sz.hoistway.side_door_width,
+                    DoorKind::Centre => sz.hoistway.centre_door_width,
+                },
+                sz.hoistway.depth,
+            ]);
+            let below = if p.space_below { sz.hoistway.space_below_depth.unwrap_or(0.2) } else { 0.0 };
+            [car_w + allowance[0], car_d + allowance[1] + below]
+        }
     };
-    let mut depth = car_d + sz.hoistway.depth;
-    if p.space_below {
-        depth += sz.hoistway.space_below_depth.unwrap_or(0.2);
-    }
-    let row = sz
-        .pit_overhead
-        .iter()
-        .filter(|r| r.drives.contains(&p.drive) && speed <= r.max_speed + 1e-9)
-        .min_by(|a, b| a.max_speed.total_cmp(&b.max_speed))
-        .ok_or_else(|| bad("vt.no_sizing", format!("{} gives no pit and overhead for a {} elevator at {speed} m/s", pack.id, p.drive.label())))?;
-    let overhead = match (row.overhead, row.overhead_above_car) {
-        (Some(o), _) => o + (car_h - sz.car_height.unwrap_or(car_h)).max(0.0),
-        (None, Some(a)) => car_h + a,
-        _ => unreachable!("checked when the pack was read"),
+    let (pit, overhead) = match base.and_then(|c| c.pit.zip(c.overhead)) {
+        Some((pit, o)) => (pit, o + (car_h - base.and_then(|c| c.car_height).unwrap_or(car_h)).max(0.0)),
+        None => {
+            let row = sz
+                .pit_overhead
+                .iter()
+                .filter(|r| r.drives.contains(&p.drive) && speed <= r.max_speed + 1e-9)
+                .min_by(|a, b| a.max_speed.total_cmp(&b.max_speed))
+                .ok_or_else(|| bad("vt.no_sizing", format!("{} gives no pit and overhead for a {} elevator at {speed} m/s", pack.id, p.drive.label())))?;
+            let overhead = match (row.overhead, row.overhead_above_car) {
+                (Some(o), _) => o + (car_h - sz.car_height.unwrap_or(car_h)).max(0.0),
+                (None, Some(a)) => car_h + a,
+                _ => unreachable!("checked when the pack was read"),
+            };
+            (row.pit, overhead)
+        }
     };
-    let persons = (load / sz.persons_kg.unwrap_or(75.0)).floor() as u32;
+    let class = match kind {
+        ElevatorKind::Freight | ElevatorKind::Vehicle => p.class.or(base.and_then(|c| c.class)).or(Some(if kind == ElevatorKind::Vehicle { LoadingClass::B } else { LoadingClass::A })),
+        _ => None,
+    };
+    let persons = if kind.carries_people() { (load / sz.persons_kg.unwrap_or(75.0)).floor() as u32 } else { 0 };
     Ok(Sized {
+        kind,
+        class,
         load,
         persons,
         speed,
@@ -677,8 +890,10 @@ pub fn size(packs: &[Pack], p: &SizeParams) -> Result<Sized> {
         door,
         car: [car_w, car_d, car_h],
         door_size: [door_w, door_h],
-        hoistway: [car_w + allowance, depth],
-        pit: row.pit,
+        entrance: base.and_then(|c| c.entrance).unwrap_or_default(),
+        sill: base.and_then(|c| c.sill).unwrap_or(0.0),
+        hoistway,
+        pit,
         overhead,
         sizing_pack: pack.id.clone(),
         notes,
@@ -811,12 +1026,19 @@ fn cuboid(x: V2, y: V2, z: V2) -> (Vec<[f64; 3]>, Vec<[u32; 3]>) {
 
 /// The car type for these sizes, made the first time.
 fn car_type(txn: &mut Transaction<'_>, s: &Sized) -> Result<ElementId> {
-    let name = format!("Elevator car {:.0} × {:.0} × {:.0}", s.car[0] * 1000.0, s.car[1] * 1000.0, s.car[2] * 1000.0);
+    let name = format!("{} car {:.0} × {:.0} × {:.0}", s.kind.label(), s.car[0] * 1000.0, s.car[1] * 1000.0, s.car[2] * 1000.0);
     if let Some(e) = txn.store().iter().find(|e| e.name.as_deref() == Some(name.as_str()) && crate::mesh_objects::mesh_object_type(e).is_some()) {
         return Ok(e.id());
     }
     let (p, t) = cuboid([-s.car[0] / 2.0, s.car[0] / 2.0], [0.0, s.car[1]], [0.0, s.car[2]]);
-    crate::mesh_objects::create_generated_type(txn, &name, crate::mesh_objects::Category::Transport, &p, &t, [0.72, 0.74, 0.78, 1.0], Vec::new(), Some("ELEVATOR"))
+    let (predefined, object_type) = s.kind.ifc();
+    let id = crate::mesh_objects::create_generated_type(txn, &name, crate::mesh_objects::Category::Transport, &p, &t, [0.72, 0.74, 0.78, 1.0], Vec::new(), Some(predefined))?;
+    if let Some(o) = object_type {
+        txn.modify(id, |e| {
+            e.params.insert("@ElementType".into(), o.into());
+        })?;
+    }
+    Ok(id)
 }
 
 /// The hoistway wall type of this thickness, made the first time.
@@ -961,31 +1183,72 @@ pub(crate) fn create(txn: &mut Transaction<'_>, p: CreateParams) -> Result<Creat
             el.walls.push(member(txn, id)?);
             walls.push(id);
         }
-        let et = entrance_type(txn)?;
         let front = walls[0];
-        // The leaves slide over the wall face either side of the opening, half the width each,
-        // inside the hoistway's inside face (the side walls take the ends).
         let length = w + t;
         let dw = sized.door_size[0];
-        let half = dw + crate::inserts::SLIDE_LAP + 0.005;
-        if w < 2.0 * half - 1e-9 {
-            return Err(bad("vt.entrance", format!("the {:.0} mm entrance's leaves need a hoistway {:.0} mm wide; it is {:.0} mm", dw * 1000.0, 2.0 * half * 1000.0, w * 1000.0)));
+        // A sliding door's leaves slide over the wall face either side of the opening, half the
+        // width each, inside the hoistway's inside face (the side walls take the ends); other
+        // entrances need only their own width.
+        let half_of = |e: Entrance| match e {
+            Entrance::Sliding => dw + crate::inserts::SLIDE_LAP + 0.005,
+            _ => dw / 2.0 + 0.06,
+        };
+        // Side-opening (telescopic) doors stack inside the hoistway, which Reviera's bi-parting
+        // sliding door cannot show: where its leaves would not fit the front wall, the entrance
+        // is an opening.
+        if el.sized.entrance == Entrance::Sliding && w < 2.0 * half_of(Entrance::Sliding) - 1e-9 {
+            el.sized.entrance = Entrance::Opening;
+            el.sized.notes.push(format!("the {:.0} mm doors' leaves would not fit the front wall as a bi-parting door, so each entrance is an opening until telescopic doors are modelled", dw * 1000.0));
         }
+        let half = half_of(el.sized.entrance);
         let along = (w / 2.0 + h + el.door_x()).clamp(h + half, length - h - half);
         el.entrance_x = Some(along - w / 2.0 - h);
+        let et = match el.sized.entrance {
+            Entrance::Sliding => Some(entrance_type(txn)?),
+            _ => None,
+        };
         for l in &levels {
-            let args = json!({
-                "type_id": et.0,
-                "host_wall_id": front.0,
-                "point_along": along,
-                // A sill is measured from the wall's base level, not its offset bottom in the pit.
-                "sill_height": l.elevation - base.elevation,
-                "width": sized.door_size[0],
-                "height": sized.door_size[1],
-                "fit": false,
-            });
-            let id = crate::inserts::place(txn, crate::inserts::Kind::Door, serde_json::from_value(args).map_err(|e| bad("vt.params", e.to_string()))?)?;
-            txn.modify(id, |e| e.name = Some(format!("Elevator entrance, {}", l.name)))?;
+            let id = match el.sized.entrance {
+                Entrance::Opening => {
+                    let args = json!({
+                        "wall_id": front.0,
+                        "u0": along - dw / 2.0,
+                        "u1": along + dw / 2.0,
+                        "base_level": l.id.0,
+                        "base_offset": sized.sill,
+                        "top_constraint": { "unconnected": sized.door_size[1] },
+                    });
+                    crate::wall_openings::create(txn, serde_json::from_value(args).map_err(|e| bad("vt.params", e.to_string()))?)?
+                }
+                _ => {
+                    let mut args = json!({
+                        "host_wall_id": front.0,
+                        "point_along": along,
+                        // A sill is measured from the wall's base level, not its offset bottom in
+                        // the pit.
+                        "sill_height": l.elevation - base.elevation + sized.sill,
+                        "width": dw,
+                        "height": sized.door_size[1],
+                        "fit": false,
+                    });
+                    if let Some(et) = et {
+                        args["type_id"] = json!(et.0);
+                    }
+                    let door = crate::inserts::place(txn, crate::inserts::Kind::Door, serde_json::from_value(args).map_err(|e| bad("vt.params", e.to_string()))?)?;
+                    // A swinging door opens out onto the landing, not into the hoistway.
+                    if let Some(sw) = crate::clearances::all(txn.store()).into_iter().find(|v| v.element == door && v.kind == ClearanceKind::DoorSwing)
+                        && let Some((lo, hi)) = sw.body().bounds()
+                    {
+                        let mid = [(lo[0] + hi[0]) / 2.0 - el.point[0], (lo[1] + hi[1]) / 2.0 - el.point[1]];
+                        let (sin, cos) = el.rotation.sin_cos();
+                        if -mid[0] * sin + mid[1] * cos > 0.0 {
+                            crate::inserts::flip(txn, serde_json::from_value(json!({ "element_ids": [door.0] })).map_err(|e| bad("vt.params", e.to_string()))?, false)?;
+                        }
+                    }
+                    door
+                }
+            };
+            txn.modify(id, |e| e.name = Some(format!("{} entrance, {}", sized.kind.label(), l.name)))?;
             el.entrances.push(member(txn, id)?);
             entrances.push(id);
         }
@@ -994,11 +1257,11 @@ pub(crate) fn create(txn: &mut Transaction<'_>, p: CreateParams) -> Result<Creat
     let data = serde_json::to_value(&el).expect("serialises");
     let props = properties(&el);
     txn.modify(car, |e| {
-        e.name = Some("Elevator".into());
+        e.name = Some(el.sized.kind.label().into());
         e.params.insert(DATA_KEY.into(), data);
         e.params.extend(props);
     })?;
-    Ok(Created { elevator: car, shaft, walls, entrances, sized })
+    Ok(Created { elevator: car, shaft, walls, entrances, sized: el.sized.clone() })
 }
 
 /// An elevator's property sets: IFC's capacity and clear car size, and `Reviera_Elevator`.
@@ -1023,7 +1286,11 @@ pub fn properties(el: &Elevator) -> Vec<(String, Value)> {
         ("Reviera_Elevator.Overhead".into(), measure("IfcPositiveLengthMeasure", s.overhead)),
         ("Reviera_Elevator.StopsServed".into(), measure("IfcCountMeasure", el.levels.len())),
         ("Reviera_Elevator.SizingPack".into(), label(s.sizing_pack.clone().into())),
+        ("Reviera_Elevator.Kind".into(), label(serde_json::to_value(s.kind).expect("serialises"))),
     ]
+    .into_iter()
+    .chain(s.class.map(|c| ("Reviera_Elevator.LoadingClass".into(), label(serde_json::to_value(c).expect("serialises")))))
+    .collect()
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -1114,7 +1381,7 @@ pub fn zones(store: &Store) -> Vec<Clearance> {
             door_swing_forbidden: false,
         });
         for pack in &packs {
-            let Some(l) = &pack.landing else { continue };
+            let Some(l) = pack.landing.as_ref().filter(|_| el.sized.kind.carries_people()) else { continue };
             let x = el.door_x();
             let front = if el.walls.is_empty() { 0.0 } else { -el.wall_thickness };
             for g in &el.levels {
@@ -1157,6 +1424,10 @@ pub enum FindingKind {
     Stretcher,
     /// The rated load is below the pack's table.
     LoadBelowTable,
+    /// A freight car's rated load is below its loading class's least load for its area.
+    FreightClass,
+    /// The car's area, load, height or the rise is beyond its kind's limit.
+    Limit,
 }
 
 /// One finding of `elevator.check`.
@@ -1219,8 +1490,14 @@ pub(crate) fn check(store: &Store, p: Option<CheckParams>) -> Result<Vec<Finding
     for (car, el) in &chosen {
         let s = &el.sized;
         let area = s.car[0] * s.car[1];
+        let levels = crate::levels::list(store);
+        let z = |g: &String| levels.iter().find(|l| &l.guid == g).map(|l| l.elevation);
+        let rise = match (el.levels.first().and_then(z), el.levels.last().and_then(z)) {
+            (Some(a), Some(b)) => b - a,
+            _ => 0.0,
+        };
         for pack in &packs {
-            if let Some(a) = &pack.car_area {
+            if let Some(a) = pack.car_area.as_ref().filter(|_| s.kind.stretcher_car()) {
                 match a.max_area(s.load) {
                     Some(max) if area > max + 1e-4 => {
                         let mut f = finding(pack, FindingKind::CarArea, *car, &a.id, &a.description, a.confidence, &a.source, format!("the car's {area:.2} m² is more than the {max:.2} m² allowed for {:.0} kg", s.load));
@@ -1232,10 +1509,18 @@ pub(crate) fn check(store: &Store, p: Option<CheckParams>) -> Result<Vec<Finding
                     _ => {}
                 }
             }
-            if let Some(a) = &pack.accessible_car
-                && a.met_by([s.car[0], s.car[1]], s.door, s.door_size[0]).is_none()
-            {
-                let options: Vec<String> = a.options.iter().map(|o| format!("{:.0} × {:.0} mm with a {:.0} mm door", o.width * 1000.0, o.depth * 1000.0, o.door_width * 1000.0)).collect();
+            for a in pack.accessible_cars.iter().filter(|a| a.applies(s.kind)) {
+                if a.met_by([s.car[0], s.car[1]], s.door, s.door_size[0]).is_some() {
+                    continue;
+                }
+                let options: Vec<String> = a
+                    .options
+                    .iter()
+                    .map(|o| match o.door_width {
+                        Some(d) => format!("{:.0} × {:.0} mm with a {:.0} mm door", o.width * 1000.0, o.depth * 1000.0, d * 1000.0),
+                        None => format!("{:.0} × {:.0} mm", o.width * 1000.0, o.depth * 1000.0),
+                    })
+                    .collect();
                 out.push(finding(
                     pack,
                     FindingKind::AccessibleCar,
@@ -1247,16 +1532,37 @@ pub(crate) fn check(store: &Store, p: Option<CheckParams>) -> Result<Vec<Finding
                     format!("the car ({:.0} × {:.0} mm, {:.0} mm door) is smaller than any of: {}", s.car[0] * 1000.0, s.car[1] * 1000.0, s.door_size[0] * 1000.0, options.join("; ")),
                 ));
             }
+            if let (Some(fc), Some(class)) = (&pack.freight_classes, s.class)
+                && let Some(row) = fc.rows.iter().find(|r| r.class == class)
+            {
+                let least = area * row.min_load_per_m2;
+                if s.load + 1e-6 < least {
+                    let mut f = finding(pack, FindingKind::FreightClass, *car, &fc.id, &fc.description, fc.confidence, &fc.source, format!("a class {} car of {area:.2} m² needs a rated load of at least {least:.0} kg; it has {:.0} kg", serde_json::to_value(class).expect("serialises").as_str().unwrap_or_default().to_uppercase(), s.load));
+                    f.measured = Some(s.load);
+                    f.required = Some(least);
+                    out.push(f);
+                }
+            }
+            for l in pack.limits.iter().filter(|l| l.kinds.contains(&s.kind)) {
+                let checks = [("car area", area, l.max_area, "m²"), ("rated load", s.load, l.max_load, "kg"), ("rise", rise, l.max_rise, "m"), ("car height", s.car[2], l.max_height, "m")];
+                for (what, value, max, unit) in checks {
+                    let Some(max) = max.filter(|m| value > m + 1e-4) else { continue };
+                    let mut f = finding(pack, FindingKind::Limit, *car, &l.id, &l.description, l.confidence, &l.source, format!("its {what} of {value:.2} {unit} is more than the {max:.2} {unit} a {} may have", s.kind.label().to_lowercase()));
+                    f.measured = Some(value);
+                    f.required = Some(max);
+                    out.push(f);
+                }
+            }
         }
     }
     // The stretcher: one elevator serving every floor the most-storeys elevator serves must take
     // it, once per pack.
-    if let Some((tall, el)) = all.iter().max_by_key(|(_, e)| e.levels.len())
+    if let Some((tall, el)) = all.iter().filter(|(_, e)| e.sized.kind.stretcher_car()).max_by_key(|(_, e)| e.levels.len())
         && (p.elevators.is_empty() || chosen.iter().any(|(c, _)| c == tall))
     {
         for pack in &packs {
             let Some(st) = pack.stretcher.as_ref().filter(|s| el.levels.len() as u32 >= s.min_storeys) else { continue };
-            let serving: Vec<&(ElementId, Elevator)> = all.iter().filter(|(_, e)| el.levels.iter().all(|g| e.levels.contains(g))).collect();
+            let serving: Vec<&(ElementId, Elevator)> = all.iter().filter(|(_, e)| e.sized.kind.stretcher_car() && el.levels.iter().all(|g| e.levels.contains(g))).collect();
             if !serving.iter().any(|(_, e)| stretcher_fits([e.sized.car[0], e.sized.car[1]], st.length, st.width, st.corner_radius)) {
                 out.push(finding(
                     pack,
@@ -1282,8 +1588,9 @@ mod tests {
     fn shipped_packs_are_valid_and_cite_registered_sources() {
         let register = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../design_documents/SOURCE_REGISTER.md")).expect("the register is there");
         for p in shipped() {
-            let sources = [p.car_area.as_ref().map(|a| &a.source), p.accessible_car.as_ref().map(|a| &a.source), p.stretcher.as_ref().map(|a| &a.source), p.landing.as_ref().map(|a| &a.source), p.call_buttons.as_ref().map(|a| &a.source), p.sizing.as_ref().map(|a| &a.source)];
-            for s in sources.into_iter().flatten().flat_map(|s| s.split(' ')) {
+            let sources = [p.car_area.as_ref().map(|a| &a.source), p.sizing.as_ref().map(|a| &a.source), p.stretcher.as_ref().map(|a| &a.source), p.landing.as_ref().map(|a| &a.source), p.call_buttons.as_ref().map(|a| &a.source), p.sizing.as_ref().map(|a| &a.source)];
+            let more = p.accessible_cars.iter().map(|a| &a.source).chain(p.limits.iter().map(|l| &l.source)).chain(p.freight_classes.as_ref().map(|f| &f.source));
+            for s in sources.into_iter().flatten().chain(more).flat_map(|s| s.split(' ')) {
                 assert!(register.contains(&format!("| {s} |")), "{}: {s} is not in the register", p.id);
             }
         }

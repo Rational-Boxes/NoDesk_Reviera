@@ -1,11 +1,11 @@
 {
   "format": "reviera.vt-rules-1",
   "id": "us_a17",
-  "title": "ASME A17.1 maximum car area (through makers and the VA)",
+  "title": "ASME A17.1 car area, freight loading classes and small-lift limits (through makers, states and the VA)",
   "jurisdiction": "US",
   "edition": "ASME A17.1 Rule 2.16.1, Table 2.16.1.1, as restated by Hollister-Whitney and VA PG 18-10",
   "layer": "minimum",
-  "notes": "A17.1 itself was not read; the table comes from makers and the VA, so findings are advisory. Rows stop at 6000 lb because the 8000 lb row differs between sources (research/16 M2). Loads are converted from pounds.",
+  "notes": "A17.1 itself was not read; the table comes from makers and the VA, so findings are advisory. Rows stop at 6000 lb because the 8000 lb row differs between sources (research/16 M2). Loads are converted from pounds. The freight classes come from California Title 8 §3101, which restates A17.1 2.16.2.2. The LULA, residence and dumbwaiter limits come from makers and state codes; the residence area differs by edition (research/16 M16).",
   "car_area": {
     "id": "ASME A17.1 2.16.1.1",
     "description": "Maximum inside net platform area for a passenger car's rated load",
@@ -45,5 +45,75 @@
     ],
     "source": "S1513 S1521",
     "confidence": "advisory"
-  }
+  },
+  "freight_classes": {
+    "id": "ASME A17.1 2.16.2.2",
+    "description": "A freight car's rated load is at least its inside area times 50 lb/ft² (244 kg/m²) for classes A and C, 30 lb/ft² (146 kg/m²) for class B (motor vehicles)",
+    "rows": [
+      {
+        "class": "a",
+        "min_load_per_m2": 244,
+        "description": "general freight, by hand or hand truck"
+      },
+      {
+        "class": "b",
+        "min_load_per_m2": 146,
+        "description": "motor vehicles"
+      },
+      {
+        "class": "c1",
+        "min_load_per_m2": 244,
+        "description": "industrial truck rides with the load"
+      },
+      {
+        "class": "c2",
+        "min_load_per_m2": 244,
+        "description": "truck loads and unloads, does not ride"
+      },
+      {
+        "class": "c3",
+        "min_load_per_m2": 244,
+        "description": "other heavy concentrated loads"
+      }
+    ],
+    "source": "S1568",
+    "confidence": "verified"
+  },
+  "limits": [
+    {
+      "id": "ASME A17.1 5.2 (LULA)",
+      "description": "LULA: platform at most 18 ft² (1.67 m²), rated load at most 1400 lb (635 kg), rise at most 25 ft (7.62 m)",
+      "kinds": [
+        "lula"
+      ],
+      "max_area": 1.6723,
+      "max_load": 635,
+      "max_rise": 7.62,
+      "source": "S1514 S1586",
+      "confidence": "secondary"
+    },
+    {
+      "id": "ASME A17.1 5.3.1.10.1 (residence)",
+      "description": "Private-residence elevator: inside area at most 15 ft² (1.39 m²; 18 ft² in some later editions), rise at most 50 ft (15.24 m)",
+      "kinds": [
+        "residence"
+      ],
+      "max_area": 1.39,
+      "max_rise": 15.24,
+      "source": "S1578 S1586",
+      "confidence": "advisory"
+    },
+    {
+      "id": "California Title 8 §3079 (dumbwaiter)",
+      "description": "Dumbwaiter: car floor at most 9 ft² (0.84 m²), inside height at most 4 ft (1219 mm), rated load at most 500 lb (227 kg)",
+      "kinds": [
+        "dumbwaiter"
+      ],
+      "max_area": 0.84,
+      "max_height": 1.219,
+      "max_load": 227,
+      "source": "S1596",
+      "confidence": "verified"
+    }
+  ]
 }

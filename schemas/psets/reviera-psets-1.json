@@ -122,7 +122,9 @@
         { "name": "PitDepth", "measure": "IfcPositiveLengthMeasure", "unit": "m", "description": "From the lowest landing's floor down to the pit floor." },
         { "name": "Overhead", "measure": "IfcPositiveLengthMeasure", "unit": "m", "description": "From the top landing's floor up to the underside of the structure above the hoistway." },
         { "name": "StopsServed", "measure": "IfcCountMeasure", "description": "How many levels the elevator serves." },
-        { "name": "SizingPack", "measure": "IfcLabel", "description": "The vertical-transport rule pack the sizes came from (ARC-VT-001), until a product replaces them." }
+        { "name": "SizingPack", "measure": "IfcLabel", "description": "The vertical-transport rule pack the sizes came from (ARC-VT-001), until a product replaces them." },
+        { "name": "Kind", "measure": "IfcLabel", "description": "What the elevator or lift is for.", "values": ["passenger", "hospital", "freight", "vehicle", "lula", "residence", "platform_lift", "dumbwaiter"] },
+        { "name": "LoadingClass", "measure": "IfcLabel", "description": "A freight car's loading class (ASME A17.1 2.16.2.2).", "values": ["a", "b", "c1", "c2", "c3"] }
       ]
     }
   ]

@@ -5,11 +5,13 @@
 <b>vertical-transport rule packs</b> in use, then builds the hoistway round it: a shaft that cuts
 every floor from the pit to the overhead, hoistway walls, and a sliding entrance at each level it
 serves. <b>Check Elevators</b> then says which rule a car breaks. The sample
-<a href="reviera:sample/elevators">Elevators in an office core</a> shows the tools.</p>
+<a href="reviera:sample/elevators">Elevators in an office core</a> and
+<a href="reviera:sample/lifts">Hospital, freight and small lifts</a> show the tools.</p>
 <nav class="toc">
   <a href="#place">Placing an elevator</a>
   <a href="#sizes">How it is sized</a>
   <a href="#parts">What it is made of</a>
+  <a href="#kinds">Hospital, freight and small lifts</a>
   <a href="#zones">Hoistway and landing zones</a>
   <a href="#check">Check Elevators</a>
   <a href="#packs">Rule packs</a>
@@ -47,6 +49,22 @@ hoistway walls. The <b>walls</b> and <b>entrances</b> are ordinary walls and sli
 doors. Delete an elevator with <code>elevator.delete</code>, given the car or any of its walls or
 entrances; it removes them all.</p>
 
+<h2 id="kinds">Hospital, freight and small lifts</h2>
+<p>The dialog's <b>Kind</b> chooses what the elevator is for, and sizing then uses only that
+kind's catalogue cars, with their own hoistway, pit and overhead:</p>
+<ul>
+  <li><b>Hospital or service</b>: a 5000 lb car that takes a bed and the stretcher.</li>
+  <li><b>Freight</b> (class A by default; B, C1, C2 or C3 by script) and <b>Vehicle</b> (class
+  B): no passengers, no landing zones. Check Elevators reports a rated load below the class's
+  least load for the car's area.</li>
+  <li><b>LULA</b>, <b>Home</b>, <b>Vertical platform lift</b>: swinging entrances that open onto
+  the landing; Check Elevators reports an area, load or rise beyond the kind's limit (a LULA rises
+  at most 25 ft).</li>
+  <li><b>Dumbwaiter</b>: openings at counter height, 762 mm above each floor.</li>
+</ul>
+<p>Freight and vehicle doors (vertical bi-parting) and two-speed side-opening doors are drawn as
+openings in the hoistway wall until Reviera models them.</p>
+
 <h2 id="zones">Hoistway and landing zones</h2>
 <p>Each elevator has virtual volumes: its <b>hoistway</b> (violet), from the pit floor to the
 overhead, which nothing but the elevator's own parts may enter, and a <b>landing</b> (green) in
@@ -77,8 +95,8 @@ with a shipped pack's id replaces it in this project.</p>
 <h2 id="limits">Limits and what to check</h2>
 <p>ASME A17.1 and EN 81-20 were read only through state adoptions, inspection checklists and
 makers' guides, so their rules are advisory. Not yet built: editing an elevator in place, rear
-entrances, freight and hospital cars, machine rooms, pit ladders, hall fixtures, banks of
-elevators and escalators.</p>
+entrances, vertical bi-parting and telescopic doors, machine rooms, pit ladders, hall fixtures,
+banks of elevators and escalators.</p>
 
 <h2 id="scripts">Scripts and agents</h2>
 <p>Everything above is a command: <code>vt.rule_packs</code>, <code>vt.set_rule_packs</code>,

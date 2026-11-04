@@ -3,18 +3,92 @@
   "id": "practice_us",
   "title": "US elevator sizing practice (maker planning guides)",
   "jurisdiction": "US",
-  "edition": "Otis Gen3, KONE MonoSpace 500, Schindler 3300/330A, TKE endura/evolution and Hollister-Whitney planning guides, 2015–2024",
+  "edition": "Otis Gen3, KONE MonoSpace 500, Schindler 3300/330A, TKE endura/evolution and Hollister-Whitney planning guides, 2015–2024; hospital, freight and vehicle cars from TK Elevator, Canton (Nidec) and Otis freight guides; LULA, residence, platform-lift and dumbwaiter cars from Garaventa, Savaria, Excelevator, Matot and California Title 8",
   "layer": "recommended",
-  "notes": "Generic, maker-style defaults for sizing a new elevator: where makers differ, the larger value (research/16 M6). A chosen product's own sizes replace them. Overheads are for an 8 ft (2438 mm) cab; a taller cab adds its extra height.",
+  "notes": "Generic, maker-style defaults for sizing a new elevator: where makers differ, the larger value (research/16 M6). A chosen product's own sizes replace them. Overheads are for an 8 ft (2438 mm) cab; a taller cab adds its extra height. Freight and vehicle entrances are openings until vertical bi-parting doors are modelled; LULA, residence and platform-lift entrances are swinging doors. Small-lift hoistways without a maker's figure are judgement (EXPERT_REVIEW E-84).",
   "sizing": {
     "cars": [
+      {
+        "load": 227,
+        "kind": "dumbwaiter",
+        "door": "side",
+        "entrance": "opening",
+        "width": 0.914,
+        "depth": 0.914,
+        "door_width": 0.762,
+        "door_height": 0.914,
+        "car_height": 1.219,
+        "sill": 0.762,
+        "hoistway": [
+          0.965,
+          1.067
+        ],
+        "pit": 0.1,
+        "overhead": 2.5,
+        "use": "500 lb counter-loading dumbwaiter, 36 × 36 × 48 in"
+      },
+      {
+        "load": 340,
+        "kind": "platform_lift",
+        "door": "side",
+        "entrance": "swing",
+        "width": 0.9144,
+        "depth": 1.524,
+        "door_width": 0.9144,
+        "door_height": 2.032,
+        "car_height": 1.07,
+        "hoistway": [
+          1.219,
+          1.778
+        ],
+        "pit": 0.076,
+        "overhead": 2.286,
+        "use": "750 lb vertical platform lift, 36 × 60 in"
+      },
+      {
+        "load": 454,
+        "kind": "residence",
+        "door": "side",
+        "entrance": "swing",
+        "width": 0.9144,
+        "depth": 1.3716,
+        "door_width": 0.813,
+        "door_height": 2.032,
+        "car_height": 2.032,
+        "hoistway": [
+          1.32,
+          1.676
+        ],
+        "pit": 0.254,
+        "overhead": 2.438,
+        "use": "1000 lb home elevator, 36 × 54 in"
+      },
+      {
+        "load": 635,
+        "kind": "lula",
+        "door": "side",
+        "entrance": "swing",
+        "width": 1.2192,
+        "depth": 1.3716,
+        "door_width": 0.915,
+        "door_height": 2.032,
+        "car_height": 2.134,
+        "hoistway": [
+          1.676,
+          1.727
+        ],
+        "pit": 0.355,
+        "overhead": 3.429,
+        "use": "1400 lb LULA, 48 × 54 in"
+      },
       {
         "load": 907,
         "door": "side",
         "width": 1.727,
         "depth": 1.295,
         "door_width": 0.914,
-        "use": "2000–2100 lb"
+        "use": "2000–2100 lb",
+        "kind": "passenger"
       },
       {
         "load": 1134,
@@ -22,7 +96,27 @@
         "width": 2.032,
         "depth": 1.295,
         "door_width": 1.067,
-        "use": "2500 lb"
+        "use": "2500 lb",
+        "kind": "passenger"
+      },
+      {
+        "load": 1134,
+        "width": 1.626,
+        "depth": 2.134,
+        "door_width": 1.524,
+        "hoistway": [
+          2.184,
+          2.337
+        ],
+        "use": "2500 lb class A freight",
+        "kind": "freight",
+        "door": "centre",
+        "entrance": "opening",
+        "car_height": 2.438,
+        "door_height": 2.134,
+        "pit": 1.524,
+        "overhead": 4.496,
+        "class": "a"
       },
       {
         "load": 1361,
@@ -30,7 +124,8 @@
         "width": 2.032,
         "depth": 1.448,
         "door_width": 1.067,
-        "use": "3000 lb"
+        "use": "3000 lb",
+        "kind": "passenger"
       },
       {
         "load": 1588,
@@ -38,7 +133,8 @@
         "width": 2.032,
         "depth": 1.651,
         "door_width": 1.067,
-        "use": "3500 lb; takes the IBC stretcher with a side door"
+        "use": "3500 lb; takes the IBC stretcher with a side door",
+        "kind": "passenger"
       },
       {
         "load": 1814,
@@ -46,7 +142,135 @@
         "width": 2.337,
         "depth": 1.651,
         "door_width": 1.219,
-        "use": "4000 lb"
+        "use": "4000 lb",
+        "kind": "passenger"
+      },
+      {
+        "load": 1814,
+        "width": 2.032,
+        "depth": 2.413,
+        "door_width": 2.032,
+        "hoistway": [
+          2.743,
+          2.845
+        ],
+        "use": "4000 lb class A freight",
+        "kind": "freight",
+        "door": "centre",
+        "entrance": "opening",
+        "car_height": 2.438,
+        "door_height": 2.134,
+        "pit": 1.524,
+        "overhead": 4.496,
+        "class": "a"
+      },
+      {
+        "load": 2268,
+        "kind": "hospital",
+        "door": "side",
+        "width": 1.727,
+        "depth": 2.743,
+        "door_width": 1.372,
+        "hoistway": [
+          2.286,
+          3.277
+        ],
+        "use": "5000 lb hospital (stretcher and bed)"
+      },
+      {
+        "load": 2268,
+        "width": 2.337,
+        "depth": 2.565,
+        "door_width": 2.337,
+        "hoistway": [
+          3.048,
+          2.997
+        ],
+        "use": "5000 lb class A freight",
+        "kind": "freight",
+        "door": "centre",
+        "entrance": "opening",
+        "car_height": 2.438,
+        "door_height": 2.134,
+        "pit": 1.524,
+        "overhead": 4.496,
+        "class": "a"
+      },
+      {
+        "load": 2722,
+        "width": 2.438,
+        "depth": 2.87,
+        "door_width": 2.438,
+        "hoistway": [
+          3.2,
+          3.302
+        ],
+        "use": "6000 lb class A freight",
+        "kind": "freight",
+        "door": "centre",
+        "entrance": "opening",
+        "car_height": 2.438,
+        "door_height": 2.134,
+        "pit": 1.524,
+        "overhead": 4.496,
+        "class": "a"
+      },
+      {
+        "load": 3629,
+        "width": 2.438,
+        "depth": 3.48,
+        "door_width": 2.438,
+        "hoistway": [
+          3.353,
+          3.912
+        ],
+        "use": "8000 lb class A or C freight",
+        "kind": "freight",
+        "door": "centre",
+        "entrance": "opening",
+        "car_height": 2.438,
+        "door_height": 2.134,
+        "pit": 1.524,
+        "overhead": 4.496,
+        "class": "a"
+      },
+      {
+        "load": 3629,
+        "kind": "vehicle",
+        "class": "b",
+        "door": "centre",
+        "entrance": "opening",
+        "width": 2.438,
+        "depth": 6.426,
+        "door_width": 2.438,
+        "door_height": 2.438,
+        "car_height": 2.438,
+        "hoistway": [
+          3.353,
+          6.858
+        ],
+        "pit": 1.524,
+        "overhead": 3.886,
+        "use": "8000 lb class B vehicle"
+      },
+      {
+        "load": 4536,
+        "width": 3.048,
+        "depth": 4.089,
+        "door_width": 3.048,
+        "hoistway": [
+          3.962,
+          4.521
+        ],
+        "use": "10,000 lb class A or C freight",
+        "kind": "freight",
+        "door": "centre",
+        "entrance": "opening",
+        "car_height": 2.438,
+        "door_height": 2.134,
+        "pit": 1.524,
+        "overhead": 4.496,
+        "class": "a"
       }
     ],
     "hoistway": {
@@ -117,7 +341,7 @@
     "car_height": 2.438,
     "door_height": 2.134,
     "persons_kg": 75,
-    "source": "S1505 S1506 S1508 S1512 S1513",
+    "source": "S1505 S1506 S1508 S1512 S1513 S1567 S1570 S1571 S1572 S1514 S1576 S1577 S1594 S1596",
     "confidence": "secondary"
   }
 }

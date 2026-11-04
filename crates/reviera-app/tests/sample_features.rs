@@ -1017,6 +1017,22 @@ fn the_elevators_sample_keeps_its_cars_and_hoistways() {
 }
 
 #[test]
+fn the_lifts_sample_keeps_each_kind() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "lifts");
+    let list = ok(&mut app, "elevator.list", json!({}));
+    let mut kinds: Vec<(String, f64, usize)> = list.as_array().unwrap().iter().map(|e| (e["kind"].as_str().unwrap().to_owned(), f(&e["load"]), e["entrances"].as_array().unwrap().len())).collect();
+    kinds.sort_by(|a, b| a.0.cmp(&b.0));
+    let want = [("dumbwaiter", 227.0, 3), ("freight", 1134.0, 2), ("hospital", 2268.0, 4), ("lula", 635.0, 2), ("platform_lift", 340.0, 2), ("residence", 454.0, 2), ("vehicle", 3629.0, 2)];
+    assert_eq!(kinds, want.map(|(k, l, n)| (k.to_owned(), l, n)));
+    // The one finding: the hospital car's area, a note.
+    let found = ok(&mut app, "elevator.check", json!({}));
+    let found: Vec<(&str, &str)> = found.as_array().unwrap().iter().map(|x| (x["kind"].as_str().unwrap(), x["severity"].as_str().unwrap())).collect();
+    assert_eq!(found, [("car_area", "note")]);
+    assert_eq!(ok(&mut app, "clearance.check", json!({})), json!([]));
+}
+
+#[test]
 fn the_washrooms_sample_keeps_its_core_and_lockers() {
     let work = tempfile::tempdir().unwrap();
     let mut app = open(work.path(), "washrooms");

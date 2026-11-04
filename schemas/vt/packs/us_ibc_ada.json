@@ -5,44 +5,106 @@
   "jurisdiction": "US",
   "edition": "2010 ADA Standards §407; IBC 3002.4 as printed in the 2025 California Building Code",
   "layer": "accessible",
-  "notes": "Car depth is measured from the back wall to the front return (ADA Table 407.4.1 also gives 54 in to the inside face of the door). The ADA's 36 in door may be 5/8 in (16 mm) narrower. The stretcher rule applies where the elevator serves four or more storeys; the IBC counts storeys above or below the grade plane.",
-  "accessible_car": {
-    "id": "ADA 2010 407.4.1",
-    "description": "Minimum inside car dimensions, Table 407.4.1, with the door centred, to one side, or anywhere",
-    "options": [
-      {
-        "label": "centred door",
-        "door": "centred",
-        "door_width": 1.065,
-        "width": 2.03,
-        "depth": 1.295
-      },
-      {
-        "label": "side door",
-        "door": "side",
-        "door_width": 0.899,
-        "width": 1.725,
-        "depth": 1.295
-      },
-      {
-        "label": "any door, deep car",
-        "door": "any",
-        "door_width": 0.899,
-        "width": 1.37,
-        "depth": 2.03
-      },
-      {
-        "label": "any door, square car",
-        "door": "any",
-        "door_width": 0.899,
-        "width": 1.525,
-        "depth": 1.525
-      }
-    ],
-    "turning_circle": 1.525,
-    "source": "S1182",
-    "confidence": "verified"
-  },
+  "notes": "Car depth is measured from the back wall to the front return (ADA Table 407.4.1 also gives 54 in to the inside face of the door). The ADA's 36 in door may be 5/8 in (16 mm) narrower. The stretcher rule applies where the elevator serves four or more storeys; the IBC counts storeys above or below the grade plane. The small-lift sizes (408–410) are the inch values converted exactly, since the ADA's metric figures are rounded.",
+  "accessible_cars": [
+    {
+      "id": "ADA 2010 407.4.1",
+      "description": "Minimum inside car dimensions, Table 407.4.1, with the door centred, to one side, or anywhere",
+      "options": [
+        {
+          "label": "centred door",
+          "door": "centred",
+          "door_width": 1.065,
+          "width": 2.03,
+          "depth": 1.295
+        },
+        {
+          "label": "side door",
+          "door": "side",
+          "door_width": 0.899,
+          "width": 1.725,
+          "depth": 1.295
+        },
+        {
+          "label": "any door, deep car",
+          "door": "any",
+          "door_width": 0.899,
+          "width": 1.37,
+          "depth": 2.03
+        },
+        {
+          "label": "any door, square car",
+          "door": "any",
+          "door_width": 0.899,
+          "width": 1.525,
+          "depth": 1.525
+        }
+      ],
+      "turning_circle": 1.525,
+      "source": "S1182",
+      "confidence": "verified"
+    },
+    {
+      "id": "ADA 2010 408.4.1",
+      "description": "LULA car at least 42 in wide by 54 in deep (1065 × 1370 mm) with the door on the narrow end at least 32 in (815 mm); or 51 × 51 in (1295 × 1295 mm) with a 36 in (915 mm) door (exception 1)",
+      "kinds": [
+        "lula"
+      ],
+      "options": [
+        {
+          "label": "42 × 54 in",
+          "door": "any",
+          "door_width": 0.8128,
+          "width": 1.0668,
+          "depth": 1.3716
+        },
+        {
+          "label": "51 × 51 in",
+          "door": "any",
+          "door_width": 0.9144,
+          "width": 1.2954,
+          "depth": 1.2954
+        }
+      ],
+      "source": "S1182",
+      "confidence": "verified"
+    },
+    {
+      "id": "ADA 2010 409.4.1",
+      "description": "Private-residence elevator: clear floor at least 36 × 48 in (915 × 1220 mm)",
+      "kinds": [
+        "residence"
+      ],
+      "options": [
+        {
+          "label": "36 × 48 in",
+          "door": "any",
+          "width": 0.9144,
+          "depth": 1.2192
+        }
+      ],
+      "source": "S1182",
+      "confidence": "verified"
+    },
+    {
+      "id": "ADA 2010 410.3, 305",
+      "description": "Platform lift: a 30 × 48 in (760 × 1220 mm) clear floor space, end doors at least 32 in (815 mm)",
+      "kinds": [
+        "platform_lift"
+      ],
+      "options": [
+        {
+          "label": "30 × 48 in",
+          "door": "any",
+          "door_width": 0.8128,
+          "width": 0.762,
+          "depth": 1.2192
+        }
+      ],
+      "source": "S1182 S0869",
+      "confidence": "verified"
+    }
+  ],
   "stretcher": {
     "id": "IBC 3002.4",
     "description": "At least one elevator serving every floor takes a 24 × 84 in (610 × 2134 mm) stretcher, lying flat, corners of at least 5 in (127 mm) radius",

@@ -126,6 +126,19 @@
     ]
   },
   {
+    "name": "lifts",
+    "title": "Hospital, freight and small lifts",
+    "group": "Architecture",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "lifts.lua"
+        }
+      }
+    ]
+  },
+  {
     "name": "washrooms",
     "title": "Washrooms and a locker room",
     "group": "Architecture",

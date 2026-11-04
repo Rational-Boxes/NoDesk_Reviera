@@ -716,9 +716,17 @@ tools and the datums.
   shaft cutting every floor from the pit to the overhead, hoistway walls and a sliding entrance
   at each level. Hoistways and landings are virtual volumes checked by Check Clearances; Check
   Elevators reports car area against load (A17.1, EN 81-20, advisory), accessible car sizes and
-  the stretcher. Not built yet: editing in place, rear entrances, freight, hospital and vehicle
-  cars, small lifts, machine rooms, hall fixtures, banks, panoramic cars; escalators and moving
-  walks, stairlifts, people movers, funiculars and ropeways (planned).
+  the stretcher.
+- **Hospital, freight, vehicle and small lifts** (ARC-VT-005/006): the Elevator dialog's *Kind*
+  sizes a 5000 lb hospital car, class A freight cars (2500–10,000 lb), a class B vehicle car, a
+  LULA, a home elevator, a vertical platform lift (`IfcTransportElement` PLATFORMLIFT) or a
+  counter-loading dumbwaiter, each from its makers' catalogue car with its own hoistway, pit,
+  overhead and entrance (sliding, swinging onto the landing, or an opening). Check Elevators adds
+  freight loading classes (A17.1 2.16.2.2) and each kind's limits on area, load, rise and car
+  height (A17.1, A18.1, California Title 8). Not built yet for elevators: editing in place, rear
+  entrances, vertical bi-parting and telescopic doors, machine rooms, hall fixtures, banks,
+  panoramic cars; escalators and moving walks, stairlifts, people movers, funiculars and ropeways
+  (planned).
 - **Structural columns**: Column (`SC`) places load-bearing columns in plans; **At Grids** puts
   one at every crossing of the grid lines you select (a window in a plan now selects grids), in
   one undo step. Shapes are rectangular, round, I, channel, angle, tee and rectangular or round
@@ -1741,6 +1749,9 @@ sample:
 - **Elevators in an office core** (`elevators.ifc`): five storeys under the IBC with a pair of
   3500 lb passenger elevators sized for the stretcher and a two-stop hydraulic elevator, each with
   its shaft, hoistway walls and entrances; Check Elevators and Check Clearances find nothing.
+- **Hospital, freight and small lifts** (`lifts.ifc`): a four-storey clinic and service building
+  with a hospital elevator, freight and vehicle elevators, a LULA, a home elevator, a platform lift
+  and a dumbwaiter; Check Elevators gives one note.
 - **Editing tools** (`modify_tools.ifc`): every Modify tab tool's result side by side, from align,
   mirror and the arrays to trim/extend, split and pinning, a component created and placed
   again, and a layered wall's parts divided, merged and excluded.

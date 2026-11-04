@@ -1,0 +1,22 @@
+{
+  "format": "reviera.vt-rules-1",
+  "id": "us_a18",
+  "title": "ASME A18.1 platform lifts (through update notices)",
+  "jurisdiction": "US",
+  "edition": "ASME A18.1-2017/2020 as quoted in Intertek's update notices",
+  "layer": "minimum",
+  "notes": "A18.1 itself was not read; values come from published summaries of its changes. A lift without a runway enclosure is limited to 1500 mm of travel (not checked yet).",
+  "limits": [
+    {
+      "id": "ASME A18.1 2.1.1",
+      "description": "Vertical platform lift with a full or partial runway enclosure: travel at most 4250 mm (168 in); rated load 250–475 kg",
+      "kinds": [
+        "platform_lift"
+      ],
+      "max_rise": 4.25,
+      "max_load": 475,
+      "source": "S1574 S1575",
+      "confidence": "secondary"
+    }
+  ]
+}
