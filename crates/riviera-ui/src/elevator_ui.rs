@@ -558,6 +558,61 @@ impl Gui {
         }
     }
 
+    /// Architecture › Circulation › Ropeway (ARC-VT-027): a gondola line along the selected
+    /// alignment, then what its check finds.
+    pub(crate) fn place_ropeway(&mut self) {
+        let frame = self.frame;
+        let Some(line) = self.selected_where(|e| riviera_core::alignments::recipe(e).is_some()) else {
+            return error(&frame, "Select the alignment the ropeway runs along first: straight legs, its corners becoming angle stations.");
+        };
+        let f = super::reinforcement_ui::Form::new(&frame, "Ropeway");
+        let cabin = f.text("Persons a cabin", "10", "");
+        let speed = f.text("Line speed (m/s)", "6", "");
+        let headway = f.text("Seconds between cabins", "15", "");
+        let height = f.text("Tower height (m)", "18.3", "Above the ground");
+        let spacing = f.text("Largest tower spacing (m)", "152", "");
+        let gauge = f.text("Gauge (m)", "6.4", "Between the two directions' ropes");
+        let ok = f.show("A monocable gondola: terminals at the ends, angle stations at corners, towers over the site's toposolids (or the level).", "Place");
+        let num = |t: &TextCtrl| t.get_value().trim().parse::<f64>().ok();
+        let mut args = json!({ "alignment_id": line });
+        for (k, t) in [("speed", &speed), ("headway", &headway), ("tower_height", &height), ("tower_spacing", &spacing), ("gauge", &gauge)] {
+            if let Some(v) = num(t) {
+                args[k] = json!(v);
+            }
+        }
+        if let Some(c) = num(&cabin) {
+            args["cabin_capacity"] = json!(c.max(1.0) as u32);
+        }
+        f.dialog.destroy();
+        if !ok {
+            return;
+        }
+        let made = match self.run("ropeway.line", args) {
+            Ok(v) => v,
+            Err(e) => return error(&frame, &format!("Could not place the ropeway:\n{e}")),
+        };
+        self.refresh_scene(&frame);
+        let id = made["ropeway"].clone();
+        let found: Vec<String> = self
+            .run("ropeway.check", json!({}))
+            .ok()
+            .and_then(|v| v.as_array().cloned())
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|x| x["ropeway"] == id)
+            .filter_map(|x| x["message"].as_str().map(str::to_owned))
+            .collect();
+        let towers = made["supports"].as_array().map_or(0, |s| s.iter().filter(|x| x["kind"] == "tower").count());
+        let head = format!(
+            "Ropeway: {:.0} m, {towers} towers, {:.0} persons an hour each way, {:.0} s a trip",
+            made["length"].as_f64().unwrap_or(0.0),
+            made["capacity"].as_f64().unwrap_or(0.0),
+            made["trip"].as_f64().unwrap_or(0.0)
+        );
+        let d = MessageDialog::builder(&frame, &format!("{head}\n\n{}", found.join("\n")), "Ropeway").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build();
+        d.show_modal();
+    }
+
     /// Architecture › Circulation › Fare Line (ARC-VT-022): a row of fare gates on this plan's
     /// level, then a click where it starts (or a typed point).
     pub(crate) fn place_fare_line(&mut self) {

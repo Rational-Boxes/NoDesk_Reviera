@@ -1210,6 +1210,23 @@ fn the_apm_sample_keeps_its_stations_and_capacity() {
 }
 
 #[test]
+fn the_ropeway_sample_keeps_its_towers_and_spans() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "ropeway");
+    let list = ok(&mut app, "ropeway.list", json!({}));
+    let r = &list[0];
+    for (k, sp) in r["spans"].as_array().unwrap().iter().enumerate() {
+        println!("span {}: {:.1} m, sag {:.1}, clearance {:.1} (needs {:.1}), highest {:.1}", k + 1, f(&sp["length"]), f(&sp["sag"]), f(&sp["clearance"]), f(&sp["required"]), f(&sp["highest"]));
+    }
+    for x in ok(&mut app, "ropeway.check", json!({ "demand": 2000.0 })).as_array().unwrap() {
+        println!("{} {}: {}", x["severity"].as_str().unwrap(), x["rule"].as_str().unwrap(), x["message"].as_str().unwrap());
+    }
+    assert_eq!(r["supports"].as_array().unwrap().iter().filter(|s| s["kind"] == "tower").count(), 7, "{list:#}");
+    assert_eq!(f(&r["capacity"]), 2400.0);
+    assert!(r["spans"].as_array().unwrap().iter().all(|s| f(&s["clearance"]) >= f(&s["required"])));
+}
+
+#[test]
 fn the_escalators_sample_keeps_its_units_and_openings() {
     let work = tempfile::tempdir().unwrap();
     let mut app = open(work.path(), "escalators");

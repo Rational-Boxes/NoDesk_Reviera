@@ -274,6 +274,19 @@
     ]
   },
   {
+    "name": "ropeway",
+    "title": "A gondola up a hillside",
+    "group": "Architecture",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "ropeway.lua"
+        }
+      }
+    ]
+  },
+  {
     "name": "escalators",
     "title": "Escalators and moving walks in a department store",
     "group": "Architecture",

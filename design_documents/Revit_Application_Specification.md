@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Riviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Riviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 902 numbered requirements (320 P0 · 343 P1 · 232 P2 · 7 P3), 2,353 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 903 numbered requirements (320 P0 · 343 P1 · 233 P2 · 7 P3), 2,356 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Riviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Riviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,353 commands; 902 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,356 commands; 903 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -14414,6 +14414,36 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 
 *Built (2026-11-05):* in `riviera_core::apm`, the APM Station action; three stations in the sample. Not yet: platform clearing (ANA-ROUTE-005) on APM platforms, vertical circulation and equipment rooms, door sets per car, vehicles as their own elements.
 
+### 3.7a.27 Aerial ropeways
+**ID:** ARC-VT-027 · **Priority:** P2 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §8 (step 11); research/16 R3; ARC-ALN-001; EXPERT_REVIEW E-100
+
+**Purpose.** A gondola line over the terrain, its towers and spans laid out along an alignment and checked for cabin clearance to the ground and capacity.
+
+**Behaviour & rules.**
+- `ropeway.line(alignment_id, gauge?, cabin_capacity?, speed?, headway?, tower_height?, tower_spacing?)` lays out a monocable detachable gondola (MGD) along an alignment of straight legs. A curved alignment is refused.
+  - **Supports:** a terminal station at each end and an angle station at each corner of the alignment. Towers are spaced evenly along each leg at most `tower_spacing` apart (default 152 m), `tower_height` above the ground (default 18.3 m). The ground is the highest current toposolid at the point, or the level.
+  - **Ropes:** the two directions' ropes are `gauge` apart (default 6.4 m). The rope is 6 m above the ground at stations and sags 4 % of each span when loaded (a parabola). Cabins hang 3.5 m below it.
+  - **Reports:** for each span its length, sag, least cabin clearance to the ground (away from the 30 m nearest a station, where cabins come down to board), the clearance required, and the highest cabin above the ground; the loaded rope's turn over each tower; the capacity each way, 3600 × `cabin_capacity` ÷ `headway` (defaults 10 and 15 s); and the trip at `speed` (default 6 m/s).
+  - **The object:** towers (seated on the highest ground under them), stations and ropes are one transport object (USERDEFINED "ROPEWAY", `Riviera_Ropeway`).
+- `ropeway.check(demand?)` reports:
+  - a span whose loaded cabin comes nearer the ground than RM2's 4 m (2.5 m on spans under 200 m);
+  - the highest overflight, a note for the rescue concept;
+  - a capacity each way below `demand`.
+- `ropeway.list` lists them.
+- **In the window:** Architecture › Circulation › *Ropeway* on the selected alignment, with the check's findings.
+
+**Acceptance criteria.**
+- [x] 600 m across flat ground gives terminals at the ends and three towers, four 150 m spans, 2,400 an hour each way and a 100 s trip. Between towers the cabin clears the ground by 18.3 − 6 − 3.5 m, and the check reports exactly the spans that fall short. The rope turns −2 atan 0.16 over a tower on the flat. A corner becomes an angle station, and a curved alignment is refused.
+
+*Built (2026-11-05):* `riviera_core::ropeways`, the Ropeway action; the sample *A gondola up a hillside* (the default towers too low over the rising ground in two spans; 22 m towers at most 120 m apart clear every span). Not yet:
+- RM2's change of slope between the empty and loaded cases (≤ 0.15 rad), which needs the rope's tension and loads;
+- the full sag cases (loaded, empty, stopped, ice) and the clearance envelope with swing, as compute jobs;
+- roads, buildings and other lines, overflight limits by system class, fire distances, privacy and evacuation;
+- 3S, funitel, chair and tram systems;
+- cabins, foundations;
+- the IFC facility and its parts;
+- placing towers by hand.
+
 ---
 
 ## 3.8 Openings
@@ -16817,6 +16847,9 @@ All commands below are registered once in the command registry and exposed autom
 | `apm.station` | guideway_id, station, name?, platform?, cars?, platform_width?, screen_doors? | {station_id, platform_length, …} | Yes | ARC-VT-026 |
 | `apm.list` | — | [{guideway, lanes, length, stations[]}] | No (query) | ARC-VT-025, ARC-VT-026 |
 | `apm.check` | headway?, cars?, passengers?, demand? | {capacity, findings[]} | No (query) | ARC-VT-025, ARC-VT-026 |
+| `ropeway.line` | alignment_id, gauge?, cabin_capacity?, speed?, headway?, tower_height?, tower_spacing? | {ropeway, supports[], spans[], turns[], length, capacity, trip, …} | Yes | ARC-VT-027 |
+| `ropeway.list` | — | [{ropeway, supports[], spans[], length, capacity, …}] | No (query) | ARC-VT-027 |
+| `ropeway.check` | demand? | [{ropeway, severity, rule, message}] | No (query) | ARC-VT-027 |
 | `fare_line.create` | level, start, toward, kind?, count, wide?, emergency? | {fare_line, level, start, direction, aisles[], length, capacity} | Yes | ARC-VT-022 |
 | `fare_line.list` | — | [{fare_line, level_name, aisles[], length, capacity, …}] | No (query) | ARC-VT-022 |
 | `enclosure.create` | form, footprint \| host_wall_ids, level_id, params | element_id | Yes | ARC-GLZ-001 |
@@ -30204,14 +30237,14 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 39 | 8 | 0 | 123 |
 | DM | 91 | 65 | 34 | 3 | 193 |
-| ARC | 77 | 101 | 36 | 1 | 215 |
+| ARC | 77 | 101 | 37 | 1 | 216 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 32 | 0 | 33 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
 | COL | 8 | 52 | 16 | 1 | 77 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **343** | **232** | **7** | **902** |
+| **Total** | **320** | **343** | **233** | **7** | **903** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -30422,7 +30455,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2353 unique commands** in 440 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2356 unique commands** in 441 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -30752,6 +30785,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `room` | 8 |
 | `roomseparator` | 1 |
 | `roomtag` | 1 |
+| `ropeway` | 3 |
 | `route` | 1 |
 | `route_settings` | 1 |
 | `routing_preferences` | 2 |
@@ -32421,6 +32455,9 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `room.unplace` | 3 | room_ids | — | Yes | ARC-ROOM-001 |
 | `roomseparator.create` | 3 | level_id, curves: [curve] | [element_id] | Yes | ARC-ROOM-001 |
 | `roomtag.move_to_reference` | 3 | tag_ids | — | Yes | ARC-ROOM-001 |
+| `ropeway.check` | 3 | demand? | [{ropeway, severity, rule, message}] | No (query) | ARC-VT-027 |
+| `ropeway.line` | 3 | alignment_id, gauge?, cabin_capacity?, speed?, headway?, tower_height?, tower_spacing? | {ropeway, supports[], spans[], turns[], length, capacity, trip, …} | Yes | ARC-VT-027 |
+| `ropeway.list` | 3 | — | [{ropeway, supports[], spans[], length, capacity, …}] | No (query) | ARC-VT-027 |
 | `route.reveal_obstacles` | 4 | view_id, on: bool | — | No | ANA-ROUTE-002 |
 | `route_settings.set` | 4 | params | — | Yes | ANA-ROUTE-002 |
 | `routing_preferences.get` | 4 | type_id | table | No | MEP-DUCT-002 |

@@ -599,6 +599,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ApmStation),
         registry.add(ApmList),
         registry.add(ApmCheck),
+        registry.add(RopewayLine),
+        registry.add(RopewayList),
+        registry.add(RopewayCheck),
         registry.add(LibraryReloadItem),
         registry.add(PublishListSets),
         registry.add(PublishRemoveSet),
@@ -7732,4 +7735,43 @@ read_command!(
     Option<crate::apm::CheckParams>,
     crate::apm::Check,
     crate::apm::check
+);
+
+edit_command!(
+    RopewayLine,
+    "ropeway.line",
+    "Create a ropeway line",
+    "A monocable detachable gondola (MGD) along an alignment of straight legs (ARC-VT-027): terminal stations at \
+     its ends and an angle station at each corner, towers spaced evenly along each leg at most `tower_spacing` \
+     apart (default 152 m) and `tower_height` (18.3 m) above the ground (the site's toposolids, or the level), \
+     and the two directions' ropes `gauge` (6.4 m) apart sagging 4 % of each span when loaded. Reports each \
+     span's least cabin clearance to the ground, the rope's turn over each tower, the capacity each way \
+     (3600 × `cabin_capacity` ÷ `headway`) and the trip time.",
+    "New Ropeway",
+    crate::ropeways::CreateParams,
+    crate::ropeways::Created,
+    crate::ropeways::create
+);
+
+read_command!(
+    RopewayList,
+    "ropeway.list",
+    "List the ropeways",
+    "Lists the model's ropeways (ARC-VT-027): supports, spans with their sag and clearances, the rope's turn \
+     over each tower, length, capacity and trip.",
+    Option<crate::inclined_elevators::NoParams>,
+    Vec<crate::ropeways::Info>,
+    crate::ropeways::list
+);
+
+read_command!(
+    RopewayCheck,
+    "ropeway.check",
+    "Check ropeways",
+    "Checks each ropeway (ARC-VT-027): the loaded cabin's clearance to the ground in every span (RM2: 4 m, \
+     2.5 m on spans under 200 m), the highest overflight (a note for the rescue concept) and the capacity each \
+     way against `demand`.",
+    Option<crate::ropeways::CheckParams>,
+    Vec<crate::ropeways::Finding>,
+    crate::ropeways::check
 );

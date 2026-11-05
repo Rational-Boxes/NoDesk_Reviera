@@ -55,6 +55,7 @@ pub const UI_ACTIONS: &[&str] = &[
     "ui.funicular",
     "ui.apm_guideway",
     "ui.apm_station",
+    "ui.ropeway",
     "ui.stairlift",
     "ui.elevator_traffic",
     "ui.elevator_egress_role",

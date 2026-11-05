@@ -54,6 +54,7 @@ pub mod alignments;
 pub mod inclined_elevators;
 pub mod funiculars;
 pub mod apm;
+pub mod ropeways;
 pub mod escalators;
 pub mod enclosures;
 pub mod grab_bars;

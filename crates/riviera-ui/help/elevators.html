@@ -180,7 +180,7 @@ The sample <a href="riviera:sample/funicular">A funicular up a hillside</a> has 
   way.</li>
   <li>It reports the track along the slope, the rise, the steepest grade, the trip time and how
   many people an hour it carries each way.</li>
-  <li><code>funicular.check</code>, <code>apm.guideway</code>, <code>apm.station</code>, <code>apm.list</code>, <code>apm.check</code> compares that with a demand, and notes a gauge outside 762–1524
+  <li><code>funicular.check</code>, <code>apm.guideway</code>, <code>apm.station</code>, <code>apm.list</code>, <code>apm.check</code>, <code>ropeway.line</code>, <code>ropeway.list</code>, <code>ropeway.check</code> compares that with a demand, and notes a gauge outside 762–1524
   mm and a track without an evacuation walkway.</li>
 </ul>
 
@@ -197,6 +197,22 @@ people mover</a> has three stations.</p>
   <li>It also gives the line's capacity each way, 3600 ÷ headway × cars × persons a car, against
   a demand.</li>
   <li>These are planning values (ACRP Report 37); ASCE 21's own are not public.</li>
+</ul>
+
+<h2 id="ropeway">Aerial ropeways</h2>
+<p><b>Architecture › Circulation › Ropeway</b> lays out a monocable gondola along the selected
+alignment of straight legs. There is a terminal station at each end and an angle station at each
+corner, and towers are spaced evenly over the ground: the site's toposolids, or the level. The
+sample <a href="riviera:sample/ropeway">A gondola up a hillside</a> shows a line rebuilt with
+taller, closer towers.</p>
+<ul>
+  <li>Each span's rope sags 4 % of its length when loaded, and the cabins hang below it. The
+  report gives each span's least cabin clearance to the ground against RM2's 4 m (2.5 m on spans
+  under 200 m).</li>
+  <li>It also gives the highest overflight, for the rescue concept, and the capacity each way:
+  3600 × cabin persons ÷ seconds between cabins.</li>
+  <li>The change of slope between empty and loaded cabins, the swing envelope, roads, buildings
+  and other lines need the rope's tension and are not checked yet.</li>
 </ul>
 
 <h2 id="zones">Hoistway and landing zones</h2>

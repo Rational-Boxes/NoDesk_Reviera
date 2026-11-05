@@ -218,6 +218,7 @@ pub fn toolset_of(command: &str) -> String {
             | "inclined_elevator"
             | "funicular"
             | "apm"
+            | "ropeway"
             | "fare_line"
             | "stairlift"
             | "grab_bar"

@@ -4188,6 +4188,36 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 
 *Built (2026-11-05):* in `riviera_core::apm`, the APM Station action; three stations in the sample. Not yet: platform clearing (ANA-ROUTE-005) on APM platforms, vertical circulation and equipment rooms, door sets per car, vehicles as their own elements.
 
+### 3.7a.27 Aerial ropeways
+**ID:** ARC-VT-027 · **Priority:** P2 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §8 (step 11); research/16 R3; ARC-ALN-001; EXPERT_REVIEW E-100
+
+**Purpose.** A gondola line over the terrain, its towers and spans laid out along an alignment and checked for cabin clearance to the ground and capacity.
+
+**Behaviour & rules.**
+- `ropeway.line(alignment_id, gauge?, cabin_capacity?, speed?, headway?, tower_height?, tower_spacing?)` lays out a monocable detachable gondola (MGD) along an alignment of straight legs. A curved alignment is refused.
+  - **Supports:** a terminal station at each end and an angle station at each corner of the alignment. Towers are spaced evenly along each leg at most `tower_spacing` apart (default 152 m), `tower_height` above the ground (default 18.3 m). The ground is the highest current toposolid at the point, or the level.
+  - **Ropes:** the two directions' ropes are `gauge` apart (default 6.4 m). The rope is 6 m above the ground at stations and sags 4 % of each span when loaded (a parabola). Cabins hang 3.5 m below it.
+  - **Reports:** for each span its length, sag, least cabin clearance to the ground (away from the 30 m nearest a station, where cabins come down to board), the clearance required, and the highest cabin above the ground; the loaded rope's turn over each tower; the capacity each way, 3600 × `cabin_capacity` ÷ `headway` (defaults 10 and 15 s); and the trip at `speed` (default 6 m/s).
+  - **The object:** towers (seated on the highest ground under them), stations and ropes are one transport object (USERDEFINED "ROPEWAY", `Riviera_Ropeway`).
+- `ropeway.check(demand?)` reports:
+  - a span whose loaded cabin comes nearer the ground than RM2's 4 m (2.5 m on spans under 200 m);
+  - the highest overflight, a note for the rescue concept;
+  - a capacity each way below `demand`.
+- `ropeway.list` lists them.
+- **In the window:** Architecture › Circulation › *Ropeway* on the selected alignment, with the check's findings.
+
+**Acceptance criteria.**
+- [x] 600 m across flat ground gives terminals at the ends and three towers, four 150 m spans, 2,400 an hour each way and a 100 s trip. Between towers the cabin clears the ground by 18.3 − 6 − 3.5 m, and the check reports exactly the spans that fall short. The rope turns −2 atan 0.16 over a tower on the flat. A corner becomes an angle station, and a curved alignment is refused.
+
+*Built (2026-11-05):* `riviera_core::ropeways`, the Ropeway action; the sample *A gondola up a hillside* (the default towers too low over the rising ground in two spans; 22 m towers at most 120 m apart clear every span). Not yet:
+- RM2's change of slope between the empty and loaded cases (≤ 0.15 rad), which needs the rope's tension and loads;
+- the full sag cases (loaded, empty, stopped, ice) and the clearance envelope with swing, as compute jobs;
+- roads, buildings and other lines, overflight limits by system class, fire distances, privacy and evacuation;
+- 3S, funitel, chair and tram systems;
+- cabins, foundations;
+- the IFC facility and its parts;
+- placing towers by hand.
+
 ---
 
 ## 3.8 Openings
@@ -6591,6 +6621,9 @@ All commands below are registered once in the command registry and exposed autom
 | `apm.station` | guideway_id, station, name?, platform?, cars?, platform_width?, screen_doors? | {station_id, platform_length, …} | Yes | ARC-VT-026 |
 | `apm.list` | — | [{guideway, lanes, length, stations[]}] | No (query) | ARC-VT-025, ARC-VT-026 |
 | `apm.check` | headway?, cars?, passengers?, demand? | {capacity, findings[]} | No (query) | ARC-VT-025, ARC-VT-026 |
+| `ropeway.line` | alignment_id, gauge?, cabin_capacity?, speed?, headway?, tower_height?, tower_spacing? | {ropeway, supports[], spans[], turns[], length, capacity, trip, …} | Yes | ARC-VT-027 |
+| `ropeway.list` | — | [{ropeway, supports[], spans[], length, capacity, …}] | No (query) | ARC-VT-027 |
+| `ropeway.check` | demand? | [{ropeway, severity, rule, message}] | No (query) | ARC-VT-027 |
 | `fare_line.create` | level, start, toward, kind?, count, wide?, emergency? | {fare_line, level, start, direction, aisles[], length, capacity} | Yes | ARC-VT-022 |
 | `fare_line.list` | — | [{fare_line, level_name, aisles[], length, capacity, …}] | No (query) | ARC-VT-022 |
 | `enclosure.create` | form, footprint \| host_wall_ids, level_id, params | element_id | Yes | ARC-GLZ-001 |
