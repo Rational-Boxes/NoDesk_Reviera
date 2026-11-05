@@ -1105,6 +1105,22 @@ fn the_station_sample_keeps_its_transit_pair_and_run_off() {
 }
 
 #[test]
+fn the_evacuation_lifts_sample_keeps_its_evacuation_elevator() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "evacuation_lifts");
+    let lifts = ok(&mut app, "elevator.list", json!({}));
+    assert_eq!(lifts[0]["egress_role"], "occupant_evacuation", "{lifts:#}");
+    let levels = ok(&mut app, "level.list", json!({}));
+    let (ground, top) = (levels[0]["id"].clone(), levels[5]["id"].clone());
+    let args = |lifts: bool| json!({ "start": { "point": [28.0, 3.0], "level": top }, "end": { "point": [28.0, 3.0], "level": ground }, "lifts": lifts });
+    let (by_lift, by_stairs) = (ok(&mut app, "egress.route", args(true)), ok(&mut app, "egress.route", args(false)));
+    println!("by the stairs {:.0} s, by the lift {:.0} s", f(&by_stairs["time"]), f(&by_lift["time"]));
+    assert_eq!((by_lift["links"][0]["kind"].as_str(), by_stairs["links"].as_array().unwrap().len()), (Some("lift"), 5));
+    assert_eq!(ok(&mut app, "path_of_travel.list", json!({})).as_array().unwrap().len(), 2);
+    assert_eq!(ok(&mut app, "clearance.check", json!({})), json!([]));
+}
+
+#[test]
 fn the_escalators_sample_keeps_its_units_and_openings() {
     let work = tempfile::tempdir().unwrap();
     let mut app = open(work.path(), "escalators");

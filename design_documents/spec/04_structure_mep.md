@@ -5313,7 +5313,7 @@ The job runs in the background with a notification. Spaces that no system serves
 - [x] From the far end of an upper level to an exit beyond a wall on the level below, the route walks to the stair's head, takes the stair and goes round the wall's open end; its time is the walks at 1.3 m/s and the stair at 0.6 m/s. With an escalator nearer, the IBC route still takes the stair and the NFPA 130 route the escalator, sooner. Between levels with no stair it is refused.
 - [x] With floor plans on both levels, the route drawn makes one path of travel in each, each as long as its leg, and the route is the one `egress.route` finds.
 
-*Built (2026-11-04):* `riviera_core::egress_route` and the window's Egress Route; the sample *Escalators in a transit station*. Not yet: picking the points in the view, lifts (evacuation and firefighting lifts with their waits), ramps, the floor openings over stairwells as obstacles, occupant loads and exit capacity (flow through doors and stairs); platform clearing times are ANA-ROUTE-005.
+*Built (2026-11-04):* `riviera_core::egress_route` and the window's Egress Route; the sample *Escalators in a transit station*. Not yet: picking the points in the view, ramps, the floor openings over stairwells as obstacles, occupant loads and exit capacity (flow through doors and stairs); platform clearing times are ANA-ROUTE-005, lifts ANA-ROUTE-006.
 
 ### 4.12.13b Platform clearing times
 **ID:** ANA-ROUTE-005 · **Priority:** P2 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §9 (*Egress*); owner direction (2026-11-04: "Egress and transit"); NFPA 130 (2020) 5.5.6.3 and Annex C, as quoted in S2749 and S2750; EXPERT_REVIEW E-92
@@ -5333,6 +5333,25 @@ The job runs in the background with a notification. Spaces that no system serves
 - [x] With a pair of escalators added, one is out and the other counts up to the stairs' capacity; 400 people clear within 4 minutes with them, and not with the stair alone.
 
 *Built (2026-11-04):* `riviera_core::egress_route::platform_clearing` and the window's Platform Clearing; the sample *Escalators in a transit station* (500 people: 3.00 min, 4.22 min to safety; 6.0 min by the stair alone). Not yet: the occupant load from train and headway data, waits further on (concourse exits, fare gates) and the concourse's own load, doors and fare gates as exits, lifts, platform-edge doors.
+
+### 4.12.13c Lifts in egress routes
+**ID:** ANA-ROUTE-006 · **Priority:** P2 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §9 (*Egress*); owner direction (2026-11-04: "Egress and transit"); IBC 3007–3008, EN 81-72 and EN 81-76 (roles only); EXPERT_REVIEW E-93
+
+**Purpose.** Let egress routes use occupant evacuation elevators, with the wait for the car, and record each elevator's part in an evacuation.
+
+**Behaviour & rules.**
+- `elevator.set_egress_role(elevator_id, role)` sets `none` (default), `occupant_evacuation` or `fire_service`. It is kept with the elevator, written as `Riviera_Elevator.EgressRole` (when not none), and a fire service elevator sets IFC's `Pset_TransportElementElevator.FireFightingLift`.
+- `egress.route` and `egress.draw_route` take `lifts` (default false) and `lift_wait` (s, default 60). With `lifts`, each occupant evacuation elevator links every pair of the levels it serves, from 0.6 m in front of its landing entrance outside the hoistway wall:
+  - the time is the wait, 10 s of doors, and the rise at the rated speed plus speed ÷ 1 m/s²;
+  - the length is the rise;
+  - the link's kind is `lift`.
+- Fire service elevators are never taken. `egress.platform_clearing` takes no lifts.
+- **In the window:** Architecture › Circulation › *Egress Role* (on the selected elevators); Egress Route's *Lifts* option.
+
+**Acceptance criteria.**
+- [x] In an eleven-floor building with a stair stack and an elevator 60 m away, the route from the top takes the stairs until the elevator is marked for occupant evacuation, then one lift link whose time is 60 + 10 + 35 ÷ speed + speed s, sooner; without `lifts`, or with a 1000 s wait, the stairs; marked for fire service, the stairs.
+
+*Built (2026-11-04):* `riviera_core::elevators::set_egress_role`, lift links in `riviera_core::egress_route`, the Egress Role action and the dialog's *Lifts*; the sample *Evacuation lifts in a tower* (97 s by the lift, 116 s by the stairs). Not yet: the wait from traffic and the number waiting, IBC 3008's own requirements (enclosed lobbies, standby power, hoistway protection, the 3008.1.1 capacity share), firefighters' routes up by fire service elevators.
 
 ### 4.12.14 Interference check (cross-reference)
 **ID:** ANA-CLASH-001 · **Priority:** P1 · **Ref:** research/03 §13.6
@@ -6140,8 +6159,9 @@ Every command below is registered once in the command registry and is exposed au
 | `path_of_travel.update` | ids[] \| "all_in_view" | — | Yes | ANA-ROUTE-001 |
 | `path_of_travel.add_waypoint` | id, point, index? | — | Yes | ANA-ROUTE-001 |
 | `route_settings.set` | params | — | Yes | ANA-ROUTE-002 |
-| `egress.route` | start: {point, level}, end: {point, level}, mode? | {legs, links, length, time} | No (query) | ANA-ROUTE-004 |
-| `egress.draw_route` | start: {point, level}, end: {point, level}, mode? | {legs, links, length, time, paths[], unplanned[]} | Yes | ANA-ROUTE-004 |
+| `egress.route` | start: {point, level}, end: {point, level}, mode?, lifts?, lift_wait? | {legs, links, length, time} | No (query) | ANA-ROUTE-004 |
+| `egress.draw_route` | start: {point, level}, end: {point, level}, mode?, lifts?, lift_wait? | {legs, links, length, time, paths[], unplanned[]} | Yes | ANA-ROUTE-004 |
+| `elevator.set_egress_role` | elevator_id, role: "none"\|"occupant_evacuation"\|"fire_service" | role | Yes | ANA-ROUTE-006 |
 | `egress.platform_clearing` | level, load, remote, safety: {point, level}, mode? | {exits[], capacity, platform_time, safety_time, meets_platform, meets_safety, …} | No (query) | ANA-ROUTE-005 |
 | `route.reveal_obstacles` | view_id, on: bool | — | No | ANA-ROUTE-002 |
 | `path_of_travel.create_multiple` | view_id, starts[], ends[], min_separation | ids[] | Yes | ANA-ROUTE-002 |

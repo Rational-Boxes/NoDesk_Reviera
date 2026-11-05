@@ -172,6 +172,37 @@ impl Gui {
         frame.set_status_text(&format!("{} — {} ({}, {})", f["rule"].as_str().unwrap_or_default(), f["description"].as_str().unwrap_or_default(), f["edition"].as_str().unwrap_or_default(), f["source"].as_str().unwrap_or_default()), 0);
     }
 
+    /// Architecture › Circulation › Egress Role (ANA-ROUTE-006): the selected elevators' part in
+    /// an evacuation.
+    pub(crate) fn elevator_egress_role(&mut self) {
+        let frame = self.frame;
+        let lifts: Vec<riviera_core::ElementId> = {
+            let selected = self.selection();
+            let Some(store) = self.doc.and_then(|d| self.app.document(d)).map(|d| d.doc.store()) else {
+                return;
+            };
+            selected.into_iter().filter(|id| store.get(*id).and_then(riviera_core::elevators::elevator).is_some()).collect()
+        };
+        if lifts.is_empty() {
+            return error(&frame, "Select the elevators first (their cars).");
+        }
+        let roles = ["Neither", "Occupant evacuation elevator (IBC 3008, EN 81-76)", "Fire service access elevator (IBC 3007, EN 81-72)"];
+        let labels: Vec<&str> = roles.to_vec();
+        let dialog = SingleChoiceDialog::builder(&frame, &format!("The part of {} elevator(s) in an evacuation. Egress routes take occupant evacuation elevators when Lifts is ticked.", lifts.len()), "Egress Role", &labels).build();
+        if dialog.show_modal() != ID_OK {
+            return;
+        }
+        let picked = usize::try_from(dialog.get_selection()).unwrap_or(0);
+        dialog.destroy();
+        let role = ["none", "occupant_evacuation", "fire_service"][picked.min(2)];
+        for id in lifts {
+            if let Err(e) = self.run("elevator.set_egress_role", json!({ "elevator_id": id, "role": role })) {
+                return error(&frame, &e);
+            }
+        }
+        frame.set_status_text(&format!("Egress role: {}", roles[picked.min(2)]), 0);
+    }
+
     /// Architecture › Circulation › Escalator (ARC-VT-010): an escalator or moving walk from this
     /// plan's level, then a click at the middle of its lower end (or a typed point).
     pub(crate) fn place_escalator(&mut self) {

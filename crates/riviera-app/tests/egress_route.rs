@@ -110,3 +110,43 @@ fn a_platform_clears_through_its_stairs_and_half_from_its_escalators() {
     // Too many for the stairs alone within 4 minutes.
     assert_eq!(ok(&mut app, "egress.platform_clearing", args(400.0, "ibc"))["meets_platform"], false);
 }
+
+#[test]
+fn occupant_evacuation_lifts_are_taken_only_when_marked_and_asked() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = App::new(AppConfig { live: None, untitled_dir: dir.path().join("untitled") });
+    ok(&mut app, "file.new", json!({}));
+    let ground = ok(&mut app, "level.list", json!({}))[0]["id"].clone();
+    // Eleven floors 3.5 m apart; a stair straight up at the west end, stacked flight on flight.
+    let mut levels = vec![ground.clone()];
+    for k in 1..=10 {
+        levels.push(ok(&mut app, "level.create", json!({ "elevation": 3.5 * f64::from(k) })));
+    }
+    for k in 0..10 {
+        ok(&mut app, "stair.create", json!({ "base_level": levels[k], "width": 1.2, "railings": false, "runs": [{ "start": [2.0, 4.0 + 3.0 * (k % 2) as f64], "end": [7.5, 4.0 + 3.0 * (k % 2) as f64] }] }));
+    }
+    // An elevator 60 m east, serving every floor.
+    let lift = ok(&mut app, "elevator.create", json!({ "point": [60.0, 20.0], "base_level": levels[0], "top_level": levels[10], "walls": false, "equipment": false }))["elevator"].clone();
+    let from = json!({ "point": [60.0, 15.0], "level": levels[10] });
+    let to = json!({ "point": [60.0, 15.0], "level": ground });
+    let route = |app: &mut App, lifts: bool| ok(app, "egress.route", json!({ "start": from, "end": to, "lifts": lifts }));
+
+    // Not yet marked: the stairs, even when lifts are asked for.
+    let unmarked = route(&mut app, true);
+    assert!(unmarked["links"].as_array().unwrap().iter().all(|l| l["kind"] == "stair"), "{unmarked:#}");
+    // Marked for occupant evacuation: taken when asked, in one ride with its wait.
+    assert_eq!(ok(&mut app, "elevator.set_egress_role", json!({ "elevator_id": lift, "role": "occupant_evacuation" })), "occupant_evacuation");
+    let by_lift = route(&mut app, true);
+    let links = by_lift["links"].as_array().unwrap();
+    assert_eq!((links.len(), links[0]["kind"].as_str()), (1, Some("lift")), "{by_lift:#}");
+    let speed = ok(&mut app, "elevator.list", json!({})).as_array().unwrap().iter().find(|e| e["elevator"] == lift).map(|e| f(&e["speed"])).unwrap();
+    assert!((f(&links[0]["time"]) - (60.0 + 10.0 + 35.0 / speed + speed)).abs() < 1e-6, "{by_lift:#}");
+    assert!(f(&by_lift["time"]) < f(&unmarked["time"]));
+    // Not asked: the stairs. A long wait: the stairs again.
+    assert!(route(&mut app, false)["links"].as_array().unwrap().iter().all(|l| l["kind"] == "stair"));
+    let slow = ok(&mut app, "egress.route", json!({ "start": from, "end": to, "lifts": true, "lift_wait": 1000.0 }));
+    assert!(slow["links"].as_array().unwrap().iter().all(|l| l["kind"] == "stair"), "{slow:#}");
+    // A fire service elevator is for firefighters: not taken, and IFC marks it.
+    ok(&mut app, "elevator.set_egress_role", json!({ "elevator_id": lift, "role": "fire_service" }));
+    assert!(route(&mut app, true)["links"].as_array().unwrap().iter().all(|l| l["kind"] == "stair"));
+}

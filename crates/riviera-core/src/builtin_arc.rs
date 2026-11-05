@@ -581,6 +581,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(EgressRoute),
         registry.add(EgressDrawRoute),
         registry.add(EgressPlatformClearing),
+        registry.add(ElevatorSetEgressRole),
         registry.add(LibraryReloadItem),
         registry.add(PublishListSets),
         registry.add(PublishRemoveSet),
@@ -7488,4 +7489,17 @@ read_command!(
     crate::egress_route::ClearingParams,
     crate::egress_route::Clearing,
     crate::egress_route::platform_clearing
+);
+
+edit_command!(
+    ElevatorSetEgressRole,
+    "elevator.set_egress_role",
+    "Set an elevator's part in an evacuation",
+    "Marks an elevator as an occupant evacuation elevator (IBC 3008, EN 81-76), which `egress.route` may take \
+     with `lifts`, or a fire service access elevator (IBC 3007, EN 81-72; IFC's FireFightingLift), or neither \
+     (ANA-ROUTE-006).",
+    "Elevator Egress Role",
+    crate::elevators::EgressRoleParams,
+    crate::elevators::EgressRole,
+    crate::elevators::set_egress_role
 );

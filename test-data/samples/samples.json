@@ -178,6 +178,19 @@
     ]
   },
   {
+    "name": "evacuation_lifts",
+    "title": "Evacuation lifts in a tower",
+    "group": "Architecture",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "evacuation_lifts.lua"
+        }
+      }
+    ]
+  },
+  {
     "name": "escalators",
     "title": "Escalators and moving walks in a department store",
     "group": "Architecture",

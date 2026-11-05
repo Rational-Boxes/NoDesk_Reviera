@@ -98,6 +98,7 @@ impl Gui {
         let to_level = f.choice("To level", &names, 0);
         let to = f.text("To point (x, y)", "", "Metres: the exit");
         let mode = f.choice("Escalators", &["Not counted (IBC)".to_owned(), "Counted (NFPA 130)".to_owned(), "Counted (SCDF)".to_owned()], 0);
+        let lifts = f.check("Lifts", "Take occupant evacuation elevators too (waiting 60 s for the car)", false);
         let draw = f.check("Plans", "Draw each leg as a path of travel in its level's floor plan", false);
         let ok = f.show("Walks each level round its obstacles (Route Settings) and takes the stairs between levels.", "Find Route");
         let point = |t: &TextCtrl| -> Option<[f64; 2]> {
@@ -109,12 +110,13 @@ impl Gui {
         let lb = levels[to_level.get_selection().unwrap_or(0) as usize]["id"].clone();
         let m = ["ibc", "nfpa130", "scdf"][mode.get_selection().unwrap_or(0) as usize];
         let draw = draw.is_checked();
+        let lifts = lifts.is_checked();
         f.dialog.destroy();
         if !ok {
             return;
         }
         let (Some(a), Some(b)) = (a, b) else { return error(&frame, "Give both points as x, y.") };
-        let r = match self.run(if draw { "egress.draw_route" } else { "egress.route" }, json!({ "start": { "point": a, "level": la }, "end": { "point": b, "level": lb }, "mode": m })) {
+        let r = match self.run(if draw { "egress.draw_route" } else { "egress.route" }, json!({ "start": { "point": a, "level": la }, "end": { "point": b, "level": lb }, "mode": m, "lifts": lifts })) {
             Ok(r) => r,
             Err(e) => return error(&frame, &format!("No route:\n{e}")),
         };
@@ -124,7 +126,11 @@ impl Gui {
         for (k, g) in legs.iter().enumerate() {
             lines.push(format!("Walk on {}: {:.1} m", name(&g["level"]), g["length"].as_f64().unwrap_or(0.0)));
             if let Some(l) = links.get(k) {
-                lines.push(format!("{} from {} to {}: {:.1} m, {:.0} s", if l["kind"] == "escalator" { "Escalator" } else { "Stair" }, name(&l["from"]), name(&l["to"]), l["length"].as_f64().unwrap_or(0.0), l["time"].as_f64().unwrap_or(0.0)));
+                lines.push(format!("{} from {} to {}: {:.1} m, {:.0} s", match l["kind"].as_str() {
+                        Some("escalator") => "Escalator",
+                        Some("lift") => "Evacuation lift (with its wait)",
+                        _ => "Stair",
+                    }, name(&l["from"]), name(&l["to"]), l["length"].as_f64().unwrap_or(0.0), l["time"].as_f64().unwrap_or(0.0)));
             }
         }
         if draw {

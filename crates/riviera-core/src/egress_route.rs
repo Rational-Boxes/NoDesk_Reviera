@@ -41,6 +41,24 @@ pub struct RouteParams {
     /// (default `ibc`: stairs only).
     #[serde(default)]
     pub mode: EgressMode,
+    /// Take occupant evacuation elevators too (default false; ANA-ROUTE-006).
+    #[serde(default)]
+    pub lifts: bool,
+    /// The wait for a lift's car, seconds (default 60).
+    #[serde(default)]
+    pub lift_wait: Option<f64>,
+}
+
+/// A lift's default wait for the car (s), its door time at the two stops together (s), and the
+/// acceleration and deceleration it travels with (m/s²).
+pub const LIFT_WAIT: f64 = 60.0;
+pub const LIFT_DOORS: f64 = 10.0;
+pub const LIFT_ACCELERATION: f64 = 1.0;
+
+/// A lift's time between two of its levels `rise` apart: the wait, the doors, and the ride at
+/// its rated speed with the time lost speeding up and slowing down.
+pub fn lift_time(rise: f64, speed: f64, wait: f64) -> f64 {
+    wait + LIFT_DOORS + rise.abs() / speed + speed / LIFT_ACCELERATION
 }
 
 /// A stretch walked on one level.
@@ -56,6 +74,7 @@ pub struct Leg {
 pub enum LinkKind {
     Stair,
     Escalator,
+    Lift,
 }
 
 /// A stair or escalator taken between levels.
@@ -65,7 +84,7 @@ pub struct Link {
     pub element: ElementId,
     pub from: ElementId,
     pub to: ElementId,
-    /// Along its flights (m), and the time taken (s).
+    /// Along its flights (m; a lift's rise), and the time taken (s; a lift's with its wait).
     pub length: f64,
     pub time: f64,
 }
@@ -91,6 +110,7 @@ struct Edge {
     kind: LinkKind,
     element: ElementId,
     length: f64,
+    time: f64,
 }
 
 fn level_id(store: &Store, guid: &str) -> Option<ElementId> {
@@ -101,8 +121,10 @@ fn polyline(p: &[[f64; 3]]) -> f64 {
     p.windows(2).map(|w| ((w[1][0] - w[0][0]).powi(2) + (w[1][1] - w[0][1]).powi(2) + (w[1][2] - w[0][2]).powi(2)).sqrt()).sum()
 }
 
-/// The links between levels: stairs, and escalators where allowed.
-fn links(store: &Store, mode: EgressMode, nodes: &mut Vec<Node>) -> Vec<Edge> {
+/// The links between levels: stairs, escalators where allowed, and occupant evacuation lifts if
+/// asked.
+fn links(store: &Store, p: &RouteParams, stair_speed: f64, nodes: &mut Vec<Node>) -> Vec<Edge> {
+    let mode = p.mode;
     let mut out = Vec::new();
     for (id, _) in crate::stairs::all(store) {
         let Some(e) = store.get(id) else { continue };
@@ -121,7 +143,8 @@ fn links(store: &Store, mode: EgressMode, nodes: &mut Vec<Node>) -> Vec<Edge> {
         let a = nodes.len();
         nodes.push(Node { level: base, p: [first.start[0] - d0[0] * 0.4, first.start[1] - d0[1] * 0.4] });
         nodes.push(Node { level: top, p: [e1[0] + d1[0] * 0.4, e1[1] + d1[1] * 0.4] });
-        out.push(Edge { a, b: a + 1, kind: LinkKind::Stair, element: id, length: polyline(&middle) + 0.8 });
+        let length = polyline(&middle) + 0.8;
+        out.push(Edge { a, b: a + 1, kind: LinkKind::Stair, element: id, length, time: length / stair_speed });
     }
     if mode != EgressMode::Ibc {
         for (id, el) in crate::escalators::escalators(store) {
@@ -134,7 +157,32 @@ fn links(store: &Store, mode: EgressMode, nodes: &mut Vec<Node>) -> Vec<Edge> {
             nodes.push(Node { level: lo, p: el.at(-0.6, 0.0) });
             nodes.push(Node { level: hi, p: el.at(s.length() + 0.6, 0.0) });
             let length = s.lower_end + s.run.hypot(s.rise) + s.upper_end + 1.2;
-            out.push(Edge { a, b: a + 1, kind: LinkKind::Escalator, element: id, length });
+            out.push(Edge { a, b: a + 1, kind: LinkKind::Escalator, element: id, length, time: length / stair_speed });
+        }
+    }
+    if p.lifts {
+        let wait = p.lift_wait.unwrap_or(LIFT_WAIT);
+        let levels = crate::levels::list(store);
+        for (id, el) in crate::elevators::elevators(store) {
+            if el.egress_role != crate::elevators::EgressRole::OccupantEvacuation {
+                continue;
+            }
+            // In front of the entrance on each level served.
+            let landing = el.at(el.door_x(), -(el.wall_thickness + 0.6));
+            let stops: Vec<(usize, f64)> = el
+                .levels
+                .iter()
+                .filter_map(|g| levels.iter().find(|l| l.guid == *g))
+                .map(|l| {
+                    nodes.push(Node { level: l.id, p: landing });
+                    (nodes.len() - 1, l.elevation)
+                })
+                .collect();
+            for (i, &(a, za)) in stops.iter().enumerate() {
+                for &(b, zb) in &stops[i + 1..] {
+                    out.push(Edge { a, b, kind: LinkKind::Lift, element: id, length: (zb - za).abs(), time: lift_time(zb - za, el.sized.speed, wait) });
+                }
+            }
         }
     }
     out
@@ -147,9 +195,12 @@ pub fn route(store: &Store, p: RouteParams) -> Result<Route> {
         let id = store.resolve(r).ok_or_else(|| bad("element.not_found", "no such level"))?;
         crate::levels::list(store).iter().any(|l| l.id == id).then_some(id).ok_or_else(|| bad("route.not_a_level", format!("element {id} is not a level")))
     };
+    if p.lift_wait.is_some_and(|w| !(w.is_finite() && w >= 0.0)) {
+        return Err(bad("route.invalid", "the lift wait must be 0 s or more"));
+    }
     let (l0, l1) = (level(&p.start.level)?, level(&p.end.level)?);
     let mut nodes = vec![Node { level: l0, p: p.start.point }, Node { level: l1, p: p.end.point }];
-    let edges = links(store, p.mode, &mut nodes);
+    let edges = links(store, &p, s.stair_speed, &mut nodes);
     // Each level's obstacles, once.
     let mut obstacles: std::collections::HashMap<ElementId, Vec<crate::path_of_travel::Poly>> = std::collections::HashMap::new();
     for n in &nodes {
@@ -197,7 +248,7 @@ pub fn route(store: &Store, p: RouteParams) -> Result<Route> {
                 (_, true) => e.a,
                 _ => continue,
             };
-            let t = best[u] + e.length / s.stair_speed;
+            let t = best[u] + e.time;
             if !done[v] && t < best[v] {
                 best[v] = t;
                 prev[v] = Some((u, Some(k)));
@@ -226,7 +277,7 @@ pub fn route(store: &Store, p: RouteParams) -> Result<Route> {
                     legs.push(g);
                 }
                 let e = &edges[k];
-                out_links.push(Link { kind: e.kind, element: e.element, from: nodes[a].level, to: nodes[b].level, length: e.length, time: e.length / s.stair_speed });
+                out_links.push(Link { kind: e.kind, element: e.element, from: nodes[a].level, to: nodes[b].level, length: e.length, time: e.time });
             }
             None => {
                 let pts = walk(a, b).expect("walked");
@@ -403,7 +454,7 @@ pub fn platform_clearing(store: &Store, p: ClearingParams) -> Result<Clearing> {
         return Err(bad("route.no_exits", format!("no stair (or counted escalator) leaves {}", platform.name)));
     }
     let platform_time = p.load / capacity;
-    let r = route(store, RouteParams { start: At { point: p.remote, level: ElementRef::Id(id) }, end: p.safety, mode: p.mode })?;
+    let r = route(store, RouteParams { start: At { point: p.remote, level: ElementRef::Id(id) }, end: p.safety, mode: p.mode, lifts: false, lift_wait: None })?;
     let elevation = |l: ElementId| levels.iter().find(|x| x.id == l).map_or(0.0, |x| x.elevation);
     let climb: f64 = r
         .links

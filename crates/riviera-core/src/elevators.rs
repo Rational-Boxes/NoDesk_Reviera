@@ -1030,6 +1030,49 @@ pub struct Elevator {
     /// What encloses the hoistway: walls, or glass at the sides and rear (ARC-VT-016).
     #[serde(default)]
     pub hoistway_enclosure: crate::panoramic::Hoistway,
+    /// Its part in an evacuation (ANA-ROUTE-006).
+    #[serde(default, skip_serializing_if = "EgressRole::is_none")]
+    pub egress_role: EgressRole,
+}
+
+/// An elevator's part in an evacuation.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum EgressRole {
+    /// Recalled in a fire; not used to leave.
+    #[default]
+    None,
+    /// An occupant evacuation elevator (IBC 3008, EN 81-76): occupants may leave by it.
+    OccupantEvacuation,
+    /// A fire service access elevator (IBC 3007, EN 81-72): for firefighters, not occupants.
+    FireService,
+}
+
+impl EgressRole {
+    pub fn is_none(&self) -> bool {
+        *self == EgressRole::None
+    }
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct EgressRoleParams {
+    pub elevator_id: ElementRef,
+    pub role: EgressRole,
+}
+
+/// `elevator.set_egress_role`.
+pub(crate) fn set_egress_role(txn: &mut Transaction<'_>, p: EgressRoleParams) -> Result<EgressRole> {
+    let id = txn.store().resolve(&p.elevator_id).ok_or_else(|| bad("element.not_found", "no such elevator"))?;
+    let mut el = txn.store().get(id).and_then(elevator).ok_or_else(|| bad("vt.not_elevator", format!("element {id} is not an elevator")))?;
+    el.egress_role = p.role;
+    let data = serde_json::to_value(&el).expect("serialises");
+    let props = properties(&el);
+    txn.modify(id, |e| {
+        e.params.insert(DATA_KEY.into(), data);
+        e.params.extend(props);
+    })?;
+    Ok(p.role)
 }
 
 /// What kind of space an elevator's machine and controller need.
@@ -1279,6 +1322,7 @@ pub(crate) fn create(txn: &mut Transaction<'_>, p: CreateParams) -> Result<Creat
         equipment: Vec::new(),
         machine_space: None,
         hoistway_enclosure: p.hoistway,
+        egress_role: EgressRole::None,
     };
 
     // The car, on the lowest level.
@@ -1518,7 +1562,7 @@ pub fn properties(el: &Elevator) -> Vec<(String, Value)> {
         ("Pset_TransportElementElevator.ClearWidth".into(), measure("IfcPositiveLengthMeasure", s.car[0])),
         ("Pset_TransportElementElevator.ClearDepth".into(), measure("IfcPositiveLengthMeasure", s.car[1])),
         ("Pset_TransportElementElevator.ClearHeight".into(), measure("IfcPositiveLengthMeasure", s.car[2])),
-        ("Pset_TransportElementElevator.FireFightingLift".into(), measure("IfcBoolean", false)),
+        ("Pset_TransportElementElevator.FireFightingLift".into(), measure("IfcBoolean", el.egress_role == EgressRole::FireService)),
         ("Riviera_Elevator.RatedSpeed".into(), measure("IfcLinearVelocityMeasure", s.speed)),
         ("Riviera_Elevator.DriveType".into(), label(serde_json::to_value(s.drive).expect("serialises"))),
         ("Riviera_Elevator.DoorOperation".into(), label(serde_json::to_value(s.door).expect("serialises"))),
@@ -1533,6 +1577,7 @@ pub fn properties(el: &Elevator) -> Vec<(String, Value)> {
         ("Riviera_Elevator.Kind".into(), label(serde_json::to_value(s.kind).expect("serialises"))),
     ]
     .into_iter()
+    .chain((!el.egress_role.is_none()).then(|| ("Riviera_Elevator.EgressRole".into(), label(serde_json::to_value(el.egress_role).expect("serialises")))))
     .chain(s.power.iter().flat_map(|w| {
         [
             ("Riviera_Elevator.MotorPower".into(), measure("IfcPowerMeasure", w.motor_kw * 1000.0)),
@@ -1902,7 +1947,7 @@ mod tests {
         let us: Vec<Pack> = shipped().iter().filter(|p| p.id == "practice_us").cloned().collect();
         // A glazed car, so that its glass's values are written too.
         let sized = size(&us, &SizeParams { car_glass: crate::panoramic::CarGlass::Rear, ..SizeParams::default() }).unwrap();
-        let el = Elevator { sized, point: [0.0; 2], rotation: 0.0, levels: vec![], wall_thickness: 0.2, shaft: String::new(), walls: vec![], entrances: vec![], space_below: false, entrance_x: None, equipment: vec![], machine_space: None, hoistway_enclosure: crate::panoramic::Hoistway::Glass };
+        let el = Elevator { sized, point: [0.0; 2], rotation: 0.0, levels: vec![], wall_thickness: 0.2, shaft: String::new(), walls: vec![], entrances: vec![], space_below: false, entrance_x: None, equipment: vec![], machine_space: None, hoistway_enclosure: crate::panoramic::Hoistway::Glass, egress_role: EgressRole::None };
         for (key, value) in properties(&el) {
             let Some(name) = key.strip_prefix("Riviera_Elevator.") else { continue };
             let def = set["properties"].as_array().unwrap().iter().find(|p| p["name"] == name).unwrap_or_else(|| panic!("{name} is not published"));
