@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Riviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Riviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 899 numbered requirements (320 P0 · 343 P1 · 229 P2 · 7 P3), 2,346 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 900 numbered requirements (320 P0 · 343 P1 · 230 P2 · 7 P3), 2,349 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Riviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Riviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,346 commands; 899 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,349 commands; 900 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -14345,6 +14345,30 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 
 *Built (2026-11-05):* `riviera_core::inclined_elevators`, the Inclined Elevator action; the sample *An inclined elevator up a hillside*. Not yet: supports (posts, piers and piles, as footings and members), landing gates, the drive and its slab, A17.1 end clearances and runby on an incline, curved or variable-grade tracks, cars moving along the track, schedules.
 
+### 3.7a.24 Funiculars
+**ID:** ARC-VT-024 · **Priority:** P2 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §7 (step 9); research/16 Q4 C3 (S2498–S2504); ARC-ALN-001; EXPERT_REVIEW E-98
+
+**Purpose.** Two cars on one haul rope, counterbalancing each other, along an alignment up a hillside, with their trip and line capacity.
+
+**Behaviour & rules.**
+- `funicular.create(alignment_id, layout?, gauge?, car_length?, car_width?, car_height?, car_floor?, car_capacity?, speed?, dwell?, walkway?)` runs along the alignment from its start (the bottom station) to its end (the top), following its curves and its profile. The profile must rise from start to end.
+  - **Layout:** `abt_loop` (the default) is two rails with an Abt passing loop half way, as long as a car and two 20 m switches. `four_rail` is two tracks the whole way.
+  - **Defaults:** a 1 m gauge; cars 12 m long, the gauge + 1.2 m wide and 3 m high, for 60 persons; floors `level` or `stepped`; 5 m/s; a 60 s stop at each station. The tracks are a car's width plus 0.6 m apart where the cars pass.
+  - The alignment must be long enough for a car at each station, plus the loop.
+  - **Reports:** the track along the slope, the rise, the steepest grade, the loop's middle and length, the trip (starting and stopping at 0.5 m/s²), and the capacity each way (a car's persons every trip and stop).
+  - **The object:** the rails, the two cars (one at each station) and the drive house at the top are one transport object for now (USERDEFINED "FUNICULAR", `Riviera_Funicular`).
+- `funicular.check(demand?)` reports:
+  - a gauge outside the reference lines' 762–1524 mm (a note);
+  - a capacity each way below `demand` persons an hour;
+  - no evacuation walkway beside the track (a note).
+- `funicular.list` lists them.
+- **In the window:** Architecture › Circulation › *Funicular* on the selected alignment.
+
+**Acceptance criteria.**
+- [x] Along a 300 m alignment rising 90 m: the track is √(300² + 90²) m long at 30 %; the trip is that ÷ 5 + 10 s; 60 persons every trip and a minute's stop; the loop is at 150 m and 52 m long. A demand of 2000 an hour and the missing walkway are reported. Four rails at standard gauge with a walkway have no loop and nothing to report at 500 an hour. A flat alignment, or one too short, is refused.
+
+*Built (2026-11-05):* `riviera_core::funiculars`, the Funicular action; the sample *A funicular up a hillside* (an IFC 4.3 project: 327 m rising 100 m, steepest 43.75 %, 75 s a trip, 1,594 an hour each way). Not yet: IFC 4.3 classes (IfcRailway "FUNICULAR", IfcRail, IfcVehicle × 2, HAULINGGEAR), stations and platforms (stepped or level), the haul rope and pulleys, the walkway, tunnels and viaducts, three-rail layouts, bottom tail ropes, levelling cabins.
+
 ---
 
 ## 3.8 Openings
@@ -16741,6 +16765,9 @@ All commands below are registered once in the command registry and exposed autom
 | `inclined_elevator.create` | bottom: {point, level}, top: {point, level}, size?, use?, enclosure?, drive?, track_width?, speed?, accessible? | {inclined_elevator, alignment, length, rise, run, angle, trip, capacity, …} | Yes | ARC-VT-023 |
 | `inclined_elevator.list` | — | [{inclined_elevator, bottom, top, size, drive, length, angle, …}] | No (query) | ARC-VT-023 |
 | `inclined_elevator.check` | — | [{inclined_elevator, severity, rule, message}] | No (query) | ARC-VT-023 |
+| `funicular.create` | alignment_id, layout?, gauge?, car_length?, car_width?, car_height?, car_floor?, car_capacity?, speed?, dwell?, walkway? | {funicular, length, rise, max_grade, passing_loop, trip, capacity, …} | Yes | ARC-VT-024 |
+| `funicular.list` | — | [{funicular, layout, gauge, length, rise, max_grade, trip, capacity, …}] | No (query) | ARC-VT-024 |
+| `funicular.check` | demand? | [{funicular, severity, rule, message}] | No (query) | ARC-VT-024 |
 | `fare_line.create` | level, start, toward, kind?, count, wide?, emergency? | {fare_line, level, start, direction, aisles[], length, capacity} | Yes | ARC-VT-022 |
 | `fare_line.list` | — | [{fare_line, level_name, aisles[], length, capacity, …}] | No (query) | ARC-VT-022 |
 | `enclosure.create` | form, footprint \| host_wall_ids, level_id, params | element_id | Yes | ARC-GLZ-001 |
@@ -30128,14 +30155,14 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 39 | 8 | 0 | 123 |
 | DM | 91 | 65 | 34 | 3 | 193 |
-| ARC | 77 | 101 | 33 | 1 | 212 |
+| ARC | 77 | 101 | 34 | 1 | 213 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 32 | 0 | 33 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
 | COL | 8 | 52 | 16 | 1 | 77 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **343** | **229** | **7** | **899** |
+| **Total** | **320** | **343** | **230** | **7** | **900** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -30346,7 +30373,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2346 unique commands** in 438 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2349 unique commands** in 439 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -30518,6 +30545,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `foundation_slab` | 1 |
 | `frame` | 3 |
 | `framing` | 7 |
+| `funicular` | 3 |
 | `gbxml` | 2 |
 | `geom` | 1 |
 | `geometry` | 7 |
@@ -31652,6 +31680,9 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `framing.set_cutback` | 4 | id, end, distance | — | Yes | STR-BEAM-002 |
 | `framing.set_extension` | 4 | id, end, length | — | Yes | STR-BEAM-002 |
 | `framing.set_justification` | 4 | ids[], y_just, y_offset, z_just, z_offset, mode | — | Yes | STR-BEAM-002 |
+| `funicular.check` | 3 | demand? | [{funicular, severity, rule, message}] | No (query) | ARC-VT-024 |
+| `funicular.create` | 3 | alignment_id, layout?, gauge?, car_length?, car_width?, car_height?, car_floor?, car_capacity?, speed?, dwell?, walkway? | {funicular, length, rise, max_grade, passing_loop, trip, capacity, …} | Yes | ARC-VT-024 |
+| `funicular.list` | 3 | — | [{funicular, layout, gauge, length, rise, max_grade, trip, capacity, …}] | No (query) | ARC-VT-024 |
 | `gbxml.export` | 4 | path, source: "energy_model"\ | "spaces" | — | No |
 | `gbxml.import_loads` | 4 | path | report | Yes | ANA-EM-004 |
 | `geom.raycast` | 2 | origin, direction, filter? | hit[] | No | DM-LUA-010 |

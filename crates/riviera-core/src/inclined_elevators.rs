@@ -227,7 +227,7 @@ fn scale(a: V3, k: f64) -> V3 {
 }
 
 /// A box from `a` to `b` (its axis), `w` wide across (horizontal) and `h` deep below the axis.
-fn beam(a: V3, b: V3, w: f64, h: f64) -> crate::bodies::Mesh {
+pub(crate) fn beam(a: V3, b: V3, w: f64, h: f64) -> crate::bodies::Mesh {
     let d = [b[0] - a[0], b[1] - a[1]];
     let l = d[0].hypot(d[1]).max(1e-9);
     let n = [-d[1] / l * w / 2.0, d[0] / l * w / 2.0, 0.0];
@@ -244,7 +244,7 @@ fn beam(a: V3, b: V3, w: f64, h: f64) -> crate::bodies::Mesh {
     (pts, idx)
 }
 
-fn merge(into: &mut crate::bodies::Mesh, m: crate::bodies::Mesh) {
+pub(crate) fn merge(into: &mut crate::bodies::Mesh, m: crate::bodies::Mesh) {
     let base = into.0.len() as u32;
     into.0.extend(m.0);
     into.1.extend(m.1.into_iter().map(|i| i + base));

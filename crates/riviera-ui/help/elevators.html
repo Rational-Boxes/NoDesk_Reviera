@@ -171,6 +171,19 @@ hillside</a> has one.</p>
   a level landing clear at each gate.</li>
 </ul>
 
+<h2 id="funicular">Funiculars</h2>
+<p><b>Architecture › Circulation › Funicular</b> runs two counterbalanced cars along the selected
+alignment, from its start (the bottom station) to its end, up its curves and its rising profile.
+The sample <a href="riviera:sample/funicular">A funicular up a hillside</a> has one.</p>
+<ul>
+  <li>Two rails with an Abt passing loop half way (where the cars pass), or four rails the whole
+  way.</li>
+  <li>It reports the track along the slope, the rise, the steepest grade, the trip time and how
+  many people an hour it carries each way.</li>
+  <li><code>funicular.check</code> compares that with a demand, and notes a gauge outside 762–1524
+  mm and a track without an evacuation walkway.</li>
+</ul>
+
 <h2 id="zones">Hoistway and landing zones</h2>
 <p>Each elevator has virtual volumes: its <b>hoistway</b> (violet), from the pit floor to the
 overhead, which nothing but the elevator's own parts may enter, and a <b>landing</b> (green) in
@@ -210,6 +223,6 @@ glass shafts. Power and heat are estimates, and so is the glass hoistway's struc
 <p>Everything above is a command: <code>vt.rule_packs</code>, <code>vt.set_rule_packs</code>,
 <code>vt.add_rule_pack</code>, <code>vt.remove_rule_pack</code>, <code>elevator.size</code>,
 <code>elevator.create</code>, <code>elevator.list</code>, <code>elevator.delete</code> and
-<code>elevator.check</code>, <code>elevator.set_egress_role</code>, <code>elevator.check_lobbies</code>, <code>inclined_elevator.create</code>, <code>inclined_elevator.list</code>, <code>inclined_elevator.check</code>; <code>clearance.list</code> and <code>clearance.check</code> include
+<code>elevator.check</code>, <code>elevator.set_egress_role</code>, <code>elevator.check_lobbies</code>, <code>inclined_elevator.create</code>, <code>inclined_elevator.list</code>, <code>inclined_elevator.check</code>, <code>funicular.create</code>, <code>funicular.list</code>, <code>funicular.check</code>; <code>clearance.list</code> and <code>clearance.check</code> include
 hoistways and landings. Lua scripts and AI agents (MCP, the <i>modeling</i> toolset) can use
 them.</p>

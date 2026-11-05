@@ -751,9 +751,11 @@ tools and the datums.
   intrusions more finely. Not built yet: crisscross arrangements, wellway protection, the airport
   and transit context, intersection guards. Not built yet for elevators: editing in place, rear
   entrances, vertical bi-parting and telescopic doors, machine rooms, hall fixtures, banks,
-  people movers, funiculars and ropeways (planned). **Inclined elevators** (ARC-VT-023): a car on a straight
+  people movers and ropeways (planned). **Inclined elevators** (ARC-VT-023): a car on a straight
   track up a slope between two levels, its track an alignment, cars from 3 × 3 to 5 × 8 ft, four drives,
-  level landings kept clear, and checks of the incline (under 70°), the drive and the accessible car.
+  level landings kept clear, and checks of the incline (under 70°), the drive and the accessible car. **Funiculars**
+  (ARC-VT-024): two counterbalanced cars along an alignment, two rails with an Abt passing loop or four rails, with
+  the trip time and the capacity each way checked against a demand.
 - **Panoramic cars and glass hoistways** (ARC-VT-016/017): the Elevator dialog's *Car glass*
   glazes the rear, or the rear and sides, with laminated glass sized for its panels (EN 81-20
   Table 9 under the EN packs) and weighed for the cab; a glazed traction car's counterweight

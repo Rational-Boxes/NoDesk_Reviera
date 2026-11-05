@@ -394,6 +394,70 @@ impl Gui {
         }
     }
 
+    /// Architecture › Circulation › Funicular (ARC-VT-024): two counterbalanced cars along the
+    /// selected alignment, from its start (the bottom station) to its end.
+    pub(crate) fn place_funicular(&mut self) {
+        let frame = self.frame;
+        let line = {
+            let selected = self.selection();
+            let Some(store) = self.doc.and_then(|d| self.app.document(d)).map(|d| d.doc.store()) else {
+                return;
+            };
+            selected.into_iter().find(|id| store.get(*id).and_then(riviera_core::alignments::recipe).is_some())
+        };
+        let Some(line) = line else {
+            return error(&frame, "Select the alignment the funicular runs along first (Massing & Site › Alignment), with a profile rising from its start to its end.");
+        };
+        let f = super::reinforcement_ui::Form::new(&frame, "Funicular");
+        let layout = f.choice("Track", &["Two rails, Abt passing loop half way".to_owned(), "Four rails (two tracks)".to_owned()], 0);
+        let gauge = f.text("Gauge (mm)", "1000", "762 to 1524 on the reference lines; 1000 and 1435 are common");
+        let length = f.text("Car length (m)", "12", "");
+        let persons = f.text("Persons a car", "60", "");
+        let speed = f.text("Speed (m/s)", "5", "");
+        let dwell = f.text("Stop at each station (s)", "60", "");
+        let floor = f.choice("Car floor", &["Level (levelling or stepped car, level platforms)".to_owned(), "Along the slope (stepped platforms)".to_owned()], 0);
+        let walkway = f.check("Walkway", "An evacuation walkway beside the track", false);
+        let ok = f.show("Its start is the bottom station and its end the top one; the drive is at the top.", "Place");
+        let num = |t: &TextCtrl| t.get_value().trim().parse::<f64>().ok();
+        let mut args = json!({
+            "alignment_id": line,
+            "layout": if layout.get_selection() == Some(1) { "four_rail" } else { "abt_loop" },
+            "car_floor": if floor.get_selection() == Some(1) { "stepped" } else { "level" },
+            "walkway": walkway.is_checked(),
+        });
+        if let Some(g) = num(&gauge) {
+            args["gauge"] = json!(g / 1000.0);
+        }
+        for (k, t) in [("car_length", &length), ("speed", &speed), ("dwell", &dwell)] {
+            if let Some(v) = num(t) {
+                args[k] = json!(v);
+            }
+        }
+        if let Some(p) = num(&persons) {
+            args["car_capacity"] = json!(p.max(0.0) as u32);
+        }
+        f.dialog.destroy();
+        if !ok {
+            return;
+        }
+        let made = match self.run("funicular.create", args) {
+            Ok(v) => v,
+            Err(e) => return error(&frame, &format!("Could not place the funicular:\n{e}")),
+        };
+        self.refresh_scene(&frame);
+        frame.set_status_text(
+            &format!(
+                "Funicular: {:.0} m of track rising {:.0} m, steepest {:.0} %, {:.0} s a trip, {:.0} persons an hour each way",
+                made["length"].as_f64().unwrap_or(0.0),
+                made["rise"].as_f64().unwrap_or(0.0),
+                made["max_grade"].as_f64().unwrap_or(0.0),
+                made["trip"].as_f64().unwrap_or(0.0),
+                made["capacity"].as_f64().unwrap_or(0.0)
+            ),
+            0,
+        );
+    }
+
     /// Architecture › Circulation › Fare Line (ARC-VT-022): a row of fare gates on this plan's
     /// level, then a click where it starts (or a typed point).
     pub(crate) fn place_fare_line(&mut self) {

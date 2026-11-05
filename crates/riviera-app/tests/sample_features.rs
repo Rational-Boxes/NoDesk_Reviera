@@ -1185,6 +1185,19 @@ fn the_inclined_elevator_sample_keeps_its_car_and_track() {
 }
 
 #[test]
+fn the_funicular_sample_keeps_its_loop_and_capacity() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "funicular");
+    let list = ok(&mut app, "funicular.list", json!({}));
+    let fun = &list[0];
+    println!("funicular: {:.1} m rising {:.1} m, steepest {:.2} %, {:.0} s a trip, {:.0} an hour each way", f(&fun["length"]), f(&fun["rise"]), f(&fun["max_grade"]), f(&fun["trip"]), f(&fun["capacity"]));
+    assert_eq!((fun["layout"].as_str(), fun["walkway"].as_bool()), (Some("abt_loop"), Some(true)), "{list:#}");
+    assert!((f(&fun["max_grade"]) - 43.75).abs() < 0.01 && f(&fun["capacity"]) > 600.0);
+    assert_eq!(ok(&mut app, "funicular.check", json!({ "demand": 600.0 })), json!([]));
+    assert_eq!(ok(&mut app, "alignment.list", json!({}))[0]["name"], "Funicular line");
+}
+
+#[test]
 fn the_escalators_sample_keeps_its_units_and_openings() {
     let work = tempfile::tempdir().unwrap();
     let mut app = open(work.path(), "escalators");

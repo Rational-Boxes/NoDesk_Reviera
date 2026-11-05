@@ -236,6 +236,25 @@
     ]
   },
   {
+    "name": "funicular",
+    "title": "A funicular up a hillside",
+    "group": "Architecture",
+    "steps": [
+      {
+        "command": "file.new",
+        "args": {
+          "schema": "IFC4X3"
+        }
+      },
+      {
+        "command": "script.run",
+        "args": {
+          "file": "funicular.lua"
+        }
+      }
+    ]
+  },
+  {
     "name": "escalators",
     "title": "Escalators and moving walks in a department store",
     "group": "Architecture",

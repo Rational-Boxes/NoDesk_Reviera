@@ -592,6 +592,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(InclinedElevatorCreate),
         registry.add(InclinedElevatorList),
         registry.add(InclinedElevatorCheck),
+        registry.add(FunicularCreate),
+        registry.add(FunicularList),
+        registry.add(FunicularCheck),
         registry.add(LibraryReloadItem),
         registry.add(PublishListSets),
         registry.add(PublishRemoveSet),
@@ -7638,4 +7641,42 @@ read_command!(
     Option<crate::inclined_elevators::NoParams>,
     Vec<crate::inclined_elevators::Finding>,
     crate::inclined_elevators::check
+);
+
+edit_command!(
+    FunicularCreate,
+    "funicular.create",
+    "Create a funicular",
+    "Two counterbalanced cars on one haul rope along an alignment (ARC-VT-024), from its start (the bottom \
+     station) to its end (the top station), up its curves and rising profile: `layout` abt_loop (two rails \
+     with an Abt passing loop half way, the default) or four_rail; gauge (default 1 m), cars (12 m long, the \
+     gauge + 1.2 m wide, 3 m high; 60 persons; level or stepped floors), speed (5 m/s) and the stop at each \
+     station (60 s). Reports the track along the slope, the rise, the steepest grade, the trip and the capacity \
+     each way. The rails, both cars and the drive house at the top are one transport object.",
+    "New Funicular",
+    crate::funiculars::CreateParams,
+    crate::funiculars::Created,
+    crate::funiculars::create
+);
+
+read_command!(
+    FunicularList,
+    "funicular.list",
+    "List the funiculars",
+    "Lists the model's funiculars (ARC-VT-024): alignment, layout, gauge, cars, track length, rise, steepest \
+     grade, passing loop, trip and capacity.",
+    Option<crate::inclined_elevators::NoParams>,
+    Vec<crate::funiculars::Info>,
+    crate::funiculars::list
+);
+
+read_command!(
+    FunicularCheck,
+    "funicular.check",
+    "Check funiculars",
+    "Checks each funicular (ARC-VT-024): a gauge outside the reference lines' 762–1524 mm (a note), its capacity \
+     each way against `demand` persons an hour, and a note where there is no evacuation walkway.",
+    Option<crate::funiculars::CheckParams>,
+    Vec<crate::funiculars::Finding>,
+    crate::funiculars::check
 );
