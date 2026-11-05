@@ -1137,6 +1137,12 @@ fn the_evacuation_lifts_sample_keeps_its_evacuation_elevator() {
     assert_eq!((by_lift["links"][0]["kind"].as_str(), by_stairs["links"].as_array().unwrap().len()), (Some("lift"), 5));
     assert_eq!(ok(&mut app, "path_of_travel.list", json!({})).as_array().unwrap().len(), 2);
     assert_eq!(ok(&mut app, "clearance.check", json!({})), json!([]));
+    // A lobby on the top floor only, large enough but far from the stairs.
+    let lobbies = ok(&mut app, "elevator.check_lobbies", json!({}));
+    let top = lobbies.as_array().unwrap().iter().find(|l| l["level"] == top).unwrap().clone();
+    println!("top lobby: {:.1} m² for {:.1} m²; nearest stair {:.1} m away", f(&top["area"]), f(&top["required"]), f(&top["stair_distance"]));
+    assert!(top["room"].is_number() && f(&top["area"]) > f(&top["required"]) && top["stair_access"] == false, "{top:#}");
+    assert_eq!(lobbies.as_array().unwrap().iter().filter(|l| l["room"].is_null()).count(), 5);
 }
 
 #[test]

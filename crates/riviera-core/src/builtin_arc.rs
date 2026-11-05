@@ -584,6 +584,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(ElevatorSetEgressRole),
         registry.add(FareLineCreate),
         registry.add(FareLineList),
+        registry.add(ElevatorCheckLobbies),
         registry.add(LibraryReloadItem),
         registry.add(PublishListSets),
         registry.add(PublishRemoveSet),
@@ -7530,4 +7531,18 @@ read_command!(
     Option<crate::fare_gates::NoParams>,
     Vec<crate::fare_gates::Info>,
     crate::fare_gates::list
+);
+
+read_command!(
+    ElevatorCheckLobbies,
+    "elevator.check_lobbies",
+    "Check evacuation elevator lobbies",
+    "For each occupant evacuation elevator on each floor it serves (ANA-ROUTE-007): the room in front of its \
+     landing is its lobby (none is a problem, IBC 3008.6); it holds a quarter of the floor's occupant load \
+     (`occupants`, or the floors on the level at `load_factor` m² a person, default 13.94) at 0.28 m² a \
+     person and a 0.76 × 1.22 m wheelchair space for each 50 or part of 50 (IBC 3008.6.3); and an exit \
+     stair's end on the floor lies within 3 m of it (direct access, IBC 3008.6.2).",
+    Option<crate::lift_lobbies::CheckParams>,
+    Vec<crate::lift_lobbies::Lobby>,
+    crate::lift_lobbies::check
 );

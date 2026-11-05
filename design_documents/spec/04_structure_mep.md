@@ -5358,7 +5358,25 @@ The job runs in the background with a notification. Spaces that no system serves
 **Acceptance criteria.**
 - [x] In an eleven-floor building with a stair stack and an elevator 60 m away, the route from the top takes the stairs until the elevator is marked for occupant evacuation, then one lift link whose time is 60 + 10 + 35 ÷ speed + speed s, sooner; without `lifts`, or with a 1000 s wait, the stairs; marked for fire service, the stairs.
 
-*Built (2026-11-04):* `riviera_core::elevators::set_egress_role`, lift links in `riviera_core::egress_route`, the Egress Role action and the dialog's *Lifts*; the sample *Evacuation lifts in a tower* (97 s by the lift, 116 s by the stairs). Not yet: the wait from traffic and the number waiting, IBC 3008's own requirements (enclosed lobbies, standby power, hoistway protection, the 3008.1.1 capacity share), firefighters' routes up by fire service elevators.
+*Built (2026-11-04):* `riviera_core::elevators::set_egress_role`, lift links in `riviera_core::egress_route`, the Egress Role action and the dialog's *Lifts*; the sample *Evacuation lifts in a tower* (97 s by the lift, 116 s by the stairs). Not yet: the wait from traffic and the number waiting, IBC 3008's own requirements (standby power, hoistway protection, the 3008.1.1 capacity share; lobbies are ANA-ROUTE-007), firefighters' routes up by fire service elevators.
+
+### 4.12.13d Evacuation elevator lobbies
+**ID:** ANA-ROUTE-007 · **Priority:** P2 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §9 (*Egress*); owner direction (2026-11-04: "Egress and transit"); IBC 3008.6 (S2753–S2755); EXPERT_REVIEW E-95
+
+**Purpose.** Check that every occupant evacuation elevator (ANA-ROUTE-006) has, on each floor it serves, an enclosed lobby large enough for the people who wait there, with direct access to an exit stair.
+
+**Behaviour & rules.**
+- `elevator.check_lobbies(occupants?, load_factor?)` reports, for each occupant evacuation elevator and each level it serves:
+  - **the lobby:** the room around the point 0.6 m in front of the landing entrance, outside the hoistway wall. With no room there, *no enclosed lobby* (IBC 3008.6).
+  - **its size:** a quarter of the floor's occupant load at 0.28 m² (3 ft²) a person, and one 0.76 × 1.22 m (30 × 48 in) wheelchair space for each 50 of the load or part of 50 (IBC 3008.6.3). The load is `occupants` (persons a floor), or the floors on the level at `load_factor` m² a person (default 13.94, 150 ft² gross).
+  - **direct access to an exit stair** (IBC 3008.6.2): the end of a stair on that level (the foot of one rising from it, the head of one arriving) inside the lobby or within 3 m of its boundary.
+- Each row gives the room, its area, the load, those waiting, the wheelchair spaces, the area needed, the nearest stair and its distance, and the problems.
+- **In the window:** Architecture › Circulation › *Check Lobbies* (occupants typed or worked out) lists the problems; picking one selects and frames the elevator.
+
+**Acceptance criteria.**
+- [x] An evacuation elevator serving two levels with a walled lobby on the upper one only: the lower is reported without a lobby; with 40 on the floor the upper needs 10 × 0.2787 + 0.929 m² and is large enough, with 200 (four wheelchair spaces) too small; with no stair near it lacks direct access, and with a stair arriving beside it the lobby passes; an elevator not marked for evacuation is not checked.
+
+*Built (2026-11-05):* `riviera_core::lift_lobbies`, the Check Lobbies action; the sample *Evacuation lifts in a tower* (a top-floor lobby of 7.5 m² for 3.7 m², 17.5 m from the nearest stair; five floors without a lobby). Not yet: the 1-hour smoke barrier around the lobby, the lobby's door and its swing, standby power, the protected hoistway, NFPA 130 5.5.6.3.3.3's holding areas (0.46 m² a person), the occupant load from rooms' uses.
 
 ### 4.12.14 Interference check (cross-reference)
 **ID:** ANA-CLASH-001 · **Priority:** P1 · **Ref:** research/03 §13.6
@@ -6168,6 +6186,7 @@ Every command below is registered once in the command registry and is exposed au
 | `route_settings.set` | params | — | Yes | ANA-ROUTE-002 |
 | `egress.route` | start: {point, level}, end: {point, level}, mode?, lifts?, lift_wait? | {legs, links, length, time} | No (query) | ANA-ROUTE-004 |
 | `egress.draw_route` | start: {point, level}, end: {point, level}, mode?, lifts?, lift_wait? | {legs, links, length, time, paths[], unplanned[]} | Yes | ANA-ROUTE-004 |
+| `elevator.check_lobbies` | occupants?, load_factor? | [{elevator, level, room, area, occupants, waiting, wheelchair_spaces, required, stair, stair_distance, stair_access, problems[]}] | No (query) | ANA-ROUTE-007 |
 | `elevator.set_egress_role` | elevator_id, role: "none"\|"occupant_evacuation"\|"fire_service" | role | Yes | ANA-ROUTE-006 |
 | `egress.platform_clearing` | level, load? \| occupancy?: {trains[], entraining?, area_per_person?, area?, train?}, remote, safety: {point, level}, mode?, lifts?, concourse_load? | {exits[], capacity, platform_time, safety_time, meets_platform, meets_safety, …} | No (query) | ANA-ROUTE-005 |
 | `route.reveal_obstacles` | view_id, on: bool | — | No | ANA-ROUTE-002 |

@@ -33,7 +33,8 @@ for k = 1, 5 do
 end
 
 -- A passenger elevator at the east end serving every floor, its landing toward the south.
-local lift = riviera.elevator.create{ point = { 26.0, 9.0 }, base_level = levels[1], top_level = levels[6] }.elevator
+local made = riviera.elevator.create{ point = { 26.0, 9.0 }, base_level = levels[1], top_level = levels[6] }
+local lift = made.elevator
 
 -- From the top floor's east end to the ground floor's. The elevator is not yet an evacuation
 -- elevator: the route walks west and takes the five flights.
@@ -58,3 +59,27 @@ local drawn = riviera.egress.draw_route{ start = from, ["end"] = out, lifts = tr
 assert(#drawn.paths == 2, "a path on each end floor")
 
 assert(#riviera.elevator.check{} == 0, "elevator.check found problems")
+
+-- Its lobbies (IBC 3008.6). On the top floor, three walls carry the hoistway's side walls on 3 m
+-- from its front wall (whose outer face is 0.2 m in front of the entrance line) and close them: a
+-- lobby 3 m deep, with a door. The floor's 512 m² at
+-- 13.94 m² a person is 37 people: the lobby holds a quarter of them, 10, at 0.28 m² and one
+-- wheelchair space, 3.7 m², and is large enough. But the stairs are at the far end: no direct
+-- access. The other floors have no lobby at all.
+local w, face = made.hoistway[1], 9.0 - 0.2
+local x0, x1 = 26.0 - w / 2 - 0.1, 26.0 + w / 2 + 0.1
+local lobby = {}
+for k, ab in ipairs({ { { x0, face }, { x0, face - 3.0 } }, { { x0, face - 3.0 }, { x1, face - 3.0 } }, { { x1, face - 3.0 }, { x1, face } } }) do
+  lobby[k] = riviera.wall.create{ curve = { line = { start = ab[1], ["end"] = ab[2] } }, base_level = levels[6], top_constraint = { unconnected = 3.0 } }
+end
+-- A door in the middle of its front wall, so the way to the lift is open.
+riviera.door.place{ host_wall_id = lobby[2], point_along = (x1 - x0) / 2 }
+riviera.room.place{ level_id = levels[6], point = { 26.0, face - 1.5 } }
+local lobbies = riviera.elevator.check_lobbies{}
+local top, missing = nil, 0
+for _, l in ipairs(lobbies) do
+  if l.level == levels[6] then top = l elseif l.room == nil then missing = missing + 1 end
+end
+assert(#lobbies == 6 and missing == 5, "five floors without a lobby")
+assert(top.area > top.required and not top.stair_access and #top.problems == 1, "the top lobby is large enough but far from a stair")
+print(string.format("top lobby: %.1f m² for %.1f m²; nearest stair %.1f m away", top.area, top.required, top.stair_distance))

@@ -268,6 +268,46 @@ impl Gui {
         }
     }
 
+    /// Architecture › Circulation › Check Lobbies (ANA-ROUTE-007): each evacuation elevator's lobby
+    /// on each floor; pick a problem to select and frame the elevator.
+    pub(crate) fn check_lobbies(&mut self) {
+        let frame = self.frame;
+        let f = super::reinforcement_ui::Form::new(&frame, "Check Lobbies");
+        let occupants = f.text("Occupants a floor", "", "Empty: the floors at 150 ft² (13.94 m²) a person");
+        let ok = f.show("Each lobby holds a quarter of its floor's load at 3 ft² a person and a wheelchair space for each 50, and reaches an exit stair (IBC 3008.6).", "Check");
+        let typed = occupants.get_value().trim().parse::<f64>().ok();
+        f.dialog.destroy();
+        if !ok {
+            return;
+        }
+        let args = typed.map_or_else(|| json!({}), |n| json!({ "occupants": n }));
+        let lobbies = match self.run("elevator.check_lobbies", args) {
+            Ok(v) => v.as_array().cloned().unwrap_or_default(),
+            Err(e) => return error(&frame, &format!("The check did not run:\n{e}")),
+        };
+        if lobbies.is_empty() {
+            return error(&frame, "No occupant evacuation elevators: mark one with Egress Role first.");
+        }
+        let problems: Vec<(Value, String)> = lobbies.iter().flat_map(|l| l["problems"].as_array().cloned().unwrap_or_default().into_iter().map(move |p| (l["elevator"].clone(), p.as_str().unwrap_or_default().to_owned()))).collect();
+        if problems.is_empty() {
+            let d = MessageDialog::builder(&frame, &format!("All {} lobbies are large enough and reach an exit stair.", lobbies.len()), "Check Lobbies").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build();
+            d.show_modal();
+            return;
+        }
+        let labels: Vec<&str> = problems.iter().map(|(_, p)| p.as_str()).collect();
+        let dialog = SingleChoiceDialog::builder(&frame, &format!("{} problem(s) in {} lobbies. Pick one to select and frame the elevator:", problems.len(), lobbies.len()), "Check Lobbies", &labels).build();
+        if dialog.show_modal() != ID_OK {
+            return;
+        }
+        let picked = usize::try_from(dialog.get_selection()).ok();
+        dialog.destroy();
+        let Some((lift, text)) = picked.and_then(|i| problems.get(i)).cloned() else { return };
+        let _ = self.run("selection.set", json!({ "ids": [lift] }));
+        self.selection_changed();
+        self.zoom_to_fit();
+        frame.set_status_text(&text, 0);
+    }
+
     /// Architecture › Circulation › Fare Line (ARC-VT-022): a row of fare gates on this plan's
     /// level, then a click where it starts (or a typed point).
     pub(crate) fn place_fare_line(&mut self) {

@@ -30,9 +30,20 @@ on each.
 6. **For firefighters.** *Egress Role* › *Fire service access elevator*: routes leave it alone,
    and its IFC FireFightingLift property is set.
 
+7. **Its lobbies.** On the top floor, three **Walls** carrying the hoistway's side walls on 3 m
+   from its front wall, and one across, enclosing the landing. Put a **Door** in the middle of the
+   wall across, then a **Room** inside them.
+   - **Architecture › Circulation › Check Lobbies**, *Occupants a floor* empty: 512 m² at
+     13.94 m² a person is 37 people.
+   - The top lobby must hold a quarter of them, 10, at 0.28 m², and one wheelchair space: 3.7 m².
+     At 7.5 m² it is large enough.
+   - The nearest stair's end is 17.5 m away at the other end of the floor, so there's no direct
+     access to one (IBC 3008.6.2).
+   - The five lower floors have no lobby at all (IBC 3008.6).
+
 ## Gaps
 
 - **[gap]** The wait for the car is typed in a script (`lift_wait`); the dialog uses 60 s. It is
   not worked out from the elevators' traffic or the number of people waiting.
-- **[gap]** IBC 3008's own rules for occupant evacuation elevators (enclosed lobbies, standby
-  power, the protected hoistway) are not checked.
+- **[gap]** The lobby's 1-hour smoke barrier, standby power and the protected hoistway are not
+  checked; *direct access* is a stair's end within 3 m of the lobby.
