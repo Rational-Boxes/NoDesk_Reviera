@@ -2,7 +2,7 @@
 
 Builders for the three desktop packages of TECH_STACK §5.4. Each one is a script that runs on its
 own platform; there is no hosted CI. The version in file names defaults to the first
-pre-release, `0.1.0-pre.9` (the workspace `Cargo.toml` says `0.1.0`), and every script takes
+pre-release, `0.1.0-pre.10` (the workspace `Cargo.toml` says `0.1.0`), and every script takes
 another one (`RIVIERA_VERSION=…` or `-Version …`).
 
 | Package | Builder | Output in `dist/` | Status |
@@ -233,7 +233,7 @@ bundle.
 
 ## Releasing a pre-release
 
-The current one is `0.1.0-pre.9` (2026-11-03; `0.1.0-pre.8` was 2026-11-02, `0.1.0-pre.7` was 2026-11-01, `0.1.0-pre.6` was 2026-10-30, `0.1.0-pre.5` was 2026-10-29, `0.1.0-pre.4` was 2026-10-28, `0.1.0-pre.3` 2026-10-27, `0.1.0-pre.2` 2026-10-26, `0.1.0-pre.1` 2026-10-15). The tag is
+The current one is `0.1.0-pre.10` (2026-11-05; `0.1.0-pre.9` was 2026-11-03, `0.1.0-pre.8` was 2026-11-02, `0.1.0-pre.7` was 2026-11-01, `0.1.0-pre.6` was 2026-10-30, `0.1.0-pre.5` was 2026-10-29, `0.1.0-pre.4` was 2026-10-28, `0.1.0-pre.3` 2026-10-27, `0.1.0-pre.2` 2026-10-26, `0.1.0-pre.1` 2026-10-15). The tag is
 `0.1.0-pre.N`; the AppStream release is `0.1.0~pre.N` (so that it sorts before `0.1.0`), with a
 new `<release>` entry at the top of the metainfo, and the macOS and Windows version fields, which
 take numbers only, say `0.1.0`. The version is the default `VERSION` in the Flatpak, Windows and

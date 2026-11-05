@@ -2,12 +2,12 @@
 ; Copyright (C) 2026 Riviera contributors
 ;
 ; Inno Setup script (Inno Setup 7, or 6.3 and later) for BIM Riviera. build-installer.ps1 compiles it with:
-;   ISCC /DAppVersion=0.1.0-pre.9 /DAppVersionNumeric=0.1.0 /DStageDir=<stage> /DOutputDir=<dist> riviera.iss
+;   ISCC /DAppVersion=0.1.0-pre.10 /DAppVersionNumeric=0.1.0 /DStageDir=<stage> /DOutputDir=<dist> riviera.iss
 ; The stage folder holds riviera.exe, its DLLs, samples\, COPYING.txt, THIRD-PARTY-NOTICES.txt
 ; and riviera.ico.
 
 #ifndef AppVersion
-  #define AppVersion "0.1.0-pre.9"
+  #define AppVersion "0.1.0-pre.10"
 #endif
 #ifndef AppVersionNumeric
   #define AppVersionNumeric "0.1.0"
