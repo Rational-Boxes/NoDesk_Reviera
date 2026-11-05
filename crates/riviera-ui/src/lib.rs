@@ -4703,6 +4703,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "toposolid.simplify" => with(gui, Gui::simplify_toposolid),
         "site.set_settings" => with(gui, Gui::site_settings),
         "propertyline.create" => with(gui, Gui::property_line),
+        "alignment.create" => with(gui, Gui::alignment),
         "sitecomponent.place" => with(gui, |g| {
             g.start_site_component();
             focus(g);

@@ -300,6 +300,73 @@ impl Gui {
         }
     }
 
+    /// The selected model lines joined end to end into one open chain, in plan.
+    fn selected_chain(&mut self) -> Option<Vec<[f64; 2]>> {
+        let store = self.store_now()?;
+        let mut lines: Vec<Vec<[f64; 2]>> = self
+            .selection()
+            .into_iter()
+            .filter_map(|id| store.get(id).and_then(model_lines::recipe))
+            .map(|r| r.curve.points())
+            .collect();
+        if lines.is_empty() {
+            return None;
+        }
+        let near = |a: [f64; 2], b: [f64; 2]| (a[0] - b[0]).hypot(a[1] - b[1]) < 1e-4;
+        let mut chain = lines.remove(0);
+        while !lines.is_empty() {
+            let (head, tail) = (chain[0], *chain.last().expect("non-empty"));
+            let k = lines.iter().position(|l| near(l[0], tail) || near(*l.last().expect("a line"), tail) || near(l[0], head) || near(*l.last().expect("a line"), head))?;
+            let mut l = lines.remove(k);
+            if near(l[0], tail) {
+                chain.extend(l.into_iter().skip(1));
+            } else if near(*l.last().expect("a line"), tail) {
+                l.reverse();
+                chain.extend(l.into_iter().skip(1));
+            } else {
+                if near(l[0], head) {
+                    l.reverse();
+                }
+                l.pop();
+                l.extend(chain);
+                chain = l;
+            }
+        }
+        Some(chain)
+    }
+
+    /// Massing & Site › Alignment (ARC-ALN-001): its points from the selected model lines or a
+    /// typed table, then an optional profile.
+    pub(crate) fn alignment(&mut self) {
+        let frame = self.frame;
+        let Some(level) = self.active_view().and_then(|v| v.plan.clone()).map(|p| json!(p.level)).or_else(|| self.run("level.list", json!({})).ok().map(|l| l[0]["id"].clone())) else {
+            return super::error(&frame, "The model has no level.");
+        };
+        let nums = |line: &str| -> Vec<f64> { line.split([',', ' ', '\t']).filter_map(|s| s.trim().parse().ok()).collect() };
+        let (points, radii): (Vec<[f64; 2]>, Vec<f64>) = if let Some(chain) = self.selected_chain() {
+            let n = chain.len().saturating_sub(2);
+            let Some(r) = super::notes::ask_text(&frame, "Alignment: the curve radius at each of the inner corners, in metres (0: none), one a row", &"0\n".repeat(n)) else { return };
+            (chain, r.lines().filter_map(|l| l.trim().parse().ok()).collect())
+        } else {
+            let Some(text) = super::notes::ask_text(&frame, "Alignment: one point of intersection a row, x, y in metres, and the curve radius at inner corners (or select model lines first)", "0, 0\n100, 0, 30\n100, 100\n") else { return };
+            let rows: Vec<Vec<f64>> = text.lines().map(nums).filter(|v| v.len() >= 2).collect();
+            let n = rows.len();
+            let radii = rows.iter().enumerate().filter(|(i, _)| *i > 0 && *i + 1 < n).map(|(_, r)| r.get(2).copied().unwrap_or(0.0)).collect();
+            (rows.iter().map(|r| [r[0], r[1]]).collect(), radii)
+        };
+        let Some(profile) = super::notes::ask_text(&frame, "Alignment: its vertical profile, one point a row: chainage, elevation and the vertical curve's length (empty: flat)", "") else { return };
+        let profile: Vec<Value> = profile
+            .lines()
+            .map(nums)
+            .filter(|v| v.len() >= 2)
+            .map(|v| json!({ "station": v[0], "elevation": v[1], "curve": v.get(2).copied().filter(|c| *c > 0.0) }))
+            .collect();
+        let args = json!({ "level": level, "points": points, "radii": radii, "profile": profile });
+        if let Some(v) = self.site_run("alignment.create", args, "Alignment made") {
+            frame.set_status_text(&format!("Alignment made: {:.2} m, chainage {:.2} to {:.2}", v["length"].as_f64().unwrap_or(0.0), v["start_station"].as_f64().unwrap_or(0.0), v["end_station"].as_f64().unwrap_or(0.0)), 0);
+        }
+    }
+
     /// Massing & Site › Site Component: the type, then clicks.
     pub(crate) fn start_site_component(&mut self) {
         let frame = self.frame;

@@ -1160,6 +1160,18 @@ fn the_deep_station_sample_waits_only_briefly_on_its_concourse() {
 }
 
 #[test]
+fn the_alignment_drive_sample_keeps_its_curves_and_profile() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "alignment_drive");
+    let list = ok(&mut app, "alignment.list", json!({}));
+    let a = &list[0];
+    assert_eq!((a["name"].as_str(), a["curves"].as_array().unwrap().len()), (Some("Drive"), 2), "{list:#}");
+    assert!((f(&a["start_station"]) - 1000.0).abs() < 1e-9 && (f(&a["length"]) - 187.91).abs() < 0.01);
+    let z = ok(&mut app, "alignment.point_at", json!({ "alignment_id": a["alignment"], "station": 1040.0 }));
+    assert!((f(&z["elevation"]) - 2.4).abs() < 1e-9, "{z:#}");
+}
+
+#[test]
 fn the_escalators_sample_keeps_its_units_and_openings() {
     let work = tempfile::tempdir().unwrap();
     let mut app = open(work.path(), "escalators");

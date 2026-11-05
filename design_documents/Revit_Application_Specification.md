@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Riviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Riviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 896 numbered requirements (320 P0 · 343 P1 · 226 P2 · 7 P3), 2,339 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 897 numbered requirements (320 P0 · 343 P1 · 227 P2 · 7 P3), 2,343 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Riviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Riviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,339 commands; 896 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,343 commands; 897 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -15834,6 +15834,31 @@ All family-editor commands from the DM chapter can be used inside the session.
 
 **Implementation note (2026-10-15, first build).** As built: `sitecomponent.place` puts a custom object type (ARC-COMP mesh objects) on a toposolid's surface (or a level); it keeps its surface height as the ground changes. `propertyline.create` from points or a table of distances and bearings (N/S … E/W in degrees-minutes-seconds, or an azimuth; lines and arcs with radius and side), an `IfcAnnotation` (`PropertyLine`); a closed line reports its area (`propertyline.area`); drawn dash-dotted in plans. The window: Property Line (a model-line loop or a typed table) and Site Component (pick a type, click in plans). Not built yet: true north, parking components, Pick New Host, Convert to table, property-line tags and the area property, `IfcSite` containment, the 4X3 VEGETATION class.
 
+### 3.11.11 Alignments
+**ID:** ARC-ALN-001 · **Priority:** P2 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §7 and Question 5 (answer: one shared `IfcAlignment` foundation, built with roads, before the guideway devices); research/17 (roads, drives and lots); EXPERT_REVIEW E-96
+
+**Purpose.** A route along the ground, set out by chainage: the shared foundation for roads and drives (research/17), and later for funiculars, inclined elevators, people movers and ropeways (VERTICAL_TRANSPORT_PLAN §7–8). Things are placed along it by chainage and offset.
+
+**Behaviour & rules.**
+- **Horizontal layout:** points of intersection (PIs) in plan. Each interior PI may have a **circular curve** of a given radius, tangent to both legs, so the layout is tangent lines and arcs. A radius too large for its legs (its tangent length longer than the room either side) is refused (`alignment.invalid`).
+- **Chainage (stationing):** measured along the horizontal layout from `start_station` (default 0) at the first PI.
+- **Vertical profile** (optional): vertical PIs as `{station, elevation}` in increasing chainage, each interior one with an optional symmetric **parabolic vertical curve** of a given length. Grades are straight between. Without a profile the alignment lies at elevation 0 relative to its level.
+- `alignment.create(level, points: [[x, y]], radii?: [m], start_station?, profile?: [{station, elevation, curve?}], name?)` makes it. `radii` gives one radius per interior PI (0: no curve).
+- `alignment.point_at(alignment_id, station, offset?)` gives the plan point at that chainage, moved `offset` metres to the left (positive) or right (negative), with its elevation, the direction and the grade.
+- `alignment.station_of(alignment_id, point)` gives the chainage and offset of the nearest point on the alignment.
+- `alignment.list` gives each one's level, length, start and end chainage, its curves (radius, arc length) and its elevation range.
+- **Drawing:** in plans whose range takes in its level, as a dash-dot centreline with a tick across it every 20 m of chainage (longer every 100 m). The Modify tools move, rotate, mirror and copy it; its curves follow its points.
+- **In the window:** Massing & Site › *Alignment*: the selected model lines (joined end to end) as the PIs, or a typed table of PIs (`x, y[, radius]` a row), then an optional typed profile (`station, elevation[, curve length]` a row).
+
+**Data (IFC mapping).** First build: `IfcAnnotation` (`ObjectType = "Alignment"`), its definition in RXD element data (`recipe.alignment`), in IFC4 and IFC4X3 projects alike. Not yet: `IfcAlignment` with `IfcAlignmentHorizontal`/`IfcAlignmentVertical` segments and `IfcLinearPlacement` in IFC4X3 projects (ARC-ALN-002).
+
+**Acceptance criteria.**
+- [x] An L-shaped alignment, 100 m east and 100 m north with a 30 m curve at the corner, is 200 − 2 × 30 + 30 × π ÷ 2 m long; the point at the chainage half way round the curve lies 30 m from its centre; a point 5 m off to the left reports that offset and its chainage back.
+- [x] With a profile rising from 0 to 10 m over 200 m with a 100 m vertical curve at a high point, the elevations at the PVIs' chainages away from the curve match the straight grades, and the curve's top is below the PVI by A × L ÷ 8.
+- [x] A radius too large for its legs is refused.
+
+*Built (2026-11-05):* `riviera_core::alignments`, drawn in plans, the Alignment action; the sample *A drive set out by chainage*. Not yet: chainage labels in plans, spirals (clothoids) and cant, IFC 4.3 `IfcAlignment` export and import (ARC-ALN-002), elements placed by chainage and offset (roads, drives, guideway devices), cross sections and corridors, editing the PIs with grips.
+
 ---
 
 ## 3.12 Modify tools
@@ -16953,6 +16978,10 @@ All commands below are registered once in the command registry and exposed autom
 | `toposolid.generate_from_surface` | surface_element_id, type_id, level_id | element_id | Yes | ARC-TOPO-006 |
 | `sitecomponent.place` | type_id, point, host_id?, rotation? | element_id | Yes | ARC-SITE-001 |
 | `propertyline.create` | loops \| table: [{distance, bearing, kind, radius?, side?}], origin? | element_id | Yes | ARC-SITE-001 |
+| `alignment.create` | level, points[], radii?[], start_station?, profile?: [{station, elevation, curve?}], name? | {alignment, length, start_station, end_station} | Yes | ARC-ALN-001 |
+| `alignment.point_at` | alignment_id, station, offset? | {point, elevation, direction, grade} | No (query) | ARC-ALN-001 |
+| `alignment.station_of` | alignment_id, point | {station, offset} | No (query) | ARC-ALN-001 |
+| `alignment.list` | — | [{alignment, level, length, start_station, end_station, curves[], elevations}] | No (query) | ARC-ALN-001 |
 | `propertyline.to_table` | element_id | — | Yes | ARC-SITE-001 |
 | `site.settings` | — | () | No (opens dialog) | ARC-TOPO-004 |
 | `site.set_settings` | contour_interval?: f64 \| None, passing_elevation?, additional_contours?: rows, section_material_id?, poche_base_elevation?, angle_display?: Bearing\|Azimuth, angle_units?: DMS\|Decimal | () | Yes | ARC-TOPO-004 |
@@ -30050,14 +30079,14 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 39 | 8 | 0 | 123 |
 | DM | 91 | 65 | 34 | 3 | 193 |
-| ARC | 77 | 101 | 30 | 1 | 209 |
+| ARC | 77 | 101 | 31 | 1 | 210 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 32 | 0 | 33 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
 | COL | 8 | 52 | 16 | 1 | 77 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **343** | **226** | **7** | **896** |
+| **Total** | **320** | **343** | **227** | **7** | **897** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -30267,7 +30296,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2339 unique commands** in 436 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2343 unique commands** in 437 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -30275,6 +30304,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `agent` | 7 |
 | `agent_preset` | 3 |
 | `air_terminal` | 1 |
+| `alignment` | 4 |
 | `analysis_job` | 2 |
 | `analysis_provider` | 7 |
 | `analysis_result` | 2 |
@@ -30734,6 +30764,10 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `agent_preset.list` | 1 | `preset` / `preset_id` (Lua and UI only) | `presets[]` / `()` | No | UI-AGENT-004 |
 | `agent_preset.set` | 1 | `preset` / `preset_id` (Lua and UI only) | `presets[]` / `()` | No | UI-AGENT-004 |
 | `air_terminal.place` | 4 | type_id, point \ | duct_face_ref, level, flow? | id | Yes |
+| `alignment.create` | 3 | level, points[], radii?[], start_station?, profile?: [{station, elevation, curve?}], name? | {alignment, length, start_station, end_station} | Yes | ARC-ALN-001 |
+| `alignment.list` | 3 | — | [{alignment, level, length, start_station, end_station, curves[], elevations}] | No (query) | ARC-ALN-001 |
+| `alignment.point_at` | 3 | alignment_id, station, offset? | {point, elevation, direction, grade} | No (query) | ARC-ALN-001 |
+| `alignment.station_of` | 3 | alignment_id, point | {station, offset} | No (query) | ARC-ALN-001 |
 | `analysis_job.cancel` | 4 | job_id | — | No | ANA-GEN-001 |
 | `analysis_job.status` | 4 | job_id | {state, progress, messages} | No | ANA-GEN-001 |
 | `analysis_provider.list` | 4 | kind? | providers[] | No | ANA-PLUG-001 |

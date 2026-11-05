@@ -585,6 +585,10 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(FareLineCreate),
         registry.add(FareLineList),
         registry.add(ElevatorCheckLobbies),
+        registry.add(AlignmentCreate),
+        registry.add(AlignmentPointAt),
+        registry.add(AlignmentStationOf),
+        registry.add(AlignmentList),
         registry.add(LibraryReloadItem),
         registry.add(PublishListSets),
         registry.add(PublishRemoveSet),
@@ -7545,4 +7549,51 @@ read_command!(
     Option<crate::lift_lobbies::CheckParams>,
     Vec<crate::lift_lobbies::Lobby>,
     crate::lift_lobbies::check
+);
+
+edit_command!(
+    AlignmentCreate,
+    "alignment.create",
+    "Create an alignment",
+    "A route set out by chainage on a level (ARC-ALN-001): `points` of intersection in plan, a circular \
+     curve of `radii[i]` at each interior point (0: none), chainage from `start_station` at the first point, \
+     and an optional vertical `profile` of {station, elevation, curve?} with symmetric parabolic curves. \
+     Radii too large for their legs are refused. The shared foundation for roads and guideway devices.",
+    "New Alignment",
+    crate::alignments::CreateParams,
+    crate::alignments::Created,
+    crate::alignments::create
+);
+
+read_command!(
+    AlignmentPointAt,
+    "alignment.point_at",
+    "Point on an alignment at a chainage",
+    "The plan point at `station` along an alignment, moved `offset` m to the left (negative: right), with its \
+     elevation from the profile, the direction of travel and the grade (ARC-ALN-001).",
+    crate::alignments::PointAtParams,
+    crate::alignments::PointAt,
+    crate::alignments::point_at
+);
+
+read_command!(
+    AlignmentStationOf,
+    "alignment.station_of",
+    "Chainage and offset of a point",
+    "The chainage of the nearest point on an alignment to `point`, and its offset to the left (negative: \
+     right) (ARC-ALN-001).",
+    crate::alignments::StationOfParams,
+    crate::alignments::StationOf,
+    crate::alignments::station_of
+);
+
+read_command!(
+    AlignmentList,
+    "alignment.list",
+    "List the alignments",
+    "Lists the model's alignments (ARC-ALN-001): level, length, start and end chainage, curves (radius, \
+     length, chainages, turning left or right) and the elevation range of the profile.",
+    Option<crate::alignments::NoParams>,
+    Vec<crate::alignments::Info>,
+    crate::alignments::list
 );

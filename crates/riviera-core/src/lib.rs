@@ -50,6 +50,7 @@ pub mod elevators;
 pub mod egress_route;
 pub mod fare_gates;
 pub mod lift_lobbies;
+pub mod alignments;
 pub mod escalators;
 pub mod enclosures;
 pub mod grab_bars;

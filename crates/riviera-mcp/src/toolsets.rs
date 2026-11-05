@@ -266,6 +266,7 @@ pub fn toolset_of(command: &str) -> String {
             | "curtainsystem"
             | "toposolid"
             | "propertyline"
+            | "alignment"
             | "sitecomponent"
             | "parts" => "modeling",
             "view" | "sheet" | "schedule" | "annotate" | "render" | "walkthrough" | "xr" | "ui"

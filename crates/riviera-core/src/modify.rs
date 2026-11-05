@@ -323,6 +323,10 @@ pub fn transform(
             let target = if copy { txn.create(copied(e))? } else { id };
             crate::property_lines::transform(txn, target, &|p| x.point(p))?;
             out.push(target);
+        } else if crate::alignments::recipe(e).is_some() {
+            let target = if copy { txn.create(copied(e))? } else { id };
+            crate::alignments::transform(txn, target, &|p| x.point(p))?;
+            out.push(target);
         } else if crate::masses::recipe(e).is_some() {
             let target = if copy { txn.create(copied(e))? } else { id };
             let dz = match x {

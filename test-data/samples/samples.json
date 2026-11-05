@@ -191,6 +191,19 @@
     ]
   },
   {
+    "name": "alignment_drive",
+    "title": "A drive set out by chainage",
+    "group": "Massing & Site",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "alignment_drive.lua"
+        }
+      }
+    ]
+  },
+  {
     "name": "evacuation_lifts",
     "title": "Evacuation lifts in a tower",
     "group": "Architecture",

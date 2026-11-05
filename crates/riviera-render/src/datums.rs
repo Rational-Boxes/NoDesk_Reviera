@@ -18,7 +18,7 @@ use std::collections::HashSet;
 use riviera_core::model_lines::{self, Pattern};
 use riviera_core::sections::SectionFrame;
 use riviera_core::{ElementId, Store, datum_extents, grids, ref_planes, scope_boxes, standards};
-use riviera_core::{property_lines, toposolids};
+use riviera_core::{alignments, property_lines, toposolids};
 
 use crate::annotation::{GridMark, GridStyle};
 use crate::plan::Lines;
@@ -209,17 +209,19 @@ pub fn plan_lines(
             segments,
         ));
     }
-    out.extend(site_lines(store, z, scale, selected));
+    out.extend(site_lines(store, (bottom, top), z, scale, selected));
     out
 }
 
 /// Contours' and property lines' colours.
 pub const CONTOUR_COLOR: [f32; 4] = [0.55, 0.40, 0.22, 1.0];
 pub const PROPERTY_LINE_COLOR: [f32; 4] = [0.75, 0.10, 0.10, 1.0];
+/// Alignment centrelines (ARC-ALN-001).
+pub const ALIGNMENT_COLOR: [f32; 4] = [0.10, 0.35, 0.75, 1.0];
 
 /// A site in plan (ARC-TOPO-002, ARC-SITE-001): toposolids' contours at the site settings'
 /// interval (every fifth from the passing elevation heavier), and property lines dash-dotted.
-fn site_lines(store: &Store, z: f64, scale: f64, selected: &HashSet<ElementId>) -> Vec<Lines> {
+fn site_lines(store: &Store, (bottom, top): (f64, f64), z: f64, scale: f64, selected: &HashSet<ElementId>) -> Vec<Lines> {
     let pens = standards::pen_set(store);
     let unit = scale / 1000.0;
     let s = toposolids::settings(store);
@@ -263,6 +265,36 @@ fn site_lines(store: &Store, z: f64, scale: f64, selected: &HashSet<ElementId>) 
             selected,
             e.id(),
             PROPERTY_LINE_COLOR,
+            pens.model_width(3, scale) as f32,
+            segments,
+        ));
+    }
+    // Alignments on a level in the plan's range: a dash-dot centreline, a tick across it every
+    // 20 m of chainage, longer every 100 m.
+    for (id, a) in alignments::alignments(store) {
+        let on = riviera_core::levels::elevation_of(store, &a.recipe.level)
+            .is_ok_and(|zl| zl >= bottom - 1e-6 && zl <= top + 1e-6);
+        if !on {
+            continue;
+        }
+        let pts: Vec<[f64; 3]> = a.polyline(1.0).iter().map(|p| [p[0], p[1], z]).collect();
+        let mut segments: Vec<_> = model_lines::dashes(&pts, Pattern::Centre, unit)
+            .into_iter()
+            .map(|s| seg(s[0], s[1]))
+            .collect();
+        let first = (a.recipe.start_station / 20.0).ceil() as i64;
+        let last = (a.end_station() / 20.0).floor() as i64;
+        for k in first..=last {
+            let station = k as f64 * 20.0;
+            let (q, d, _, _) = a.at(station);
+            let half = if k.rem_euclid(5) == 0 { 2.0 } else { 1.0 } * unit;
+            let n = [-d[1] * half, d[0] * half];
+            segments.push(seg([q[0] - n[0], q[1] - n[1], z], [q[0] + n[0], q[1] + n[1], z]));
+        }
+        out.push(lines_of(
+            selected,
+            id,
+            ALIGNMENT_COLOR,
             pens.model_width(3, scale) as f32,
             segments,
         ));

@@ -1461,6 +1461,12 @@ icon = "property_line"
 help = "A property line from a selected closed loop of model lines, or a table of distances and bearings; reports its area"
 
 [[action]]
+id = "alignment.create"
+label = "Alignment"
+icon = "property_line"
+help = "A route set out by chainage: the selected model lines joined end to end, or a typed table of points with curve radii, then an optional vertical profile; drawn in plans with a tick every 20 m (ARC-ALN-001)"
+
+[[action]]
 id = "sitecomponent.place"
 label = "Site Component"
 icon = "site_component"
@@ -4170,7 +4176,7 @@ tools = [
 
 [[tab.panel]]
 label = "Property Line"
-tools = [{ action = "propertyline.create", size = "large" }]
+tools = [{ action = "propertyline.create", size = "large" }, { action = "alignment.create", size = "large" }]
 
 [[tab]]
 id = "annotate"
