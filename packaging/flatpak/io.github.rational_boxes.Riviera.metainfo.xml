@@ -78,6 +78,11 @@
   </supports>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.0~pre.11" date="2026-11-05" type="development">
+      <description>
+        <p>Eleventh pre-release (tag 0.1.0-pre.11), for testing: the program is that of 0.1.0-pre.10. The Windows installer now removes what an install under the old spelling left behind when it upgrades one: the old programs, their Start menu and desktop shortcuts, and their .ifc association.</p>
+      </description>
+    </release>
     <release version="0.1.0~pre.10" date="2026-11-05" type="development">
       <description>
         <p>Tenth pre-release (tag 0.1.0-pre.10), for testing. The project's name is now spelled BIM Riviera; files, settings and property sets saved under the old spelling still open. Vertical transport: elevators sized under rule packs (passenger, hospital, freight, vehicle and small lifts, panoramic cars and glass hoistways) with their hoistways, landings, machine spaces, power estimates and schedule; escalators and moving walks, stairlifts and inclined platform lifts; elevator and escalator traffic checks; transit escalators and fare lines in stations. Egress: routes across levels by stairs, escalators and evacuation elevators, drawn in the plans, with their points typed or clicked; NFPA 130 platform clearing times, with occupant loads from trains and the standing area, escalators, evacuation elevators and the wait at fare lines. FileEngine wherever a file is read or written: exports, imports, Component Libraries with update notices, parameter libraries, scripts, keynotes and publish sets.</p>
