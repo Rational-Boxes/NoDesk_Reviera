@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Riviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Riviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 894 numbered requirements (320 P0 · 343 P1 · 224 P2 · 7 P3), 2,336 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 895 numbered requirements (320 P0 · 343 P1 · 225 P2 · 7 P3), 2,338 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Riviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Riviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,336 commands; 894 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,338 commands; 895 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -14295,7 +14295,28 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 **Acceptance criteria.**
 - [x] 9,000 persons an hour up needs three units with one out. Two 1 m units up give 120 persons a minute with the worst out: under the IBC nothing counts (400 needed, 300 from the stairs: short); under NFPA 130 all 120 count (enough); under SCDF with 200 needed only 100 count.
 
-*Built (2026-11-04):* in `escalator.traffic`. Not yet: NFPA 130 5.3.5.5's larger share where escalators stop remotely, Bellevue's 25 % cap, platform clearing times (4 and 6 minutes), egress through the path of travel across levels.
+*Built (2026-11-04):* in `escalator.traffic`. Not yet: NFPA 130 5.3.5.5's larger share where escalators stop remotely, Bellevue's 25 % cap. Platform clearing times are ANA-ROUTE-005, egress across levels ANA-ROUTE-004.
+
+### 3.7a.22 Fare lines
+**ID:** ARC-VT-022 · **Priority:** P2 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §9 (*Egress*); owner direction (2026-11-04: "Egress and transit"); SCDF CPFPRTS 2.2.3i–j and 2.2.8 (S2752, S2456); EXPERT_REVIEW E-94
+
+**Purpose.** Model the row of fare gates across a station concourse, with its evacuation capacity, so routes pass through it and platform clearing counts the wait at it.
+
+**Behaviour & rules.**
+- `fare_line.create(level, start, toward, kind?, count, wide?, emergency?)` makes one object of cabinets with aisles between them. It runs from `start` toward `toward` for as long as its gates need.
+  - **Aisles:** `wide` wide gates first (default 1, 0.9 m clear), then `count` gates of `kind`, then `emergency` emergency gates (default 0, 1.0 m clear). The kinds are `tripod` (turnstile, 0.5 m), `paddle` (default, 0.6 m), `wide` and `emergency`.
+  - **Cabinets:** 0.3 m wide, 1.6 m along the way through and 1.0 m high, either side of every aisle.
+  - **Capacity in an evacuation** (SCDF Table 2.2.3i, the gates open): 25 persons a minute a turnstile, 50 a gate under 850 mm, and 80 a minute per metre of a wider one.
+  - It is a generic model typed `FAREGATE` with `Riviera_FareLine` (gates of each kind, length, capacity).
+- `fare_line.list` lists them.
+- **Paths of travel** (ANA-ROUTE-001) take its cabinets alone as obstacles, without the clearance, so routes walk its aisles.
+- **Platform clearing** (ANA-ROUTE-005) adds the wait at each fare line its route crosses.
+- **In the window:** Architecture › Circulation › *Fare Line* (gates, counts, angle; click where it starts, or type it).
+
+**Acceptance criteria.**
+- [x] One turnstile and one wide gate make a line 0.3 × 3 + 0.9 + 0.5 m long passing 97 a minute; with walls either side, the route from the platform below crosses the line between its ends; it is listed.
+
+*Built (2026-11-05):* `riviera_core::fare_gates`, the Fare Line action; the sample *Escalators in a transit station* (a line of ten gates passing 552 a minute). Not yet: SCDF 2.2.3j's 50 % gate-type emergency exits where turnstiles are used, the 6 m run-off in front of gates in the standing area, ticket machines and barriers, gates that do not open.
 
 ---
 
@@ -16646,6 +16667,8 @@ All commands below are registered once in the command registry and exposed autom
 | `stairlift.check` | stairlifts? | finding[] | No (query) | ARC-VT-015 |
 | `elevator.traffic` | building_use?, elevators?, population?, area_per_person?, loading?, stop_time?, transfer_time? | [{elevators, cars, floors, population, passengers, probable_stops, highest_reversal, rtt, interval, hc5, handling, waiting, targets, meets, notes}] | No (query) | ARC-VT-018 |
 | `escalator.traffic` | up, down, demand_up, demand_down?, one_out?, egress?: {mode, exit, required, stairs} | {up, down, one_out, egress, notes} | No (query) | ARC-VT-019, ARC-VT-021 |
+| `fare_line.create` | level, start, toward, kind?, count, wide?, emergency? | {fare_line, level, start, direction, aisles[], length, capacity} | Yes | ARC-VT-022 |
+| `fare_line.list` | — | [{fare_line, level_name, aisles[], length, capacity, …}] | No (query) | ARC-VT-022 |
 | `enclosure.create` | form, footprint \| host_wall_ids, level_id, params | element_id | Yes | ARC-GLZ-001 |
 | `enclosure.set` | enclosure_id, params | — | Yes | ARC-GLZ-001 |
 | `enclosure.get` | enclosure_id | {form, params, parts} | No (query) | ARC-GLZ-001 |
@@ -22444,7 +22467,7 @@ The job runs in the background with a notification. Spaces that no system serves
   - **exits:** every stair with one end on the platform's level (capacity 0.0555 persons a minute per millimetre of its narrowest run) and, unless `mode` is `ibc`, every escalator between it and another level (120 a minute per metre of tread, ARC-VT-021), the widest out of service, the rest counted up to the stairs' capacity (escalators at most half the exit capacity);
   - **lifts** (with `lifts`, NFPA 130 5.5.6.3.3; default off, as some adopting codes delete it): occupant evacuation elevators (ANA-ROUTE-006) serving the platform and the point of safety's level, the largest out of service and, unless a fire service elevator serves the platform, the next kept for firefighters; each at its rated persons every round trip (the rise both ways at the rated speed plus speed ÷ 1 m/s², 10 s of doors, 1.2 s a passenger boarding and again leaving), counted up to half the exit capacity;
   - **platform time** = load ÷ exit capacity, at most 4 minutes;
-  - **time to safety:** the route (ANA-ROUTE-004) from `remote` to `safety`, walked at 37.7 m/min and climbed at 15 m/min up and 18 m/min down (vertical), plus the **wait** at the platform exits (the platform time less the walk to the first exit, not below 0); at most 6 minutes.
+  - **time to safety:** the route (ANA-ROUTE-004) from `remote` to `safety`, walked at 37.7 m/min and climbed at 15 m/min up and 18 m/min down (vertical), plus the **wait** at the platform exits (the platform time less the walk to the first exit, not below 0), plus the wait at each **fare line** the route passes through (ARC-VT-022): the platform load and `concourse_load` (those already on the concourse, default 0) through the line's capacity, less the platform time, not below 0 (NFPA 130 Annex C's fare barrier waiting); at most 6 minutes.
 - It returns the exits and their capacities, the stairs', escalators' and counted capacities, the times, the route, whether each test is met, and notes (escalators limited, the unit out). With no stair (or counted escalator) leaving the level it is refused (`route.no_exits`).
 - **In the window:** Analyze › Route Analysis › *Platform Clearing* (level, load, points typed, escalators counted or not) reports the capacities, the times and the two tests.
 
@@ -22453,9 +22476,10 @@ The job runs in the background with a notification. Spaces that no system serves
 - [x] With a pair of escalators added, one is out and the other counts up to the stairs' capacity; 400 people clear within 4 minutes with them, and not with the stair alone.
 - [x] Two trains of 300 and 250 with 100 waiting make 650, more than a 40 × 10 m platform at 0.65 m² a person (615): the trains govern; with 520 m² given, the area does (800). A load and an occupancy together are refused.
 - [x] On a 100 × 10 m platform with a 1.5 m stair, an 80 m train's standing area is 800 m² less the stair's run × 1.5 m and its 6 × 1.5 m run-off; a train longer than the platform counts the whole platform less the same.
+- [x] Through a line of one turnstile and one wide gate (97 a minute), 100 people pass in 1.03 minutes, within the platform's 1.20: no wait; with 200 already on the concourse, the wait is 300 ÷ 97 − 100 ÷ 83.25 minutes, added to the time to safety.
 - [x] With three evacuation elevators and no fire service one, one counts at persons × 60 ÷ round trip; with one marked for fire service, of the other two one counts; with nine more than the stair carries, only the stair's capacity counts. Without `lifts`, none.
 
-*Built (2026-11-04):* `riviera_core::egress_route::platform_clearing` and the window's Platform Clearing; the sample *Escalators in a transit station* (a train of 350 and 150 waiting: 3.00 min, 4.22 min to safety; 6.0 min by the stair alone; the dense area figure over its whole slab governs and fails). Not yet: columns, seats, rooms, low headroom and fare gate run-offs in the standing area, train loads from vehicle capacity and headways, the elevators' holding areas (NFPA 130 5.5.6.3.3.3: 1-hour separation, a stair, 0.46 m² a person), waits further on (concourse exits, fare gates) and the concourse's own load, doors and fare gates as exits, lifts, platform-edge doors.
+*Built (2026-11-04):* `riviera_core::egress_route::platform_clearing` and the window's Platform Clearing; the sample *Escalators in a transit station* (a train of 350 and 150 waiting: 3.00 min, 4.22 min to safety; 6.0 min by the stair alone; the dense area figure over its whole slab governs and fails). Not yet: columns, seats, rooms, low headroom and fare gate run-offs in the standing area, train loads from vehicle capacity and headways, the elevators' holding areas (NFPA 130 5.5.6.3.3.3: 1-hour separation, a stair, 0.46 m² a person), the concourse's own exit capacity and its waits, doors as exits, lifts, platform-edge doors.
 
 ### 4.12.13c Lifts in egress routes
 **ID:** ANA-ROUTE-006 · **Priority:** P2 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §9 (*Egress*); owner direction (2026-11-04: "Egress and transit"); IBC 3007–3008, EN 81-72 and EN 81-76 (roles only); EXPERT_REVIEW E-93
@@ -23285,7 +23309,7 @@ Every command below is registered once in the command registry and is exposed au
 | `egress.route` | start: {point, level}, end: {point, level}, mode?, lifts?, lift_wait? | {legs, links, length, time} | No (query) | ANA-ROUTE-004 |
 | `egress.draw_route` | start: {point, level}, end: {point, level}, mode?, lifts?, lift_wait? | {legs, links, length, time, paths[], unplanned[]} | Yes | ANA-ROUTE-004 |
 | `elevator.set_egress_role` | elevator_id, role: "none"\|"occupant_evacuation"\|"fire_service" | role | Yes | ANA-ROUTE-006 |
-| `egress.platform_clearing` | level, load? \| occupancy?: {trains[], entraining?, area_per_person?, area?, train?}, remote, safety: {point, level}, mode?, lifts? | {exits[], capacity, platform_time, safety_time, meets_platform, meets_safety, …} | No (query) | ANA-ROUTE-005 |
+| `egress.platform_clearing` | level, load? \| occupancy?: {trains[], entraining?, area_per_person?, area?, train?}, remote, safety: {point, level}, mode?, lifts?, concourse_load? | {exits[], capacity, platform_time, safety_time, meets_platform, meets_safety, …} | No (query) | ANA-ROUTE-005 |
 | `route.reveal_obstacles` | view_id, on: bool | — | No | ANA-ROUTE-002 |
 | `path_of_travel.create_multiple` | view_id, starts[], ends[], min_separation | ids[] | Yes | ANA-ROUTE-002 |
 | `one_way_indicator.place` | view_id, point, direction | id | Yes | ANA-ROUTE-002 |
@@ -30006,14 +30030,14 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 39 | 8 | 0 | 123 |
 | DM | 91 | 65 | 34 | 3 | 193 |
-| ARC | 77 | 101 | 29 | 1 | 208 |
+| ARC | 77 | 101 | 30 | 1 | 209 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 31 | 0 | 32 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
 | COL | 8 | 52 | 16 | 1 | 77 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **343** | **224** | **7** | **894** |
+| **Total** | **320** | **343** | **225** | **7** | **895** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -30068,7 +30092,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.2a Riviera-originated features
 
-146 requirements are Riviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
+147 requirements are Riviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
 
 | Requirement | Ch | Feature |
 |-------------|----|---------|
@@ -30172,6 +30196,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | ARC-RAIL-003 | 3 | 3.7.8b Railing openings and gates |
 | ARC-DECK-001 | 3 | 3.7.8a Decks |
 | ARC-VT-009 | 3 | 3.7a.9 Elevator schedule |
+| ARC-VT-022 | 3 | 3.7a.22 Fare lines |
 | ARC-BATH-018 | 3 | 3.9a.18 Bathroom elevations and schedules |
 | ARC-BATH-019 | 3 | 3.9a.19 Bathroom compliance report |
 | ARC-MOD-030 | 3 | 3.12.2a Volume overlaps, virtual volumes and their resolution |
@@ -30221,7 +30246,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2336 unique commands** in 435 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2338 unique commands** in 436 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -30372,6 +30397,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `family` | 12 |
 | `family_doc` | 58 |
 | `family_template` | 1 |
+| `fare_line` | 2 |
 | `fascia` | 1 |
 | `fastener_pattern` | 2 |
 | `file` | 15 |
@@ -31199,7 +31225,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `editrequest.manage` | 6 | — | () | No | COL-OWN-003 |
 | `editrequest.retract` | 6 | request_id | () | No | COL-OWN-003 |
 | `egress.draw_route` | 4 | start: {point, level}, end: {point, level}, mode?, lifts?, lift_wait? | {legs, links, length, time, paths[], unplanned[]} | Yes | ANA-ROUTE-004 |
-| `egress.platform_clearing` | 4 | level, load? \ | occupancy?: {trains[], entraining?, area_per_person?, area?, train?}, remote, safety: {point, level}, mode?, lifts? | {exits[], capacity, platform_time, safety_time, meets_platform, meets_safety, …} | No (query) |
+| `egress.platform_clearing` | 4 | level, load? \ | occupancy?: {trains[], entraining?, area_per_person?, area?, train?}, remote, safety: {point, level}, mode?, lifts?, concourse_load? | {exits[], capacity, platform_time, safety_time, meets_platform, meets_safety, …} | No (query) |
 | `egress.route` | 4 | start: {point, level}, end: {point, level}, mode?, lifts?, lift_wait? | {legs, links, length, time} | No (query) | ANA-ROUTE-004 |
 | `electrical_analytical.add_node` | 4 | kind, parent_id?, distribution_system_id? | id | Yes | MEP-ELEC-020 |
 | `electrical_analytical.rollup` | 4 | root_id | report | No | MEP-ELEC-020 |
@@ -31434,6 +31460,8 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `family_doc.types` | 2 | — | — | No | DM-FED-006 |
 | `family_doc.visibility.set` | 2 | element_ids[], {coarse, medium, fine, plan, front_back, left_right, only_when_cut, visible_param?} | — | Yes | DM-FED-007 |
 | `family_template.list` | 2 | locale? | template[] | No | DM-FED-001 |
+| `fare_line.create` | 3 | level, start, toward, kind?, count, wide?, emergency? | {fare_line, level, start, direction, aisles[], length, capacity} | Yes | ARC-VT-022 |
+| `fare_line.list` | 3 | — | [{fare_line, level_name, aisles[], length, capacity, …}] | No (query) | ARC-VT-022 |
 | `fascia.create` | 3 | type_id, edge_refs, mitering? | element_id | Yes | ARC-ROOF-004 |
 | `fastener_pattern.info` | 4 | element_ids[] | patterns | No | STR-STL-006 |
 | `fastener_pattern.set` | 4 | pattern_ids[], layout?, diameter?, grip_increase?, … | — | Yes | STR-STL-006 |

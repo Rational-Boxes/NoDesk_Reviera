@@ -182,6 +182,13 @@ pub fn obstacles(store: &Store, level: ElementId, s: &Settings) -> Vec<Poly> {
         if crate::mesh_objects::mesh_object_recipe(e).is_none() || ignored(e) {
             continue;
         }
+        // A fare line's gates stand open in an evacuation: its cabinets alone are in the way.
+        if let Some(f) = crate::fare_gates::fare_line(e) {
+            if store.get(level).is_some_and(|l| l.guid().to_string() == f.level) {
+                out.extend(f.cabinets());
+            }
+            continue;
+        }
         let Ok(g) = crate::mesh_objects::regenerate(store, e) else { continue };
         let mut pts = Vec::new();
         let (mut lo, mut hi) = (f64::MAX, f64::MIN);

@@ -374,6 +374,20 @@ pub struct ClearingParams {
     /// in the exit capacity (NFPA 130 5.5.6.3.3; default false: some adopting codes delete it).
     #[serde(default)]
     pub lifts: bool,
+    /// Those already on the concourse who leave through the same fare lines (persons; default 0).
+    #[serde(default)]
+    pub concourse_load: f64,
+}
+
+/// A fare line on the way out, and its wait.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct FareCrossing {
+    pub fare_line: ElementId,
+    /// Persons a minute; minutes for the platform and concourse loads to pass; and the wait (the
+    /// flow time less the platform time, not below 0).
+    pub capacity: f64,
+    pub flow_time: f64,
+    pub wait: f64,
 }
 
 /// Seconds a passenger takes to board, and again to leave, a lift's car.
@@ -600,6 +614,9 @@ pub struct Clearing {
     pub walking_time: f64,
     pub walk_to_exit: f64,
     pub wait: f64,
+    /// The fare lines the route passes through (ARC-VT-022), and their waits together.
+    pub fare_lines: Vec<FareCrossing>,
+    pub fare_wait: f64,
     pub safety_time: f64,
     pub meets_platform: bool,
     pub meets_safety: bool,
@@ -692,7 +709,22 @@ pub fn platform_clearing(store: &Store, p: ClearingParams) -> Result<Clearing> {
     let walking_time = walked / WALK_SPEED + climb;
     let walk_to_exit = if r.links.is_empty() { walking_time } else { r.legs.first().map_or(0.0, |g| g.length) / WALK_SPEED };
     let wait = (platform_time - walk_to_exit).max(0.0);
-    let safety_time = walking_time + wait;
+    if !(p.concourse_load.is_finite() && p.concourse_load >= 0.0) {
+        return Err(bad("route.invalid", "the concourse load must be 0 or more"));
+    }
+    // NFPA 130 Annex C: the wait at a fare line is how much longer its flow takes than the
+    // platform's.
+    let fare_lines: Vec<FareCrossing> = r
+        .legs
+        .iter()
+        .flat_map(|g| crate::fare_gates::crossed(store, g.level, &g.points))
+        .map(|(fid, f)| {
+            let flow_time = (load + p.concourse_load) / f.capacity;
+            FareCrossing { fare_line: fid, capacity: f.capacity, flow_time, wait: (flow_time - platform_time).max(0.0) }
+        })
+        .collect();
+    let fare_wait = fare_lines.iter().map(|x| x.wait).sum::<f64>() + 0.0;
+    let safety_time = walking_time + wait + fare_wait;
     Ok(Clearing {
         mode: p.mode,
         load,
@@ -709,6 +741,8 @@ pub fn platform_clearing(store: &Store, p: ClearingParams) -> Result<Clearing> {
         walking_time,
         walk_to_exit,
         wait,
+        fare_lines,
+        fare_wait,
         safety_time,
         meets_platform: platform_time <= PLATFORM_LIMIT + 1e-9,
         meets_safety: safety_time <= SAFETY_LIMIT + 1e-9,

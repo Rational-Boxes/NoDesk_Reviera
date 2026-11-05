@@ -202,8 +202,25 @@ impl Gui {
         {
             o.insert("base_level".into(), l);
         }
+        // A fare line starts at the click and runs at its angle.
+        if command == "fare_line.create"
+            && let Some(o) = args.as_object_mut()
+            && let Some(p) = o.remove("point")
+        {
+            let a = o.remove("angle").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let (x, y) = (p[0].as_f64().unwrap_or(0.0), p[1].as_f64().unwrap_or(0.0));
+            o.insert("toward".into(), json!([x + a.cos(), y + a.sin()]));
+            o.insert("start".into(), p);
+        }
         match self.app.execute(&command, args, &super::user()) {
             Ok(out) => {
+                if command == "fare_line.create" {
+                    self.refresh_scene(&frame);
+                    return frame.set_status_text(
+                        &format!("Fare line: {} gates over {:.2} m, {:.0} people a minute in an evacuation", out.result["aisles"].as_array().map_or(0, Vec::len), out.result["length"].as_f64().unwrap_or(0.0), out.result["capacity"].as_f64().unwrap_or(0.0)),
+                        0,
+                    );
+                }
                 if command == "elevator.create" {
                     return self.elevator_made(&out.result);
                 }

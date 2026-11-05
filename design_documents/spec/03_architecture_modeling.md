@@ -4069,7 +4069,28 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 **Acceptance criteria.**
 - [x] 9,000 persons an hour up needs three units with one out. Two 1 m units up give 120 persons a minute with the worst out: under the IBC nothing counts (400 needed, 300 from the stairs: short); under NFPA 130 all 120 count (enough); under SCDF with 200 needed only 100 count.
 
-*Built (2026-11-04):* in `escalator.traffic`. Not yet: NFPA 130 5.3.5.5's larger share where escalators stop remotely, Bellevue's 25 % cap, platform clearing times (4 and 6 minutes), egress through the path of travel across levels.
+*Built (2026-11-04):* in `escalator.traffic`. Not yet: NFPA 130 5.3.5.5's larger share where escalators stop remotely, Bellevue's 25 % cap. Platform clearing times are ANA-ROUTE-005, egress across levels ANA-ROUTE-004.
+
+### 3.7a.22 Fare lines
+**ID:** ARC-VT-022 · **Priority:** P2 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §9 (*Egress*); owner direction (2026-11-04: "Egress and transit"); SCDF CPFPRTS 2.2.3i–j and 2.2.8 (S2752, S2456); EXPERT_REVIEW E-94
+
+**Purpose.** Model the row of fare gates across a station concourse, with its evacuation capacity, so routes pass through it and platform clearing counts the wait at it.
+
+**Behaviour & rules.**
+- `fare_line.create(level, start, toward, kind?, count, wide?, emergency?)` makes one object of cabinets with aisles between them. It runs from `start` toward `toward` for as long as its gates need.
+  - **Aisles:** `wide` wide gates first (default 1, 0.9 m clear), then `count` gates of `kind`, then `emergency` emergency gates (default 0, 1.0 m clear). The kinds are `tripod` (turnstile, 0.5 m), `paddle` (default, 0.6 m), `wide` and `emergency`.
+  - **Cabinets:** 0.3 m wide, 1.6 m along the way through and 1.0 m high, either side of every aisle.
+  - **Capacity in an evacuation** (SCDF Table 2.2.3i, the gates open): 25 persons a minute a turnstile, 50 a gate under 850 mm, and 80 a minute per metre of a wider one.
+  - It is a generic model typed `FAREGATE` with `Riviera_FareLine` (gates of each kind, length, capacity).
+- `fare_line.list` lists them.
+- **Paths of travel** (ANA-ROUTE-001) take its cabinets alone as obstacles, without the clearance, so routes walk its aisles.
+- **Platform clearing** (ANA-ROUTE-005) adds the wait at each fare line its route crosses.
+- **In the window:** Architecture › Circulation › *Fare Line* (gates, counts, angle; click where it starts, or type it).
+
+**Acceptance criteria.**
+- [x] One turnstile and one wide gate make a line 0.3 × 3 + 0.9 + 0.5 m long passing 97 a minute; with walls either side, the route from the platform below crosses the line between its ends; it is listed.
+
+*Built (2026-11-05):* `riviera_core::fare_gates`, the Fare Line action; the sample *Escalators in a transit station* (a line of ten gates passing 552 a minute). Not yet: SCDF 2.2.3j's 50 % gate-type emergency exits where turnstiles are used, the 6 m run-off in front of gates in the standing area, ticket machines and barriers, gates that do not open.
 
 ---
 
@@ -6420,6 +6441,8 @@ All commands below are registered once in the command registry and exposed autom
 | `stairlift.check` | stairlifts? | finding[] | No (query) | ARC-VT-015 |
 | `elevator.traffic` | building_use?, elevators?, population?, area_per_person?, loading?, stop_time?, transfer_time? | [{elevators, cars, floors, population, passengers, probable_stops, highest_reversal, rtt, interval, hc5, handling, waiting, targets, meets, notes}] | No (query) | ARC-VT-018 |
 | `escalator.traffic` | up, down, demand_up, demand_down?, one_out?, egress?: {mode, exit, required, stairs} | {up, down, one_out, egress, notes} | No (query) | ARC-VT-019, ARC-VT-021 |
+| `fare_line.create` | level, start, toward, kind?, count, wide?, emergency? | {fare_line, level, start, direction, aisles[], length, capacity} | Yes | ARC-VT-022 |
+| `fare_line.list` | — | [{fare_line, level_name, aisles[], length, capacity, …}] | No (query) | ARC-VT-022 |
 | `enclosure.create` | form, footprint \| host_wall_ids, level_id, params | element_id | Yes | ARC-GLZ-001 |
 | `enclosure.set` | enclosure_id, params | — | Yes | ARC-GLZ-001 |
 | `enclosure.get` | enclosure_id | {form, params, parts} | No (query) | ARC-GLZ-001 |

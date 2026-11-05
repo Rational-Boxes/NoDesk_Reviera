@@ -232,3 +232,37 @@ fn the_standing_area_stops_at_the_train_and_leaves_out_stairs_and_their_run_off(
     let c = occ(json!({ "trains": [100.0], "area_per_person": 0.5, "train": [[-50.0, 5.0], [150.0, 5.0]] }));
     assert!((f(&c["load_basis"]["area"]) - (1000.0 - 9.0 - 1.5 * run)).abs() < 0.05, "{c:#}");
 }
+
+#[test]
+fn a_route_passes_a_fare_line_through_its_aisles_and_waits_at_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = App::new(AppConfig { live: None, untitled_dir: dir.path().join("untitled") });
+    ok(&mut app, "file.new", json!({}));
+    let platform = ok(&mut app, "level.list", json!({}))[0]["id"].clone();
+    let concourse = ok(&mut app, "level.create", json!({ "elevation": 3.6 }));
+    ok(&mut app, "stair.create", json!({ "base_level": platform, "width": 1.5, "railings": false, "runs": [{ "start": [2.0, 4.0], "end": [7.0, 4.0] }] }));
+    // Across the concourse at x = 30: a wall, a fare line of one turnstile and one wide gate
+    // running north from y = 2, and a wall beyond it.
+    let line = ok(&mut app, "fare_line.create", json!({ "level": concourse, "start": [30.0, 2.0], "toward": [30.0, 10.0], "kind": "tripod", "count": 1 }));
+    assert!((f(&line["length"]) - (0.3 * 3.0 + 0.9 + 0.5)).abs() < 1e-9 && (f(&line["capacity"]) - (72.0 + 25.0)).abs() < 1e-9, "{line:#}");
+    let end = 2.0 + f(&line["length"]);
+    for (a, b) in [(-30.0, 1.6), (end + 0.4, 40.0)] {
+        ok(&mut app, "wall.create", json!({ "curve": { "line": { "start": [30.0, a], "end": [30.0, b] } }, "base_level": concourse, "top_constraint": { "unconnected": 3.0 } }));
+    }
+    assert_eq!(ok(&mut app, "fare_line.list", json!({})).as_array().unwrap().len(), 1);
+
+    let args = |load: f64, concourse_load: f64| json!({ "level": platform, "load": load, "remote": [20.0, 4.0], "safety": { "point": [40.0, 4.0], "level": concourse }, "concourse_load": concourse_load });
+    // The way out goes through the line, between its cabinets.
+    let c = ok(&mut app, "egress.platform_clearing", args(100.0, 0.0));
+    let leg = c["route"]["legs"].as_array().unwrap().last().unwrap().clone();
+    let pts: Vec<[f64; 2]> = leg["points"].as_array().unwrap().iter().map(|p| [f(&p[0]), f(&p[1])]).collect();
+    let at = pts.windows(2).find_map(|w| ((w[0][0] - 30.0) * (w[1][0] - 30.0) < 0.0).then(|| w[0][1] + (w[1][1] - w[0][1]) * (30.0 - w[0][0]) / (w[1][0] - w[0][0]))).expect("crosses x = 30");
+    assert!(at > 2.0 && at < end, "through the line at y = {at}: {leg:#}");
+    // 100 people: 1.20 min off the platform, 1.03 min through the line: no wait.
+    assert_eq!(c["fare_lines"].as_array().unwrap().len(), 1, "{c:#}");
+    assert_eq!(f(&c["fare_wait"]), 0.0);
+    // With 200 already on the concourse: 3.09 min through the line, a wait of 1.89 min.
+    let c = ok(&mut app, "egress.platform_clearing", args(100.0, 200.0));
+    let w = 300.0 / 97.0 - 100.0 / 83.25;
+    assert!((f(&c["fare_wait"]) - w).abs() < 1e-9 && (f(&c["safety_time"]) - (f(&c["walking_time"]) + f(&c["wait"]) + w)).abs() < 1e-9, "{c:#}");
+}

@@ -268,6 +268,50 @@ impl Gui {
         }
     }
 
+    /// Architecture › Circulation › Fare Line (ARC-VT-022): a row of fare gates on this plan's
+    /// level, then a click where it starts (or a typed point).
+    pub(crate) fn place_fare_line(&mut self) {
+        let frame = self.frame;
+        if self.active_view().and_then(|v| v.plan.clone()).is_none() {
+            return error(&frame, "Open a plan of the concourse first.");
+        }
+        let f = super::reinforcement_ui::Form::new(&frame, "Fare Line");
+        let kind = f.choice("Gates", &["Paddle gates (0.6 m, 50 a minute)".to_owned(), "Tripod turnstiles (0.5 m, 25 a minute)".to_owned(), "Wide gates (0.9 m, 72 a minute)".to_owned()], 0);
+        let count = f.text("How many", "6", "Besides the wide and emergency gates");
+        let wide = f.text("Wide gates", "1", "Accessible, 0.9 m clear; first along the line");
+        let emergency = f.text("Emergency gates", "0", "Swing gates 1.0 m clear; last along the line");
+        let angle = f.text("Runs at (°)", "90", "0: toward the right of the plan; counter-clockwise");
+        let at = f.text("Start (x, y)", "", "Empty: click in the plan where it starts");
+        let ok = f.show("Cabinets 0.3 × 1.6 m either side of each aisle. Paths of travel walk the aisles; Platform Clearing adds the wait at it.", "Place");
+        let n = |t: &TextCtrl, d: u32| t.get_value().trim().parse::<u32>().unwrap_or(d);
+        let gate = ["paddle", "tripod", "wide"][kind.get_selection().unwrap_or(0) as usize];
+        let args = json!({
+            "command": "fare_line.create",
+            "kind": gate,
+            "count": n(&count, 6),
+            "wide": n(&wide, 1),
+            "emergency": n(&emergency, 0),
+            "angle": angle.get_value().trim().parse::<f64>().unwrap_or(90.0).to_radians(),
+        });
+        let typed: Vec<f64> = at.get_value().split([',', ' ']).filter_map(|s| s.trim().parse().ok()).collect();
+        f.dialog.destroy();
+        if !ok {
+            return;
+        }
+        let Some(plan) = self.active_view().and_then(|v| v.plan.clone()) else { return };
+        if let [x, y] = typed[..] {
+            let mut args = args;
+            args["point"] = json!([x, y]);
+            args["level"] = json!(plan.level);
+            return self.layout_bathroom_at(args);
+        }
+        self.start_room_tool();
+        if let Some(tool) = self.room_tool.as_mut() {
+            tool.layout = Some(args);
+            frame.set_status_text("Fare line: click where it starts; Esc ends", 0);
+        }
+    }
+
     /// After `escalator.create`: what was made, and what Check Escalators finds.
     pub(crate) fn escalator_made(&mut self, made: &Value) {
         let frame = self.frame;

@@ -4784,6 +4784,10 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             g.place_escalator();
             focus(g);
         }),
+        "ui.fare_line" => with(gui, |g| {
+            g.place_fare_line();
+            focus(g);
+        }),
         "ui.elevator" => with(gui, |g| {
             g.place_elevator();
             focus(g);

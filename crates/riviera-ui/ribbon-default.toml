@@ -816,6 +816,12 @@ icon = "escalator"
 help = "An escalator or moving walk (inclined between levels, or horizontal on one) sized under the vertical-transport rule packs in use, with floor openings for its pits and its headroom; then click the middle of its lower end in a plan (ARC-VT-010)"
 
 [[action]]
+id = "ui.fare_line"
+label = "Fare Line"
+icon = "escalator_check"
+help = "A row of fare gates across a concourse: paddle gates, turnstiles or wide gates, with a wide (accessible) gate first and emergency gates last; then click where it starts in a plan. Paths of travel walk its aisles and Platform Clearing adds the wait at it (ARC-VT-022)"
+
+[[action]]
 id = "escalator.check"
 label = "Check Escalators"
 icon = "escalator_check"
@@ -3615,6 +3621,7 @@ tools = [
   { action = "ui.elevator_traffic", size = "small" },
   { action = "ui.elevator_egress_role", size = "small" },
   { action = "ui.escalator", size = "large" },
+  { action = "ui.fare_line", size = "small" },
   { action = "escalator.check", size = "small" },
   { action = "ui.stairlift", size = "large" },
   { action = "stairlift.check", size = "small" },
@@ -4812,7 +4819,7 @@ items = [
   "room.place", "room.place_automatically", "-",
   "roof.create_extrusion", "slabedge.create", "enclosure.create", "roof.create_geodesic", "growing.layout", "growing.lights", "-",
   "ui.place_bathroom_component", "ui.bathroom_layout", "ui.toilet_core", "ui.locker_room", "ui.sauna", "ui.steam_room", "ui.tiles", "ui.shower_falls", "ui.waterproofing", "ui.make_product", "ui.swap_for_product", "ui.product_documents", "bath.place_grab_bars", "bath.check", "ui.fixture_count", "-",
-  "ui.elevator", "elevator.check", "ui.elevator_traffic", "ui.elevator_egress_role", "ui.escalator", "escalator.check", "ui.stairlift", "stairlift.check", "-",
+  "ui.elevator", "elevator.check", "ui.elevator_traffic", "ui.elevator_egress_role", "ui.escalator", "ui.fare_line", "escalator.check", "ui.stairlift", "stairlift.check", "-",
   "opening.create_wall", "opening.create_vertical", "opening.create_by_face", "opening.create_shaft", "-",
   "grid.create", "level.create", "refplane.create", "modelline.create", "-",
   "workplane.set", "workplane.show",

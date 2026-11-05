@@ -1115,8 +1115,12 @@ fn the_station_sample_keeps_its_transit_pair_and_run_off() {
     let standing = ok(&mut app, "egress.platform_clearing", json!({ "level": platform, "occupancy": { "trains": [350], "entraining": 150, "area_per_person": 1.39, "train": [[5.0, 2.0], [65.0, 2.0]] }, "remote": [64.0, 4.0], "safety": { "point": [64.0, 20.0], "level": concourse } }));
     println!("standing: {:.0} m², {:.0} people, {:.1} min", f(&standing["load_basis"]["area"]), f(&standing["load"]), f(&standing["platform_time"]));
     assert!(f(&standing["load_basis"]["area"]) < 1440.0 && f(&standing["load_basis"]["area"]) > 1000.0, "{standing:#}");
-    // The other numbers are as before: the elevators stand clear of the routes.
-    assert!((f(&c["safety_time"]) - 4.22).abs() < 0.01, "{c:#}");
+    // The way out passes the fare line; with 1,500 on the concourse it waits there.
+    let gated = ok(&mut app, "egress.platform_clearing", json!({ "level": platform, "load": 500, "remote": [64.0, 4.0], "safety": { "point": [64.0, 20.0], "level": concourse }, "concourse_load": 1500 }));
+    println!("fare line: {:.2} min to pass, waiting {:.2} min; to safety {:.2} min (without the wait {:.2})", f(&gated["fare_lines"][0]["flow_time"]), f(&gated["fare_wait"]), f(&gated["safety_time"]), f(&c["safety_time"]));
+    assert_eq!(gated["fare_lines"].as_array().unwrap().len(), 1, "{gated:#}");
+    assert!((f(&gated["fare_wait"]) - (2000.0 / 552.0 - 500.0 / 166.5)).abs() < 1e-6 && gated["meets_safety"] == true);
+    assert_eq!(ok(&mut app, "fare_line.list", json!({})).as_array().unwrap().len(), 1);
 }
 
 #[test]

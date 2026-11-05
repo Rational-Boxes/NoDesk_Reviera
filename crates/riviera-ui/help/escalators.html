@@ -68,8 +68,24 @@ SCDF, the worst unit out.</p>
 and shutters around the openings, intersection guards, deck barricades, airport rules (trolley walks,
 queues), run-off to gatelines, and outdoor units.</p>
 
+<h2 id="fare">Fare lines</h2>
+<p><b>Architecture › Circulation › Fare Line</b> puts a row of fare gates across a concourse: paddle
+gates (0.6 m), tripod turnstiles (0.5 m) or wide gates (0.9 m), with wide (accessible) gates first
+and emergency gates (1.0 m) last, and 0.3 m cabinets either side of each aisle. Click where it
+starts in a plan, or type the point; it runs at the angle given. The sample
+<a href="riviera:sample/station">Escalators in a transit station</a> has one.</p>
+<ul>
+  <li>In an evacuation the gates stand open. A turnstile passes 25 people a minute, a narrow
+  gate 50, and a wide or emergency gate 80 a minute per metre (SCDF CPFPRTS Table 2.2.3i).</li>
+  <li>Paths of travel and egress routes walk through the aisles. Close the rest of the concourse
+  with walls that meet the line's ends.</li>
+  <li><b>Analyze › Route Analysis › Platform Clearing</b> adds the wait at a line its route
+  crosses. That is the time for the platform's people (and those already on the concourse) to
+  pass, less the platform's own clearing time.</li>
+</ul>
+
 <h2 id="scripts">Scripts and agents</h2>
 <p>Everything above is a command: <code>escalator.size</code>, <code>escalator.create</code>,
-<code>escalator.list</code>, <code>escalator.delete</code> and <code>escalator.check</code>;
+<code>escalator.list</code>, <code>escalator.delete</code> and <code>escalator.check</code>, <code>fare_line.create</code>, <code>fare_line.list</code>;
 <code>clearance.list</code> and <code>clearance.check</code> include the zones. Lua scripts and AI
 agents (MCP, the <i>modeling</i> toolset) can use them.</p>

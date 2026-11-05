@@ -161,6 +161,7 @@ impl Gui {
         let safe_level = f.choice("Point of safety level", &names, names.len() - 1);
         let safe = f.text("Point of safety (x, y)", "", "Metres");
         let mode = f.choice("Escalators", &["Counted (NFPA 130)".to_owned(), "Not counted".to_owned()], 0);
+        let concourse = f.text("Already on the concourse", "0", "Persons leaving through the same fare lines");
         let lifts = f.check("Lifts", "Count occupant evacuation elevators (NFPA 130 5.5.6.3.3; one out, one for firefighters)", false);
         let ok = f.show("The platform must clear within 4 minutes, and its most remote point reach a point of safety within 6.", "Check");
         let point = |t: &TextCtrl| -> Option<[f64; 2]> {
@@ -178,12 +179,13 @@ impl Gui {
         let ls = levels[safe_level.get_selection().unwrap_or(0) as usize]["id"].clone();
         let m = ["nfpa130", "ibc"][mode.get_selection().unwrap_or(0) as usize];
         let lifts = lifts.is_checked();
+        let on_concourse = concourse.get_value().trim().parse::<f64>().unwrap_or(0.0);
         f.dialog.destroy();
         if !ok {
             return;
         }
         let (Some(a), Some(b)) = (a, b) else { return error(&frame, "Give both points as x, y.") };
-        let mut args = json!({ "level": lp, "remote": a, "safety": { "point": b, "level": ls }, "mode": m, "lifts": lifts });
+        let mut args = json!({ "level": lp, "remote": a, "safety": { "point": b, "level": ls }, "mode": m, "lifts": lifts, "concourse_load": on_concourse });
         if typed.is_empty() {
             if train_loads.is_empty() && per_person.is_none() {
                 return error(&frame, "Give the occupant load, or the trains (and an area figure) to work it out from.");
@@ -215,10 +217,13 @@ impl Gui {
             num("capacity")
         ));
         lines.push(format!("Platform cleared in {:.2} min (at most 4): {}", num("platform_time"), pass("meets_platform")));
+        for x in c["fare_lines"].as_array().cloned().unwrap_or_default() {
+            lines.push(format!("Fare line: {:.0} a minute, {:.2} min to pass, waiting {:.2} min", x["capacity"].as_f64().unwrap_or(0.0), x["flow_time"].as_f64().unwrap_or(0.0), x["wait"].as_f64().unwrap_or(0.0)));
+        }
         lines.push(format!(
             "To the point of safety: walking {:.2} min + waiting {:.2} min = {:.2} min (at most 6): {}",
             num("walking_time"),
-            num("wait"),
+            num("wait") + num("fare_wait"),
             num("safety_time"),
             pass("meets_safety")
         ));

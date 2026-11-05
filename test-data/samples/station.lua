@@ -108,3 +108,15 @@ print(string.format("with lifts: %.1f a minute from the lift, %.2f min", with_li
 local standing = riviera.egress.platform_clearing{ level = platform, occupancy = { trains = { 350 }, entraining = 150, area_per_person = 1.39, train = { { 5.0, 2.0 }, { 65.0, 2.0 } } }, remote = { 64.0, 4.0 }, safety = exit }
 assert(standing.load_basis.area < 60 * 24 and standing.load_basis.from == "area", "the standing area")
 print(string.format("standing: %.0f m², %.0f people, %.1f min", standing.load_basis.area, standing.load, standing.platform_time))
+
+-- A fare line across the concourse west of the exit, from the slab's south edge at x = 58: a
+-- wide gate, eight paddle gates and an emergency gate (552 people a minute in an evacuation,
+-- SCDF CPFPRTS Table 2.2.3i), and a wall on from its end to the north edge. The way out now passes
+-- through its aisles. With 1,500 people already on the concourse, the line's 2,000 take 3.62
+-- minutes, longer than the platform's 3.00: the wait at it is added to the time to safety.
+local fare = riviera.fare_line.create{ level = concourse, start = { 58.0, 0.0 }, toward = { 58.0, 10.0 }, count = 8, emergency = 1 }
+assert(fare.capacity == 552, "552 a minute")
+riviera.wall.create{ curve = { line = { start = { 58.0, fare.length }, ["end"] = { 58.0, 24.0 } } }, base_level = concourse, top_constraint = { unconnected = 3.0 } }
+local gated = riviera.egress.platform_clearing{ level = platform, occupancy = { trains = { 350 }, entraining = 150 }, remote = { 64.0, 4.0 }, safety = exit, concourse_load = 1500 }
+assert(#gated.fare_lines == 1 and gated.fare_wait > 0 and gated.meets_safety, "through the fare line")
+print(string.format("fare line: %.2f min to pass, waiting %.2f min; to safety %.2f min", gated.fare_lines[1].flow_time, gated.fare_wait, gated.safety_time))

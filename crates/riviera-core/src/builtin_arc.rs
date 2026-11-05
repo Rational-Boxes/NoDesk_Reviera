@@ -582,6 +582,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(EgressDrawRoute),
         registry.add(EgressPlatformClearing),
         registry.add(ElevatorSetEgressRole),
+        registry.add(FareLineCreate),
+        registry.add(FareLineList),
         registry.add(LibraryReloadItem),
         registry.add(PublishListSets),
         registry.add(PublishRemoveSet),
@@ -7502,4 +7504,30 @@ edit_command!(
     crate::elevators::EgressRoleParams,
     crate::elevators::EgressRole,
     crate::elevators::set_egress_role
+);
+
+edit_command!(
+    FareLineCreate,
+    "fare_line.create",
+    "Create a fare line",
+    "A row of fare gates on a level (ARC-VT-022), from `start` toward `toward`: `wide` wide gates first \
+     (default 1, 0.9 m), `count` gates of `kind` (tripod 0.5 m, paddle 0.6 m, wide, emergency 1.0 m), then \
+     `emergency` emergency gates, with 0.3 × 1.6 × 1.0 m cabinets either side of each aisle. Its evacuation \
+     capacity is 25 a minute a turnstile, 50 a gate under 850 mm, 80 a minute per metre of a wider one (SCDF \
+     CPFPRTS Table 2.2.3i). Paths of travel walk its aisles; platform clearing adds the wait at it.",
+    "New Fare Line",
+    crate::fare_gates::CreateParams,
+    crate::fare_gates::Created,
+    crate::fare_gates::create
+);
+
+read_command!(
+    FareLineList,
+    "fare_line.list",
+    "List the fare lines",
+    "Lists the model's fare lines (ARC-VT-022): each one's level, start, direction, aisles, length and \
+     evacuation capacity.",
+    Option<crate::fare_gates::NoParams>,
+    Vec<crate::fare_gates::Info>,
+    crate::fare_gates::list
 );
