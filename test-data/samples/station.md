@@ -26,7 +26,8 @@ level at 7.0 m (the concourse) above the platform, and a 70 × 24 m **Architectu
 4. **A stair.** **Architecture › Stair**, 1500 mm wide, from `4, 19` to `14.64, 19` up to the
    concourse, then **Modify | Stairs › Stair Openings**.
 5. **The way out.** **Analyze › Route Analysis › Egress Route**:
-   - from the platform at `64, 4` to the concourse at `64, 20`;
+   - from the platform at `64, 4` to the concourse at `64, 20` (or leave the points empty and
+     click them: the start in the platform's plan, then the exit in the concourse's);
    - *Escalators* "Not counted (IBC)": the route walks to the west end, climbs the stair and
      comes back east;
    - "Counted (NFPA 130)": it takes the up escalator, and is quicker.

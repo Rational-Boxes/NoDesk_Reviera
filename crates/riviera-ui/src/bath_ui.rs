@@ -195,6 +195,10 @@ impl Gui {
         // The Locker Room, Sauna and Steam Room tools ride on the same click, with their own
         // commands.
         let command = args.as_object_mut().and_then(|o| o.remove("command")).and_then(|c| c.as_str().map(str::to_owned)).unwrap_or_else(|| "bath.layout".to_owned());
+        // A point of a pick sequence (egress routes, platform clearing).
+        if command == "ui.pick" {
+            return self.picked(args);
+        }
         // Elevators and escalators stand on the clicked plan's level as their lowest.
         if matches!(command.as_str(), "elevator.create" | "escalator.create")
             && let Some(o) = args.as_object_mut()

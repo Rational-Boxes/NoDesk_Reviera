@@ -94,9 +94,9 @@ impl Gui {
         let names: Vec<String> = levels.iter().map(|l| l["name"].as_str().unwrap_or("").to_owned()).collect();
         let f = super::reinforcement_ui::Form::new(&frame, "Egress Route");
         let from_level = f.choice("From level", &names, names.len() - 1);
-        let from = f.text("From point (x, y)", "", "Metres, in that level's plan");
+        let from = f.text("From point (x, y)", "", "Metres, in that level's plan; empty: click it in a plan");
         let to_level = f.choice("To level", &names, 0);
-        let to = f.text("To point (x, y)", "", "Metres: the exit");
+        let to = f.text("To point (x, y)", "", "Metres: the exit; empty: click it in a plan");
         let mode = f.choice("Escalators", &["Not counted (IBC)".to_owned(), "Counted (NFPA 130)".to_owned(), "Counted (SCDF)".to_owned()], 0);
         let lifts = f.check("Lifts", "Take occupant evacuation elevators too (waiting 60 s for the car)", false);
         let draw = f.check("Plans", "Draw each leg as a path of travel in its level's floor plan", false);
@@ -115,8 +115,28 @@ impl Gui {
         if !ok {
             return;
         }
-        let (Some(a), Some(b)) = (a, b) else { return error(&frame, "Give both points as x, y.") };
-        let r = match self.run(if draw { "egress.draw_route" } else { "egress.route" }, json!({ "start": { "point": a, "level": la }, "end": { "point": b, "level": lb }, "mode": m, "lifts": lifts })) {
+        let mut args = json!({ "mode": m, "lifts": lifts, "draw": draw });
+        let mut slots = Vec::new();
+        match a {
+            Some(a) => args["start"] = json!({ "point": a, "level": la }),
+            None => slots.push(json!({ "key": "start", "kind": "at", "prompt": "Egress route: click where it starts, in the plan of its level; Esc ends" })),
+        }
+        match b {
+            Some(b) => args["end"] = json!({ "point": b, "level": lb }),
+            None => slots.push(json!({ "key": "end", "kind": "at", "prompt": "Egress route: click the exit, in the plan of its level (open that plan first); Esc ends" })),
+        }
+        if slots.is_empty() {
+            return self.egress_route_run(args);
+        }
+        self.start_picking("egress.route", slots, args);
+    }
+
+    /// Runs an egress route (drawn when `draw`) and reports it leg by leg.
+    pub(crate) fn egress_route_run(&mut self, mut args: Value) {
+        let frame = self.frame;
+        let levels: Vec<Value> = self.run("level.list", json!({})).ok().and_then(|v| v.as_array().cloned()).unwrap_or_default();
+        let draw = args.as_object_mut().and_then(|o| o.remove("draw")).and_then(|v| v.as_bool()).unwrap_or(false);
+        let r = match self.run(if draw { "egress.draw_route" } else { "egress.route" }, args) {
             Ok(r) => r,
             Err(e) => return error(&frame, &format!("No route:\n{e}")),
         };
@@ -157,9 +177,9 @@ impl Gui {
         let waiting = f.text("Waiting to board", "", "Persons on the platform for those trains");
         let train = f.text("Train along the platform", "", "x1, y1, x2, y2: its ends; the area figure then counts only the standing area (SCDF 2.2.2c)");
         let density = f.choice("Area figure", &["None".to_owned(), "Dense: 7 ft² (0.65 m²) a person".to_owned(), "Outlying: 15 ft² (1.39 m²) a person".to_owned()], 0);
-        let remote = f.text("Most remote point (x, y)", "", "Metres, on the platform");
+        let remote = f.text("Most remote point (x, y)", "", "Metres, on the platform; empty: click it in the platform's plan");
         let safe_level = f.choice("Point of safety level", &names, names.len() - 1);
-        let safe = f.text("Point of safety (x, y)", "", "Metres");
+        let safe = f.text("Point of safety (x, y)", "", "Metres; empty: click it in a plan");
         let mode = f.choice("Escalators", &["Counted (NFPA 130)".to_owned(), "Not counted".to_owned()], 0);
         let concourse = f.text("Already on the concourse", "0", "Persons leaving through the same fare lines");
         let lifts = f.check("Lifts", "Count occupant evacuation elevators (NFPA 130 5.5.6.3.3; one out, one for firefighters)", false);
@@ -184,8 +204,7 @@ impl Gui {
         if !ok {
             return;
         }
-        let (Some(a), Some(b)) = (a, b) else { return error(&frame, "Give both points as x, y.") };
-        let mut args = json!({ "level": lp, "remote": a, "safety": { "point": b, "level": ls }, "mode": m, "lifts": lifts, "concourse_load": on_concourse });
+        let mut args = json!({ "level": lp, "mode": m, "lifts": lifts, "concourse_load": on_concourse });
         if typed.is_empty() {
             if train_loads.is_empty() && per_person.is_none() {
                 return error(&frame, "Give the occupant load, or the trains (and an area figure) to work it out from.");
@@ -195,6 +214,24 @@ impl Gui {
             let Ok(n) = typed.parse::<f64>() else { return error(&frame, "The occupant load must be a number.") };
             args["load"] = json!(n);
         }
+        let mut slots = Vec::new();
+        match a {
+            Some(a) => args["remote"] = json!(a),
+            None => slots.push(json!({ "key": "remote", "kind": "point", "prompt": "Platform clearing: click the platform's most remote point, in its plan; Esc ends" })),
+        }
+        match b {
+            Some(b) => args["safety"] = json!({ "point": b, "level": ls }),
+            None => slots.push(json!({ "key": "safety", "kind": "at", "prompt": "Platform clearing: click the point of safety, in the plan of its level (open that plan first); Esc ends" })),
+        }
+        if slots.is_empty() {
+            return self.platform_clearing_run(args);
+        }
+        self.start_picking("egress.platform_clearing", slots, args);
+    }
+
+    /// Runs NFPA 130's platform clearing and reports it.
+    pub(crate) fn platform_clearing_run(&mut self, args: Value) {
+        let frame = self.frame;
         let c = match self.run("egress.platform_clearing", args) {
             Ok(c) => c,
             Err(e) => return error(&frame, &format!("Not worked out:\n{e}")),
@@ -231,6 +268,50 @@ impl Gui {
             lines.push(format!("\n{}", n.as_str().unwrap_or("")));
         }
         MessageDialog::builder(&frame, &lines.join("\n"), "Platform Clearing").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build().show_modal();
+    }
+
+    /// Asks for points one click at a time in plans: each slot's `key` gets the point (`kind`
+    /// `point`) or the point and the clicked plan's level (`at`); then `finish` runs.
+    pub(crate) fn start_picking(&mut self, finish: &str, slots: Vec<Value>, args: Value) {
+        let frame = self.frame;
+        let prompt = slots.first().and_then(|s| s["prompt"].as_str()).unwrap_or("Click in a plan; Esc ends").to_owned();
+        self.start_room_tool();
+        if let Some(tool) = self.room_tool.as_mut() {
+            tool.layout = Some(json!({ "command": "ui.pick", "finish": finish, "slots": slots, "args": args }));
+        }
+        frame.set_status_text(&prompt, 0);
+    }
+
+    /// A click of a pick sequence: the next point, then the next prompt, or the finish.
+    pub(crate) fn picked(&mut self, mut pick: Value) {
+        let frame = self.frame;
+        let (point, level) = (pick["point"].clone(), pick["level"].clone());
+        let Some(slots) = pick["slots"].as_array_mut() else { return };
+        if slots.is_empty() {
+            return;
+        }
+        let slot = slots.remove(0);
+        let key = slot["key"].as_str().unwrap_or_default().to_owned();
+        pick["args"][key.as_str()] = if slot["kind"] == "at" { json!({ "point": point, "level": level }) } else { point };
+        if let Some(next) = pick["slots"].get(0).and_then(|s| s["prompt"].as_str()).map(str::to_owned) {
+            if let Some(o) = pick.as_object_mut() {
+                o.remove("point");
+                o.remove("level");
+                o.insert("command".into(), json!("ui.pick"));
+            }
+            if let Some(tool) = self.room_tool.as_mut() {
+                tool.layout = Some(pick);
+            }
+            return frame.set_status_text(&next, 0);
+        }
+        self.end_room_tool();
+        frame.set_status_text("", 0);
+        let args = pick["args"].take();
+        match pick["finish"].as_str() {
+            Some("egress.route") => self.egress_route_run(args),
+            Some("egress.platform_clearing") => self.platform_clearing_run(args),
+            _ => {}
+        }
     }
 
     /// Paths of Travel: a list with length and time.
