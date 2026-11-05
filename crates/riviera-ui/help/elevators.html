@@ -154,6 +154,23 @@ tower</a> shows one taken from the top floor.</p>
   yet.</li>
 </ul>
 
+<h2 id="inclined">Inclined elevators</h2>
+<p><b>Architecture › Circulation › Inclined Elevator</b> puts a car on a straight track up a slope,
+between a landing on one level and a landing on a higher one. Type the two landings or click them
+in the plans. The sample <a href="riviera:sample/inclined_elevator">An inclined elevator up a
+hillside</a> has one.</p>
+<ul>
+  <li>The track is an alignment rising from one landing to the other. The rails, the car parked at
+  the bottom and its buffer are one object.</li>
+  <li>Cars run from 3 × 3 ft to 5 × 8 ft. The 5 × 5 ft car with a 36 in door is the accessible one.
+  Its capacity is the maker-style figure for residential or commercial use.</li>
+  <li>The drive sets the longest track and the heaviest car: a winding drum on a slab, a drum on
+  the rail, a continuous loop, or a double drum.</li>
+  <li>The check reports an incline of 70° or more (a vertical elevator), a drive that is too
+  small, and, on an accessible route, a car that is not the accessible one. Check Clearances keeps
+  a level landing clear at each gate.</li>
+</ul>
+
 <h2 id="zones">Hoistway and landing zones</h2>
 <p>Each elevator has virtual volumes: its <b>hoistway</b> (violet), from the pit floor to the
 overhead, which nothing but the elevator's own parts may enter, and a <b>landing</b> (green) in
@@ -193,6 +210,6 @@ glass shafts. Power and heat are estimates, and so is the glass hoistway's struc
 <p>Everything above is a command: <code>vt.rule_packs</code>, <code>vt.set_rule_packs</code>,
 <code>vt.add_rule_pack</code>, <code>vt.remove_rule_pack</code>, <code>elevator.size</code>,
 <code>elevator.create</code>, <code>elevator.list</code>, <code>elevator.delete</code> and
-<code>elevator.check</code>, <code>elevator.set_egress_role</code>, <code>elevator.check_lobbies</code>; <code>clearance.list</code> and <code>clearance.check</code> include
+<code>elevator.check</code>, <code>elevator.set_egress_role</code>, <code>elevator.check_lobbies</code>, <code>inclined_elevator.create</code>, <code>inclined_elevator.list</code>, <code>inclined_elevator.check</code>; <code>clearance.list</code> and <code>clearance.check</code> include
 hoistways and landings. Lua scripts and AI agents (MCP, the <i>modeling</i> toolset) can use
 them.</p>

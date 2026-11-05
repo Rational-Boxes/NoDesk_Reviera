@@ -1172,6 +1172,19 @@ fn the_alignment_drive_sample_keeps_its_curves_and_profile() {
 }
 
 #[test]
+fn the_inclined_elevator_sample_keeps_its_car_and_track() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "inclined_elevator");
+    let list = ok(&mut app, "inclined_elevator.list", json!({}));
+    let lift = &list[0];
+    assert_eq!((lift["size"].as_str(), lift["drive"].as_str(), lift["accessible"].as_bool()), (Some("ada"), Some("wdd"), Some(true)), "{list:#}");
+    assert!((f(&lift["length"]) - 30.0f64.hypot(12.0)).abs() < 1e-9 && (f(&lift["angle"]) - 21.8).abs() < 0.01);
+    assert_eq!(ok(&mut app, "inclined_elevator.check", json!({})), json!([]));
+    assert_eq!(ok(&mut app, "clearance.check", json!({})), json!([]));
+    assert_eq!(ok(&mut app, "alignment.list", json!({})).as_array().unwrap().len(), 1);
+}
+
+#[test]
 fn the_escalators_sample_keeps_its_units_and_openings() {
     let work = tempfile::tempdir().unwrap();
     let mut app = open(work.path(), "escalators");

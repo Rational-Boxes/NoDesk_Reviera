@@ -88,6 +88,8 @@ pub enum ClearanceKind {
     StairliftRun,
     /// The run-out and landing space at each end of a stairlift (ARC-VT-014).
     StairliftLanding,
+    /// An inclined elevator's level landing at a gate (ARC-VT-023).
+    InclinedLanding,
 }
 
 impl ClearanceKind {
@@ -109,6 +111,7 @@ impl ClearanceKind {
             Self::EscalatorRunOff => "Clearance:escalator_run_off/3d",
             Self::StairliftRun => "Clearance:stairlift_run/3d",
             Self::StairliftLanding => "Clearance:stairlift_landing/3d",
+            Self::InclinedLanding => "Clearance:inclined_landing/3d",
         }
     }
 
@@ -129,6 +132,7 @@ impl ClearanceKind {
             Self::EscalatorRunOff => "station run-off",
             Self::StairliftRun => "stairlift running envelope",
             Self::StairliftLanding => "stairlift landing",
+            Self::InclinedLanding => "inclined elevator landing",
         }
     }
 }
@@ -318,6 +322,7 @@ pub fn all(store: &Store) -> Vec<Clearance> {
     out.extend(crate::elevators::zones(store));
     out.extend(crate::escalators::zones(store));
     out.extend(crate::stairlifts::zones(store));
+    out.extend(crate::inclined_elevators::zones(store));
     out
 }
 
@@ -329,6 +334,9 @@ pub fn may_share(store: &Store, kind: ClearanceKind, other: ElementId) -> bool {
     }
     if matches!(kind, ClearanceKind::StairliftRun | ClearanceKind::StairliftLanding) {
         return crate::stairlifts::may_share(store, other);
+    }
+    if kind == ClearanceKind::InclinedLanding {
+        return crate::inclined_elevators::may_share(store, other);
     }
     if matches!(kind, ClearanceKind::Hoistway | ClearanceKind::ElevatorLanding | ClearanceKind::MachineSpace) {
         return crate::elevators::may_share(store, other);

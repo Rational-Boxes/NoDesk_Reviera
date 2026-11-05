@@ -308,6 +308,92 @@ impl Gui {
         frame.set_status_text(&text, 0);
     }
 
+    /// Architecture › Circulation › Inclined Elevator (ARC-VT-023): a car on a straight track up a
+    /// slope between landings on two levels, typed or clicked in plans.
+    pub(crate) fn place_inclined_elevator(&mut self) {
+        let frame = self.frame;
+        let levels: Vec<Value> = self.run("level.list", json!({})).ok().and_then(|v| v.as_array().cloned()).unwrap_or_default();
+        if levels.len() < 2 {
+            return error(&frame, "An inclined elevator runs between levels: the model needs two or more.");
+        }
+        let names: Vec<String> = levels.iter().map(|l| l["name"].as_str().unwrap_or("").to_owned()).collect();
+        let f = super::reinforcement_ui::Form::new(&frame, "Inclined Elevator");
+        let bottom_level = f.choice("Bottom landing level", &names, 0);
+        let bottom = f.text("Bottom landing (x, y)", "", "Where the car's gate is; empty: click it in that level's plan");
+        let top_level = f.choice("Top landing level", &names, names.len() - 1);
+        let top = f.text("Top landing (x, y)", "", "Empty: click it in that level's plan");
+        let sizes = ["small", "medium", "large", "xl", "ada", "hd", "hdx", "hdxl"];
+        let size = f.choice("Car", &["3 × 3 ft".to_owned(), "3 × 4 ft".to_owned(), "4 × 4 ft".to_owned(), "4 × 5 ft".to_owned(), "5 × 5 ft (accessible)".to_owned(), "5 × 6 ft".to_owned(), "5 × 7 ft".to_owned(), "5 × 8 ft".to_owned()], 2);
+        let use_ = f.choice("Use", &["Commercial (A17.1 5.1)".to_owned(), "Residential (A17.1 5.4)".to_owned()], 0);
+        let enclosure = f.choice("Car", &["Enclosed (75 in walls, roof)".to_owned(), "Open (42 in rails)".to_owned()], 0);
+        let drives = ["wd", "wdx", "clx", "wdd"];
+        let drive = f.choice("Drive", &["Winding drum on a slab (≤ 500 ft, 2000 lb)".to_owned(), "Winding drum on the rail (≤ 155 ft, 1200 lb)".to_owned(), "Continuous loop (1200 lb)".to_owned(), "Double drum on a slab (≤ 500 ft, 3800 lb)".to_owned()], 0);
+        let accessible = f.check("Accessible route", "The car must be the accessible one (5 × 5 ft, 36 in door)", false);
+        let ok = f.show("The track is an alignment from the bottom landing up to the top one; a level landing is kept clear at each gate.", "Place");
+        let point = |t: &TextCtrl| -> Option<[f64; 2]> {
+            let v: Vec<f64> = t.get_value().split([',', ' ']).filter_map(|s| s.trim().parse().ok()).collect();
+            (v.len() == 2).then(|| [v[0], v[1]])
+        };
+        let (a, b) = (point(&bottom), point(&top));
+        let lb = levels[bottom_level.get_selection().unwrap_or(0) as usize]["id"].clone();
+        let lt = levels[top_level.get_selection().unwrap_or(0) as usize]["id"].clone();
+        let size = sizes[size.get_selection().unwrap_or(2) as usize];
+        let use_ = if use_.get_selection() == Some(1) { "residential" } else { "commercial" };
+        let enclosure = if enclosure.get_selection() == Some(1) { "open" } else { "enclosed" };
+        let drive = drives[drive.get_selection().unwrap_or(0) as usize];
+        let accessible = accessible.is_checked();
+        f.dialog.destroy();
+        if !ok {
+            return;
+        }
+        let mut args = json!({ "size": size, "use": use_, "enclosure": enclosure, "drive": drive, "accessible": accessible });
+        let mut slots = Vec::new();
+        match a {
+            Some(a) => args["bottom"] = json!({ "point": a, "level": lb }),
+            None => slots.push(json!({ "key": "bottom", "kind": "at", "prompt": "Inclined elevator: click the bottom landing, in its level's plan; Esc ends" })),
+        }
+        match b {
+            Some(b) => args["top"] = json!({ "point": b, "level": lt }),
+            None => slots.push(json!({ "key": "top", "kind": "at", "prompt": "Inclined elevator: click the top landing, in its level's plan (open that plan first); Esc ends" })),
+        }
+        if slots.is_empty() {
+            return self.inclined_elevator_run(args);
+        }
+        self.start_picking("inclined_elevator.create", slots, args);
+    }
+
+    /// Places an inclined elevator and reports it with what its check finds.
+    pub(crate) fn inclined_elevator_run(&mut self, args: Value) {
+        let frame = self.frame;
+        let made = match self.run("inclined_elevator.create", args) {
+            Ok(v) => v,
+            Err(e) => return error(&frame, &format!("Could not place the inclined elevator:\n{e}")),
+        };
+        self.refresh_scene(&frame);
+        let id = made["inclined_elevator"].clone();
+        let problems: Vec<String> = self
+            .run("inclined_elevator.check", json!({}))
+            .ok()
+            .and_then(|v| v.as_array().cloned())
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|x| x["inclined_elevator"] == id)
+            .filter_map(|x| x["message"].as_str().map(str::to_owned))
+            .collect();
+        let head = format!(
+            "Inclined elevator: {:.1} m of track at {:.1}°, {:.0} s a trip",
+            made["length"].as_f64().unwrap_or(0.0),
+            made["angle"].as_f64().unwrap_or(0.0),
+            made["trip"].as_f64().unwrap_or(0.0)
+        );
+        if problems.is_empty() {
+            frame.set_status_text(&format!("{head}; no problems found"), 0);
+        } else {
+            let d = MessageDialog::builder(&frame, &format!("{head}\n\n{}", problems.join("\n")), "Inclined Elevator").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconWarning).build();
+            d.show_modal();
+        }
+    }
+
     /// Architecture › Circulation › Fare Line (ARC-VT-022): a row of fare gates on this plan's
     /// level, then a click where it starts (or a typed point).
     pub(crate) fn place_fare_line(&mut self) {

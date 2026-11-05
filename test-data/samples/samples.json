@@ -223,6 +223,19 @@
     ]
   },
   {
+    "name": "inclined_elevator",
+    "title": "An inclined elevator up a hillside",
+    "group": "Architecture",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "inclined_elevator.lua"
+        }
+      }
+    ]
+  },
+  {
     "name": "escalators",
     "title": "Escalators and moving walks in a department store",
     "group": "Architecture",

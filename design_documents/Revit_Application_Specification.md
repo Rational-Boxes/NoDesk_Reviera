@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Riviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Riviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 898 numbered requirements (320 P0 · 343 P1 · 228 P2 · 7 P3), 2,343 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 899 numbered requirements (320 P0 · 343 P1 · 229 P2 · 7 P3), 2,346 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Riviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Riviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,343 commands; 898 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,346 commands; 899 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -14318,6 +14318,33 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 
 *Built (2026-11-05):* `riviera_core::fare_gates`, the Fare Line action; the sample *Escalators in a transit station* (a line of ten gates passing 552 a minute). Not yet: SCDF 2.2.3j's 50 % gate-type emergency exits where turnstiles are used, the 6 m run-off in front of gates in the standing area, ticket machines and barriers, gates that do not open.
 
+### 3.7a.23 Inclined elevators
+**ID:** ARC-VT-023 · **Priority:** P2 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §7 (step 9); research/16 Q4 C1–C2 (S2494–S2496); ARC-ALN-001; EXPERT_REVIEW E-97
+
+**Purpose.** A car on a straight track up a slope between a landing on one level and a landing on a higher one: the first guideway device on the alignment foundation.
+
+**Behaviour & rules.**
+- `inclined_elevator.create(bottom: {point, level}, top: {point, level}, size?, use?, enclosure?, drive?, track_width?, speed?, accessible?)`:
+  - **the track:** an alignment (ARC-ALN-001) from the bottom landing to the top one, its profile rising by the levels' difference. The landings must be on different levels, the top one higher, and not one above the other.
+  - **the car:** `size` `small` 3 × 3 ft, `medium` 3 × 4, `large` 4 × 4 (default), `xl` 4 × 5, `ada` 5 × 5 (the accessible car, 36 in door), `hd` 5 × 6, `hdx` 5 × 7 or `hdxl` 5 × 8, with its frame and door. Its capacity comes from `use`: `residential` (A17.1 §5.4) or `commercial` (§5.1, the default), as published (none for `hd` and `hdx`). `enclosure` is `open` (42 in rails) or `enclosed` (75 in walls and a roof).
+  - **the drive:** `wd` winding drum on a slab (≤ 500 ft, 2000 lb, the default), `wdx` drum on the rail (≤ 155 ft, 1200 lb), `clx` continuous loop (1200 lb) or `wdd` double drum (≤ 500 ft, 3800 lb). The track is 914 mm wide for a 3 ft wide car and 1219 mm otherwise; the speed is 0.25 m/s.
+  - **the object:** the rails (dipping into a pit below the bottom landing so that the parked car's floor is level with it), the car parked at the bottom and the spring buffer, as one transport object: ELEVATOR with ObjectType "InclinedElevator", `Pset_TransportElementElevator` (clear car size) and `Riviera_InclinedElevator` (angle, track length and width, speed, drive, door).
+  - It reports the length along the slope, the rise, the run, the angle and the time a trip takes.
+- **Landings:** a level landing 1.5 m deep and at least 1.5 m wide is kept clear in front of each gate, with 2 m of headroom, for Check Clearances (`inclined_landing`). Its own track may stand in it.
+- `inclined_elevator.check` reports:
+  - an incline of 70° or more (A17.1 §5.1 covers inclines below 70°; steeper is a vertical elevator);
+  - a track longer than the drive runs, or a car heavier than it lifts;
+  - on an accessible route, a car that is not the accessible one (5 × 5 ft, 36 in door; by analogy with ADA 407, as no public text covers inclined elevators);
+  - a note where no capacity is published.
+- `inclined_elevator.list` lists them.
+- **In the window:** Architecture › Circulation › *Inclined Elevator*. The landings are typed with their levels, or clicked in plans one after the other.
+
+**Acceptance criteria.**
+- [x] Landings 30 m apart and 12 m up give 32.3 m of track at 21.8° and a trip of 129 s. The accessible commercial car carries 2371 lb on a 1219 mm track, and the track is an alignment rising from 0 to 12 m. Both landings are clear and nothing is reported.
+- [x] The accessible car on the default winding drum is too heavy for it. A large car on an accessible route is reported. 12 m up over 3 m (76°) is reported as not an incline. Landings one above the other, or with the top one not higher, are refused.
+
+*Built (2026-11-05):* `riviera_core::inclined_elevators`, the Inclined Elevator action; the sample *An inclined elevator up a hillside*. Not yet: supports (posts, piers and piles, as footings and members), landing gates, the drive and its slab, A17.1 end clearances and runby on an incline, curved or variable-grade tracks, cars moving along the track, schedules.
+
 ---
 
 ## 3.8 Openings
@@ -16711,6 +16738,9 @@ All commands below are registered once in the command registry and exposed autom
 | `stairlift.check` | stairlifts? | finding[] | No (query) | ARC-VT-015 |
 | `elevator.traffic` | building_use?, elevators?, population?, area_per_person?, loading?, stop_time?, transfer_time? | [{elevators, cars, floors, population, passengers, probable_stops, highest_reversal, rtt, interval, hc5, handling, waiting, targets, meets, notes}] | No (query) | ARC-VT-018 |
 | `escalator.traffic` | up, down, demand_up, demand_down?, one_out?, egress?: {mode, exit, required, stairs} | {up, down, one_out, egress, notes} | No (query) | ARC-VT-019, ARC-VT-021 |
+| `inclined_elevator.create` | bottom: {point, level}, top: {point, level}, size?, use?, enclosure?, drive?, track_width?, speed?, accessible? | {inclined_elevator, alignment, length, rise, run, angle, trip, capacity, …} | Yes | ARC-VT-023 |
+| `inclined_elevator.list` | — | [{inclined_elevator, bottom, top, size, drive, length, angle, …}] | No (query) | ARC-VT-023 |
+| `inclined_elevator.check` | — | [{inclined_elevator, severity, rule, message}] | No (query) | ARC-VT-023 |
 | `fare_line.create` | level, start, toward, kind?, count, wide?, emergency? | {fare_line, level, start, direction, aisles[], length, capacity} | Yes | ARC-VT-022 |
 | `fare_line.list` | — | [{fare_line, level_name, aisles[], length, capacity, …}] | No (query) | ARC-VT-022 |
 | `enclosure.create` | form, footprint \| host_wall_ids, level_id, params | element_id | Yes | ARC-GLZ-001 |
@@ -30098,14 +30128,14 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 39 | 8 | 0 | 123 |
 | DM | 91 | 65 | 34 | 3 | 193 |
-| ARC | 77 | 101 | 32 | 1 | 211 |
+| ARC | 77 | 101 | 33 | 1 | 212 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 32 | 0 | 33 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
 | COL | 8 | 52 | 16 | 1 | 77 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **343** | **228** | **7** | **898** |
+| **Total** | **320** | **343** | **229** | **7** | **899** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -30316,7 +30346,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2343 unique commands** in 437 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2346 unique commands** in 438 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -30513,6 +30543,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `hydronic` | 1 |
 | `image` | 8 |
 | `import` | 10 |
+| `inclined_elevator` | 3 |
 | `inplace` | 5 |
 | `insert` | 4 |
 | `instance` | 5 |
@@ -31733,6 +31764,9 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `import.pdf` | 2 | path, page, view_id, options | element_id | Yes | DM-IMP-004 |
 | `import.query` | 6 | import_id, pick_ref | cad_entity_info | No | COL-LNK-002 |
 | `import.step` | 2 | path, target: "project"\ | "family", category? | element_id | Yes |
+| `inclined_elevator.check` | 3 | — | [{inclined_elevator, severity, rule, message}] | No (query) | ARC-VT-023 |
+| `inclined_elevator.create` | 3 | bottom: {point, level}, top: {point, level}, size?, use?, enclosure?, drive?, track_width?, speed?, accessible? | {inclined_elevator, alignment, length, rise, run, angle, trip, capacity, …} | Yes | ARC-VT-023 |
+| `inclined_elevator.list` | 3 | — | [{inclined_elevator, bottom, top, size, drive, length, angle, …}] | No (query) | ARC-VT-023 |
 | `inplace.add_form` | 3 | session_id, kind: Extrusion\ | Blend\ | Revolve\ | Sweep\ |
 | `inplace.begin` | 3 | category, name | session_id | Within session; one step on finish | ARC-INPL-001 |
 | `inplace.cancel` | 3 | session_id | — | Discards session | ARC-INPL-001 |

@@ -4793,6 +4793,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             g.place_escalator();
             focus(g);
         }),
+        "ui.inclined_elevator" => with(gui, Gui::place_inclined_elevator),
         "ui.fare_line" => with(gui, |g| {
             g.place_fare_line();
             focus(g);

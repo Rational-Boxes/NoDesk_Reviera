@@ -589,6 +589,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(AlignmentPointAt),
         registry.add(AlignmentStationOf),
         registry.add(AlignmentList),
+        registry.add(InclinedElevatorCreate),
+        registry.add(InclinedElevatorList),
+        registry.add(InclinedElevatorCheck),
         registry.add(LibraryReloadItem),
         registry.add(PublishListSets),
         registry.add(PublishRemoveSet),
@@ -7596,4 +7599,43 @@ read_command!(
     Option<crate::alignments::NoParams>,
     Vec<crate::alignments::Info>,
     crate::alignments::list
+);
+
+edit_command!(
+    InclinedElevatorCreate,
+    "inclined_elevator.create",
+    "Create an inclined elevator",
+    "A car on a straight track up a slope from a landing on one level to one on a higher level (ARC-VT-023): \
+     the track as an alignment rising between them, and the rails, the car parked at the bottom and the spring \
+     buffer as one transport object (ELEVATOR, \"InclinedElevator\"). `size` small (3 × 3 ft) … ada (5 × 5 ft) … \
+     hdxl (5 × 8 ft), `use` residential or commercial (its capacity), `enclosure` open (42 in) or enclosed \
+     (75 in), `drive` wd, wdx, clx or wdd, track width 914 or 1219 mm, speed 0.25 m/s. Level landings at both \
+     gates are virtual volumes for Check Clearances.",
+    "New Inclined Elevator",
+    crate::inclined_elevators::CreateParams,
+    crate::inclined_elevators::Created,
+    crate::inclined_elevators::create
+);
+
+read_command!(
+    InclinedElevatorList,
+    "inclined_elevator.list",
+    "List the inclined elevators",
+    "Lists the model's inclined elevators (ARC-VT-023): their landings, track, car, drive, length, rise, angle \
+     and trip time.",
+    Option<crate::inclined_elevators::NoParams>,
+    Vec<crate::inclined_elevators::Info>,
+    crate::inclined_elevators::list
+);
+
+read_command!(
+    InclinedElevatorCheck,
+    "inclined_elevator.check",
+    "Check inclined elevators",
+    "Checks each inclined elevator (ARC-VT-023): an incline below 70° (A17.1 5.1), the drive's longest track and \
+     heaviest load, and the accessible car (5 × 5 ft, 36 in door) on an accessible route. Clearances at its \
+     landings are in Check Clearances.",
+    Option<crate::inclined_elevators::NoParams>,
+    Vec<crate::inclined_elevators::Finding>,
+    crate::inclined_elevators::check
 );

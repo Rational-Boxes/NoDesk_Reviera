@@ -4092,6 +4092,33 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 
 *Built (2026-11-05):* `riviera_core::fare_gates`, the Fare Line action; the sample *Escalators in a transit station* (a line of ten gates passing 552 a minute). Not yet: SCDF 2.2.3j's 50 % gate-type emergency exits where turnstiles are used, the 6 m run-off in front of gates in the standing area, ticket machines and barriers, gates that do not open.
 
+### 3.7a.23 Inclined elevators
+**ID:** ARC-VT-023 · **Priority:** P2 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §7 (step 9); research/16 Q4 C1–C2 (S2494–S2496); ARC-ALN-001; EXPERT_REVIEW E-97
+
+**Purpose.** A car on a straight track up a slope between a landing on one level and a landing on a higher one: the first guideway device on the alignment foundation.
+
+**Behaviour & rules.**
+- `inclined_elevator.create(bottom: {point, level}, top: {point, level}, size?, use?, enclosure?, drive?, track_width?, speed?, accessible?)`:
+  - **the track:** an alignment (ARC-ALN-001) from the bottom landing to the top one, its profile rising by the levels' difference. The landings must be on different levels, the top one higher, and not one above the other.
+  - **the car:** `size` `small` 3 × 3 ft, `medium` 3 × 4, `large` 4 × 4 (default), `xl` 4 × 5, `ada` 5 × 5 (the accessible car, 36 in door), `hd` 5 × 6, `hdx` 5 × 7 or `hdxl` 5 × 8, with its frame and door. Its capacity comes from `use`: `residential` (A17.1 §5.4) or `commercial` (§5.1, the default), as published (none for `hd` and `hdx`). `enclosure` is `open` (42 in rails) or `enclosed` (75 in walls and a roof).
+  - **the drive:** `wd` winding drum on a slab (≤ 500 ft, 2000 lb, the default), `wdx` drum on the rail (≤ 155 ft, 1200 lb), `clx` continuous loop (1200 lb) or `wdd` double drum (≤ 500 ft, 3800 lb). The track is 914 mm wide for a 3 ft wide car and 1219 mm otherwise; the speed is 0.25 m/s.
+  - **the object:** the rails (dipping into a pit below the bottom landing so that the parked car's floor is level with it), the car parked at the bottom and the spring buffer, as one transport object: ELEVATOR with ObjectType "InclinedElevator", `Pset_TransportElementElevator` (clear car size) and `Riviera_InclinedElevator` (angle, track length and width, speed, drive, door).
+  - It reports the length along the slope, the rise, the run, the angle and the time a trip takes.
+- **Landings:** a level landing 1.5 m deep and at least 1.5 m wide is kept clear in front of each gate, with 2 m of headroom, for Check Clearances (`inclined_landing`). Its own track may stand in it.
+- `inclined_elevator.check` reports:
+  - an incline of 70° or more (A17.1 §5.1 covers inclines below 70°; steeper is a vertical elevator);
+  - a track longer than the drive runs, or a car heavier than it lifts;
+  - on an accessible route, a car that is not the accessible one (5 × 5 ft, 36 in door; by analogy with ADA 407, as no public text covers inclined elevators);
+  - a note where no capacity is published.
+- `inclined_elevator.list` lists them.
+- **In the window:** Architecture › Circulation › *Inclined Elevator*. The landings are typed with their levels, or clicked in plans one after the other.
+
+**Acceptance criteria.**
+- [x] Landings 30 m apart and 12 m up give 32.3 m of track at 21.8° and a trip of 129 s. The accessible commercial car carries 2371 lb on a 1219 mm track, and the track is an alignment rising from 0 to 12 m. Both landings are clear and nothing is reported.
+- [x] The accessible car on the default winding drum is too heavy for it. A large car on an accessible route is reported. 12 m up over 3 m (76°) is reported as not an incline. Landings one above the other, or with the top one not higher, are refused.
+
+*Built (2026-11-05):* `riviera_core::inclined_elevators`, the Inclined Elevator action; the sample *An inclined elevator up a hillside*. Not yet: supports (posts, piers and piles, as footings and members), landing gates, the drive and its slab, A17.1 end clearances and runby on an incline, curved or variable-grade tracks, cars moving along the track, schedules.
+
 ---
 
 ## 3.8 Openings
@@ -6485,6 +6512,9 @@ All commands below are registered once in the command registry and exposed autom
 | `stairlift.check` | stairlifts? | finding[] | No (query) | ARC-VT-015 |
 | `elevator.traffic` | building_use?, elevators?, population?, area_per_person?, loading?, stop_time?, transfer_time? | [{elevators, cars, floors, population, passengers, probable_stops, highest_reversal, rtt, interval, hc5, handling, waiting, targets, meets, notes}] | No (query) | ARC-VT-018 |
 | `escalator.traffic` | up, down, demand_up, demand_down?, one_out?, egress?: {mode, exit, required, stairs} | {up, down, one_out, egress, notes} | No (query) | ARC-VT-019, ARC-VT-021 |
+| `inclined_elevator.create` | bottom: {point, level}, top: {point, level}, size?, use?, enclosure?, drive?, track_width?, speed?, accessible? | {inclined_elevator, alignment, length, rise, run, angle, trip, capacity, …} | Yes | ARC-VT-023 |
+| `inclined_elevator.list` | — | [{inclined_elevator, bottom, top, size, drive, length, angle, …}] | No (query) | ARC-VT-023 |
+| `inclined_elevator.check` | — | [{inclined_elevator, severity, rule, message}] | No (query) | ARC-VT-023 |
 | `fare_line.create` | level, start, toward, kind?, count, wide?, emergency? | {fare_line, level, start, direction, aisles[], length, capacity} | Yes | ARC-VT-022 |
 | `fare_line.list` | — | [{fare_line, level_name, aisles[], length, capacity, …}] | No (query) | ARC-VT-022 |
 | `enclosure.create` | form, footprint \| host_wall_ids, level_id, params | element_id | Yes | ARC-GLZ-001 |
