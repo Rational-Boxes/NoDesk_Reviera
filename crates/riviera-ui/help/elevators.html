@@ -138,6 +138,11 @@ tower</a> shows one taken from the top floor.</p>
   <li>A ride counts the wait for the car (60 s; <code>lift_wait</code> in a script), 10 s of doors,
   and the rise at the rated speed with the time lost speeding up and slowing down. These are
   planning values flagged for expert review.</li>
+  <li><b>Analyze › Route Analysis › Platform Clearing</b> with <i>Lifts</i> ticked counts
+  evacuation elevators serving the platform and the point of safety's level in its exit capacity
+  (NFPA 130 5.5.6.3.3). One is taken as out of service, and one is kept for firefighters unless a
+  fire service elevator serves the platform. Each counts its rated persons every round trip, and
+  together they give at most half the capacity.</li>
   <li><i>Fire service access elevator</i> (IBC 3007, EN 81-72): for firefighters. Routes never take
   it, and its IFC <code>FireFightingLift</code> property is set.</li>
   <li>The rules these elevators must meet themselves (lobbies, standby power, the protected

@@ -39014,6 +39014,7 @@ No IFC equivalent.
 - <code>egress.platform_clearing(level, load | occupancy, remote, safety: {point, level}, mode?)</code> (mode default <code>nfpa130</code>):
   - <strong>occupant load:</strong> given as <code>load</code>, or worked out from <code>occupancy</code> (NFPA 130 5.5.5.1) as the greater of the trains entering at once on every track (<code>trains</code>, persons each) with those waiting to board (<code>entraining</code>), and, when <code>area_per_person</code> is given (0.65 m², 7 ft², for stations serving event venues or dense neighbourhoods; 1.39 m², 15 ft², for outlying ones), the area (<code>area</code>, or the floors on the level) at that density; <code>load_basis</code> says which governs;
   - <strong>exits:</strong> every stair with one end on the platform's level (capacity 0.0555 persons a minute per millimetre of its narrowest run) and, unless <code>mode</code> is <code>ibc</code>, every escalator between it and another level (120 a minute per metre of tread, ARC-VT-021), the widest out of service, the rest counted up to the stairs' capacity (escalators at most half the exit capacity);
+  - <strong>lifts</strong> (with <code>lifts</code>, NFPA 130 5.5.6.3.3; default off, as some adopting codes delete it): occupant evacuation elevators (ANA-ROUTE-006) serving the platform and the point of safety's level, the largest out of service and, unless a fire service elevator serves the platform, the next kept for firefighters; each at its rated persons every round trip (the rise both ways at the rated speed plus speed ÷ 1 m/s², 10 s of doors, 1.2 s a passenger boarding and again leaving), counted up to half the exit capacity;
   - <strong>platform time</strong> = load ÷ exit capacity, at most 4 minutes;
   - <strong>time to safety:</strong> the route (ANA-ROUTE-004) from <code>remote</code> to <code>safety</code>, walked at 37.7 m/min and climbed at 15 m/min up and 18 m/min down (vertical), plus the <strong>wait</strong> at the platform exits (the platform time less the walk to the first exit, not below 0); at most 6 minutes.
 - It returns the exits and their capacities, the stairs', escalators' and counted capacities, the times, the route, whether each test is met, and notes (escalators limited, the unit out). With no stair (or counted escalator) leaving the level it is refused (<code>route.no_exits</code>).
@@ -39021,8 +39022,9 @@ No IFC equivalent.
 <p><strong>Acceptance criteria.</strong>
 - [x] A platform with a 1500 mm stair has a capacity of 83.25 persons a minute; its platform time is the load over that; its walking time is the route's legs at 37.7 m/min and its 3.6 m climb at 15 m/min; the wait is the platform time less the walk to the stair.
 - [x] With a pair of escalators added, one is out and the other counts up to the stairs' capacity; 400 people clear within 4 minutes with them, and not with the stair alone.
-- [x] Two trains of 300 and 250 with 100 waiting make 650, more than a 40 × 10 m platform at 0.65 m² a person (615): the trains govern; with 520 m² given, the area does (800). A load and an occupancy together are refused.</p>
-<p><em>Built (2026-11-04):</em> <code>riviera_core::egress_route::platform_clearing</code> and the window's Platform Clearing; the sample <em>Escalators in a transit station</em> (a train of 350 and 150 waiting: 3.00 min, 4.22 min to safety; 6.0 min by the stair alone; the dense area figure over its whole slab governs and fails). Not yet: the platform area cut to the train's length less obstructions and run-off zones (SCDF 2.2.2c), train loads from vehicle capacity and headways, elevators in the exit capacity (NFPA 130 5.5.6.3.3: at most half, one out and one for firefighters, 30 minutes' carrying), waits further on (concourse exits, fare gates) and the concourse's own load, doors and fare gates as exits, lifts, platform-edge doors.</p>
+- [x] Two trains of 300 and 250 with 100 waiting make 650, more than a 40 × 10 m platform at 0.65 m² a person (615): the trains govern; with 520 m² given, the area does (800). A load and an occupancy together are refused.
+- [x] With three evacuation elevators and no fire service one, one counts at persons × 60 ÷ round trip; with one marked for fire service, of the other two one counts; with nine more than the stair carries, only the stair's capacity counts. Without <code>lifts</code>, none.</p>
+<p><em>Built (2026-11-04):</em> <code>riviera_core::egress_route::platform_clearing</code> and the window's Platform Clearing; the sample <em>Escalators in a transit station</em> (a train of 350 and 150 waiting: 3.00 min, 4.22 min to safety; 6.0 min by the stair alone; the dense area figure over its whole slab governs and fails). Not yet: the platform area cut to the train's length less obstructions and run-off zones (SCDF 2.2.2c), train loads from vehicle capacity and headways, the elevators' holding areas (NFPA 130 5.5.6.3.3.3: 1-hour separation, a stair, 0.46 m² a person), waits further on (concourse exits, fare gates) and the concourse's own load, doors and fare gates as exits, lifts, platform-edge doors.</p>
 <h3 id="41213c-lifts-in-egress-routes">4.12.13c Lifts in egress routes</h3>
 <p><strong>ID:</strong> <code class="rid" id="ANA-ROUTE-006">ANA-ROUTE-006</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> <code>VERTICAL_TRANSPORT_PLAN.md</code> §9 (<em>Egress</em>); owner direction (2026-11-04: "Egress and transit"); IBC 3007–3008, EN 81-72 and EN 81-76 (roles only); EXPERT_REVIEW E-93</p>
 <p><strong>Purpose.</strong> Let egress routes use occupant evacuation elevators, with the wait for the car, and record each elevator's part in an evacuation.</p>
@@ -43225,7 +43227,7 @@ No IFC equivalent.
 </tr>
 <tr>
 <td><code>egress.platform_clearing</code></td>
-<td>level, load? | occupancy?: {trains[], entraining?, area_per_person?, area?}, remote, safety: {point, level}, mode?</td>
+<td>level, load? | occupancy?: {trains[], entraining?, area_per_person?, area?}, remote, safety: {point, level}, mode?, lifts?</td>
 <td>{exits[], capacity, platform_time, safety_time, meets_platform, meets_safety, …}</td>
 <td>No (query)</td>
 <td>ANA-ROUTE-005</td>
@@ -61593,7 +61595,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td><code>egress.platform_clearing</code></td>
 <td>4</td>
 <td>level, load? \</td>
-<td>occupancy?: {trains[], entraining?, area_per_person?, area?}, remote, safety: {point, level}, mode?</td>
+<td>occupancy?: {trains[], entraining?, area_per_person?, area?}, remote, safety: {point, level}, mode?, lifts?</td>
 <td>{exits[], capacity, platform_time, safety_time, meets_platform, meets_safety, …}</td>
 <td>No (query)</td>
 </tr>

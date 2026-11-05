@@ -160,6 +160,7 @@ impl Gui {
         let safe_level = f.choice("Point of safety level", &names, names.len() - 1);
         let safe = f.text("Point of safety (x, y)", "", "Metres");
         let mode = f.choice("Escalators", &["Counted (NFPA 130)".to_owned(), "Not counted".to_owned()], 0);
+        let lifts = f.check("Lifts", "Count occupant evacuation elevators (NFPA 130 5.5.6.3.3; one out, one for firefighters)", false);
         let ok = f.show("The platform must clear within 4 minutes, and its most remote point reach a point of safety within 6.", "Check");
         let point = |t: &TextCtrl| -> Option<[f64; 2]> {
             let v: Vec<f64> = t.get_value().split([',', ' ']).filter_map(|s| s.trim().parse().ok()).collect();
@@ -173,12 +174,13 @@ impl Gui {
         let lp = levels[platform.get_selection().unwrap_or(0) as usize]["id"].clone();
         let ls = levels[safe_level.get_selection().unwrap_or(0) as usize]["id"].clone();
         let m = ["nfpa130", "ibc"][mode.get_selection().unwrap_or(0) as usize];
+        let lifts = lifts.is_checked();
         f.dialog.destroy();
         if !ok {
             return;
         }
         let (Some(a), Some(b)) = (a, b) else { return error(&frame, "Give both points as x, y.") };
-        let mut args = json!({ "level": lp, "remote": a, "safety": { "point": b, "level": ls }, "mode": m });
+        let mut args = json!({ "level": lp, "remote": a, "safety": { "point": b, "level": ls }, "mode": m, "lifts": lifts });
         if typed.is_empty() {
             if train_loads.is_empty() && per_person.is_none() {
                 return error(&frame, "Give the occupant load, or the trains (and an area figure) to work it out from.");
@@ -201,10 +203,12 @@ impl Gui {
         };
         let mut lines = vec![format!("Occupant load {:.0}{basis}", num("load"))];
         lines.push(format!(
-            "Exits: stairs {:.0}/min, escalators {:.0}/min counted (of {:.0}, one out)\nCapacity {:.0} persons a minute\n",
+            "Exits: stairs {:.0}/min, escalators {:.0}/min counted (of {:.0}, one out), lifts {:.0}/min counted (of {:.0})\nCapacity {:.0} persons a minute\n",
             num("stairs"),
             num("counted"),
             num("escalators"),
+            num("lifts_counted"),
+            num("lifts"),
             num("capacity")
         ));
         lines.push(format!("Platform cleared in {:.2} min (at most 4): {}", num("platform_time"), pass("meets_platform")));

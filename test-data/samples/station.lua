@@ -85,3 +85,19 @@ assert(not stairs_only.meets_platform, "the stair alone is too narrow")
 local dense = riviera.egress.platform_clearing{ level = platform, occupancy = { trains = { 350 }, entraining = 150, area_per_person = 0.65 }, remote = { 64.0, 4.0 }, safety = exit }
 assert(dense.load_basis.from == "area" and not dense.meets_platform, "the area governs")
 print(string.format("dense: %.0f m², %.0f people, %.1f min", dense.load_basis.area, dense.load, dense.platform_time))
+
+-- Three elevators from the platform to the concourse east of the escalators, their landings
+-- toward the south: two for occupant evacuation, one for fire service. NFPA 130 5.5.6.3.3 lets
+-- evacuation elevators count (some adopting codes delete it): one is taken as out of service
+-- and the fire service one is kept for firefighters, so one counts, at its rated persons each
+-- round trip.
+local lifts = {}
+for k = 0, 2 do
+  lifts[k + 1] = riviera.elevator.create{ point = { 44.0 + 4.0 * k, 16.0 }, base_level = platform, top_level = concourse }.elevator
+end
+riviera.elevator.set_egress_role{ elevator_id = lifts[1], role = "occupant_evacuation" }
+riviera.elevator.set_egress_role{ elevator_id = lifts[2], role = "occupant_evacuation" }
+riviera.elevator.set_egress_role{ elevator_id = lifts[3], role = "fire_service" }
+local with_lifts = riviera.egress.platform_clearing{ level = platform, occupancy = { trains = { 350 }, entraining = 150 }, remote = { 64.0, 4.0 }, safety = exit, lifts = true }
+assert(with_lifts.lifts_counted > 0 and with_lifts.platform_time < clearing.platform_time, "a lift counts")
+print(string.format("with lifts: %.1f a minute from the lift, %.2f min", with_lifts.lifts_counted, with_lifts.platform_time))

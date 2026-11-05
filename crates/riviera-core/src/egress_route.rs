@@ -370,6 +370,21 @@ pub struct ClearingParams {
     /// Whether escalators count among the exits (default `nfpa130`; `ibc`: stairs only).
     #[serde(default = "nfpa130")]
     pub mode: EgressMode,
+    /// Count occupant evacuation elevators serving the platform and the point of safety's level
+    /// in the exit capacity (NFPA 130 5.5.6.3.3; default false: some adopting codes delete it).
+    #[serde(default)]
+    pub lifts: bool,
+}
+
+/// Seconds a passenger takes to board, and again to leave, a lift's car.
+pub const LIFT_PASSENGER_TIME: f64 = 1.2;
+
+/// A lift's evacuation capacity, persons a minute: its rated persons each round trip between
+/// levels `rise` apart (the run both ways, the doors, everyone boarding and leaving), which
+/// over 30 minutes is NFPA 130's carrying capacity.
+pub fn lift_capacity(persons: f64, rise: f64, speed: f64) -> f64 {
+    let round_trip = 2.0 * (rise.abs() / speed + speed / LIFT_ACCELERATION) + LIFT_DOORS + 2.0 * persons * LIFT_PASSENGER_TIME;
+    persons * 60.0 / round_trip
 }
 
 /// What the occupant load is worked out from (NFPA 130 5.5.5.1): the greater of the trains
@@ -475,10 +490,14 @@ pub struct Clearing {
     pub load_basis: LoadBasis,
     pub exits: Vec<Exit>,
     /// Persons a minute: the stairs; the escalators with the worst unit out; what of them
-    /// counts (at most half the whole); and the platform's exit capacity.
+    /// counts (at most half the whole); the evacuation lifts left after one out and one kept for
+    /// firefighters, and what of them counts (at most half the whole); and the platform's exit
+    /// capacity.
     pub stairs: f64,
     pub escalators: f64,
     pub counted: f64,
+    pub lifts: f64,
+    pub lifts_counted: f64,
     pub capacity: f64,
     /// Minutes: the load through the exits (at most 4).
     pub platform_time: f64,
@@ -522,7 +541,8 @@ pub fn platform_clearing(store: &Store, p: ClearingParams) -> Result<Clearing> {
             }
         }
     }
-    let escalators = esc.iter().map(|x| x.capacity).sum::<f64>() - esc.iter().map(|x| x.capacity).fold(0.0, f64::max);
+    // (+ 0.0: an empty sum is −0.)
+    let escalators = esc.iter().map(|x| x.capacity).sum::<f64>() - esc.iter().map(|x| x.capacity).fold(0.0, f64::max) + 0.0;
     // At most half the exit capacity: no more than the stairs give.
     let counted = escalators.min(stairs);
     if counted < escalators {
@@ -532,7 +552,36 @@ pub fn platform_clearing(store: &Store, p: ClearingParams) -> Result<Clearing> {
         notes.push("the escalator out of service is the widest; the rest run in the exit direction".to_owned());
     }
     exits.extend(esc);
-    let capacity = stairs + counted;
+    // Evacuation lifts serving the platform and the point of safety's level.
+    let mut lifts = 0.0;
+    if p.lifts {
+        use crate::elevators::EgressRole;
+        let safe_id = store.resolve(&p.safety.level).ok_or_else(|| bad("element.not_found", "no such level"))?;
+        let safe = levels.iter().find(|l| l.id == safe_id).ok_or_else(|| bad("route.not_a_level", format!("element {safe_id} is not a level")))?;
+        let rise = safe.elevation - platform.elevation;
+        let serving: Vec<(ElementId, crate::elevators::Elevator)> = crate::elevators::elevators(store).into_iter().filter(|(_, el)| el.levels.contains(&platform.guid)).collect();
+        let mut evac: Vec<Exit> = serving
+            .iter()
+            .filter(|(_, el)| el.egress_role == EgressRole::OccupantEvacuation && el.levels.contains(&safe.guid) && rise.abs() > 1e-9)
+            .map(|(eid, el)| Exit { kind: LinkKind::Lift, element: *eid, width: el.sized.car[0], capacity: lift_capacity(f64::from(el.sized.persons), rise, el.sized.speed) })
+            .collect();
+        evac.sort_by(|a, b| b.capacity.total_cmp(&a.capacity));
+        let firefighters = serving.iter().any(|(_, el)| el.egress_role == EgressRole::FireService);
+        let out = 1 + usize::from(!firefighters);
+        notes.push(if firefighters {
+            "of the evacuation lifts the largest is out of service; a fire service lift is kept for firefighters".to_owned()
+        } else {
+            "of the evacuation lifts the two largest are left out: one out of service, one kept for firefighters (no fire service lift serves the platform)".to_owned()
+        });
+        lifts = evac.iter().skip(out).map(|x| x.capacity).sum::<f64>() + 0.0;
+        exits.extend(evac);
+    }
+    // At most half the exit capacity: no more than the stairs and escalators give.
+    let lifts_counted = lifts.min(stairs + counted);
+    if lifts_counted < lifts {
+        notes.push(format!("lifts limited to half the exit capacity: {lifts_counted:.0} of {lifts:.0} persons a minute counted"));
+    }
+    let capacity = stairs + counted + lifts_counted;
     if capacity <= 0.0 {
         return Err(bad("route.no_exits", format!("no stair (or counted escalator) leaves {}", platform.name)));
     }
@@ -560,6 +609,8 @@ pub fn platform_clearing(store: &Store, p: ClearingParams) -> Result<Clearing> {
         stairs,
         escalators,
         counted,
+        lifts,
+        lifts_counted,
         capacity,
         platform_time,
         route: r,

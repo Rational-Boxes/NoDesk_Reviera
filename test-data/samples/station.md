@@ -49,4 +49,4 @@ level at 7.0 m (the concourse) above the platform, and a 70 × 24 m **Architectu
 ## Gaps
 
 - **[gap]** No escalator traffic or egress dialog yet.
-- **[gap]** The area figure takes the whole slab on the level (or an area typed in a script); waits beyond the platform (concourse, fare gates) are not added.
+- **[gap]** The area figure takes the whole slab on the level (or an area typed in a script); elevators' holding areas are not checked; waits beyond the platform (concourse, fare gates) are not added.

@@ -1106,6 +1106,13 @@ fn the_station_sample_keeps_its_transit_pair_and_run_off() {
     let dense = ok(&mut app, "egress.platform_clearing", json!({ "level": platform, "occupancy": { "trains": [350], "entraining": 150, "area_per_person": 0.65 }, "remote": [64.0, 4.0], "safety": { "point": [64.0, 20.0], "level": concourse } }));
     println!("dense: {:.0} m², {:.0} people, {:.1} min", f(&dense["load_basis"]["area"]), f(&dense["load"]), f(&dense["platform_time"]));
     assert_eq!((dense["load_basis"]["from"].as_str(), dense["meets_platform"].as_bool()), (Some("area"), Some(false)));
+    // Two evacuation elevators and one for fire service: one lift counts.
+    let lifted = ok(&mut app, "egress.platform_clearing", json!({ "level": platform, "load": 500, "remote": [64.0, 4.0], "safety": { "point": [64.0, 20.0], "level": concourse }, "lifts": true }));
+    println!("lifts: {:.1} of {:.1} a minute, {:.2} min", f(&lifted["lifts_counted"]), f(&lifted["lifts"]), f(&lifted["platform_time"]));
+    assert_eq!(lifted["exits"].as_array().unwrap().iter().filter(|x| x["kind"] == "lift").count(), 2);
+    assert!(f(&lifted["lifts_counted"]) > 0.0 && f(&lifted["platform_time"]) < f(&c["platform_time"]));
+    // The other numbers are as before: the elevators stand clear of the routes.
+    assert!((f(&c["safety_time"]) - 4.22).abs() < 0.01, "{c:#}");
 }
 
 #[test]

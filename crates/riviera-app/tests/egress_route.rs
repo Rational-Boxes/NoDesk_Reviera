@@ -167,3 +167,43 @@ fn occupant_evacuation_lifts_are_taken_only_when_marked_and_asked() {
     ok(&mut app, "elevator.set_egress_role", json!({ "elevator_id": lift, "role": "fire_service" }));
     assert!(route(&mut app, true)["links"].as_array().unwrap().iter().all(|l| l["kind"] == "stair"));
 }
+
+#[test]
+fn evacuation_lifts_count_in_a_platforms_exit_capacity_with_two_left_out() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = App::new(AppConfig { live: None, untitled_dir: dir.path().join("untitled") });
+    ok(&mut app, "file.new", json!({}));
+    let platform = ok(&mut app, "level.list", json!({}))[0]["id"].clone();
+    let concourse = ok(&mut app, "level.create", json!({ "elevation": 6.0 }));
+    ok(&mut app, "stair.create", json!({ "base_level": platform, "width": 1.5, "railings": false, "runs": [{ "start": [2.0, 4.0], "end": [12.0, 4.0] }] }));
+    let lifts: Vec<Value> = (0..3)
+        .map(|k| ok(&mut app, "elevator.create", json!({ "point": [30.0 + 4.0 * f64::from(k), 20.0], "base_level": platform, "top_level": concourse, "walls": false, "equipment": false }))["elevator"].clone())
+        .collect();
+    for l in &lifts {
+        ok(&mut app, "elevator.set_egress_role", json!({ "elevator_id": l, "role": "occupant_evacuation" }));
+    }
+    let args = |lifts: bool| json!({ "level": platform, "load": 400.0, "remote": [40.0, 4.0], "safety": { "point": [20.0, 4.0], "level": concourse }, "lifts": lifts });
+    let el = ok(&mut app, "elevator.list", json!({}));
+    let one = {
+        let (persons, speed) = (f(&el[0]["persons"]), f(&el[0]["speed"]));
+        persons * 60.0 / (2.0 * (6.0 / speed + speed) + 10.0 + 2.0 * persons * 1.2)
+    };
+
+    // Not asked: no lifts.
+    assert_eq!(f(&ok(&mut app, "egress.platform_clearing", args(false))["lifts"]), 0.0);
+    // Three evacuation lifts and no fire service lift: one out, one kept for firefighters.
+    let c = ok(&mut app, "egress.platform_clearing", args(true));
+    assert!((f(&c["lifts"]) - one).abs() < 1e-6, "{c:#}");
+    assert!((f(&c["capacity"]) - (83.25 + f(&c["lifts_counted"]))).abs() < 1e-6);
+    // One of them for fire service: the other two evacuate, one out.
+    ok(&mut app, "elevator.set_egress_role", json!({ "elevator_id": lifts[2], "role": "fire_service" }));
+    let c = ok(&mut app, "egress.platform_clearing", args(true));
+    assert!((f(&c["lifts"]) - one).abs() < 1e-6 && c["exits"].as_array().unwrap().iter().filter(|x| x["kind"] == "lift").count() == 2, "{c:#}");
+    // Seven more evacuation lifts: more than the stair; only half the whole counts.
+    for k in 3..10 {
+        let l = ok(&mut app, "elevator.create", json!({ "point": [30.0 + 4.0 * f64::from(k), 20.0], "base_level": platform, "top_level": concourse, "walls": false, "equipment": false }))["elevator"].clone();
+        ok(&mut app, "elevator.set_egress_role", json!({ "elevator_id": l, "role": "occupant_evacuation" }));
+    }
+    let c = ok(&mut app, "egress.platform_clearing", args(true));
+    assert!(f(&c["lifts"]) > 83.25 && (f(&c["lifts_counted"]) - 83.25).abs() < 1e-6, "{c:#}");
+}
