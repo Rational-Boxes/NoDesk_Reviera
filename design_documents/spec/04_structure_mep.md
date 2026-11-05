@@ -5306,12 +5306,14 @@ The job runs in the background with a notification. Spaces that no system serves
   - **between levels** a stair, from 0.4 m before its first riser on its base level to 0.4 m beyond its last on its top level, its length along the middle of its flights and landings, at the **stair speed** (route settings, default 0.6 m/s along the flights);
   - **escalators** under `mode` `nfpa130` or `scdf` (ARC-VT-021): from 0.6 m beyond each end of the truss, walked as a stair; under `ibc` (default) never.
 - It returns the legs walked on each level (their points and lengths), the stairs and escalators taken (levels, length, time), and the total length and time. With no route (a point inside an obstacle, or no stair between the levels) it is refused (`route.no_route`).
-- `route_settings.set` takes `stair_speed`. **In the window:** Analyze › Route Analysis › *Egress Route* (levels and points typed, the escalator rule chosen) reports the route leg by leg.
+- `egress.draw_route` (same arguments) finds the route and draws each leg as a path of travel (ANA-ROUTE-001) in the first floor plan of its level, by name, with its length and time; `path_of_travel.update` works them out again after the model changes. It returns the route, the paths drawn, and the levels crossed that have no floor plan (`unplanned`, not drawn).
+- `route_settings.set` takes `stair_speed`. **In the window:** Analyze › Route Analysis › *Egress Route* (levels and points typed, the escalator rule chosen, *Plans* ticked to draw it) reports the route leg by leg.
 
 **Acceptance criteria.**
 - [x] From the far end of an upper level to an exit beyond a wall on the level below, the route walks to the stair's head, takes the stair and goes round the wall's open end; its time is the walks at 1.3 m/s and the stair at 0.6 m/s. With an escalator nearer, the IBC route still takes the stair and the NFPA 130 route the escalator, sooner. Between levels with no stair it is refused.
+- [x] With floor plans on both levels, the route drawn makes one path of travel in each, each as long as its leg, and the route is the one `egress.route` finds.
 
-*Built (2026-11-04):* `riviera_core::egress_route` and the window's Egress Route; the sample *Escalators in a transit station*. Not yet: drawing the route in the plans, picking the points in the view, lifts (evacuation and firefighting lifts with their waits), ramps, the floor openings over stairwells as obstacles, occupant loads and exit capacity (flow through doors and stairs), platform clearing times.
+*Built (2026-11-04):* `riviera_core::egress_route` and the window's Egress Route; the sample *Escalators in a transit station*. Not yet: picking the points in the view, lifts (evacuation and firefighting lifts with their waits), ramps, the floor openings over stairwells as obstacles, occupant loads and exit capacity (flow through doors and stairs), platform clearing times.
 
 ### 4.12.14 Interference check (cross-reference)
 **ID:** ANA-CLASH-001 · **Priority:** P1 · **Ref:** research/03 §13.6
@@ -6120,6 +6122,7 @@ Every command below is registered once in the command registry and is exposed au
 | `path_of_travel.add_waypoint` | id, point, index? | — | Yes | ANA-ROUTE-001 |
 | `route_settings.set` | params | — | Yes | ANA-ROUTE-002 |
 | `egress.route` | start: {point, level}, end: {point, level}, mode? | {legs, links, length, time} | No (query) | ANA-ROUTE-004 |
+| `egress.draw_route` | start: {point, level}, end: {point, level}, mode? | {legs, links, length, time, paths[], unplanned[]} | Yes | ANA-ROUTE-004 |
 | `route.reveal_obstacles` | view_id, on: bool | — | No | ANA-ROUTE-002 |
 | `path_of_travel.create_multiple` | view_id, starts[], ends[], min_separation | ids[] | Yes | ANA-ROUTE-002 |
 | `one_way_indicator.place` | view_id, point, direction | id | Yes | ANA-ROUTE-002 |

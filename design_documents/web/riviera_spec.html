@@ -173,7 +173,7 @@ td code { white-space: nowrap; }
         <div class="tb-cell"><span class="tb-label">Revision</span><span class="tb-value">0.1 · Draft</span></div>
         <div class="tb-cell"><span class="tb-label">Date</span><span class="tb-value tb-num">2026-10-12</span></div>
         <div class="tb-cell"><span class="tb-label">Requirements</span><span class="tb-value tb-num">892</span></div>
-        <div class="tb-cell"><span class="tb-label">Commands</span><span class="tb-value tb-num">2,333</span></div>
+        <div class="tb-cell"><span class="tb-label">Commands</span><span class="tb-value tb-num">2,334</span></div>
         <div class="tb-cell"><span class="tb-label">Licence</span><span class="tb-value">GPL-3.0-or-later</span></div>
         <div class="tb-cell last-row"><span class="tb-label">Stack</span><span class="tb-value">IFC · Rust · OCCT · wx · LuaJIT · MCP</span></div>
         <div class="tb-cell last-row" style="grid-column: span 3"><span class="tb-label">By priority</span>
@@ -185,7 +185,7 @@ td code { white-space: nowrap; }
 <p><strong>Document:</strong> Functional and technical specification of Riviera, an open-source BIM authoring application
 <strong>Functional reference:</strong> Autodesk® Revit® 2026/2027 (described from public sources only; see <code>RESEARCH_LOG.md</code>)
 <strong>Licence of Riviera:</strong> GPL-3.0-or-later
-<strong>Version:</strong> 0.1 (draft) · 2026-10-16 · <strong>Size:</strong> 892 numbered requirements (320 P0 · 343 P1 · 222 P2 · 7 P3), 2,333 commands</p>
+<strong>Version:</strong> 0.1 (draft) · 2026-10-16 · <strong>Size:</strong> 892 numbered requirements (320 P0 · 343 P1 · 222 P2 · 7 P3), 2,334 commands</p>
 <blockquote>
 <p><strong>Clean-room statement.</strong> This specification describes features, workflows and behaviour in Riviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in <code>SOURCE_REGISTER.md</code>. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Riviera is not affiliated with or endorsed by Autodesk.</p>
 <p><strong>Independence statement.</strong> BIM Riviera is an independent, original application. It is in no way a copy or clone of any existing product, and it does not set out to read or write any existing product's closed, proprietary formats (such as RVT and RFA); IFC is its native format. An existing application was researched, from public sources only, to establish the workflows and user-interface conventions that the industry's users already know, so they can work in Riviera without relearning their trade. Beyond that research, Riviera implements its own features and enhancements: its architecture, native IFC storage, scripting and AI integration, remote computation and analysis, and many of its modelling tools are its own design. Interchange formats used across the industry, such as DWG and DXF, are supported only through open-source libraries, for interoperability.</p>
@@ -254,7 +254,7 @@ td code { white-space: nowrap; }
 </tr>
 <tr>
 <td>A</td>
-<td>Appendix A: requirement summary, shared commands, consolidated command index (2,333 commands; 892 requirements)</td>
+<td>Appendix A: requirement summary, shared commands, consolidated command index (2,334 commands; 892 requirements)</td>
 </tr>
 </tbody>
 </table></div>
@@ -39001,10 +39001,12 @@ No IFC equivalent.
   - <strong>between levels</strong> a stair, from 0.4 m before its first riser on its base level to 0.4 m beyond its last on its top level, its length along the middle of its flights and landings, at the <strong>stair speed</strong> (route settings, default 0.6 m/s along the flights);
   - <strong>escalators</strong> under <code>mode</code> <code>nfpa130</code> or <code>scdf</code> (ARC-VT-021): from 0.6 m beyond each end of the truss, walked as a stair; under <code>ibc</code> (default) never.
 - It returns the legs walked on each level (their points and lengths), the stairs and escalators taken (levels, length, time), and the total length and time. With no route (a point inside an obstacle, or no stair between the levels) it is refused (<code>route.no_route</code>).
-- <code>route_settings.set</code> takes <code>stair_speed</code>. <strong>In the window:</strong> Analyze › Route Analysis › <em>Egress Route</em> (levels and points typed, the escalator rule chosen) reports the route leg by leg.</p>
+- <code>egress.draw_route</code> (same arguments) finds the route and draws each leg as a path of travel (ANA-ROUTE-001) in the first floor plan of its level, by name, with its length and time; <code>path_of_travel.update</code> works them out again after the model changes. It returns the route, the paths drawn, and the levels crossed that have no floor plan (<code>unplanned</code>, not drawn).
+- <code>route_settings.set</code> takes <code>stair_speed</code>. <strong>In the window:</strong> Analyze › Route Analysis › <em>Egress Route</em> (levels and points typed, the escalator rule chosen, <em>Plans</em> ticked to draw it) reports the route leg by leg.</p>
 <p><strong>Acceptance criteria.</strong>
-- [x] From the far end of an upper level to an exit beyond a wall on the level below, the route walks to the stair's head, takes the stair and goes round the wall's open end; its time is the walks at 1.3 m/s and the stair at 0.6 m/s. With an escalator nearer, the IBC route still takes the stair and the NFPA 130 route the escalator, sooner. Between levels with no stair it is refused.</p>
-<p><em>Built (2026-11-04):</em> <code>riviera_core::egress_route</code> and the window's Egress Route; the sample <em>Escalators in a transit station</em>. Not yet: drawing the route in the plans, picking the points in the view, lifts (evacuation and firefighting lifts with their waits), ramps, the floor openings over stairwells as obstacles, occupant loads and exit capacity (flow through doors and stairs), platform clearing times.</p>
+- [x] From the far end of an upper level to an exit beyond a wall on the level below, the route walks to the stair's head, takes the stair and goes round the wall's open end; its time is the walks at 1.3 m/s and the stair at 0.6 m/s. With an escalator nearer, the IBC route still takes the stair and the NFPA 130 route the escalator, sooner. Between levels with no stair it is refused.
+- [x] With floor plans on both levels, the route drawn makes one path of travel in each, each as long as its leg, and the route is the one <code>egress.route</code> finds.</p>
+<p><em>Built (2026-11-04):</em> <code>riviera_core::egress_route</code> and the window's Egress Route; the sample <em>Escalators in a transit station</em>. Not yet: picking the points in the view, lifts (evacuation and firefighting lifts with their waits), ramps, the floor openings over stairwells as obstacles, occupant loads and exit capacity (flow through doors and stairs), platform clearing times.</p>
 <h3 id="41214-interference-check-cross-reference">4.12.14 Interference check (cross-reference)</h3>
 <p><strong>ID:</strong> <code class="rid" id="ANA-CLASH-001">ANA-CLASH-001</code> · <strong>Priority:</strong> <span class="pri pri-p1">P1</span> · <strong>Ref:</strong> research/03 §13.6</p>
 <p><strong>Behaviour &amp; rules.</strong>
@@ -43175,6 +43177,13 @@ No IFC equivalent.
 <td>start: {point, level}, end: {point, level}, mode?</td>
 <td>{legs, links, length, time}</td>
 <td>No (query)</td>
+<td>ANA-ROUTE-004</td>
+</tr>
+<tr>
+<td><code>egress.draw_route</code></td>
+<td>start: {point, level}, end: {point, level}, mode?</td>
+<td>{legs, links, length, time, paths[], unplanned[]}</td>
+<td>Yes</td>
 <td>ANA-ROUTE-004</td>
 </tr>
 <tr>
@@ -55475,7 +55484,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tbody>
 </table></div>
 <h2 id="a3-consolidated-command-index">A.3 Consolidated command index</h2>
-<p><strong>2333 unique commands</strong> in 435 domains. Every command is exposed automatically to the UI, to Lua (<code>riviera.&lt;domain&gt;.&lt;verb&gt;</code>) and to MCP (<code>&lt;domain&gt;_&lt;verb&gt;</code>), subject to its permission class.</p>
+<p><strong>2334 unique commands</strong> in 435 domains. Every command is exposed automatically to the UI, to Lua (<code>riviera.&lt;domain&gt;.&lt;verb&gt;</code>) and to MCP (<code>&lt;domain&gt;_&lt;verb&gt;</code>), subject to its permission class.</p>
 <div class="tbl"><table>
 <thead>
 <tr>
@@ -55938,7 +55947,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 </tr>
 <tr>
 <td><code>egress</code></td>
-<td style="text-align: right;">1</td>
+<td style="text-align: right;">2</td>
 </tr>
 <tr>
 <td><code>electrical_analytical</code></td>
@@ -61517,6 +61526,14 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <td>()</td>
 <td>No</td>
 <td>COL-OWN-003</td>
+</tr>
+<tr>
+<td><code>egress.draw_route</code></td>
+<td>4</td>
+<td>start: {point, level}, end: {point, level}, mode?</td>
+<td>{legs, links, length, time, paths[], unplanned[]}</td>
+<td>Yes</td>
+<td>ANA-ROUTE-004</td>
 </tr>
 <tr>
 <td><code>egress.route</code></td>

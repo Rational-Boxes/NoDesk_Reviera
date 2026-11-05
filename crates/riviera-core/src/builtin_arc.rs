@@ -579,6 +579,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(PublishSaveSet),
         registry.add(LibraryUpdates),
         registry.add(EgressRoute),
+        registry.add(EgressDrawRoute),
         registry.add(LibraryReloadItem),
         registry.add(PublishListSets),
         registry.add(PublishRemoveSet),
@@ -7461,4 +7462,17 @@ read_command!(
     crate::egress_route::RouteParams,
     crate::egress_route::Route,
     crate::egress_route::route
+);
+
+edit_command!(
+    EgressDrawRoute,
+    "egress.draw_route",
+    "Draw an egress route across levels",
+    "Finds the route as `egress.route` does and draws each leg as a path of travel in the first floor plan of \
+     its level (ANA-ROUTE-004), with its length and time; `path_of_travel.update` works them out again after \
+     the model changes. Returns the route and the paths drawn.",
+    "Draw Egress Route",
+    crate::egress_route::RouteParams,
+    crate::egress_route::Drawn,
+    crate::egress_route::draw
 );

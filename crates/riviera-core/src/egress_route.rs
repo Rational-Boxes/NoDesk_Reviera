@@ -252,3 +252,39 @@ pub fn route(store: &Store, p: RouteParams) -> Result<Route> {
     let length = legs.iter().map(|g| g.length).sum::<f64>() + out_links.iter().map(|l| l.length).sum::<f64>();
     Ok(Route { legs, links: out_links, length, time: best[1] })
 }
+
+/// What `egress.draw_route` drew.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct Drawn {
+    #[serde(flatten)]
+    pub route: Route,
+    /// A path of travel for each leg, in a plan of its level (none where the level has no plan).
+    pub paths: Vec<ElementId>,
+    /// Levels the route crosses that have no floor plan to draw it in.
+    pub unplanned: Vec<ElementId>,
+}
+
+/// `egress.draw_route`: the route, each leg drawn as a path of travel (ANA-ROUTE-001) in the first
+/// floor plan of its level, with its length and time.
+pub(crate) fn draw(txn: &mut crate::txn::Transaction<'_>, p: RouteParams) -> Result<Drawn> {
+    let store = txn.store().clone();
+    let r = route(&store, p)?;
+    let (mut paths, mut unplanned) = (Vec::new(), Vec::new());
+    for leg in &r.legs {
+        let Some(level_guid) = store.get(leg.level).map(|e| e.guid().to_string()) else { continue };
+        let mut plans: Vec<(String, ElementId)> = store
+            .iter()
+            .filter_map(|e| crate::views::view_data(e).filter(|d| d.kind == crate::plans::KIND_PLAN && d.level.as_deref() == Some(level_guid.as_str())).map(|_| (e.name.clone().unwrap_or_default(), e.id())))
+            .collect();
+        plans.sort();
+        let Some((_, view)) = plans.first() else {
+            unplanned.push(leg.level);
+            continue;
+        };
+        let (Some(&start), Some(&end)) = (leg.points.first(), leg.points.last()) else { continue };
+        let waypoints = leg.points[1..leg.points.len().saturating_sub(1)].to_vec();
+        let id = crate::path_of_travel::create(txn, crate::path_of_travel::CreateParams { view_id: ElementRef::Id(*view), start, end, waypoints })?;
+        paths.push(id);
+    }
+    Ok(Drawn { route: r, paths, unplanned })
+}

@@ -221,7 +221,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2333 unique commands** in 435 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2334 unique commands** in 435 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -338,7 +338,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `duct_size_table` | 1 |
 | `edit` | 3 |
 | `editrequest` | 6 |
-| `egress` | 1 |
+| `egress` | 2 |
 | `electrical_analytical` | 3 |
 | `electrical_equipment` | 1 |
 | `electrical_load_area` | 2 |
@@ -1198,6 +1198,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `editrequest.list` | 6 | — | request[] | No | COL-OWN-003 |
 | `editrequest.manage` | 6 | — | () | No | COL-OWN-003 |
 | `editrequest.retract` | 6 | request_id | () | No | COL-OWN-003 |
+| `egress.draw_route` | 4 | start: {point, level}, end: {point, level}, mode? | {legs, links, length, time, paths[], unplanned[]} | Yes | ANA-ROUTE-004 |
 | `egress.route` | 4 | start: {point, level}, end: {point, level}, mode? | {legs, links, length, time} | No (query) | ANA-ROUTE-004 |
 | `electrical_analytical.add_node` | 4 | kind, parent_id?, distribution_system_id? | id | Yes | MEP-ELEC-020 |
 | `electrical_analytical.rollup` | 4 | root_id | report | No | MEP-ELEC-020 |

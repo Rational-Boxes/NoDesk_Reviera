@@ -59,3 +59,9 @@ local by_stair = riviera.egress.route{ start = from, ["end"] = exit }
 assert(by_stair.links[1].kind == "stair", "the IBC route takes the stair")
 local by_escalator = riviera.egress.route{ start = from, ["end"] = exit, mode = "nfpa130" }
 assert(by_escalator.links[1].kind == "escalator" and by_escalator.time < by_stair.time, "NFPA 130 takes an escalator")
+
+-- Drawn in the plans: each leg as a path of travel in its level's floor plan, with its length
+-- and time, kept up to date by path_of_travel.update as the model changes.
+riviera.view.create_plan{ level_ids = { platform, concourse } }
+local drawn = riviera.egress.draw_route{ start = from, ["end"] = exit, mode = "nfpa130" }
+assert(#drawn.paths == 2 and #drawn.unplanned == 0, "a path of travel on each level")

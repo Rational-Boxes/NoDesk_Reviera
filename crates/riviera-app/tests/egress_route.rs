@@ -54,3 +54,26 @@ fn routes_go_down_the_stairs_and_by_escalator_where_counted() {
     let l3 = ok(&mut app, "level.create", json!({ "elevation": 7.2 }));
     assert!(app.execute("egress.route", json!({ "start": { "point": [1.0, 1.0], "level": l3 }, "end": { "point": [20.0, 2.0], "level": l1 } }), &Caller::user()).is_err());
 }
+
+#[test]
+fn a_drawn_route_puts_a_path_of_travel_in_each_levels_plan() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = App::new(AppConfig { live: None, untitled_dir: dir.path().join("untitled") });
+    ok(&mut app, "file.new", json!({}));
+    let l1 = ok(&mut app, "level.list", json!({}))[0]["id"].clone();
+    let l2 = ok(&mut app, "level.create", json!({ "elevation": 3.6 }));
+    ok(&mut app, "stair.create", json!({ "base_level": l1, "width": 1.2, "railings": false, "runs": [{ "start": [2.0, 4.0], "end": [7.0, 4.0] }] }));
+    ok(&mut app, "view.create_plan", json!({ "level_ids": [l1, l2] }));
+    let args = json!({ "start": { "point": [20.0, 4.0], "level": l2 }, "end": { "point": [20.0, 2.0], "level": l1 } });
+    let drawn = ok(&mut app, "egress.draw_route", args.clone());
+    let paths = drawn["paths"].as_array().unwrap();
+    assert_eq!(paths.len(), 2, "{drawn:#}");
+    // Each path follows its leg, end to end, at the leg's length.
+    let listed = ok(&mut app, "path_of_travel.list", json!({}));
+    for (leg, id) in drawn["legs"].as_array().unwrap().iter().zip(paths) {
+        let p = listed.as_array().unwrap().iter().find(|p| p["id"] == *id).unwrap_or_else(|| panic!("{listed:#}"));
+        assert!((f(&p["length"]) - f(&leg["length"])).abs() < 1e-6, "{p:#} {leg:#}");
+    }
+    // The route itself is as egress.route finds it.
+    assert_eq!(drawn["time"], ok(&mut app, "egress.route", args)["time"]);
+}

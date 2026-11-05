@@ -1093,6 +1093,9 @@ fn the_station_sample_keeps_its_transit_pair_and_run_off() {
     let zones = ok(&mut app, "clearance.list", json!({}));
     assert_eq!(zones.as_array().unwrap().iter().filter(|z| z["kind"] == "escalator_run_off").count(), 4);
     assert_eq!(ok(&mut app, "clearance.check", json!({})), json!([]));
+    // The NFPA 130 way out, drawn in both plans: platform to escalator, escalator to exit.
+    let paths = ok(&mut app, "path_of_travel.list", json!({}));
+    assert_eq!(paths.as_array().unwrap().len(), 2, "{paths:#}");
 }
 
 #[test]

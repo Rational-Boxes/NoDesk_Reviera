@@ -30,8 +30,11 @@ level at 7.0 m (the concourse) above the platform, and a 70 × 24 m **Architectu
    - *Escalators* "Not counted (IBC)": the route walks to the west end, climbs the stair and
      comes back east;
    - "Counted (NFPA 130)": it takes the up escalator, and is quicker.
+6. **Drawn in the plans.** **View › Create › Floor Plan** for both levels, then Egress Route again with
+   *Plans* ticked: each leg becomes a path of travel in its level's floor plan, showing its
+   length and time, and **Paths of Travel** lists them.
 
 ## Gaps
 
 - **[gap]** No escalator traffic or egress dialog yet.
-- **[gap]** Platform clearing times are not worked out yet, and a route is reported, not drawn.
+- **[gap]** Platform clearing times are not worked out yet.

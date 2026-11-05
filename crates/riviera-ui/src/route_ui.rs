@@ -98,6 +98,7 @@ impl Gui {
         let to_level = f.choice("To level", &names, 0);
         let to = f.text("To point (x, y)", "", "Metres: the exit");
         let mode = f.choice("Escalators", &["Not counted (IBC)".to_owned(), "Counted (NFPA 130)".to_owned(), "Counted (SCDF)".to_owned()], 0);
+        let draw = f.check("Plans", "Draw each leg as a path of travel in its level's floor plan", false);
         let ok = f.show("Walks each level round its obstacles (Route Settings) and takes the stairs between levels.", "Find Route");
         let point = |t: &TextCtrl| -> Option<[f64; 2]> {
             let v: Vec<f64> = t.get_value().split([',', ' ']).filter_map(|s| s.trim().parse().ok()).collect();
@@ -107,12 +108,13 @@ impl Gui {
         let la = levels[from_level.get_selection().unwrap_or(0) as usize]["id"].clone();
         let lb = levels[to_level.get_selection().unwrap_or(0) as usize]["id"].clone();
         let m = ["ibc", "nfpa130", "scdf"][mode.get_selection().unwrap_or(0) as usize];
+        let draw = draw.is_checked();
         f.dialog.destroy();
         if !ok {
             return;
         }
         let (Some(a), Some(b)) = (a, b) else { return error(&frame, "Give both points as x, y.") };
-        let r = match self.run("egress.route", json!({ "start": { "point": a, "level": la }, "end": { "point": b, "level": lb }, "mode": m })) {
+        let r = match self.run(if draw { "egress.draw_route" } else { "egress.route" }, json!({ "start": { "point": a, "level": la }, "end": { "point": b, "level": lb }, "mode": m })) {
             Ok(r) => r,
             Err(e) => return error(&frame, &format!("No route:\n{e}")),
         };
@@ -124,6 +126,10 @@ impl Gui {
             if let Some(l) = links.get(k) {
                 lines.push(format!("{} from {} to {}: {:.1} m, {:.0} s", if l["kind"] == "escalator" { "Escalator" } else { "Stair" }, name(&l["from"]), name(&l["to"]), l["length"].as_f64().unwrap_or(0.0), l["time"].as_f64().unwrap_or(0.0)));
             }
+        }
+        if draw {
+            let unplanned: Vec<String> = r["unplanned"].as_array().map(|u| u.iter().map(name).collect()).unwrap_or_default();
+            lines.push(format!("\nDrawn as {} path(s) of travel{}", r["paths"].as_array().map_or(0, Vec::len), if unplanned.is_empty() { String::new() } else { format!("; no floor plan on {}", unplanned.join(", ")) }));
         }
         lines.push(format!("\nIn all {:.1} m, {:.0} s ({:.1} min)", r["length"].as_f64().unwrap_or(0.0), r["time"].as_f64().unwrap_or(0.0), r["time"].as_f64().unwrap_or(0.0) / 60.0));
         MessageDialog::builder(&frame, &lines.join("\n"), "Egress Route").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build().show_modal();
