@@ -135,6 +135,63 @@ impl Gui {
         MessageDialog::builder(&frame, &lines.join("\n"), "Egress Route").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build().show_modal();
     }
 
+    /// Analyze › Route Analysis › Platform Clearing (ANA-ROUTE-005): NFPA 130's two tests for a
+    /// station platform, reported with the exits, the capacities and the times.
+    pub(crate) fn platform_clearing_dialog(&mut self) {
+        let frame = self.frame;
+        let levels: Vec<Value> = self.run("level.list", json!({})).ok().and_then(|v| v.as_array().cloned()).unwrap_or_default();
+        if levels.len() < 2 {
+            return error(&frame, "A platform is cleared to another level: the model needs two or more.");
+        }
+        let names: Vec<String> = levels.iter().map(|l| l["name"].as_str().unwrap_or("").to_owned()).collect();
+        let f = super::reinforcement_ui::Form::new(&frame, "Platform Clearing");
+        let platform = f.choice("Platform level", &names, 0);
+        let load = f.text("Occupant load", "", "Persons: the train load and those waiting");
+        let remote = f.text("Most remote point (x, y)", "", "Metres, on the platform");
+        let safe_level = f.choice("Point of safety level", &names, names.len() - 1);
+        let safe = f.text("Point of safety (x, y)", "", "Metres");
+        let mode = f.choice("Escalators", &["Counted (NFPA 130)".to_owned(), "Not counted".to_owned()], 0);
+        let ok = f.show("The platform must clear within 4 minutes, and its most remote point reach a point of safety within 6.", "Check");
+        let point = |t: &TextCtrl| -> Option<[f64; 2]> {
+            let v: Vec<f64> = t.get_value().split([',', ' ']).filter_map(|s| s.trim().parse().ok()).collect();
+            (v.len() == 2).then(|| [v[0], v[1]])
+        };
+        let (a, b, n) = (point(&remote), point(&safe), load.get_value().trim().parse::<f64>().ok());
+        let lp = levels[platform.get_selection().unwrap_or(0) as usize]["id"].clone();
+        let ls = levels[safe_level.get_selection().unwrap_or(0) as usize]["id"].clone();
+        let m = ["nfpa130", "ibc"][mode.get_selection().unwrap_or(0) as usize];
+        f.dialog.destroy();
+        if !ok {
+            return;
+        }
+        let (Some(a), Some(b), Some(n)) = (a, b, n) else { return error(&frame, "Give the load as a number and both points as x, y.") };
+        let c = match self.run("egress.platform_clearing", json!({ "level": lp, "load": n, "remote": a, "safety": { "point": b, "level": ls }, "mode": m })) {
+            Ok(c) => c,
+            Err(e) => return error(&frame, &format!("Not worked out:\n{e}")),
+        };
+        let num = |k: &str| c[k].as_f64().unwrap_or(0.0);
+        let pass = |k: &str| if c[k] == true { "meets" } else { "FAILS" };
+        let mut lines = vec![format!(
+            "Exits: stairs {:.0}/min, escalators {:.0}/min counted (of {:.0}, one out)\nCapacity {:.0} persons a minute\n",
+            num("stairs"),
+            num("counted"),
+            num("escalators"),
+            num("capacity")
+        )];
+        lines.push(format!("Platform cleared in {:.2} min (at most 4): {}", num("platform_time"), pass("meets_platform")));
+        lines.push(format!(
+            "To the point of safety: walking {:.2} min + waiting {:.2} min = {:.2} min (at most 6): {}",
+            num("walking_time"),
+            num("wait"),
+            num("safety_time"),
+            pass("meets_safety")
+        ));
+        for n in c["notes"].as_array().cloned().unwrap_or_default() {
+            lines.push(format!("\n{}", n.as_str().unwrap_or("")));
+        }
+        MessageDialog::builder(&frame, &lines.join("\n"), "Platform Clearing").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build().show_modal();
+    }
+
     /// Paths of Travel: a list with length and time.
     pub(crate) fn paths_dialog(&mut self) {
         let frame = self.frame;

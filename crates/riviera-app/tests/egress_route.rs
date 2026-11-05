@@ -77,3 +77,36 @@ fn a_drawn_route_puts_a_path_of_travel_in_each_levels_plan() {
     // The route itself is as egress.route finds it.
     assert_eq!(drawn["time"], ok(&mut app, "egress.route", args)["time"]);
 }
+
+#[test]
+fn a_platform_clears_through_its_stairs_and_half_from_its_escalators() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = App::new(AppConfig { live: None, untitled_dir: dir.path().join("untitled") });
+    ok(&mut app, "file.new", json!({}));
+    let platform = ok(&mut app, "level.list", json!({}))[0]["id"].clone();
+    let concourse = ok(&mut app, "level.create", json!({ "elevation": 3.6 }));
+    ok(&mut app, "stair.create", json!({ "base_level": platform, "width": 1.5, "railings": false, "runs": [{ "start": [2.0, 4.0], "end": [7.0, 4.0] }] }));
+    let args = |load: f64, mode: &str| json!({ "level": platform, "load": load, "remote": [40.0, 4.0], "safety": { "point": [20.0, 4.0], "level": concourse }, "mode": mode });
+
+    // Stairs alone: 1500 mm at 0.0555 a minute a millimetre.
+    let c = ok(&mut app, "egress.platform_clearing", args(250.0, "ibc"));
+    assert!((f(&c["capacity"]) - 1500.0 * 0.0555).abs() < 1e-6, "{c:#}");
+    assert!((f(&c["platform_time"]) - 250.0 / 83.25).abs() < 1e-6);
+    assert_eq!(c["meets_platform"], true);
+    // Walked at 37.7 m/min with the 3.6 m climb at 15 m/min; the wait is the platform time less
+    // the walk to the stair.
+    let walked: f64 = c["route"]["legs"].as_array().unwrap().iter().map(|g| f(&g["length"])).sum();
+    assert!((f(&c["walking_time"]) - (walked / 37.7 + 3.6 / 15.0)).abs() < 1e-6, "{c:#}");
+    let wait = f(&c["platform_time"]) - f(&c["route"]["legs"][0]["length"]) / 37.7;
+    assert!((f(&c["wait"]) - wait).abs() < 1e-6 && (f(&c["safety_time"]) - (f(&c["walking_time"]) + wait)).abs() < 1e-6);
+
+    // A pair of escalators: one out; what is left counts, up to the stairs' share.
+    ok(&mut app, "escalator.create", json!({ "point": [22.0, 10.0], "base_level": platform, "top_level": concourse }));
+    ok(&mut app, "escalator.create", json!({ "point": [22.0, 13.0], "base_level": platform, "top_level": concourse }));
+    let c = ok(&mut app, "egress.platform_clearing", args(400.0, "nfpa130"));
+    assert_eq!(c["exits"].as_array().unwrap().len(), 3, "{c:#}");
+    assert!((f(&c["counted"]) - f(&c["escalators"]).min(83.25)).abs() < 1e-6 && f(&c["counted"]) > 0.0);
+    assert!((f(&c["platform_time"]) - 400.0 / (83.25 + f(&c["counted"]))).abs() < 1e-6);
+    // Too many for the stairs alone within 4 minutes.
+    assert_eq!(ok(&mut app, "egress.platform_clearing", args(400.0, "ibc"))["meets_platform"], false);
+}

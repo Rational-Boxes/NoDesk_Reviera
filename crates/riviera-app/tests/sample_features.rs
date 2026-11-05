@@ -1096,6 +1096,12 @@ fn the_station_sample_keeps_its_transit_pair_and_run_off() {
     // The NFPA 130 way out, drawn in both plans: platform to escalator, escalator to exit.
     let paths = ok(&mut app, "path_of_travel.list", json!({}));
     assert_eq!(paths.as_array().unwrap().len(), 2, "{paths:#}");
+    // Its platform clears within NFPA 130's 4 and 6 minutes.
+    let levels = ok(&mut app, "level.list", json!({}));
+    let (platform, concourse) = (levels[0]["id"].clone(), levels[1]["id"].clone());
+    let c = ok(&mut app, "egress.platform_clearing", json!({ "level": platform, "load": 500, "remote": [64.0, 4.0], "safety": { "point": [64.0, 20.0], "level": concourse } }));
+    println!("platform {:.2} min, walking {:.2} + waiting {:.2} = {:.2} min", f(&c["platform_time"]), f(&c["walking_time"]), f(&c["wait"]), f(&c["safety_time"]));
+    assert_eq!((c["meets_platform"].clone(), c["meets_safety"].clone()), (json!(true), json!(true)), "{c:#}");
 }
 
 #[test]

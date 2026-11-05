@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Riviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Riviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 892 numbered requirements (320 P0 · 343 P1 · 222 P2 · 7 P3), 2,334 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 893 numbered requirements (320 P0 · 343 P1 · 223 P2 · 7 P3), 2,335 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Riviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Riviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,334 commands; 892 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,335 commands; 893 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -22431,7 +22431,26 @@ The job runs in the background with a notification. Spaces that no system serves
 - [x] From the far end of an upper level to an exit beyond a wall on the level below, the route walks to the stair's head, takes the stair and goes round the wall's open end; its time is the walks at 1.3 m/s and the stair at 0.6 m/s. With an escalator nearer, the IBC route still takes the stair and the NFPA 130 route the escalator, sooner. Between levels with no stair it is refused.
 - [x] With floor plans on both levels, the route drawn makes one path of travel in each, each as long as its leg, and the route is the one `egress.route` finds.
 
-*Built (2026-11-04):* `riviera_core::egress_route` and the window's Egress Route; the sample *Escalators in a transit station*. Not yet: picking the points in the view, lifts (evacuation and firefighting lifts with their waits), ramps, the floor openings over stairwells as obstacles, occupant loads and exit capacity (flow through doors and stairs), platform clearing times.
+*Built (2026-11-04):* `riviera_core::egress_route` and the window's Egress Route; the sample *Escalators in a transit station*. Not yet: picking the points in the view, lifts (evacuation and firefighting lifts with their waits), ramps, the floor openings over stairwells as obstacles, occupant loads and exit capacity (flow through doors and stairs); platform clearing times are ANA-ROUTE-005.
+
+### 4.12.13b Platform clearing times
+**ID:** ANA-ROUTE-005 · **Priority:** P2 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §9 (*Egress*); owner direction (2026-11-04: "Egress and transit"); NFPA 130 (2020) 5.5.6.3 and Annex C, as quoted in S2749 and S2750; EXPERT_REVIEW E-92
+
+**Purpose.** Check a station platform against NFPA 130's two evacuation tests: the platform cleared within 4 minutes, and its most remote point to a point of safety within 6.
+
+**Behaviour & rules.**
+- `egress.platform_clearing(level, load, remote, safety: {point, level}, mode?)` (mode default `nfpa130`):
+  - **exits:** every stair with one end on the platform's level (capacity 0.0555 persons a minute per millimetre of its narrowest run) and, unless `mode` is `ibc`, every escalator between it and another level (120 a minute per metre of tread, ARC-VT-021), the widest out of service, the rest counted up to the stairs' capacity (escalators at most half the exit capacity);
+  - **platform time** = load ÷ exit capacity, at most 4 minutes;
+  - **time to safety:** the route (ANA-ROUTE-004) from `remote` to `safety`, walked at 37.7 m/min and climbed at 15 m/min up and 18 m/min down (vertical), plus the **wait** at the platform exits (the platform time less the walk to the first exit, not below 0); at most 6 minutes.
+- It returns the exits and their capacities, the stairs', escalators' and counted capacities, the times, the route, whether each test is met, and notes (escalators limited, the unit out). With no stair (or counted escalator) leaving the level it is refused (`route.no_exits`).
+- **In the window:** Analyze › Route Analysis › *Platform Clearing* (level, load, points typed, escalators counted or not) reports the capacities, the times and the two tests.
+
+**Acceptance criteria.**
+- [x] A platform with a 1500 mm stair has a capacity of 83.25 persons a minute; its platform time is the load over that; its walking time is the route's legs at 37.7 m/min and its 3.6 m climb at 15 m/min; the wait is the platform time less the walk to the stair.
+- [x] With a pair of escalators added, one is out and the other counts up to the stairs' capacity; 400 people clear within 4 minutes with them, and not with the stair alone.
+
+*Built (2026-11-04):* `riviera_core::egress_route::platform_clearing` and the window's Platform Clearing; the sample *Escalators in a transit station* (500 people: 3.00 min, 4.22 min to safety; 6.0 min by the stair alone). Not yet: the occupant load from train and headway data, waits further on (concourse exits, fare gates) and the concourse's own load, doors and fare gates as exits, lifts, platform-edge doors.
 
 ### 4.12.14 Interference check (cross-reference)
 **ID:** ANA-CLASH-001 · **Priority:** P1 · **Ref:** research/03 §13.6
@@ -23241,6 +23260,7 @@ Every command below is registered once in the command registry and is exposed au
 | `route_settings.set` | params | — | Yes | ANA-ROUTE-002 |
 | `egress.route` | start: {point, level}, end: {point, level}, mode? | {legs, links, length, time} | No (query) | ANA-ROUTE-004 |
 | `egress.draw_route` | start: {point, level}, end: {point, level}, mode? | {legs, links, length, time, paths[], unplanned[]} | Yes | ANA-ROUTE-004 |
+| `egress.platform_clearing` | level, load, remote, safety: {point, level}, mode? | {exits[], capacity, platform_time, safety_time, meets_platform, meets_safety, …} | No (query) | ANA-ROUTE-005 |
 | `route.reveal_obstacles` | view_id, on: bool | — | No | ANA-ROUTE-002 |
 | `path_of_travel.create_multiple` | view_id, starts[], ends[], min_separation | ids[] | Yes | ANA-ROUTE-002 |
 | `one_way_indicator.place` | view_id, point, direction | id | Yes | ANA-ROUTE-002 |
@@ -29964,11 +29984,11 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 | ARC | 77 | 101 | 29 | 1 | 208 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
-| ANA | 0 | 1 | 29 | 0 | 30 |
+| ANA | 0 | 1 | 30 | 0 | 31 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
 | COL | 8 | 52 | 16 | 1 | 77 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **343** | **222** | **7** | **892** |
+| **Total** | **320** | **343** | **223** | **7** | **893** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -30023,7 +30043,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.2a Riviera-originated features
 
-144 requirements are Riviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
+145 requirements are Riviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
 
 | Requirement | Ch | Feature |
 |-------------|----|---------|
@@ -30136,6 +30156,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | ARC-GRP-004 | 3 | 3.13.4 Modular units |
 | MEP-PIPE-010 | 4 | 4.8.10 Roof drainage: gutters and downspouts |
 | MEP-PEN-001 | 4 | 4.8.11 Automatic penetrations for pipes, ducts, conduits and cable trays |
+| ANA-ROUTE-005 | 4 | 4.12.13b Platform clearing times |
 | ANA-ENV-001 | 4 | 4.12.17 Built-in environmental providers (extrapolation) |
 | DOC-VIEW-014 | 5 | Slice planes |
 | DOC-VIEW-013 | 5 | Blueprint mode (3D slice to 2D drawing) |
@@ -30174,7 +30195,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2334 unique commands** in 435 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2335 unique commands** in 435 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -30291,7 +30312,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `duct_size_table` | 1 |
 | `edit` | 3 |
 | `editrequest` | 6 |
-| `egress` | 2 |
+| `egress` | 3 |
 | `electrical_analytical` | 3 |
 | `electrical_equipment` | 1 |
 | `electrical_load_area` | 2 |
@@ -31152,6 +31173,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `editrequest.manage` | 6 | — | () | No | COL-OWN-003 |
 | `editrequest.retract` | 6 | request_id | () | No | COL-OWN-003 |
 | `egress.draw_route` | 4 | start: {point, level}, end: {point, level}, mode? | {legs, links, length, time, paths[], unplanned[]} | Yes | ANA-ROUTE-004 |
+| `egress.platform_clearing` | 4 | level, load, remote, safety: {point, level}, mode? | {exits[], capacity, platform_time, safety_time, meets_platform, meets_safety, …} | No (query) | ANA-ROUTE-005 |
 | `egress.route` | 4 | start: {point, level}, end: {point, level}, mode? | {legs, links, length, time} | No (query) | ANA-ROUTE-004 |
 | `electrical_analytical.add_node` | 4 | kind, parent_id?, distribution_system_id? | id | Yes | MEP-ELEC-020 |
 | `electrical_analytical.rollup` | 4 | root_id | report | No | MEP-ELEC-020 |

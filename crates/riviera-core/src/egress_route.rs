@@ -288,3 +288,152 @@ pub(crate) fn draw(txn: &mut crate::txn::Transaction<'_>, p: RouteParams) -> Res
     }
     Ok(Drawn { route: r, paths, unplanned })
 }
+
+// ---- Platform clearing (ANA-ROUTE-005) ----
+
+/// NFPA 130 (2020) 5.5.6.3: stair capacity, persons a minute per millimetre of width.
+pub const STAIR_CAPACITY: f64 = 0.0555;
+/// NFPA 130 walking speed on platforms, corridors and ramps (m/min).
+pub const WALK_SPEED: f64 = 37.7;
+/// Vertical speed on stairs and stopped escalators (m/min), up and down.
+pub const STAIR_UP_SPEED: f64 = 15.0;
+pub const STAIR_DOWN_SPEED: f64 = 18.0;
+/// The platform cleared within 4 minutes; the most remote point to a point of safety within 6.
+pub const PLATFORM_LIMIT: f64 = 4.0;
+pub const SAFETY_LIMIT: f64 = 6.0;
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ClearingParams {
+    /// The platform's level.
+    pub level: ElementRef,
+    /// Its occupant load: the train load and those waiting (persons).
+    pub load: f64,
+    /// The most remote point on the platform.
+    pub remote: V2,
+    /// A point of safety (on any level).
+    pub safety: At,
+    /// Whether escalators count among the exits (default `nfpa130`; `ibc`: stairs only).
+    #[serde(default = "nfpa130")]
+    pub mode: EgressMode,
+}
+
+fn nfpa130() -> EgressMode {
+    EgressMode::Nfpa130
+}
+
+/// A way off the platform.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct Exit {
+    pub kind: LinkKind,
+    pub element: ElementId,
+    /// Clear width (m) and capacity (persons a minute).
+    pub width: f64,
+    pub capacity: f64,
+}
+
+/// The platform's clearing times.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct Clearing {
+    pub mode: EgressMode,
+    pub load: f64,
+    pub exits: Vec<Exit>,
+    /// Persons a minute: the stairs; the escalators with the worst unit out; what of them
+    /// counts (at most half the whole); and the platform's exit capacity.
+    pub stairs: f64,
+    pub escalators: f64,
+    pub counted: f64,
+    pub capacity: f64,
+    /// Minutes: the load through the exits (at most 4).
+    pub platform_time: f64,
+    /// The route from the most remote point to the point of safety, and its walking time at the
+    /// NFPA 130 speeds; the walk to the first exit; the wait there (the platform time less that
+    /// walk); and the whole (at most 6).
+    pub route: Route,
+    pub walking_time: f64,
+    pub walk_to_exit: f64,
+    pub wait: f64,
+    pub safety_time: f64,
+    pub meets_platform: bool,
+    pub meets_safety: bool,
+    pub notes: Vec<String>,
+}
+
+/// `egress.platform_clearing`: NFPA 130's two tests for a station platform.
+pub fn platform_clearing(store: &Store, p: ClearingParams) -> Result<Clearing> {
+    if !(p.load.is_finite() && p.load > 0.0) {
+        return Err(bad("route.invalid", "the occupant load must be above 0"));
+    }
+    let levels = crate::levels::list(store);
+    let id = store.resolve(&p.level).ok_or_else(|| bad("element.not_found", "no such level"))?;
+    let platform = levels.iter().find(|l| l.id == id).ok_or_else(|| bad("route.not_a_level", format!("element {id} is not a level")))?;
+    let mut exits = Vec::new();
+    let mut notes = Vec::new();
+    for (sid, _) in crate::stairs::all(store) {
+        let Some(e) = store.get(sid) else { continue };
+        let Some(r) = crate::stairs::stair_recipe(e) else { continue };
+        let crate::stairs::StairTop::Level(top) = &r.top else { continue };
+        if (r.base_level == platform.guid) != (*top == platform.guid) {
+            let width = r.runs.iter().map(|x| x.width).fold(f64::INFINITY, f64::min);
+            exits.push(Exit { kind: LinkKind::Stair, element: sid, width, capacity: width * 1000.0 * STAIR_CAPACITY });
+        }
+    }
+    let stairs: f64 = exits.iter().map(|x| x.capacity).sum();
+    let mut esc = Vec::new();
+    if p.mode != EgressMode::Ibc {
+        for (eid, el) in crate::escalators::escalators(store) {
+            if el.levels[0] != el.levels[1] && el.levels.contains(&platform.guid) {
+                let width = el.sized.step_width;
+                esc.push(Exit { kind: LinkKind::Escalator, element: eid, width, capacity: width * crate::traffic::EVACUATION_RATE });
+            }
+        }
+    }
+    let escalators = esc.iter().map(|x| x.capacity).sum::<f64>() - esc.iter().map(|x| x.capacity).fold(0.0, f64::max);
+    // At most half the exit capacity: no more than the stairs give.
+    let counted = escalators.min(stairs);
+    if counted < escalators {
+        notes.push(format!("escalators limited to half the exit capacity: {counted:.0} of {escalators:.0} persons a minute counted"));
+    }
+    if !esc.is_empty() {
+        notes.push("the escalator out of service is the widest; the rest run in the exit direction".to_owned());
+    }
+    exits.extend(esc);
+    let capacity = stairs + counted;
+    if capacity <= 0.0 {
+        return Err(bad("route.no_exits", format!("no stair (or counted escalator) leaves {}", platform.name)));
+    }
+    let platform_time = p.load / capacity;
+    let r = route(store, RouteParams { start: At { point: p.remote, level: ElementRef::Id(id) }, end: p.safety, mode: p.mode })?;
+    let elevation = |l: ElementId| levels.iter().find(|x| x.id == l).map_or(0.0, |x| x.elevation);
+    let climb: f64 = r
+        .links
+        .iter()
+        .map(|l| {
+            let rise = elevation(l.to) - elevation(l.from);
+            rise.abs() / if rise > 0.0 { STAIR_UP_SPEED } else { STAIR_DOWN_SPEED }
+        })
+        .sum();
+    let walked: f64 = r.legs.iter().map(|g| g.length).sum();
+    let walking_time = walked / WALK_SPEED + climb;
+    let walk_to_exit = if r.links.is_empty() { walking_time } else { r.legs.first().map_or(0.0, |g| g.length) / WALK_SPEED };
+    let wait = (platform_time - walk_to_exit).max(0.0);
+    let safety_time = walking_time + wait;
+    Ok(Clearing {
+        mode: p.mode,
+        load: p.load,
+        exits,
+        stairs,
+        escalators,
+        counted,
+        capacity,
+        platform_time,
+        route: r,
+        walking_time,
+        walk_to_exit,
+        wait,
+        safety_time,
+        meets_platform: platform_time <= PLATFORM_LIMIT + 1e-9,
+        meets_safety: safety_time <= SAFETY_LIMIT + 1e-9,
+        notes,
+    })
+}

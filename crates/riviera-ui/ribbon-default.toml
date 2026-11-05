@@ -3298,6 +3298,12 @@ icon = "route_settings"
 help = "The quickest route from a point on one level to an exit on another: each level walked round its obstacles, the stairs between levels, and escalators where the egress mode counts them (ANA-ROUTE-004)"
 
 [[action]]
+id = "egress.platform_clearing"
+label = "Platform Clearing"
+icon = "route_settings"
+help = "NFPA 130's two tests for a station platform: its load cleared through the stairs and escalators within 4 minutes, and its most remote point to a point of safety within 6 (ANA-ROUTE-005)"
+
+[[action]]
 id = "route_settings.set"
 label = "Route Settings"
 icon = "route_settings"
@@ -3984,6 +3990,7 @@ tools = [
   { action = "route_settings.set", size = "small" },
   { action = "path_of_travel.list", size = "small" },
   { action = "egress.route", size = "small" },
+  { action = "egress.platform_clearing", size = "small" },
 ]
 
 [[tab.panel]]

@@ -580,6 +580,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(LibraryUpdates),
         registry.add(EgressRoute),
         registry.add(EgressDrawRoute),
+        registry.add(EgressPlatformClearing),
         registry.add(LibraryReloadItem),
         registry.add(PublishListSets),
         registry.add(PublishRemoveSet),
@@ -7475,4 +7476,16 @@ edit_command!(
     crate::egress_route::RouteParams,
     crate::egress_route::Drawn,
     crate::egress_route::draw
+);
+
+read_command!(
+    EgressPlatformClearing,
+    "egress.platform_clearing",
+    "Platform clearing times (NFPA 130)",
+    "NFPA 130's two tests for a station platform (ANA-ROUTE-005): its occupant load through the stairs (and \
+     escalators, worst unit out, at most half) leaving it within 4 minutes, and from its most remote point to a \
+     point of safety (walked at 37.7 m/min, stairs 15 m/min up and 18 down, plus the wait at the exits) within 6.",
+    crate::egress_route::ClearingParams,
+    crate::egress_route::Clearing,
+    crate::egress_route::platform_clearing
 );

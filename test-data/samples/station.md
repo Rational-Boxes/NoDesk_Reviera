@@ -33,8 +33,16 @@ level at 7.0 m (the concourse) above the platform, and a 70 × 24 m **Architectu
 6. **Drawn in the plans.** **View › Create › Floor Plan** for both levels, then Egress Route again with
    *Plans* ticked: each leg becomes a path of travel in its level's floor plan, showing its
    length and time, and **Paths of Travel** lists them.
+7. **Clearing the platform.** **Analyze › Route Analysis › Platform Clearing**:
+   - the platform, a load of 500, the most remote point `64, 4`, and the point of safety on the
+     concourse at `64, 20`; *Escalators* "Counted (NFPA 130)";
+   - the stair gives 83 people a minute (1500 mm at 0.0555); of the escalators one is out and the
+     other counts up to the stair's share, 83 more;
+   - the platform clears in 3.00 minutes (at most 4), and the far end reaches the exit in 4.22
+     (2.43 walking, 1.79 waiting at the escalator; at most 6);
+   - "Not counted": the stair alone takes 6.0 minutes and fails.
 
 ## Gaps
 
 - **[gap]** No escalator traffic or egress dialog yet.
-- **[gap]** Platform clearing times are not worked out yet.
+- **[gap]** The occupant load is typed, not worked out from trains and headways; waits beyond the platform (concourse, fare gates) are not added.

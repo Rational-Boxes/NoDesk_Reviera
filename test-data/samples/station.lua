@@ -2,7 +2,7 @@
 -- Copyright (C) 2026 Riviera contributors
 
 -- title: Escalators in a transit station
--- description: A concourse over a platform 7 m below, joined by an up-and-down pair of transit escalators (heavy duty, 0.65 m/s) each with a 6 m station run-off zone beyond its ends, and a stair; escalator.traffic checks the units a 9,000-an-hour peak needs with one out, and what the escalators add to the platform's egress capacity under NFPA 130 (at most half) against the IBC (nothing); egress.route finds the way out from the platform's far end, by the stair under the IBC and by an escalator under NFPA 130.
+-- description: A concourse over a platform 7 m below, joined by an up-and-down pair of transit escalators (heavy duty, 0.65 m/s) each with a 6 m station run-off zone beyond its ends, and a stair; escalator.traffic checks the units a 9,000-an-hour peak needs with one out, and what the escalators add to the platform's egress capacity under NFPA 130 (at most half) against the IBC (nothing); egress.route finds the way out from the platform's far end, by the stair under the IBC and by an escalator under NFPA 130, drawn in the plans; and egress.platform_clearing checks NFPA 130's 4 and 6 minute tests for 500 people on the platform.
 --
 -- Riviera sample model (test-data/samples): escalators in stations (ARC-VT-020, ARC-VT-021) and
 -- egress routes across levels (ANA-ROUTE-004).
@@ -65,3 +65,14 @@ assert(by_escalator.links[1].kind == "escalator" and by_escalator.time < by_stai
 riviera.view.create_plan{ level_ids = { platform, concourse } }
 local drawn = riviera.egress.draw_route{ start = from, ["end"] = exit, mode = "nfpa130" }
 assert(#drawn.paths == 2 and #drawn.unplanned == 0, "a path of travel on each level")
+
+-- NFPA 130's two tests for the platform, its 500 people (a train load and those waiting): out
+-- through the stair (1500 mm at 0.0555 a minute a millimetre, 83 a minute) and the escalators
+-- (one out, the other counted up to the stairs' share) within 4 minutes; and from its far end to
+-- the concourse exit within 6, walked at 37.7 m/min, climbed at 15 m/min, with the wait at the
+-- escalator.
+local clearing = riviera.egress.platform_clearing{ level = platform, load = 500, remote = { 64.0, 4.0 }, safety = exit }
+print(string.format("platform %.2f min, to safety %.2f min", clearing.platform_time, clearing.safety_time))
+assert(clearing.meets_platform and clearing.meets_safety, "the platform clears in time")
+local stairs_only = riviera.egress.platform_clearing{ level = platform, load = 500, remote = { 64.0, 4.0 }, safety = exit, mode = "ibc" }
+assert(not stairs_only.meets_platform, "the stair alone is too narrow")
