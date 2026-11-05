@@ -617,6 +617,10 @@ pub struct Clearing {
     /// The fare lines the route passes through (ARC-VT-022), and their waits together.
     pub fare_lines: Vec<FareCrossing>,
     pub fare_wait: f64,
+    /// The levels after the platform the route leaves by stairs or escalators (a concourse's way
+    /// up to the street), their exits' flow and their waits together.
+    pub level_exits: Vec<LevelExits>,
+    pub exit_wait: f64,
     pub safety_time: f64,
     pub meets_platform: bool,
     pub meets_safety: bool,
@@ -624,27 +628,34 @@ pub struct Clearing {
 }
 
 /// `egress.platform_clearing`: NFPA 130's two tests for a station platform.
-pub fn platform_clearing(store: &Store, p: ClearingParams) -> Result<Clearing> {
-    let levels = crate::levels::list(store);
-    let id = store.resolve(&p.level).ok_or_else(|| bad("element.not_found", "no such level"))?;
-    let platform = levels.iter().find(|l| l.id == id).ok_or_else(|| bad("route.not_a_level", format!("element {id} is not a level")))?;
-    let (load, load_basis) = occupant_load(store, platform, &p)?;
+/// A level's stairs and escalators out, and their capacity (persons a minute).
+struct LevelCapacity {
+    exits: Vec<Exit>,
+    stairs: f64,
+    escalators: f64,
+    counted: f64,
+}
+
+/// The stairs (0.0555 a minute a millimetre of the narrowest run) and, unless `mode` is `ibc`, the
+/// escalators (the widest out, counted up to the stairs' capacity) between the level `guid` and
+/// `to` (or any other level).
+fn level_capacity(store: &Store, guid: &str, to: Option<&str>, mode: EgressMode, notes: &mut Vec<String>) -> LevelCapacity {
+    let joins = |a: &str, b: &str| a != b && (a == guid || b == guid) && to.is_none_or(|t| a == t || b == t);
     let mut exits = Vec::new();
-    let mut notes = Vec::new();
     for (sid, _) in crate::stairs::all(store) {
         let Some(e) = store.get(sid) else { continue };
         let Some(r) = crate::stairs::stair_recipe(e) else { continue };
         let crate::stairs::StairTop::Level(top) = &r.top else { continue };
-        if (r.base_level == platform.guid) != (*top == platform.guid) {
+        if joins(&r.base_level, top) {
             let width = r.runs.iter().map(|x| x.width).fold(f64::INFINITY, f64::min);
             exits.push(Exit { kind: LinkKind::Stair, element: sid, width, capacity: width * 1000.0 * STAIR_CAPACITY });
         }
     }
-    let stairs: f64 = exits.iter().map(|x| x.capacity).sum();
+    let stairs: f64 = exits.iter().map(|x| x.capacity).sum::<f64>() + 0.0;
     let mut esc = Vec::new();
-    if p.mode != EgressMode::Ibc {
+    if mode != EgressMode::Ibc {
         for (eid, el) in crate::escalators::escalators(store) {
-            if el.levels[0] != el.levels[1] && el.levels.contains(&platform.guid) {
+            if joins(&el.levels[0], &el.levels[1]) {
                 let width = el.sized.step_width;
                 esc.push(Exit { kind: LinkKind::Escalator, element: eid, width, capacity: width * crate::traffic::EVACUATION_RATE });
             }
@@ -661,6 +672,28 @@ pub fn platform_clearing(store: &Store, p: ClearingParams) -> Result<Clearing> {
         notes.push("the escalator out of service is the widest; the rest run in the exit direction".to_owned());
     }
     exits.extend(esc);
+    LevelCapacity { exits, stairs, escalators, counted }
+}
+
+/// A level the route crosses after the platform, its exits toward the next level, and its wait.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct LevelExits {
+    pub level: ElementId,
+    pub exits: Vec<Exit>,
+    /// Persons a minute; minutes for the platform and concourse loads to pass; and the wait (the
+    /// flow time less the longest flow before it, not below 0).
+    pub capacity: f64,
+    pub flow_time: f64,
+    pub wait: f64,
+}
+
+pub fn platform_clearing(store: &Store, p: ClearingParams) -> Result<Clearing> {
+    let levels = crate::levels::list(store);
+    let id = store.resolve(&p.level).ok_or_else(|| bad("element.not_found", "no such level"))?;
+    let platform = levels.iter().find(|l| l.id == id).ok_or_else(|| bad("route.not_a_level", format!("element {id} is not a level")))?;
+    let (load, load_basis) = occupant_load(store, platform, &p)?;
+    let mut notes = Vec::new();
+    let LevelCapacity { mut exits, stairs, escalators, counted } = level_capacity(store, &platform.guid, None, p.mode, &mut notes);
     // Evacuation lifts serving the platform and the point of safety's level.
     let mut lifts = 0.0;
     if p.lifts {
@@ -712,19 +745,33 @@ pub fn platform_clearing(store: &Store, p: ClearingParams) -> Result<Clearing> {
     if !(p.concourse_load.is_finite() && p.concourse_load >= 0.0) {
         return Err(bad("route.invalid", "the concourse load must be 0 or more"));
     }
-    // NFPA 130 Annex C: the wait at a fare line is how much longer its flow takes than the
-    // platform's.
-    let fare_lines: Vec<FareCrossing> = r
-        .legs
-        .iter()
-        .flat_map(|g| crate::fare_gates::crossed(store, g.level, &g.points))
-        .map(|(fid, f)| {
-            let flow_time = (load + p.concourse_load) / f.capacity;
-            FareCrossing { fare_line: fid, capacity: f.capacity, flow_time, wait: (flow_time - platform_time).max(0.0) }
-        })
-        .collect();
+    // NFPA 130 Annex C: past the platform, each bottleneck on the way (a fare line, a level's
+    // exits on) holds people up for as much longer as its flow takes than the longest before it.
+    let through = load + p.concourse_load;
+    let mut longest = platform_time;
+    let mut fare_lines = Vec::new();
+    let mut level_exits = Vec::new();
+    for (k, g) in r.legs.iter().enumerate() {
+        for (fid, f) in crate::fare_gates::crossed(store, g.level, &g.points) {
+            let flow_time = through / f.capacity;
+            fare_lines.push(FareCrossing { fare_line: fid, capacity: f.capacity, flow_time, wait: (flow_time - longest).max(0.0) });
+            longest = longest.max(flow_time);
+        }
+        // Off a later level toward the next one on the route (the platform's exits are above).
+        let Some(link) = r.links.get(k).filter(|_| k > 0) else { continue };
+        let (Some(here), Some(next)) = (levels.iter().find(|l| l.id == link.from), levels.iter().find(|l| l.id == link.to)) else { continue };
+        let c = level_capacity(store, &here.guid, Some(&next.guid), p.mode, &mut Vec::new());
+        let capacity = c.stairs + c.counted;
+        if capacity <= 0.0 {
+            continue;
+        }
+        let flow_time = through / capacity;
+        level_exits.push(LevelExits { level: here.id, exits: c.exits, capacity, flow_time, wait: (flow_time - longest).max(0.0) });
+        longest = longest.max(flow_time);
+    }
     let fare_wait = fare_lines.iter().map(|x| x.wait).sum::<f64>() + 0.0;
-    let safety_time = walking_time + wait + fare_wait;
+    let exit_wait = level_exits.iter().map(|x| x.wait).sum::<f64>() + 0.0;
+    let safety_time = walking_time + wait + fare_wait + exit_wait;
     Ok(Clearing {
         mode: p.mode,
         load,
@@ -743,6 +790,8 @@ pub fn platform_clearing(store: &Store, p: ClearingParams) -> Result<Clearing> {
         wait,
         fare_lines,
         fare_wait,
+        level_exits,
+        exit_wait,
         safety_time,
         meets_platform: platform_time <= PLATFORM_LIMIT + 1e-9,
         meets_safety: safety_time <= SAFETY_LIMIT + 1e-9,

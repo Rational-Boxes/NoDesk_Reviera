@@ -178,6 +178,19 @@
     ]
   },
   {
+    "name": "deep_station",
+    "title": "Waiting on the way up from a deep station",
+    "group": "Architecture",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "deep_station.lua"
+        }
+      }
+    ]
+  },
+  {
     "name": "evacuation_lifts",
     "title": "Evacuation lifts in a tower",
     "group": "Architecture",

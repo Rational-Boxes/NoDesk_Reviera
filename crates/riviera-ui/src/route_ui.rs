@@ -254,13 +254,18 @@ impl Gui {
             num("capacity")
         ));
         lines.push(format!("Platform cleared in {:.2} min (at most 4): {}", num("platform_time"), pass("meets_platform")));
+        for x in c["level_exits"].as_array().cloned().unwrap_or_default() {
+            let level = x["level"].clone();
+            let name = self.run("level.list", json!({})).ok().and_then(|v| v.as_array().and_then(|a| a.iter().find(|l| l["id"] == level).and_then(|l| l["name"].as_str().map(str::to_owned)))).unwrap_or_default();
+            lines.push(format!("Up from {name}: {:.0} a minute, {:.2} min to pass, waiting {:.2} min", x["capacity"].as_f64().unwrap_or(0.0), x["flow_time"].as_f64().unwrap_or(0.0), x["wait"].as_f64().unwrap_or(0.0)));
+        }
         for x in c["fare_lines"].as_array().cloned().unwrap_or_default() {
             lines.push(format!("Fare line: {:.0} a minute, {:.2} min to pass, waiting {:.2} min", x["capacity"].as_f64().unwrap_or(0.0), x["flow_time"].as_f64().unwrap_or(0.0), x["wait"].as_f64().unwrap_or(0.0)));
         }
         lines.push(format!(
             "To the point of safety: walking {:.2} min + waiting {:.2} min = {:.2} min (at most 6): {}",
             num("walking_time"),
-            num("wait") + num("fare_wait"),
+            num("wait") + num("fare_wait") + num("exit_wait"),
             num("safety_time"),
             pass("meets_safety")
         ));

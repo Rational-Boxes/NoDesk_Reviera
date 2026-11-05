@@ -266,3 +266,32 @@ fn a_route_passes_a_fare_line_through_its_aisles_and_waits_at_it() {
     let w = 300.0 / 97.0 - 100.0 / 83.25;
     assert!((f(&c["fare_wait"]) - w).abs() < 1e-9 && (f(&c["safety_time"]) - (f(&c["walking_time"]) + f(&c["wait"]) + w)).abs() < 1e-9, "{c:#}");
 }
+
+#[test]
+fn a_narrow_way_up_from_the_concourse_adds_its_wait() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = App::new(AppConfig { live: None, untitled_dir: dir.path().join("untitled") });
+    ok(&mut app, "file.new", json!({}));
+    let platform = ok(&mut app, "level.list", json!({}))[0]["id"].clone();
+    let concourse = ok(&mut app, "level.create", json!({ "elevation": 3.6 }));
+    let street = ok(&mut app, "level.create", json!({ "elevation": 7.2 }));
+    // Two 2 m stairs up from the platform; one 1.2 m stair on up from the concourse.
+    for y in [4.0, 8.0] {
+        ok(&mut app, "stair.create", json!({ "base_level": platform, "width": 2.0, "railings": false, "runs": [{ "start": [2.0, y], "end": [7.0, y] }] }));
+    }
+    ok(&mut app, "stair.create", json!({ "base_level": concourse, "width": 1.2, "railings": false, "runs": [{ "start": [20.0, 4.0], "end": [25.0, 4.0] }] }));
+    let c = ok(&mut app, "egress.platform_clearing", json!({ "level": platform, "load": 300.0, "remote": [30.0, 6.0], "safety": { "point": [35.0, 4.0], "level": street } }));
+    // The platform: 2 × 2000 × 0.0555 = 222 a minute, 1.35 min. The concourse's stair: 66.6 a
+    // minute, 4.50 min: a wait of 3.15 min.
+    let platform_time = 300.0 / 222.0;
+    assert!((f(&c["platform_time"]) - platform_time).abs() < 1e-9, "{c:#}");
+    let lx = c["level_exits"].as_array().unwrap();
+    assert_eq!((lx.len(), lx[0]["level"].clone()), (1, concourse.clone()), "{c:#}");
+    let flow = 300.0 / (1200.0 * 0.0555);
+    assert!((f(&lx[0]["flow_time"]) - flow).abs() < 1e-9 && (f(&c["exit_wait"]) - (flow - platform_time)).abs() < 1e-9);
+    assert!((f(&c["safety_time"]) - (f(&c["walking_time"]) + f(&c["wait"]) + flow - platform_time)).abs() < 1e-9);
+    // A second stair up from the concourse halves the flow time: 2.25 min, a wait of 0.90 min.
+    ok(&mut app, "stair.create", json!({ "base_level": concourse, "width": 1.2, "railings": false, "runs": [{ "start": [20.0, 8.0], "end": [25.0, 8.0] }] }));
+    let c = ok(&mut app, "egress.platform_clearing", json!({ "level": platform, "load": 300.0, "remote": [30.0, 6.0], "safety": { "point": [35.0, 4.0], "level": street } }));
+    assert!((f(&c["exit_wait"]) - (flow / 2.0 - platform_time)).abs() < 1e-9, "{c:#}");
+}

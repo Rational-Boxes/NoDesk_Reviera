@@ -1140,6 +1140,20 @@ fn the_evacuation_lifts_sample_keeps_its_evacuation_elevator() {
 }
 
 #[test]
+fn the_deep_station_sample_waits_only_briefly_on_its_concourse() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "deep_station");
+    let levels = ok(&mut app, "level.list", json!({}));
+    let (platform, street) = (levels[0]["id"].clone(), levels[2]["id"].clone());
+    let c = ok(&mut app, "egress.platform_clearing", json!({ "level": platform, "load": 400, "remote": [58.0, 6.0], "safety": { "point": [56.0, 9.0], "level": street } }));
+    println!("deep station: off the platform {:.2} min, up {:.2} min, waiting {:.2}; to safety {:.2} min", f(&c["platform_time"]), f(&c["level_exits"][0]["flow_time"]), f(&c["exit_wait"]), f(&c["safety_time"]));
+    // Its two stairs up to the street: 133 a minute, 3.00 minutes, 1.20 waiting.
+    assert!((f(&c["level_exits"][0]["capacity"]) - 2.0 * 1200.0 * 0.0555).abs() < 1e-9, "{c:#}");
+    assert!((f(&c["exit_wait"]) - (400.0 / 133.2 - 400.0 / 222.0)).abs() < 1e-9 && c["meets_safety"] == true);
+    assert_eq!(ok(&mut app, "clearance.check", json!({})), json!([]));
+}
+
+#[test]
 fn the_escalators_sample_keeps_its_units_and_openings() {
     let work = tempfile::tempdir().unwrap();
     let mut app = open(work.path(), "escalators");
