@@ -207,3 +207,28 @@ fn evacuation_lifts_count_in_a_platforms_exit_capacity_with_two_left_out() {
     let c = ok(&mut app, "egress.platform_clearing", args(true));
     assert!(f(&c["lifts"]) > 83.25 && (f(&c["lifts_counted"]) - 83.25).abs() < 1e-6, "{c:#}");
 }
+
+#[test]
+fn the_standing_area_stops_at_the_train_and_leaves_out_stairs_and_their_run_off() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = App::new(AppConfig { live: None, untitled_dir: dir.path().join("untitled") });
+    ok(&mut app, "file.new", json!({}));
+    let platform = ok(&mut app, "level.list", json!({}))[0]["id"].clone();
+    let concourse = ok(&mut app, "level.create", json!({ "elevation": 3.6 }));
+    // A 100 × 10 m platform; a 1.5 m stair rising east from (20, 5).
+    let sq = [[0.0, 0.0], [100.0, 0.0], [100.0, 10.0], [0.0, 10.0]];
+    let loop_: Vec<Value> = (0..4).map(|i| json!({ "line": { "start": sq[i], "end": sq[(i + 1) % 4] } })).collect();
+    ok(&mut app, "floor.create", json!({ "loops": [loop_], "level_id": platform }));
+    ok(&mut app, "stair.create", json!({ "base_level": platform, "width": 1.5, "railings": false, "runs": [{ "start": [20.0, 5.0], "end": [26.0, 5.0] }] }));
+    let mut occ = |o: Value| ok(&mut app, "egress.platform_clearing", json!({ "level": platform, "occupancy": o, "remote": [60.0, 2.0], "safety": { "point": [60.0, 2.0], "level": concourse } }));
+    // A train 80 m long from x = 10: 800 m² less the stair (its run, 1.5 m wide) and 6 m × 1.5 m
+    // before its foot.
+    let c = occ(json!({ "trains": [100.0], "area_per_person": 0.5, "train": [[10.0, 5.0], [90.0, 5.0]] }));
+    let area = f(&c["load_basis"]["area"]);
+    let run = (area - 800.0 + 9.0) / -1.5;
+    assert!(run > 5.0 && run < 7.0, "the stair's run is {run} m: {c:#}");
+    assert!((f(&c["load"]) - area / 0.5).abs() < 1e-6 && c["load_basis"]["from"] == "area");
+    // A train past the platform's end: only the platform counts.
+    let c = occ(json!({ "trains": [100.0], "area_per_person": 0.5, "train": [[-50.0, 5.0], [150.0, 5.0]] }));
+    assert!((f(&c["load_basis"]["area"]) - (1000.0 - 9.0 - 1.5 * run)).abs() < 0.05, "{c:#}");
+}

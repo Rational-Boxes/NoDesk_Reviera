@@ -155,6 +155,7 @@ impl Gui {
         let load = f.text("Occupant load", "", "Persons; empty: worked out from the trains below (NFPA 130 5.5.5.1)");
         let trains = f.text("Trains entering at once", "", "Persons on each, one per track, e.g. 1200, 1000");
         let waiting = f.text("Waiting to board", "", "Persons on the platform for those trains");
+        let train = f.text("Train along the platform", "", "x1, y1, x2, y2: its ends; the area figure then counts only the standing area (SCDF 2.2.2c)");
         let density = f.choice("Area figure", &["None".to_owned(), "Dense: 7 ft² (0.65 m²) a person".to_owned(), "Outlying: 15 ft² (1.39 m²) a person".to_owned()], 0);
         let remote = f.text("Most remote point (x, y)", "", "Metres, on the platform");
         let safe_level = f.choice("Point of safety level", &names, names.len() - 1);
@@ -171,6 +172,8 @@ impl Gui {
         let train_loads: Vec<f64> = trains.get_value().split([',', ' ']).filter_map(|s| s.trim().parse().ok()).collect();
         let entraining = waiting.get_value().trim().parse::<f64>().unwrap_or(0.0);
         let per_person = [None, Some(0.65), Some(1.39)][density.get_selection().unwrap_or(0) as usize];
+        let ends: Vec<f64> = train.get_value().split([',', ' ']).filter_map(|s| s.trim().parse().ok()).collect();
+        let train_ends = (ends.len() == 4).then(|| [[ends[0], ends[1]], [ends[2], ends[3]]]);
         let lp = levels[platform.get_selection().unwrap_or(0) as usize]["id"].clone();
         let ls = levels[safe_level.get_selection().unwrap_or(0) as usize]["id"].clone();
         let m = ["nfpa130", "ibc"][mode.get_selection().unwrap_or(0) as usize];
@@ -185,7 +188,7 @@ impl Gui {
             if train_loads.is_empty() && per_person.is_none() {
                 return error(&frame, "Give the occupant load, or the trains (and an area figure) to work it out from.");
             }
-            args["occupancy"] = json!({ "trains": train_loads, "entraining": entraining, "area_per_person": per_person });
+            args["occupancy"] = json!({ "trains": train_loads, "entraining": entraining, "area_per_person": per_person, "train": train_ends });
         } else {
             let Ok(n) = typed.parse::<f64>() else { return error(&frame, "The occupant load must be a number.") };
             args["load"] = json!(n);

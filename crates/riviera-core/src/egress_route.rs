@@ -402,9 +402,100 @@ pub struct Occupancy {
     /// venues or dense neighbourhoods, 1.39 (15 ft²) for outlying ones; omitted, no area figure.
     #[serde(default)]
     pub area_per_person: Option<f64>,
-    /// The area counted (m²); omitted, the floors on the platform's level.
+    /// The area counted (m²); omitted, the floors on the platform's level, or with `train` the
+    /// platform's standing area.
     #[serde(default)]
     pub area: Option<f64>,
+    /// The train's length along the platform, from one end to the other: the area counted is
+    /// then the standing area (SCDF CPFPRTS 2.2.2c), the floors on the level within the train's
+    /// length less the stairs, escalators and lift shafts and a 6 m run-off zone in front of
+    /// each stair and escalator end on the platform.
+    #[serde(default)]
+    pub train: Option<[V2; 2]>,
+}
+
+/// The zone kept clear in front of a stair or escalator end on a platform, not counted as
+/// standing area (m).
+pub const STANDING_RUN_OFF: f64 = 6.0;
+
+/// A rectangle from `a` along unit `d` for `len`, `w` wide (counter-clockwise).
+fn strip(a: V2, d: V2, len: f64, w: f64) -> Vec<V2> {
+    let n = [-d[1] * w / 2.0, d[0] * w / 2.0];
+    let b = [a[0] + d[0] * len, a[1] + d[1] * len];
+    vec![[a[0] - n[0], a[1] - n[1]], [b[0] - n[0], b[1] - n[1]], [b[0] + n[0], b[1] + n[1]], [a[0] + n[0], a[1] + n[1]]]
+}
+
+fn ccw(mut r: Vec<V2>) -> Vec<V2> {
+    if crate::polygons::area(&r) < 0.0 {
+        r.reverse();
+    }
+    r
+}
+
+/// The platform's standing area (SCDF CPFPRTS 2.2.2c): the floors on `level` within the train's
+/// length, less what stands on the platform and the run-off zones in front of the ways off it.
+pub fn standing_area(store: &Store, level: &crate::levels::LevelInfo, train: [V2; 2]) -> f64 {
+    use crate::polygons::{Shape, difference, intersection};
+    let floors: Vec<Shape> = crate::floors::all(store)
+        .into_iter()
+        .filter(|(id, _)| store.get(*id).and_then(crate::floors::floor_recipe).is_some_and(|r| r.level == level.guid))
+        .flat_map(|(_, g)| g.profiles.into_iter().map(|p| Shape { outer: ccw(p.outer), holes: p.holes }))
+        .collect();
+    let [a, b] = train;
+    let len = (b[0] - a[0]).hypot(b[1] - a[1]);
+    if len < 1e-9 {
+        return 0.0;
+    }
+    let d = [(b[0] - a[0]) / len, (b[1] - a[1]) / len];
+    let band = Shape { outer: strip(a, d, len, 2000.0), holes: Vec::new() };
+    let within = intersection(&floors, &[band]);
+    let mut out: Vec<Vec<V2>> = Vec::new();
+    for (id, _) in crate::stairs::all(store) {
+        let Some(e) = store.get(id) else { continue };
+        let Some(r) = crate::stairs::stair_recipe(e) else { continue };
+        let crate::stairs::StairTop::Level(top) = &r.top else { continue };
+        let (base_here, top_here) = (r.base_level == level.guid, *top == level.guid);
+        if !base_here && !top_here {
+            continue;
+        }
+        let Ok(g) = crate::stairs::regenerate(store, e) else { continue };
+        let r = r.extended(g.risers);
+        let (Some(first), Some(last)) = (r.runs.first(), r.runs.last()) else { continue };
+        // The stair itself, between its sides (standing on the platform, or its opening over the
+        // stair below); and the zone before its foot or beyond its head.
+        let left: Vec<V2> = crate::stairs::side_path(&r, 0.0, g.riser_height, true, 0.0).iter().map(|p| [p[0], p[1]]).collect();
+        let right: Vec<V2> = crate::stairs::side_path(&r, 0.0, g.riser_height, false, 0.0).iter().map(|p| [p[0], p[1]]).collect();
+        out.push(ccw(left.into_iter().chain(right.into_iter().rev()).collect()));
+        if base_here {
+            let d0 = first.direction;
+            out.push(strip(first.start, [-d0[0], -d0[1]], STANDING_RUN_OFF, first.width));
+        } else {
+            out.push(strip(last.end(r.tread_depth), last.end_direction(r.tread_depth), STANDING_RUN_OFF, last.width));
+        }
+    }
+    for (_, el) in crate::escalators::escalators(store) {
+        let (lo, hi) = (el.levels[0] == level.guid, el.levels[1] == level.guid);
+        if !lo && !hi {
+            continue;
+        }
+        let (l, w) = (el.sized.length(), el.sized.truss_width);
+        let (s, c) = el.rotation.sin_cos();
+        let along = [c, s];
+        out.push(strip(el.at(0.0, 0.0), along, l, w));
+        if lo {
+            out.push(strip(el.at(0.0, 0.0), [-c, -s], STANDING_RUN_OFF, w));
+        }
+        if hi && el.levels[0] != el.levels[1] {
+            out.push(strip(el.at(l, 0.0), along, STANDING_RUN_OFF, w));
+        }
+    }
+    for (_, el) in crate::elevators::elevators(store) {
+        if el.levels.contains(&level.guid) {
+            let ([w, dd], t) = (el.sized.hoistway, el.wall_thickness);
+            out.push(ccw(vec![el.at(-w / 2.0 - t, -t), el.at(w / 2.0 + t, -t), el.at(w / 2.0 + t, dd + t), el.at(-w / 2.0 - t, dd + t)]));
+        }
+    }
+    difference(&within, &out).iter().map(Shape::area).sum()
 }
 
 /// Square metres an occupant: dense stations (7 ft²) and outlying ones (15 ft²).
@@ -442,10 +533,11 @@ fn occupant_load(store: &Store, level: &crate::levels::LevelInfo, p: &ClearingPa
             let (area, by_area) = match o.area_per_person {
                 Some(a) if !positive(a) => return Err(bad("route.invalid", "the area an occupant must be above 0")),
                 Some(a) => {
-                    let area = match o.area {
-                        Some(x) if !(x.is_finite() && x >= 0.0) => return Err(bad("route.invalid", "the area must be 0 or more")),
-                        Some(x) => x,
-                        None => crate::floors::all(store)
+                    let area = match (o.area, o.train) {
+                        (Some(x), _) if !(x.is_finite() && x >= 0.0) => return Err(bad("route.invalid", "the area must be 0 or more")),
+                        (Some(x), _) => x,
+                        (None, Some(train)) => standing_area(store, level, train),
+                        (None, None) => crate::floors::all(store)
                             .into_iter()
                             .filter(|(id, _)| store.get(*id).and_then(crate::floors::floor_recipe).is_some_and(|r| r.level == level.guid))
                             .map(|(_, g)| g.area())

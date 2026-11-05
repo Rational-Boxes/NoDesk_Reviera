@@ -101,3 +101,10 @@ riviera.elevator.set_egress_role{ elevator_id = lifts[3], role = "fire_service" 
 local with_lifts = riviera.egress.platform_clearing{ level = platform, occupancy = { trains = { 350 }, entraining = 150 }, remote = { 64.0, 4.0 }, safety = exit, lifts = true }
 assert(with_lifts.lifts_counted > 0 and with_lifts.platform_time < clearing.platform_time, "a lift counts")
 print(string.format("with lifts: %.1f a minute from the lift, %.2f min", with_lifts.lifts_counted, with_lifts.platform_time))
+
+-- SCDF's standing area: only where a 60 m train stands, from x = 5 to 65, less the stair, the
+-- escalators, the lift shafts and 6 m clear in front of the stair's foot and the escalators'
+-- lower ends. Smaller, but at an outlying station's 1.39 m² a person still more than the trains.
+local standing = riviera.egress.platform_clearing{ level = platform, occupancy = { trains = { 350 }, entraining = 150, area_per_person = 1.39, train = { { 5.0, 2.0 }, { 65.0, 2.0 } } }, remote = { 64.0, 4.0 }, safety = exit }
+assert(standing.load_basis.area < 60 * 24 and standing.load_basis.from == "area", "the standing area")
+print(string.format("standing: %.0f m², %.0f people, %.1f min", standing.load_basis.area, standing.load, standing.platform_time))
