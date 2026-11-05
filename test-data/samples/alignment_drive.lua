@@ -2,7 +2,7 @@
 -- Copyright (C) 2026 Riviera contributors
 
 -- title: A drive set out by chainage
--- description: An S-shaped drive up a slope as an alignment: three straights joined by a 25 m curve to the left and a 40 m curve to the right, chainage from 1+000, and a vertical profile climbing at 6 % then easing to 2 % over an 80 m crest curve. The sample reads it back by chainage and offset, finds the chainage of a point beside it, and lists its curves.
+-- description: An S-shaped drive up a slope as an alignment: three straights joined by a 25 m curve to the left and a 40 m curve to the right, chainage from 1+000, and a vertical profile climbing at 6 % then easing to 2 % over an 80 m crest curve. The sample reads it back by chainage and offset, finds the chainage of a point beside it, and lists its curves. It is an IFC 4.3 project, so the drive is saved as an IfcAlignment with its horizontal and vertical layouts.
 --
 -- Riviera sample model (test-data/samples): alignments (ARC-ALN-001), the shared foundation for
 -- roads, drives and guideway devices. Drawn in plans as a dash-dot centreline with a tick every

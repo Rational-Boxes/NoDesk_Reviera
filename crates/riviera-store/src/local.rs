@@ -642,7 +642,9 @@ impl LocalProject {
             let step = match self.steps.get(id) {
                 Some(step) => {
                     let class = self.ifc.class_of(*step)?;
-                    if !class.eq_ignore_ascii_case(&e.class) {
+                    // An alignment written natively stays an IfcAlignment (ARC-ALN-002).
+                    let aligned = class.eq_ignore_ascii_case("IfcAlignment") && riviera_core::alignments::recipe(e).is_some();
+                    if !class.eq_ignore_ascii_case(&e.class) && !aligned {
                         return Err(unsupported(format!(
                             "element {id}: changing {class} to {} is not supported yet",
                             e.class
@@ -658,7 +660,13 @@ impl LocalProject {
                             e.class
                         )));
                     }
-                    let step = self.ifc.create_rooted(&e.class, e.guid())?;
+                    // In an IFC4X3 project an alignment is an IfcAlignment (ARC-ALN-002).
+                    let class = if riviera_core::alignments::recipe(e).is_some() && crate::alignments::native(&self.ifc) {
+                        "IfcAlignment"
+                    } else {
+                        e.class.as_str()
+                    };
+                    let step = self.ifc.create_rooted(class, e.guid())?;
                     if let Some(oh) = self.new_owner_history()? {
                         self.ifc
                             .set_attribute(step, "OwnerHistory", &AttrValue::Ref(oh.0))?;
@@ -807,6 +815,8 @@ impl LocalProject {
             crate::product_docs::write_product_docs(&mut self.ifc, doc)?;
             let owner_history = self.new_owner_history()?;
             crate::mep::write_mep(&mut self.ifc, doc, &self.steps, owner_history, self.length_scale)?;
+            let owner_history = self.new_owner_history()?;
+            crate::alignments::write_alignments(&mut self.ifc, doc, &self.steps, owner_history, self.length_scale)?;
             let owner_history = self.new_owner_history()?;
             crate::curtains::write_curtains(
                 &mut self.ifc,
@@ -4640,6 +4650,7 @@ fn is_derived(ifc: &IfcModel, id: StepId) -> bool {
             || d == REBAR_TYPE_TAG
             || d == REBAR_PART_TAG
             || d == crate::mep::TAG
+            || d == crate::alignments::TAG
             || d == crate::selection_sets::TAG
             || d == crate::system_zones::TAG)
 }

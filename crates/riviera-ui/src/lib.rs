@@ -788,7 +788,13 @@ impl Gui {
     }
 
     fn new_project(&mut self, frame: &Frame) {
-        match self.run("file.new", json!({})) {
+        self.new_project_in(frame, json!({}));
+    }
+
+    /// File › New IFC 4.3 Project: the template in IFC4X3_ADD2, where alignments are written as
+    /// `IfcAlignment` (ARC-ALN-002).
+    fn new_project_in(&mut self, frame: &Frame, args: Value) {
+        match self.run("file.new", args) {
             Ok(id) => self.show_document(id.as_u64().unwrap_or_default(), frame),
             Err(e) => error(frame, &format!("Could not create a project:\n{e}")),
         }
@@ -4389,6 +4395,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             }
         }
         "file.new" => with(gui, |g| g.new_project(f)),
+        "ui.new_ifc4x3" => with(gui, |g| g.new_project_in(f, json!({ "schema": "IFC4X3" }))),
         "file.save" | "file.save_as" => {
             // A project that was never saved has no file yet: Save asks for one.
             let mut current = None;

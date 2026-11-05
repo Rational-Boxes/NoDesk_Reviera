@@ -196,6 +196,12 @@
     "group": "Massing & Site",
     "steps": [
       {
+        "command": "file.new",
+        "args": {
+          "schema": "IFC4X3"
+        }
+      },
+      {
         "command": "script.run",
         "args": {
           "file": "alignment_drive.lua"

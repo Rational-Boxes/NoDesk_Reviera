@@ -5633,6 +5633,25 @@ All family-editor commands from the DM chapter can be used inside the session.
 
 *Built (2026-11-05):* `riviera_core::alignments`, drawn in plans, the Alignment action; the sample *A drive set out by chainage*. Not yet: chainage labels in plans, spirals (clothoids) and cant, IFC 4.3 `IfcAlignment` export and import (ARC-ALN-002), elements placed by chainage and offset (roads, drives, guideway devices), cross sections and corridors, editing the PIs with grips.
 
+### 3.11.12 Alignments in IFC 4.3
+**ID:** ARC-ALN-002 · **Priority:** P2 · **Ref:** ARC-ALN-001; IFC 4.3 ADD2 alignment entities; EXPERT_REVIEW E-96
+
+**Purpose.** Write alignments as IFC 4.3's own `IfcAlignment`, so that road, rail and infrastructure tools read them as alignments.
+
+**Behaviour & rules.**
+- In an IFC4X3 project (File › *New IFC 4.3 Project*, or `file.new` with `schema: "IFC4X3"`), an alignment is written as an `IfcAlignment` instead of the `IfcAnnotation` used in IFC4 projects. Its recipe (`recipe.alignment`) is kept with it, and it reads back as the same alignment.
+- Its layouts are derived from the recipe at every save and nested in it (`IfcRelNests`):
+  - an `IfcAlignmentHorizontal` of `IfcAlignmentSegment`s whose design parameters are `IfcAlignmentHorizontalSegment`s: `LINE` (radius 0) or `CIRCULARARC` (radius positive turning left, negative right), each with its start point, start direction (radians) and length;
+  - with a profile, an `IfcAlignmentVertical` of `CONSTANTGRADIENT` and `PARABOLICARC` `IfcAlignmentVerticalSegment`s, each with its distance along the horizontal layout from its start, horizontal length, start height, start and end gradients and, for a curve, its length over its change of grade as the radius of curvature.
+- The layouts carry the `rxd:alignment` mark: they are replaced at the next save and never read as elements of their own.
+- In an IFC4 project an alignment stays an `IfcAnnotation` ("Alignment").
+
+**Acceptance criteria.**
+- [x] An IFC4X3 project's alignment of a line, a 30 m left-hand curve and a line, with a profile of two grades and a parabolic curve, is written as one `IfcAlignment` with one horizontal and one vertical layout of three segments each (the curve's radius +30), once after two saves; opened again it is the same alignment, and saved again it is not doubled.
+- [x] In an IFC4 project the same alignment is an `IfcAnnotation` and no alignment entities are written.
+
+*Built (2026-11-05):* `riviera_store::alignments`, File › New IFC 4.3 Project; the sample *A drive set out by chainage* is an IFC 4.3 project. Not yet: the start chainage as an `IfcReferent` with stationing (IFC 4.3 ADD2 has no `StartDistAlong` on the horizontal layout), the geometric representation (`IfcCompositeCurve`, `IfcGradientCurve`), `IfcAlignmentCant`, the alignment's aggregation to the project and reference in the site, reading other tools' `IfcAlignment`s without a recipe.
+
 ---
 
 ## 3.12 Modify tools

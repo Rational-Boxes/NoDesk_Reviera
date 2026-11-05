@@ -20,6 +20,12 @@ accel = "Ctrl+N"
 help = "Create a project from the built-in template"
 
 [[action]]
+id = "ui.new_ifc4x3"
+label = "New IFC 4.3 Project"
+icon = "new"
+help = "Create a project from the built-in template in IFC 4.3 (IFC4X3_ADD2), for alignments written as IfcAlignment and other infrastructure"
+
+[[action]]
 id = "file.open"
 label = "Open..."
 icon = "open"
@@ -4801,7 +4807,7 @@ panels = [{ label = "Window", tools = [{ action = "insert.flip_facing", size = "
 
 [[menu]]
 label = "&File"
-items = ["file.new", "file.open", "file.save", "file.save_as", "file.close", "-", "ui.fileengine_open", "ui.fileengine_save", "ui.fileengine_versions", "ui.publish_fileengine", "ui.material_documents", "ui.publish_local_documents", "-", "ui.bimserver", "-", "ui.model_properties", "ui.remote_analysis", "ui.profiler", "-", "export.pdf", "export.cobie", "gbxml.export", "gbxml.import_loads", "hbjson.export", "bcf.import", "bcf.export", "bcf.export_viewpoint", "bcf.import_viewpoint", "-", "app.exit"]
+items = ["file.new", "ui.new_ifc4x3", "file.open", "file.save", "file.save_as", "file.close", "-", "ui.fileengine_open", "ui.fileengine_save", "ui.fileengine_versions", "ui.publish_fileengine", "ui.material_documents", "ui.publish_local_documents", "-", "ui.bimserver", "-", "ui.model_properties", "ui.remote_analysis", "ui.profiler", "-", "export.pdf", "export.cobie", "gbxml.export", "gbxml.import_loads", "hbjson.export", "bcf.import", "bcf.export", "bcf.export_viewpoint", "bcf.import_viewpoint", "-", "app.exit"]
 
 [[menu]]
 label = "&Edit"

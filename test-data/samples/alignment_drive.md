@@ -4,7 +4,8 @@ How to build `alignment_drive.ifc` in the window. Each step names the UI path; *
 step the window cannot do yet. The script `alignment_drive.lua` is the reference: the same
 commands with exact values.
 
-Start with **File › New**.
+Start with **File › New IFC 4.3 Project**: in an IFC 4.3 project the drive is written as an
+`IfcAlignment`, with its horizontal and vertical layouts.
 
 1. **The alignment.** **Massing & Site › Alignment** with nothing selected. Type its points of
    intersection, one a row, with the curve radius at the inner corners:
@@ -38,4 +39,5 @@ Start with **File › New**.
 ## Gaps
 
 - **[gap]** No chainage labels in the plan yet, and no grips to move the points.
-- **[gap]** Spirals, cant, cross sections and IFC 4.3 `IfcAlignment` export come later.
+- **[gap]** Spirals, cant and cross sections come later, and so do the `IfcAlignment`'s geometry
+  and its start chainage as a referent.

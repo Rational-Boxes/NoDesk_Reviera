@@ -5,6 +5,7 @@
 //! RXD; BIMserver mode will add a server-backed store behind the same operations.
 
 pub mod commands;
+mod alignments;
 mod classification;
 mod product_docs;
 mod curtains;

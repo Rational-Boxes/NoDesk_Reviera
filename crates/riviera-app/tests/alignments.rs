@@ -62,3 +62,57 @@ fn an_l_shaped_alignment_curves_round_its_corner_and_rises_on_its_profile() {
     assert!(app.execute("alignment.point_at", json!({ "alignment_id": id, "station": 500.0 }), &Caller::user()).is_err());
     assert!(app.execute("alignment.create", json!({ "level": level, "points": [[0.0, 0.0], [10.0, 0.0], [10.0, 10.0]], "radii": [30.0] }), &Caller::user()).is_err());
 }
+
+fn drive(app: &mut App) -> Value {
+    let level = ok(app, "level.list", json!({}))[0]["id"].clone();
+    ok(app, "alignment.create", json!({
+        "level": level, "name": "Drive", "points": [[0.0, 0.0], [100.0, 0.0], [100.0, 100.0]], "radii": [30.0], "start_station": 1000.0,
+        "profile": [{ "station": 1000.0, "elevation": 0.0 }, { "station": 1100.0, "elevation": 8.0, "curve": 100.0 }, { "station": 1200.0, "elevation": 10.0 }]
+    }))
+}
+
+#[test]
+fn an_ifc4x3_project_writes_an_ifc_alignment_with_its_layouts() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = App::new(AppConfig { live: None, untitled_dir: dir.path().join("untitled") });
+    ok(&mut app, "file.new", json!({ "schema": "IFC4X3" }));
+    drive(&mut app);
+    let model = dir.path().join("road.ifc");
+    ok(&mut app, "file.save_as", json!({ "path": model }));
+    ok(&mut app, "file.save", json!({}));
+    let ifc = riviera_ifc::IfcModel::open(&model).unwrap();
+    let rows = ifc.step_rows().unwrap();
+    let count = |class: &str| rows.iter().filter(|r| r.class == class).count();
+    // One alignment; a line, an arc and a line; a grade, a parabolic arc and a grade; once after
+    // two saves.
+    assert_eq!((count("IFCALIGNMENT"), count("IFCANNOTATION")), (1, 0));
+    assert_eq!((count("IFCALIGNMENTHORIZONTAL"), count("IFCALIGNMENTVERTICAL")), (1, 1));
+    assert_eq!((count("IFCALIGNMENTHORIZONTALSEGMENT"), count("IFCALIGNMENTVERTICALSEGMENT"), count("IFCALIGNMENTSEGMENT")), (3, 3, 6));
+    let arc = rows.iter().find(|r| r.class == "IFCALIGNMENTHORIZONTALSEGMENT" && r.attributes.contains(".CIRCULARARC.")).expect("the curve");
+    assert!(arc.attributes.contains("30.") && !arc.attributes.contains("-30."), "turning left, radius 30: {}", arc.attributes);
+    assert_eq!(rows.iter().filter(|r| r.class == "IFCALIGNMENTVERTICALSEGMENT" && r.attributes.contains(".PARABOLICARC.")).count(), 1);
+
+    // Opened again: the same alignment, its layouts not read as elements.
+    let mut again = App::new(AppConfig { live: None, untitled_dir: dir.path().join("untitled2") });
+    ok(&mut again, "file.open", json!({ "path": model }));
+    let list = ok(&mut again, "alignment.list", json!({}));
+    assert_eq!((list.as_array().unwrap().len(), list[0]["name"].as_str(), list[0]["curves"].as_array().unwrap().len()), (1, Some("Drive"), 1), "{list:#}");
+    let z = ok(&mut again, "alignment.point_at", json!({ "alignment_id": list[0]["alignment"], "station": 1025.0 }));
+    assert!((f(&z["elevation"]) - 2.0).abs() < 1e-9);
+    ok(&mut again, "file.save", json!({}));
+    let rows = riviera_ifc::IfcModel::open(&model).unwrap().step_rows().unwrap();
+    assert_eq!(rows.iter().filter(|r| r.class == "IFCALIGNMENTSEGMENT").count(), 6);
+}
+
+#[test]
+fn an_ifc4_project_keeps_an_alignment_as_an_annotation() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = App::new(AppConfig { live: None, untitled_dir: dir.path().join("untitled") });
+    ok(&mut app, "file.new", json!({}));
+    drive(&mut app);
+    let model = dir.path().join("road.ifc");
+    ok(&mut app, "file.save_as", json!({ "path": model }));
+    let rows = riviera_ifc::IfcModel::open(&model).unwrap().step_rows().unwrap();
+    assert!(rows.iter().any(|r| r.class == "IFCANNOTATION" && r.attributes.contains("'Alignment'")));
+    assert!(!rows.iter().any(|r| r.class.starts_with("IFCALIGNMENT")));
+}
