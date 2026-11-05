@@ -22439,7 +22439,8 @@ The job runs in the background with a notification. Spaces that no system serves
 **Purpose.** Check a station platform against NFPA 130's two evacuation tests: the platform cleared within 4 minutes, and its most remote point to a point of safety within 6.
 
 **Behaviour & rules.**
-- `egress.platform_clearing(level, load, remote, safety: {point, level}, mode?)` (mode default `nfpa130`):
+- `egress.platform_clearing(level, load | occupancy, remote, safety: {point, level}, mode?)` (mode default `nfpa130`):
+  - **occupant load:** given as `load`, or worked out from `occupancy` (NFPA 130 5.5.5.1) as the greater of the trains entering at once on every track (`trains`, persons each) with those waiting to board (`entraining`), and, when `area_per_person` is given (0.65 m², 7 ft², for stations serving event venues or dense neighbourhoods; 1.39 m², 15 ft², for outlying ones), the area (`area`, or the floors on the level) at that density; `load_basis` says which governs;
   - **exits:** every stair with one end on the platform's level (capacity 0.0555 persons a minute per millimetre of its narrowest run) and, unless `mode` is `ibc`, every escalator between it and another level (120 a minute per metre of tread, ARC-VT-021), the widest out of service, the rest counted up to the stairs' capacity (escalators at most half the exit capacity);
   - **platform time** = load ÷ exit capacity, at most 4 minutes;
   - **time to safety:** the route (ANA-ROUTE-004) from `remote` to `safety`, walked at 37.7 m/min and climbed at 15 m/min up and 18 m/min down (vertical), plus the **wait** at the platform exits (the platform time less the walk to the first exit, not below 0); at most 6 minutes.
@@ -22449,8 +22450,9 @@ The job runs in the background with a notification. Spaces that no system serves
 **Acceptance criteria.**
 - [x] A platform with a 1500 mm stair has a capacity of 83.25 persons a minute; its platform time is the load over that; its walking time is the route's legs at 37.7 m/min and its 3.6 m climb at 15 m/min; the wait is the platform time less the walk to the stair.
 - [x] With a pair of escalators added, one is out and the other counts up to the stairs' capacity; 400 people clear within 4 minutes with them, and not with the stair alone.
+- [x] Two trains of 300 and 250 with 100 waiting make 650, more than a 40 × 10 m platform at 0.65 m² a person (615): the trains govern; with 520 m² given, the area does (800). A load and an occupancy together are refused.
 
-*Built (2026-11-04):* `riviera_core::egress_route::platform_clearing` and the window's Platform Clearing; the sample *Escalators in a transit station* (500 people: 3.00 min, 4.22 min to safety; 6.0 min by the stair alone). Not yet: the occupant load from train and headway data, waits further on (concourse exits, fare gates) and the concourse's own load, doors and fare gates as exits, lifts, platform-edge doors.
+*Built (2026-11-04):* `riviera_core::egress_route::platform_clearing` and the window's Platform Clearing; the sample *Escalators in a transit station* (a train of 350 and 150 waiting: 3.00 min, 4.22 min to safety; 6.0 min by the stair alone; the dense area figure over its whole slab governs and fails). Not yet: the platform area cut to the train's length less obstructions and run-off zones (SCDF 2.2.2c), train loads from vehicle capacity and headways, elevators in the exit capacity (NFPA 130 5.5.6.3.3: at most half, one out and one for firefighters, 30 minutes' carrying), waits further on (concourse exits, fare gates) and the concourse's own load, doors and fare gates as exits, lifts, platform-edge doors.
 
 ### 4.12.13c Lifts in egress routes
 **ID:** ANA-ROUTE-006 · **Priority:** P2 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §9 (*Egress*); owner direction (2026-11-04: "Egress and transit"); IBC 3007–3008, EN 81-72 and EN 81-76 (roles only); EXPERT_REVIEW E-93
@@ -23280,7 +23282,7 @@ Every command below is registered once in the command registry and is exposed au
 | `egress.route` | start: {point, level}, end: {point, level}, mode?, lifts?, lift_wait? | {legs, links, length, time} | No (query) | ANA-ROUTE-004 |
 | `egress.draw_route` | start: {point, level}, end: {point, level}, mode?, lifts?, lift_wait? | {legs, links, length, time, paths[], unplanned[]} | Yes | ANA-ROUTE-004 |
 | `elevator.set_egress_role` | elevator_id, role: "none"\|"occupant_evacuation"\|"fire_service" | role | Yes | ANA-ROUTE-006 |
-| `egress.platform_clearing` | level, load, remote, safety: {point, level}, mode? | {exits[], capacity, platform_time, safety_time, meets_platform, meets_safety, …} | No (query) | ANA-ROUTE-005 |
+| `egress.platform_clearing` | level, load? \| occupancy?: {trains[], entraining?, area_per_person?, area?}, remote, safety: {point, level}, mode? | {exits[], capacity, platform_time, safety_time, meets_platform, meets_safety, …} | No (query) | ANA-ROUTE-005 |
 | `route.reveal_obstacles` | view_id, on: bool | — | No | ANA-ROUTE-002 |
 | `path_of_travel.create_multiple` | view_id, starts[], ends[], min_separation | ids[] | Yes | ANA-ROUTE-002 |
 | `one_way_indicator.place` | view_id, point, direction | id | Yes | ANA-ROUTE-002 |
@@ -31194,7 +31196,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `editrequest.manage` | 6 | — | () | No | COL-OWN-003 |
 | `editrequest.retract` | 6 | request_id | () | No | COL-OWN-003 |
 | `egress.draw_route` | 4 | start: {point, level}, end: {point, level}, mode?, lifts?, lift_wait? | {legs, links, length, time, paths[], unplanned[]} | Yes | ANA-ROUTE-004 |
-| `egress.platform_clearing` | 4 | level, load, remote, safety: {point, level}, mode? | {exits[], capacity, platform_time, safety_time, meets_platform, meets_safety, …} | No (query) | ANA-ROUTE-005 |
+| `egress.platform_clearing` | 4 | level, load? \ | occupancy?: {trains[], entraining?, area_per_person?, area?}, remote, safety: {point, level}, mode? | {exits[], capacity, platform_time, safety_time, meets_platform, meets_safety, …} | No (query) |
 | `egress.route` | 4 | start: {point, level}, end: {point, level}, mode?, lifts?, lift_wait? | {legs, links, length, time} | No (query) | ANA-ROUTE-004 |
 | `electrical_analytical.add_node` | 4 | kind, parent_id?, distribution_system_id? | id | Yes | MEP-ELEC-020 |
 | `electrical_analytical.rollup` | 4 | root_id | report | No | MEP-ELEC-020 |

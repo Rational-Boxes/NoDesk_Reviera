@@ -358,8 +358,11 @@ pub const SAFETY_LIMIT: f64 = 6.0;
 pub struct ClearingParams {
     /// The platform's level.
     pub level: ElementRef,
-    /// Its occupant load: the train load and those waiting (persons).
-    pub load: f64,
+    /// Its occupant load (persons), given; or `occupancy` to work it out.
+    #[serde(default)]
+    pub load: Option<f64>,
+    #[serde(default)]
+    pub occupancy: Option<Occupancy>,
     /// The most remote point on the platform.
     pub remote: V2,
     /// A point of safety (on any level).
@@ -367,6 +370,87 @@ pub struct ClearingParams {
     /// Whether escalators count among the exits (default `nfpa130`; `ibc`: stairs only).
     #[serde(default = "nfpa130")]
     pub mode: EgressMode,
+}
+
+/// What the occupant load is worked out from (NFPA 130 5.5.5.1): the greater of the trains
+/// entering at once on every track with those waiting to board, and the area at a density.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Occupancy {
+    /// Persons on each train entering the station at the same time, one per track in the normal
+    /// direction of traffic.
+    pub trains: Vec<f64>,
+    /// Those waiting to board them at the same time.
+    #[serde(default)]
+    pub entraining: f64,
+    /// Square metres an occupant for the area figure: 0.65 (7 ft²) for stations serving event
+    /// venues or dense neighbourhoods, 1.39 (15 ft²) for outlying ones; omitted, no area figure.
+    #[serde(default)]
+    pub area_per_person: Option<f64>,
+    /// The area counted (m²); omitted, the floors on the platform's level.
+    #[serde(default)]
+    pub area: Option<f64>,
+}
+
+/// Square metres an occupant: dense stations (7 ft²) and outlying ones (15 ft²).
+pub const DENSE_AREA: f64 = 0.65;
+pub const OUTLYING_AREA: f64 = 1.39;
+
+/// How the load was found.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct LoadBasis {
+    /// The trains and those waiting; the area and the load at the density (where asked).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trains: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub area: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub by_area: Option<f64>,
+    /// `given`, `trains` or `area`: which one the load is.
+    pub from: String,
+}
+
+fn occupant_load(store: &Store, level: &crate::levels::LevelInfo, p: &ClearingParams) -> Result<(f64, LoadBasis)> {
+    let positive = |v: f64| v.is_finite() && v > 0.0;
+    match (p.load, &p.occupancy) {
+        (Some(load), None) => {
+            if !positive(load) {
+                return Err(bad("route.invalid", "the occupant load must be above 0"));
+            }
+            Ok((load, LoadBasis { trains: None, area: None, by_area: None, from: "given".into() }))
+        }
+        (None, Some(o)) => {
+            if o.trains.iter().chain([&o.entraining]).any(|v| !(v.is_finite() && *v >= 0.0)) {
+                return Err(bad("route.invalid", "train loads and those waiting must be 0 or more"));
+            }
+            let trains = o.trains.iter().sum::<f64>() + o.entraining;
+            let (area, by_area) = match o.area_per_person {
+                Some(a) if !positive(a) => return Err(bad("route.invalid", "the area an occupant must be above 0")),
+                Some(a) => {
+                    let area = match o.area {
+                        Some(x) if !(x.is_finite() && x >= 0.0) => return Err(bad("route.invalid", "the area must be 0 or more")),
+                        Some(x) => x,
+                        None => crate::floors::all(store)
+                            .into_iter()
+                            .filter(|(id, _)| store.get(*id).and_then(crate::floors::floor_recipe).is_some_and(|r| r.level == level.guid))
+                            .map(|(_, g)| g.area())
+                            .sum(),
+                    };
+                    (Some(area), Some(area / a))
+                }
+                None => (None, None),
+            };
+            let (load, from) = match by_area {
+                Some(b) if b > trains => (b, "area"),
+                _ => (trains, "trains"),
+            };
+            if !positive(load) {
+                return Err(bad("route.invalid", "the occupant load works out at 0"));
+            }
+            Ok((load, LoadBasis { trains: Some(trains), area, by_area, from: from.into() }))
+        }
+        _ => Err(bad("route.invalid", "give the occupant load, or the occupancy to work it out from, not both")),
+    }
 }
 
 fn nfpa130() -> EgressMode {
@@ -388,6 +472,7 @@ pub struct Exit {
 pub struct Clearing {
     pub mode: EgressMode,
     pub load: f64,
+    pub load_basis: LoadBasis,
     pub exits: Vec<Exit>,
     /// Persons a minute: the stairs; the escalators with the worst unit out; what of them
     /// counts (at most half the whole); and the platform's exit capacity.
@@ -412,12 +497,10 @@ pub struct Clearing {
 
 /// `egress.platform_clearing`: NFPA 130's two tests for a station platform.
 pub fn platform_clearing(store: &Store, p: ClearingParams) -> Result<Clearing> {
-    if !(p.load.is_finite() && p.load > 0.0) {
-        return Err(bad("route.invalid", "the occupant load must be above 0"));
-    }
     let levels = crate::levels::list(store);
     let id = store.resolve(&p.level).ok_or_else(|| bad("element.not_found", "no such level"))?;
     let platform = levels.iter().find(|l| l.id == id).ok_or_else(|| bad("route.not_a_level", format!("element {id} is not a level")))?;
+    let (load, load_basis) = occupant_load(store, platform, &p)?;
     let mut exits = Vec::new();
     let mut notes = Vec::new();
     for (sid, _) in crate::stairs::all(store) {
@@ -453,7 +536,7 @@ pub fn platform_clearing(store: &Store, p: ClearingParams) -> Result<Clearing> {
     if capacity <= 0.0 {
         return Err(bad("route.no_exits", format!("no stair (or counted escalator) leaves {}", platform.name)));
     }
-    let platform_time = p.load / capacity;
+    let platform_time = load / capacity;
     let r = route(store, RouteParams { start: At { point: p.remote, level: ElementRef::Id(id) }, end: p.safety, mode: p.mode, lifts: false, lift_wait: None })?;
     let elevation = |l: ElementId| levels.iter().find(|x| x.id == l).map_or(0.0, |x| x.elevation);
     let climb: f64 = r
@@ -471,7 +554,8 @@ pub fn platform_clearing(store: &Store, p: ClearingParams) -> Result<Clearing> {
     let safety_time = walking_time + wait;
     Ok(Clearing {
         mode: p.mode,
-        load: p.load,
+        load,
+        load_basis,
         exits,
         stairs,
         escalators,

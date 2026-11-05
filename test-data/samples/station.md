@@ -34,15 +34,19 @@ level at 7.0 m (the concourse) above the platform, and a 70 × 24 m **Architectu
    *Plans* ticked: each leg becomes a path of travel in its level's floor plan, showing its
    length and time, and **Paths of Travel** lists them.
 7. **Clearing the platform.** **Analyze › Route Analysis › Platform Clearing**:
-   - the platform, a load of 500, the most remote point `64, 4`, and the point of safety on the
-     concourse at `64, 20`; *Escalators* "Counted (NFPA 130)";
+   - the platform; *Occupant load* empty, *Trains entering at once* `350` and *Waiting to board*
+     `150` (NFPA 130 counts the trains entering at once on every track and those waiting: 500);
+     the most remote point `64, 4`, and the point of safety on the concourse at `64, 20`;
+     *Escalators* "Counted (NFPA 130)";
    - the stair gives 83 people a minute (1500 mm at 0.0555); of the escalators one is out and the
      other counts up to the stair's share, 83 more;
    - the platform clears in 3.00 minutes (at most 4), and the far end reaches the exit in 4.22
      (2.43 walking, 1.79 waiting at the escalator; at most 6);
-   - "Not counted": the stair alone takes 6.0 minutes and fails.
+   - "Not counted": the stair alone takes 6.0 minutes and fails;
+   - *Area figure* "Dense": the whole 1,680 m² slab at 0.65 m² a person (2,585 people)
+     outnumbers the trains and governs, and the platform takes 15.5 minutes to clear: it fails. A real platform's area stops at the train's length.
 
 ## Gaps
 
 - **[gap]** No escalator traffic or egress dialog yet.
-- **[gap]** The occupant load is typed, not worked out from trains and headways; waits beyond the platform (concourse, fare gates) are not added.
+- **[gap]** The area figure takes the whole slab on the level (or an area typed in a script); waits beyond the platform (concourse, fare gates) are not added.

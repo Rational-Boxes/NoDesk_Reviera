@@ -109,6 +109,23 @@ fn a_platform_clears_through_its_stairs_and_half_from_its_escalators() {
     assert!((f(&c["platform_time"]) - 400.0 / (83.25 + f(&c["counted"]))).abs() < 1e-6);
     // Too many for the stairs alone within 4 minutes.
     assert_eq!(ok(&mut app, "egress.platform_clearing", args(400.0, "ibc"))["meets_platform"], false);
+
+    // The load worked out (NFPA 130 5.5.5.1): two trains entering at once and those waiting,
+    // against a 40 × 10 m platform at 0.65 m² a person (615): the trains (650) govern.
+    let lp = ok(&mut app, "level.list", json!({}))[0]["id"].clone();
+    let sq = [[0.0, 0.0], [40.0, 0.0], [40.0, 10.0], [0.0, 10.0]];
+    let loop_: Vec<Value> = (0..4).map(|i| json!({ "line": { "start": sq[i], "end": sq[(i + 1) % 4] } })).collect();
+    ok(&mut app, "floor.create", json!({ "loops": [loop_], "level_id": lp }));
+    let occ = |o: Value| json!({ "level": platform, "occupancy": o, "remote": [40.0, 4.0], "safety": { "point": [20.0, 4.0], "level": concourse } });
+    let c = ok(&mut app, "egress.platform_clearing", occ(json!({ "trains": [300.0, 250.0], "entraining": 100.0, "area_per_person": 0.65 })));
+    assert_eq!((f(&c["load"]), c["load_basis"]["from"].as_str()), (650.0, Some("trains")), "{c:#}");
+    assert!((f(&c["load_basis"]["area"]) - 400.0).abs() < 1e-6 && (f(&c["load_basis"]["by_area"]) - 400.0 / 0.65).abs() < 1e-6);
+    // A larger area given: the area governs.
+    let c = ok(&mut app, "egress.platform_clearing", occ(json!({ "trains": [300.0, 250.0], "entraining": 100.0, "area_per_person": 0.65, "area": 520.0 })));
+    assert_eq!((f(&c["load"]), c["load_basis"]["from"].as_str()), (800.0, Some("area")));
+    // A load and an occupancy together are refused.
+    let both = json!({ "level": platform, "load": 100.0, "occupancy": { "trains": [100.0] }, "remote": [40.0, 4.0], "safety": { "point": [20.0, 4.0], "level": concourse } });
+    assert!(app.execute("egress.platform_clearing", both, &Caller::user()).is_err());
 }
 
 #[test]

@@ -1201,7 +1201,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `editrequest.manage` | 6 | — | () | No | COL-OWN-003 |
 | `editrequest.retract` | 6 | request_id | () | No | COL-OWN-003 |
 | `egress.draw_route` | 4 | start: {point, level}, end: {point, level}, mode?, lifts?, lift_wait? | {legs, links, length, time, paths[], unplanned[]} | Yes | ANA-ROUTE-004 |
-| `egress.platform_clearing` | 4 | level, load, remote, safety: {point, level}, mode? | {exits[], capacity, platform_time, safety_time, meets_platform, meets_safety, …} | No (query) | ANA-ROUTE-005 |
+| `egress.platform_clearing` | 4 | level, load? \ | occupancy?: {trains[], entraining?, area_per_person?, area?}, remote, safety: {point, level}, mode? | {exits[], capacity, platform_time, safety_time, meets_platform, meets_safety, …} | No (query) |
 | `egress.route` | 4 | start: {point, level}, end: {point, level}, mode?, lifts?, lift_wait? | {legs, links, length, time} | No (query) | ANA-ROUTE-004 |
 | `electrical_analytical.add_node` | 4 | kind, parent_id?, distribution_system_id? | id | Yes | MEP-ELEC-020 |
 | `electrical_analytical.rollup` | 4 | root_id | report | No | MEP-ELEC-020 |

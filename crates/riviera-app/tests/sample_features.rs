@@ -1102,6 +1102,10 @@ fn the_station_sample_keeps_its_transit_pair_and_run_off() {
     let c = ok(&mut app, "egress.platform_clearing", json!({ "level": platform, "load": 500, "remote": [64.0, 4.0], "safety": { "point": [64.0, 20.0], "level": concourse } }));
     println!("platform {:.2} min, walking {:.2} + waiting {:.2} = {:.2} min", f(&c["platform_time"]), f(&c["walking_time"]), f(&c["wait"]), f(&c["safety_time"]));
     assert_eq!((c["meets_platform"].clone(), c["meets_safety"].clone()), (json!(true), json!(true)), "{c:#}");
+    // Worked out from the trains, the same 500; at a dense station's area figure, the slab governs.
+    let dense = ok(&mut app, "egress.platform_clearing", json!({ "level": platform, "occupancy": { "trains": [350], "entraining": 150, "area_per_person": 0.65 }, "remote": [64.0, 4.0], "safety": { "point": [64.0, 20.0], "level": concourse } }));
+    println!("dense: {:.0} m², {:.0} people, {:.1} min", f(&dense["load_basis"]["area"]), f(&dense["load"]), f(&dense["platform_time"]));
+    assert_eq!((dense["load_basis"]["from"].as_str(), dense["meets_platform"].as_bool()), (Some("area"), Some(false)));
 }
 
 #[test]

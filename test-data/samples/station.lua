@@ -66,13 +66,22 @@ riviera.view.create_plan{ level_ids = { platform, concourse } }
 local drawn = riviera.egress.draw_route{ start = from, ["end"] = exit, mode = "nfpa130" }
 assert(#drawn.paths == 2 and #drawn.unplanned == 0, "a path of travel on each level")
 
--- NFPA 130's two tests for the platform, its 500 people (a train load and those waiting): out
+-- NFPA 130's two tests for the platform, its 500 people (a train of 350 entering and 150 waiting
+-- to board, NFPA 130 5.5.5.1): out
 -- through the stair (1500 mm at 0.0555 a minute a millimetre, 83 a minute) and the escalators
 -- (one out, the other counted up to the stairs' share) within 4 minutes; and from its far end to
 -- the concourse exit within 6, walked at 37.7 m/min, climbed at 15 m/min, with the wait at the
 -- escalator.
-local clearing = riviera.egress.platform_clearing{ level = platform, load = 500, remote = { 64.0, 4.0 }, safety = exit }
+local clearing = riviera.egress.platform_clearing{ level = platform, occupancy = { trains = { 350 }, entraining = 150 }, remote = { 64.0, 4.0 }, safety = exit }
+assert(clearing.load == 500 and clearing.load_basis.from == "trains", "the trains govern")
 print(string.format("platform %.2f min, to safety %.2f min", clearing.platform_time, clearing.safety_time))
 assert(clearing.meets_platform and clearing.meets_safety, "the platform clears in time")
 local stairs_only = riviera.egress.platform_clearing{ level = platform, load = 500, remote = { 64.0, 4.0 }, safety = exit, mode = "ibc" }
 assert(not stairs_only.meets_platform, "the stair alone is too narrow")
+
+-- The area figure for a station serving a dense neighbourhood, 7 ft² (0.65 m²) a person over the
+-- whole 70 × 24 m platform slab (1,680 m², 2,585 people), is far more than the trains bring: it
+-- governs, and the platform takes 15.5 minutes to clear. A real platform's area stops at the train's length.
+local dense = riviera.egress.platform_clearing{ level = platform, occupancy = { trains = { 350 }, entraining = 150, area_per_person = 0.65 }, remote = { 64.0, 4.0 }, safety = exit }
+assert(dense.load_basis.from == "area" and not dense.meets_platform, "the area governs")
+print(string.format("dense: %.0f m², %.0f people, %.1f min", dense.load_basis.area, dense.load, dense.platform_time))
