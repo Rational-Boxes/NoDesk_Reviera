@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Riviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Riviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 900 numbered requirements (320 P0 · 343 P1 · 230 P2 · 7 P3), 2,349 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 902 numbered requirements (320 P0 · 343 P1 · 232 P2 · 7 P3), 2,353 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Riviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Riviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,349 commands; 900 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,353 commands; 902 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -14369,6 +14369,51 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 
 *Built (2026-11-05):* `riviera_core::funiculars`, the Funicular action; the sample *A funicular up a hillside* (an IFC 4.3 project: 327 m rising 100 m, steepest 43.75 %, 75 s a trip, 1,594 an hour each way). Not yet: IFC 4.3 classes (IfcRailway "FUNICULAR", IfcRail, IfcVehicle × 2, HAULINGGEAR), stations and platforms (stepped or level), the haul rope and pulleys, the walkway, tunnels and viaducts, three-rail layouts, bottom tail ropes, levelling cabins.
 
+### 3.7a.25 APM guideways
+**ID:** ARC-VT-025 · **Priority:** P2 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §7 (step 10); research/16 Q3 B2 and Q5 (ACRP Report 37); ARC-ALN-001; EXPERT_REVIEW E-99
+
+**Purpose.** An automated people mover's guideway along an alignment, its lanes' dynamic envelopes kept clear, checked for its curves, grades and line capacity.
+
+**Behaviour & rules.**
+- `apm.guideway(alignment_id, lanes?, track_separation?, walkway?)` makes a deck along the alignment:
+  - **lanes:** 1 or 2 (default 2), `track_separation` apart (default 4.75 m, at least an envelope's width);
+  - **walkway:** an emergency walkway 0.61 m wide on the left (default on);
+  - **object:** the deck is 0.6 m deep (USERDEFINED "APMGUIDEWAY", `Riviera_ApmGuideway`).
+- **Dynamic envelopes:** each lane's dynamic envelope, 3.66 m wide and 3.6 m above the running surface, is a virtual volume for Check Clearances (`apm_envelope`). Its alignment and the stations' trains may stand in it.
+- `apm.check(headway?, cars?, passengers?, demand?)` reports, for each guideway:
+  - **curves:** below 91 m (the mainline radius) a warning, below 46 m (the least) an error;
+  - **grades:** steeper than 6 % between stations, or than 0.5 % at a station (stations are level);
+  - **stations on a curve:** a warning, as platforms are straight to keep the gap to the doors;
+  - **capacity:** the line's capacity each way is 3600 ÷ `headway` × `cars` × `passengers` (defaults 120 s, 2, 60). It is reported against `demand`, and a headway under 90 s is noted.
+- `apm.list` lists the guideways with their stations in chainage order.
+- **In the window:** Architecture › Circulation › *APM Guideway* on the selected alignment.
+
+**Acceptance criteria.**
+- [x] A two-lane guideway with a walkway along a level alignment with a 120 m curve has a 9.02 m deck, two clear envelopes, and nothing to report at 3,600 an hour for a 3,000 demand. A 60 s headway is noted, and an 8,000 demand reported. An 8 % grade, a 60 m curve (a warning) and a 40 m curve (an error) are reported on another.
+
+*Built (2026-11-05):* `riviera_core::apm`, the APM Guideway action; the sample *An airport people mover*. Not yet: spans, columns and footings, crossovers and switches, the power rail, superelevation and spirals, maintenance and storage, IFC 4.3's railway classes (IfcRailwayPart TRACK, IfcVehicle).
+
+### 3.7a.26 APM stations
+**ID:** ARC-VT-026 · **Priority:** P2 · **Ref:** ARC-VT-025; research/16 Q5 (APM station); EXPERT_REVIEW E-99
+
+**Purpose.** Stations along an APM guideway, with platforms the length of the train at the vehicle floor and the train standing at them.
+
+**Behaviour & rules.**
+- `apm.station(guideway_id, station, name?, platform?, cars?, platform_width?, screen_doors?)` places a station whose middle is at chainage `station`:
+  - **platform:** `side` platforms outside the lanes (the default), or one `centre` platform between two lanes far enough apart (the envelope and the platform);
+  - **length:** the train (`cars` × 12.2 m, default 2 cars, at most 6) and 6 m;
+  - **width and height:** `platform_width` wide (default 4 m), at the vehicle floor 1 m above the running surface;
+  - **the train:** standing at the platform on each lane;
+  - **screen doors:** platform screen doors, on by default.
+  - A station running off the guideway is refused.
+- The station is a transport object (USERDEFINED "APMSTATION", `Riviera_ApmStation`).
+- **In the window:** Architecture › Circulation › *APM Station* on the selected guideway: the chainage typed, or clicked beside the guideway and found with `alignment.station_of`.
+
+**Acceptance criteria.**
+- [x] A two-car station with side platforms has a 30.4 m platform and screen doors. A station on the curve is reported. A centre platform between lanes 4.75 m apart is refused, and accepted at 8 m. The guideway lists its stations in chainage order.
+
+*Built (2026-11-05):* in `riviera_core::apm`, the APM Station action; three stations in the sample. Not yet: platform clearing (ANA-ROUTE-005) on APM platforms, vertical circulation and equipment rooms, door sets per car, vehicles as their own elements.
+
 ---
 
 ## 3.8 Openings
@@ -16768,6 +16813,10 @@ All commands below are registered once in the command registry and exposed autom
 | `funicular.create` | alignment_id, layout?, gauge?, car_length?, car_width?, car_height?, car_floor?, car_capacity?, speed?, dwell?, walkway? | {funicular, length, rise, max_grade, passing_loop, trip, capacity, …} | Yes | ARC-VT-024 |
 | `funicular.list` | — | [{funicular, layout, gauge, length, rise, max_grade, trip, capacity, …}] | No (query) | ARC-VT-024 |
 | `funicular.check` | demand? | [{funicular, severity, rule, message}] | No (query) | ARC-VT-024 |
+| `apm.guideway` | alignment_id, lanes?, track_separation?, walkway? | {guideway, lanes, track_separation, deck_width, length, …} | Yes | ARC-VT-025 |
+| `apm.station` | guideway_id, station, name?, platform?, cars?, platform_width?, screen_doors? | {station_id, platform_length, …} | Yes | ARC-VT-026 |
+| `apm.list` | — | [{guideway, lanes, length, stations[]}] | No (query) | ARC-VT-025, ARC-VT-026 |
+| `apm.check` | headway?, cars?, passengers?, demand? | {capacity, findings[]} | No (query) | ARC-VT-025, ARC-VT-026 |
 | `fare_line.create` | level, start, toward, kind?, count, wide?, emergency? | {fare_line, level, start, direction, aisles[], length, capacity} | Yes | ARC-VT-022 |
 | `fare_line.list` | — | [{fare_line, level_name, aisles[], length, capacity, …}] | No (query) | ARC-VT-022 |
 | `enclosure.create` | form, footprint \| host_wall_ids, level_id, params | element_id | Yes | ARC-GLZ-001 |
@@ -30155,14 +30204,14 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 39 | 8 | 0 | 123 |
 | DM | 91 | 65 | 34 | 3 | 193 |
-| ARC | 77 | 101 | 34 | 1 | 213 |
+| ARC | 77 | 101 | 36 | 1 | 215 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 32 | 0 | 33 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
 | COL | 8 | 52 | 16 | 1 | 77 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **343** | **230** | **7** | **900** |
+| **Total** | **320** | **343** | **232** | **7** | **902** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -30373,7 +30422,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2349 unique commands** in 439 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2353 unique commands** in 440 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -30401,6 +30450,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `analytical_water_loop` | 1 |
 | `anchor_pattern` | 1 |
 | `api` | 7 |
+| `apm` | 4 |
 | `app` | 1 |
 | `area` | 2 |
 | `area_reinforcement` | 2 |
@@ -30901,6 +30951,10 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `api.profile.test` | 6 | profile_id | report | No | COL-API-001 |
 | `api.signin` | 6 | profile_id | status | No | COL-API-001 |
 | `api.signout` | 6 | profile_id | () | No | COL-API-001 |
+| `apm.check` | 3 | headway?, cars?, passengers?, demand? | {capacity, findings[]} | No (query) | ARC-VT-025, ARC-VT-026 |
+| `apm.guideway` | 3 | alignment_id, lanes?, track_separation?, walkway? | {guideway, lanes, track_separation, deck_width, length, …} | Yes | ARC-VT-025 |
+| `apm.list` | 3 | — | [{guideway, lanes, length, stations[]}] | No (query) | ARC-VT-025, ARC-VT-026 |
+| `apm.station` | 3 | guideway_id, station, name?, platform?, cars?, platform_width?, screen_doors? | {station_id, platform_length, …} | Yes | ARC-VT-026 |
 | `app.exit` | 1 | `force?: bool` | `()` | No | UI-FILE-001 |
 | `area.place` | 3 | view_id, point, area_type?, name?, number? | element_id | Yes | ARC-AREA-001 |
 | `area.unplace` | 3 | ids | — | Yes | ARC-AREA-001 |

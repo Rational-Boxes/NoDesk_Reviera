@@ -1198,6 +1198,18 @@ fn the_funicular_sample_keeps_its_loop_and_capacity() {
 }
 
 #[test]
+fn the_apm_sample_keeps_its_stations_and_capacity() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "apm");
+    let list = ok(&mut app, "apm.list", json!({}));
+    let names: Vec<&str> = list[0]["stations"].as_array().unwrap().iter().map(|s| s["name"].as_str().unwrap()).collect();
+    assert_eq!(names, ["Landside", "Concourse A", "Concourse B"], "{list:#}");
+    let c = ok(&mut app, "apm.check", json!({ "headway": 120.0, "cars": 2, "passengers": 60.0, "demand": 3000.0 }));
+    assert_eq!((f(&c["capacity"]), c["findings"].as_array().unwrap().len()), (3600.0, 0), "{c:#}");
+    assert_eq!(ok(&mut app, "clearance.check", json!({})), json!([]));
+}
+
+#[test]
 fn the_escalators_sample_keeps_its_units_and_openings() {
     let work = tempfile::tempdir().unwrap();
     let mut app = open(work.path(), "escalators");

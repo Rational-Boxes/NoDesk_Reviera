@@ -595,6 +595,10 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(FunicularCreate),
         registry.add(FunicularList),
         registry.add(FunicularCheck),
+        registry.add(ApmGuideway),
+        registry.add(ApmStation),
+        registry.add(ApmList),
+        registry.add(ApmCheck),
         registry.add(LibraryReloadItem),
         registry.add(PublishListSets),
         registry.add(PublishRemoveSet),
@@ -7679,4 +7683,53 @@ read_command!(
     Option<crate::funiculars::CheckParams>,
     Vec<crate::funiculars::Finding>,
     crate::funiculars::check
+);
+
+edit_command!(
+    ApmGuideway,
+    "apm.guideway",
+    "Create an APM guideway",
+    "An automated people mover's guideway along an alignment (ARC-VT-025): a deck of 1 or 2 `lanes` \
+     (default 2, `track_separation` 4.75 m apart) with an emergency walkway (default on), each lane's \
+     3.66 m wide, 3.6 m high dynamic envelope kept clear for Check Clearances.",
+    "New APM Guideway",
+    crate::apm::GuidewayParams,
+    crate::apm::GuidewayCreated,
+    crate::apm::create_guideway
+);
+
+edit_command!(
+    ApmStation,
+    "apm.station",
+    "Create an APM station",
+    "A station on an APM guideway at a chainage (ARC-VT-026): side platforms outside the lanes or a centre \
+     platform between two lanes far enough apart, as long as the train (`cars` × 12.2 m) and 6 m, at the \
+     vehicle floor 1 m above the running surface, with the train standing at it; platform screen doors \
+     (default on).",
+    "New APM Station",
+    crate::apm::StationParams,
+    crate::apm::StationCreated,
+    crate::apm::create_station
+);
+
+read_command!(
+    ApmList,
+    "apm.list",
+    "List the APM guideways",
+    "Lists the model's APM guideways and their stations in chainage order (ARC-VT-025, ARC-VT-026).",
+    Option<crate::apm::NoParams>,
+    Vec<crate::apm::GuidewayInfo>,
+    crate::apm::list
+);
+
+read_command!(
+    ApmCheck,
+    "apm.check",
+    "Check APM guideways and service",
+    "Checks each APM guideway (ARC-VT-025/026): curve radii (91 m mainline, 46 m least), grades (6 % between \
+     stations, level in them), stations on curves; and the line's capacity each way, 3600 ÷ `headway` × `cars` \
+     × `passengers`, against `demand`, with headways under 90 s noted.",
+    Option<crate::apm::CheckParams>,
+    crate::apm::Check,
+    crate::apm::check
 );

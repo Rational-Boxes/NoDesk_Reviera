@@ -180,8 +180,23 @@ The sample <a href="riviera:sample/funicular">A funicular up a hillside</a> has 
   way.</li>
   <li>It reports the track along the slope, the rise, the steepest grade, the trip time and how
   many people an hour it carries each way.</li>
-  <li><code>funicular.check</code> compares that with a demand, and notes a gauge outside 762–1524
+  <li><code>funicular.check</code>, <code>apm.guideway</code>, <code>apm.station</code>, <code>apm.list</code>, <code>apm.check</code> compares that with a demand, and notes a gauge outside 762–1524
   mm and a track without an evacuation walkway.</li>
+</ul>
+
+<h2 id="apm">Automated people movers</h2>
+<p><b>Architecture › Circulation › APM Guideway</b> lays a guideway of one or two lanes along the
+selected alignment, with an emergency walkway. Each lane's dynamic envelope, 3.66 m wide and 3.6 m
+high, is kept clear for Check Clearances. <b>APM Station</b> puts a station on the selected
+guideway at a chainage, typed or clicked: side or centre platforms as long as the train, with
+screen doors and the train standing at them. The sample <a href="riviera:sample/apm">An airport
+people mover</a> has three stations.</p>
+<ul>
+  <li><code>apm.check</code> reports curves tighter than 91 m (46 m at the least), grades over 6 %
+  between stations or any grade at a station, and stations on curves.</li>
+  <li>It also gives the line's capacity each way, 3600 ÷ headway × cars × persons a car, against
+  a demand.</li>
+  <li>These are planning values (ACRP Report 37); ASCE 21's own are not public.</li>
 </ul>
 
 <h2 id="zones">Hoistway and landing zones</h2>

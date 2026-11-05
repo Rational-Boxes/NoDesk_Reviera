@@ -840,6 +840,18 @@ icon = "escalator"
 help = "Two counterbalanced cars on one haul rope along the selected alignment, from its start (the bottom station) to its end: two rails with an Abt passing loop half way, or four rails; reports the trip and the capacity each way (ARC-VT-024)"
 
 [[action]]
+id = "ui.apm_guideway"
+label = "APM Guideway"
+icon = "escalator"
+help = "An automated people mover's guideway along the selected alignment: one or two lanes, each lane's dynamic envelope kept clear, an emergency walkway (ARC-VT-025)"
+
+[[action]]
+id = "ui.apm_station"
+label = "APM Station"
+icon = "escalator"
+help = "A station on the selected APM guideway at a chainage, typed or clicked: side or centre platforms as long as the train, with screen doors (ARC-VT-026)"
+
+[[action]]
 id = "ui.fare_line"
 label = "Fare Line"
 icon = "escalator_check"
@@ -3655,6 +3667,8 @@ tools = [
   { action = "ui.fare_line", size = "small" },
   { action = "ui.inclined_elevator", size = "small" },
   { action = "ui.funicular", size = "small" },
+  { action = "ui.apm_guideway", size = "small" },
+  { action = "ui.apm_station", size = "small" },
   { action = "escalator.check", size = "small" },
   { action = "ui.stairlift", size = "large" },
   { action = "stairlift.check", size = "small" },
@@ -4852,7 +4866,7 @@ items = [
   "room.place", "room.place_automatically", "-",
   "roof.create_extrusion", "slabedge.create", "enclosure.create", "roof.create_geodesic", "growing.layout", "growing.lights", "-",
   "ui.place_bathroom_component", "ui.bathroom_layout", "ui.toilet_core", "ui.locker_room", "ui.sauna", "ui.steam_room", "ui.tiles", "ui.shower_falls", "ui.waterproofing", "ui.make_product", "ui.swap_for_product", "ui.product_documents", "bath.place_grab_bars", "bath.check", "ui.fixture_count", "-",
-  "ui.elevator", "elevator.check", "ui.elevator_traffic", "ui.elevator_egress_role", "ui.check_lobbies", "ui.escalator", "ui.fare_line", "ui.inclined_elevator", "ui.funicular", "escalator.check", "ui.stairlift", "stairlift.check", "-",
+  "ui.elevator", "elevator.check", "ui.elevator_traffic", "ui.elevator_egress_role", "ui.check_lobbies", "ui.escalator", "ui.fare_line", "ui.inclined_elevator", "ui.funicular", "ui.apm_guideway", "ui.apm_station", "escalator.check", "ui.stairlift", "stairlift.check", "-",
   "opening.create_wall", "opening.create_vertical", "opening.create_by_face", "opening.create_shaft", "-",
   "grid.create", "level.create", "refplane.create", "modelline.create", "-",
   "workplane.set", "workplane.show",

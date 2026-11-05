@@ -458,6 +458,106 @@ impl Gui {
         );
     }
 
+    /// The first selected element `keep` accepts.
+    fn selected_where(&mut self, keep: impl Fn(&riviera_core::Element) -> bool) -> Option<riviera_core::ElementId> {
+        let selected = self.selection();
+        let store = self.doc.and_then(|d| self.app.document(d)).map(|d| d.doc.store())?;
+        selected.into_iter().find(|id| store.get(*id).is_some_and(&keep))
+    }
+
+    /// Architecture › Circulation › APM Guideway (ARC-VT-025): along the selected alignment.
+    pub(crate) fn place_apm_guideway(&mut self) {
+        let frame = self.frame;
+        let Some(line) = self.selected_where(|e| riviera_core::alignments::recipe(e).is_some()) else {
+            return error(&frame, "Select the alignment the guideway runs along first (Massing & Site › Alignment).");
+        };
+        let f = super::reinforcement_ui::Form::new(&frame, "APM Guideway");
+        let lanes = f.choice("Lanes", &["Two (dual lane)".to_owned(), "One (single lane)".to_owned()], 0);
+        let sep = f.text("Track separation (m)", "4.75", "Between the lanes' centres: 4.6–4.9 m beside the way, 6.7 m at crossovers");
+        let walkway = f.check("Walkway", "An emergency walkway along the deck", true);
+        let ok = f.show("Each lane's 3.66 m dynamic envelope is kept clear for Check Clearances.", "Place");
+        let mut args = json!({ "alignment_id": line, "lanes": if lanes.get_selection() == Some(1) { 1 } else { 2 }, "walkway": walkway.is_checked() });
+        if let Ok(v) = sep.get_value().trim().parse::<f64>() {
+            args["track_separation"] = json!(v);
+        }
+        f.dialog.destroy();
+        if !ok {
+            return;
+        }
+        match self.run("apm.guideway", args) {
+            Ok(g) => {
+                self.refresh_scene(&frame);
+                frame.set_status_text(&format!("APM guideway: {:.0} m, deck {:.2} m wide", g["length"].as_f64().unwrap_or(0.0), g["deck_width"].as_f64().unwrap_or(0.0)), 0);
+            }
+            Err(e) => error(&frame, &format!("Could not place the guideway:\n{e}")),
+        }
+    }
+
+    /// Architecture › Circulation › APM Station (ARC-VT-026): on the selected guideway, at a typed
+    /// chainage or where it is clicked.
+    pub(crate) fn place_apm_station(&mut self) {
+        let frame = self.frame;
+        let Some(gid) = self.selected_where(|e| riviera_core::apm::guideway(e).is_some()) else {
+            return error(&frame, "Select the APM guideway first.");
+        };
+        let f = super::reinforcement_ui::Form::new(&frame, "APM Station");
+        let name = f.text("Name", "", "Empty: Station n");
+        let at = f.text("Chainage (m)", "", "Of its middle; empty: click it beside the guideway in a plan");
+        let platform = f.choice("Platform", &["Side platforms".to_owned(), "Centre platform (lanes far enough apart)".to_owned()], 0);
+        let cars = f.text("Cars a train", "2", "1 to 6; the platform is the train and 6 m");
+        let width = f.text("Platform width (m)", "4", "");
+        let doors = f.check("Screen doors", "Platform screen doors", true);
+        let ok = f.show("Platforms at the vehicle floor, 1 m above the running surface, with the train at them.", "Place");
+        let mut args = json!({ "guideway_id": gid, "platform": if platform.get_selection() == Some(1) { "centre" } else { "side" }, "screen_doors": doors.is_checked() });
+        if !name.get_value().trim().is_empty() {
+            args["name"] = json!(name.get_value().trim());
+        }
+        if let Ok(v) = cars.get_value().trim().parse::<u32>() {
+            args["cars"] = json!(v);
+        }
+        if let Ok(v) = width.get_value().trim().parse::<f64>() {
+            args["platform_width"] = json!(v);
+        }
+        let typed = at.get_value().trim().parse::<f64>().ok();
+        f.dialog.destroy();
+        if !ok {
+            return;
+        }
+        match typed {
+            Some(s) => {
+                args["station"] = json!(s);
+                self.apm_station_run(args);
+            }
+            None => self.start_picking("apm.station", vec![json!({ "key": "at", "kind": "point", "prompt": "APM station: click where its middle is, beside the guideway; Esc ends" })], args),
+        }
+    }
+
+    /// Places an APM station, its chainage from a clicked point when there is one.
+    pub(crate) fn apm_station_run(&mut self, mut args: Value) {
+        let frame = self.frame;
+        if let Some(p) = args.as_object_mut().and_then(|o| o.remove("at")) {
+            let gid = args["guideway_id"].clone();
+            let line = self.doc.and_then(|d| self.app.document(d)).and_then(|d| {
+                let store = d.doc.store();
+                let g = store.resolve(&serde_json::from_value(gid).ok()?)?;
+                let guid = riviera_core::apm::guideway(store.get(g)?)?.alignment;
+                store.find_by_guid(&riviera_core::GlobalId::parse(&guid)?)
+            });
+            let Some(line) = line else { return error(&frame, "The guideway's alignment is gone.") };
+            match self.run("alignment.station_of", json!({ "alignment_id": line, "point": p })) {
+                Ok(v) => args["station"] = v["station"].clone(),
+                Err(e) => return error(&frame, &e),
+            }
+        }
+        match self.run("apm.station", args) {
+            Ok(st) => {
+                self.refresh_scene(&frame);
+                frame.set_status_text(&format!("APM station at {:.1}: platform {:.1} m long", st["station"].as_f64().unwrap_or(0.0), st["platform_length"].as_f64().unwrap_or(0.0)), 0);
+            }
+            Err(e) => error(&frame, &format!("Could not place the station:\n{e}")),
+        }
+    }
+
     /// Architecture › Circulation › Fare Line (ARC-VT-022): a row of fare gates on this plan's
     /// level, then a click where it starts (or a typed point).
     pub(crate) fn place_fare_line(&mut self) {

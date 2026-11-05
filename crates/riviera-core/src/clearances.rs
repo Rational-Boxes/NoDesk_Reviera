@@ -90,6 +90,8 @@ pub enum ClearanceKind {
     StairliftLanding,
     /// An inclined elevator's level landing at a gate (ARC-VT-023).
     InclinedLanding,
+    /// An APM lane's dynamic envelope (ARC-VT-025).
+    ApmEnvelope,
 }
 
 impl ClearanceKind {
@@ -112,6 +114,7 @@ impl ClearanceKind {
             Self::StairliftRun => "Clearance:stairlift_run/3d",
             Self::StairliftLanding => "Clearance:stairlift_landing/3d",
             Self::InclinedLanding => "Clearance:inclined_landing/3d",
+            Self::ApmEnvelope => "Clearance:apm_envelope/3d",
         }
     }
 
@@ -133,6 +136,7 @@ impl ClearanceKind {
             Self::StairliftRun => "stairlift running envelope",
             Self::StairliftLanding => "stairlift landing",
             Self::InclinedLanding => "inclined elevator landing",
+            Self::ApmEnvelope => "APM dynamic envelope",
         }
     }
 }
@@ -323,6 +327,7 @@ pub fn all(store: &Store) -> Vec<Clearance> {
     out.extend(crate::escalators::zones(store));
     out.extend(crate::stairlifts::zones(store));
     out.extend(crate::inclined_elevators::zones(store));
+    out.extend(crate::apm::zones(store));
     out
 }
 
@@ -337,6 +342,9 @@ pub fn may_share(store: &Store, kind: ClearanceKind, other: ElementId) -> bool {
     }
     if kind == ClearanceKind::InclinedLanding {
         return crate::inclined_elevators::may_share(store, other);
+    }
+    if kind == ClearanceKind::ApmEnvelope {
+        return crate::apm::may_share(store, other);
     }
     if matches!(kind, ClearanceKind::Hoistway | ClearanceKind::ElevatorLanding | ClearanceKind::MachineSpace) {
         return crate::elevators::may_share(store, other);

@@ -316,6 +316,7 @@ impl Gui {
             Some("egress.route") => self.egress_route_run(args),
             Some("egress.platform_clearing") => self.platform_clearing_run(args),
             Some("inclined_elevator.create") => self.inclined_elevator_run(args),
+            Some("apm.station") => self.apm_station_run(args),
             _ => {}
         }
     }

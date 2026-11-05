@@ -53,6 +53,7 @@ pub const RESERVED_DOMAINS: &[&str] = &[
     "alignment",
     "inclined_elevator",
     "funicular",
+    "apm",
     "stairlift",
     "grab_bar",
     "vent",
