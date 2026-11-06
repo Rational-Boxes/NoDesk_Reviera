@@ -91,6 +91,21 @@ fn an_ifc4x3_project_writes_an_ifc_alignment_with_its_layouts() {
     let arc = rows.iter().find(|r| r.class == "IFCALIGNMENTHORIZONTALSEGMENT" && r.attributes.contains(".CIRCULARARC.")).expect("the curve");
     assert!(arc.attributes.contains("30.") && !arc.attributes.contains("-30."), "turning left, radius 30: {}", arc.attributes);
     assert_eq!(rows.iter().filter(|r| r.class == "IFCALIGNMENTVERTICALSEGMENT" && r.attributes.contains(".PARABOLICARC.")).count(), 1);
+    // Its geometry: a composite curve of a line, an arc and a line; its start chainage on a STATION
+    // referent; placed, and aggregated in the project.
+    let geometry = |rows: &[riviera_ifc::StepRow]| {
+        let c = |class: &str| rows.iter().filter(|r| r.class == class).count();
+        (c("IFCCOMPOSITECURVE"), c("IFCCURVESEGMENT"), c("IFCCIRCLE"), c("IFCREFERENT"))
+    };
+    assert_eq!(geometry(&rows), (1, 3, 1, 1));
+    let curve = rows.iter().find(|r| r.class == "IFCSHAPEREPRESENTATION" && r.attributes.contains("'Axis'") && r.attributes.contains("'Curve2D'"));
+    assert!(curve.is_some(), "an Axis Curve2D representation");
+    assert!(rows.iter().any(|r| r.class == "IFCREFERENT" && r.attributes.contains(".STATION.")));
+    assert!(rows.iter().any(|r| r.class == "IFCPROPERTYSET" && r.attributes.contains("'Pset_Stationing'")));
+    assert!(rows.iter().any(|r| r.class == "IFCPROPERTYSINGLEVALUE" && r.attributes.contains("'Station'") && r.attributes.contains("IFCLENGTHMEASURE(1000.")));
+    let alignment = rows.iter().find(|r| r.class == "IFCALIGNMENT").unwrap();
+    assert!(!alignment.attributes.contains(",$,$,$)"), "placed and represented: {}", alignment.attributes);
+    assert!(rows.iter().any(|r| r.class == "IFCRELAGGREGATES" && r.attributes.contains(&format!("#{}", alignment.id.0))));
 
     // Opened again: the same alignment, its layouts not read as elements.
     let mut again = App::new(AppConfig { live: None, untitled_dir: dir.path().join("untitled2") });
@@ -102,6 +117,8 @@ fn an_ifc4x3_project_writes_an_ifc_alignment_with_its_layouts() {
     ok(&mut again, "file.save", json!({}));
     let rows = riviera_ifc::IfcModel::open(&model).unwrap().step_rows().unwrap();
     assert_eq!(rows.iter().filter(|r| r.class == "IFCALIGNMENTSEGMENT").count(), 6);
+    assert_eq!(geometry(&rows), (1, 3, 1, 1), "replaced, not doubled");
+    assert_eq!(rows.iter().filter(|r| r.class == "IFCLINE").count(), 2);
 }
 
 #[test]

@@ -39,5 +39,6 @@ Start with **File › New IFC 4.3 Project**: in an IFC 4.3 project the drive is 
 ## Gaps
 
 - **[gap]** No chainage labels in the plan yet, and no grips to move the points.
-- **[gap]** Spirals, cant and cross sections come later, and so do the `IfcAlignment`'s geometry
-  and its start chainage as a referent.
+- **[gap]** Spirals, cant and cross sections come later, and so does the vertical geometry (a
+  gradient curve). The horizontal geometry, the start chainage (a STATION referent) and the
+  layouts are written.

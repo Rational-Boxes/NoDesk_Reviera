@@ -15995,14 +15995,22 @@ All family-editor commands from the DM chapter can be used inside the session.
 - Its layouts are derived from the recipe at every save and nested in it (`IfcRelNests`):
   - an `IfcAlignmentHorizontal` of `IfcAlignmentSegment`s whose design parameters are `IfcAlignmentHorizontalSegment`s: `LINE` (radius 0) or `CIRCULARARC` (radius positive turning left, negative right), each with its start point, start direction (radians) and length;
   - with a profile, an `IfcAlignmentVertical` of `CONSTANTGRADIENT` and `PARABOLICARC` `IfcAlignmentVerticalSegment`s, each with its distance along the horizontal layout from its start, horizontal length, start height, start and end gradients and, for a curve, its length over its change of grade as the radius of curvature.
-- The layouts carry the `rxd:alignment` mark: they are replaced at the next save and never read as elements of their own.
+- **Geometry:** the alignment gets a placement at the origin and an `Axis` / `Curve2D` representation: an `IfcCompositeCurve` of `IfcCurveSegment`s, one a piece.
+  - A line is an `IfcLine` and an arc an `IfcCircle` of its radius, each cut from length 0.
+  - Each is placed at the piece's start point with its start direction as `RefDirection`, as the segment's start is its placement's reference point.
+  - A clockwise arc's `SegmentLength` is negative: it runs against the circle's sense.
+  - The joins are `CONTSAMEGRADIENT` and the last segment `DISCONTINUOUS`.
+- **Stationing:** an `IfcReferent` (STATION) named Start, nested in the alignment, carries the start chainage as `Pset_Stationing.Station`.
+- **Project:** the alignments are aggregated in the project (`IfcRelAggregates`).
+- The layouts, referent, stationing set, aggregation and representation carry the `rxd:alignment` mark or hang from the alignment. They are replaced at the next save and never read as elements of their own.
 - In an IFC4 project an alignment stays an `IfcAnnotation` ("Alignment").
 
 **Acceptance criteria.**
 - [x] An IFC4X3 project's alignment of a line, a 30 m left-hand curve and a line, with a profile of two grades and a parabolic curve, is written as one `IfcAlignment` with one horizontal and one vertical layout of three segments each (the curve's radius +30), once after two saves; opened again it is the same alignment, and saved again it is not doubled.
 - [x] In an IFC4 project the same alignment is an `IfcAnnotation` and no alignment entities are written.
+- [x] The IFC4X3 alignment has an `Axis` `Curve2D` representation of one composite curve of three curve segments (one an `IfcCircle`), a STATION referent with `Pset_Stationing.Station` 1000, a placement, and aggregation in the project, once after saving, reopening and saving again.
 
-*Built (2026-11-05):* `riviera_store::alignments`, File › New IFC 4.3 Project; the sample *A drive set out by chainage* is an IFC 4.3 project. Not yet: the start chainage as an `IfcReferent` with stationing (IFC 4.3 ADD2 has no `StartDistAlong` on the horizontal layout), the geometric representation (`IfcCompositeCurve`, `IfcGradientCurve`), `IfcAlignmentCant`, the alignment's aggregation to the project and reference in the site, reading other tools' `IfcAlignment`s without a recipe.
+*Built (2026-11-05):* `riviera_store::alignments`, File › New IFC 4.3 Project; the sample *A drive set out by chainage* is an IFC 4.3 project. Not yet: the vertical geometry (`IfcGradientCurve` over the composite curve), linear placements for referents and elements along the alignment, spirals (`IfcClothoid`), `IfcAlignmentCant`, reading other tools' `IfcAlignment`s without a recipe. The curve-segment conventions follow the IFC 4.3 documentation's attribute definitions; validation against bSI's checker is still to be done (E-96).
 
 ---
 
