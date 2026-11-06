@@ -47189,8 +47189,15 @@ Deleting an instance uses <code>element.delete</code> (Chapter 2).</p>
 <p>In HTML, rows whose severity is <code>error</code> or <code>note</code> are marked.
 - <strong>Where it goes.</strong> A local path, or, with FileEngine connected, a <code>fileengine://</code> address. The file is then uploaded into that FileEngine folder, as a new version of a file of the same name there, with metadata naming the command and the model (COL-FE-012). FileEngine stays optional: every report can be saved locally.
 - <strong>In the window.</strong>
-  - The findings dialogs of Check Bathrooms and Check Rules have <strong>Save Report…</strong> as their first row, and offer it when nothing is found.
-  - <strong>Manage › Settings › Save Report…</strong> (also in the File menu) lists the checks and reports and saves any of them.</p>
+  - Result dialogs offer <strong>Save Report…</strong>:
+    - finding lists as their first row: Check Bathrooms, Check Rules, Check Elevators, Check Lobbies, Check Escalators and Check Stairlifts;
+    - result messages beside Close: Elevator Traffic, Egress Route, Platform Clearing, Report Coordinates, Structural Analysis Results, and a check that finds nothing;
+    - result tables as a button: Heating &amp; Cooling Loads, Energy Model, Annual Energy, Embodied Carbon, Daylight, Solar, and Paths of Travel.</p>
+<pre><code>Each saves the command's result as shown, with the same arguments.
+</code></pre>
+<ul>
+<li><strong>Manage › Settings › Save Report…</strong> (also in the File menu) lists the checks and reports and saves any of them.</li>
+</ul>
 <p>Both ask for a local file. With FileEngine connected, they offer <em>Save to FileEngine…</em> with a folder and file name.
 - Reports that already write their own files (<code>bath.report</code>, <code>clash.export_report</code>, <code>structural_connection.check_report</code>, <code>docs.report</code>, <code>pressure_loss_report.export</code>, <code>profiler.export_report</code>) take FileEngine addresses in the same way.</p>
 <p><strong>Commands.</strong> <code>report.write(command, args?, path, format?: html|markdown|csv|json, title?) -&gt; {path, format, command, tables, rows}</code> · <code>report.list() -&gt; [{command, label, summary}]</code> <em>(query)</em></p>
@@ -47198,8 +47205,8 @@ Deleting an instance uses <code>element.delete</code> (Chapter 2).</p>
 - [x] <code>report.write</code> of <code>rules.check</code> to a <code>.html</code> path writes a page with the header and one table of findings, the error rows marked; to <code>.csv</code> the same findings one row each; to <code>.json</code> the findings as returned.
 - [x] A command that edits the model is refused.
 - [x] A report written to a <code>fileengine://</code> address is uploaded into that FileEngine folder.
-- [x] Check Bathrooms and Check Rules offer Save Report…, and Save Report… lists the checks.</p>
-<p><em>Built (2026-11-06):</em> <code>report.write</code> and <code>report.list</code> (<code>riviera-app</code> <code>report_files</code>), Save Report… in the two findings dialogs, and Manage › Settings › Save Report…. The reports that write their own files already took FileEngine addresses (COL-FE-012). Not yet: a Save Report… button in the other result dialogs (elevators, escalators, egress routes, platform clearing, lobbies, energy). Their commands are in Save Report…'s list, or <code>report.write</code> takes them directly. Reports in PDF are not built either.</p>
+- [x] The result dialogs above offer Save Report…, and Save Report… lists the checks. Every command they save is read-only.</p>
+<p><em>Built (2026-11-06):</em> <code>report.write</code> and <code>report.list</code> (<code>riviera-app</code> <code>report_files</code>), Save Report… in the result dialogs listed above (<code>report_message</code>, <code>pick_or_report</code>, and <code>list_dialog</code>'s <code>REPORT</code> button), and Manage › Settings › Save Report…. The reports that write their own files already took FileEngine addresses (COL-FE-012). <code>structural_connection.check</code> records the checks it makes, so it is not a report; its <code>check_report</code> writes its own file. Not yet: PDF reports. Results shown only in Properties rows (growing layouts, tile set-outs, connection status) are saved through Save Report…'s list or <code>report.write</code>.</p>
 <h3 id="background-jobs">Background jobs</h3>
 <p><strong>ID:</strong> <code class="rid" id="DOC-OUT-013">DOC-OUT-013</code> · <strong>Priority:</strong> <span class="pri pri-p1">P1</span> · <strong>Ref:</strong> research/04 §6.2 <em>Export in background</em></p>
 <p><strong>Behaviour &amp; rules.</strong>

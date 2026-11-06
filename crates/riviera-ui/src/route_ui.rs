@@ -136,7 +136,7 @@ impl Gui {
         let frame = self.frame;
         let levels: Vec<Value> = self.run("level.list", json!({})).ok().and_then(|v| v.as_array().cloned()).unwrap_or_default();
         let draw = args.as_object_mut().and_then(|o| o.remove("draw")).and_then(|v| v.as_bool()).unwrap_or(false);
-        let r = match self.run(if draw { "egress.draw_route" } else { "egress.route" }, args) {
+        let r = match self.run(if draw { "egress.draw_route" } else { "egress.route" }, args.clone()) {
             Ok(r) => r,
             Err(e) => return error(&frame, &format!("No route:\n{e}")),
         };
@@ -158,7 +158,8 @@ impl Gui {
             lines.push(format!("\nDrawn as {} path(s) of travel{}", r["paths"].as_array().map_or(0, Vec::len), if unplanned.is_empty() { String::new() } else { format!("; no floor plan on {}", unplanned.join(", ")) }));
         }
         lines.push(format!("\nIn all {:.1} m, {:.0} s ({:.1} min)", r["length"].as_f64().unwrap_or(0.0), r["time"].as_f64().unwrap_or(0.0), r["time"].as_f64().unwrap_or(0.0) / 60.0));
-        MessageDialog::builder(&frame, &lines.join("\n"), "Egress Route").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build().show_modal();
+        // The report is the route's (drawing it is an edit, not a report).
+        self.report_message("Egress Route", &lines.join("\n"), "egress.route", args);
     }
 
     /// Analyze › Route Analysis › Platform Clearing (ANA-ROUTE-005): NFPA 130's two tests for a
@@ -232,7 +233,7 @@ impl Gui {
     /// Runs NFPA 130's platform clearing and reports it.
     pub(crate) fn platform_clearing_run(&mut self, args: Value) {
         let frame = self.frame;
-        let c = match self.run("egress.platform_clearing", args) {
+        let c = match self.run("egress.platform_clearing", args.clone()) {
             Ok(c) => c,
             Err(e) => return error(&frame, &format!("Not worked out:\n{e}")),
         };
@@ -272,7 +273,7 @@ impl Gui {
         for n in c["notes"].as_array().cloned().unwrap_or_default() {
             lines.push(format!("\n{}", n.as_str().unwrap_or("")));
         }
-        MessageDialog::builder(&frame, &lines.join("\n"), "Platform Clearing").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build().show_modal();
+        self.report_message("Platform Clearing", &lines.join("\n"), "egress.platform_clearing", args);
     }
 
     /// Asks for points one click at a time in plans: each slot's `key` gets the point (`kind`
@@ -340,7 +341,9 @@ impl Gui {
                 ]
             })
             .collect();
-        super::mep_loads_ui::list_dialog(&frame, "Paths of Travel", "Each path's length and walking time (length ÷ walking speed).", &[("Path", 80), ("Length m", 90), ("Time s", 80), ("Waypoints", 80)], &rows, &[], None);
+        if super::mep_loads_ui::list_dialog(&frame, "Paths of Travel", "Each path's length and walking time (length ÷ walking speed).", &[("Path", 80), ("Length m", 90), ("Time s", 80), ("Waypoints", 80)], &rows, &[super::mep_loads_ui::REPORT], None).0 == super::mep_loads_ui::REPORT_BUTTON {
+            self.save_report("path_of_travel.list", json!({}), "Paths of Travel");
+        }
     }
 
     /// The paths of a plan: route lines and a label with length and time; selected ones lit.

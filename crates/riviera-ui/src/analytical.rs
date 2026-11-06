@@ -378,9 +378,6 @@ impl Gui {
         }
         self.frame
             .set_status_text("Structural analysis collected", 0);
-        let d = MessageDialog::builder(&self.frame, &text, "Structural Analysis Results")
-            .with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation)
-            .build();
-        d.show_modal();
+        self.report_message("Structural Analysis Results", &text, "structural_analysis.results", serde_json::json!({}));
     }
 }

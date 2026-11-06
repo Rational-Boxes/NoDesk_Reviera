@@ -55,9 +55,12 @@ impl Gui {
                 &intro,
                 &[("Space", 60), ("Name", 110), ("m²", 60), ("Ext. wall m²", 80), ("Window m²", 75), ("Roof m²", 65), ("Ground m²", 70), ("UA W/K", 70)],
                 &rows,
-                &[(THERMAL, "Thermal Values…", "A type's U-value (and a window's SHGC)")],
+                &[(THERMAL, "Thermal Values…", "A type's U-value (and a window's SHGC)"), super::mep_loads_ui::REPORT],
                 None,
             );
+            if code == super::mep_loads_ui::REPORT_BUTTON {
+                return self.save_report("energy_model.summary", json!({}), "Energy Model");
+            }
             if code != THERMAL {
                 return;
             }
@@ -169,7 +172,10 @@ impl Gui {
         if stale {
             intro.push_str(" Stale: the model or the weather changed since; run it again.");
         }
-        super::mep_loads_ui::list_dialog(&frame, "Heating & Cooling Loads", &intro, &[("Space", 60), ("Name", 110), ("Heat kW", 65), ("Sens. kW", 65), ("Cool kW", 65), ("Peak h", 55), ("W/m²", 55), ("Air L/s c/h", 90)], &rows, &[], None);
+        let (code, _) = super::mep_loads_ui::list_dialog(&frame, "Heating & Cooling Loads", &intro, &[("Space", 60), ("Name", 110), ("Heat kW", 65), ("Sens. kW", 65), ("Cool kW", 65), ("Peak h", 55), ("W/m²", 55), ("Air L/s c/h", 90)], &rows, &[super::mep_loads_ui::REPORT], None);
+        if code == super::mep_loads_ui::REPORT_BUTTON {
+            self.save_report("hc_loads.report", json!({}), "Heating and Cooling Loads");
+        }
     }
 }
 
@@ -274,7 +280,9 @@ impl Gui {
         if stale {
             intro.push_str(" Stale: the model or the weather changed since; run it again.");
         }
-        super::mep_loads_ui::list_dialog(&frame, "Annual Energy", &intro, &[("Month / space", 110), ("Heat load", 70), ("Cool load", 70), ("Heating", 65), ("Cooling", 65), ("Lighting", 65), ("Equip.", 65), ("Electric", 70), ("Gas", 60), ("CO₂e", 60)], &rows, &[], None);
+        if super::mep_loads_ui::list_dialog(&frame, "Annual Energy", &intro, &[("Month / space", 110), ("Heat load", 70), ("Cool load", 70), ("Heating", 65), ("Cooling", 65), ("Lighting", 65), ("Equip.", 65), ("Electric", 70), ("Gas", 60), ("CO₂e", 60)], &rows, &[super::mep_loads_ui::REPORT], None).0 == super::mep_loads_ui::REPORT_BUTTON {
+            self.save_report("energy.results", json!({}), "Annual Energy");
+        }
     }
 }
 

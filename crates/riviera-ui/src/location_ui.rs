@@ -96,7 +96,7 @@ impl Gui {
             Ok(r) => {
                 let t = |k: &str| r[k].as_array().map(|a| a.iter().map(|x| format!("{:.4}", x.as_f64().unwrap_or(0.0))).collect::<Vec<_>>().join(", ")).unwrap_or_default();
                 let msg = format!("Internal: {}\nProject: {}\nShared (E, N, H): {}{}", t("internal"), t("project"), t("shared"), r["crs"].as_str().map(|c| format!("  ({c})")).unwrap_or_default());
-                MessageDialog::builder(&frame, &msg, "Report Coordinates").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build().show_modal();
+                self.report_message("Report Coordinates", &msg, "coordinates.report", json!({ "point": p }));
             }
             Err(e) => error(&frame, &e),
         }

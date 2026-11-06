@@ -75,3 +75,19 @@ fn checks_are_written_as_report_files_locally_and_to_fileengine() {
     assert!(String::from_utf8(fake.content(&uid).unwrap()).unwrap().contains("ADA 2010 806.2.3 left"));
     assert_eq!(fake.metadata(&uid).get("riviera.output").map(String::as_str), Some("report.write"));
 }
+
+/// Every command a result dialog's Save Report… writes is one report.write accepts: read-only.
+#[test]
+fn the_dialogs_reports_are_read_only_commands() {
+    let dir = tempfile::tempdir().unwrap();
+    let app = App::new(AppConfig { live: None, untitled_dir: dir.path().join("u") });
+    let from_dialogs = [
+        "bath.check", "rules.check", "elevator.check", "elevator.check_lobbies", "escalator.check", "stairlift.check", "elevator.traffic",
+        "egress.route", "egress.platform_clearing", "hc_loads.report", "energy_model.summary", "energy.results", "embodied_carbon.results",
+        "daylight.results", "solar.results", "path_of_travel.list", "coordinates.report", "structural_analysis.results",
+    ];
+    for c in from_dialogs.iter().copied().chain(riviera_app::report_files::REPORTS.iter().map(|r| r.0)) {
+        let spec = app.registry().get(c).unwrap_or_else(|| panic!("no command {c}"));
+        assert!(spec.effects.iter().all(|e| matches!(e, riviera_core::Effect::Read | riviera_core::Effect::FileRead)), "{c}: {:?}", spec.effects);
+    }
+}

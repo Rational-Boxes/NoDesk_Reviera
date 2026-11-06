@@ -637,10 +637,10 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
   JSON file. The file names the model, the date and the command, then gives the results as
   tables. It can be saved on this computer, or in a FileEngine folder when one is connected:
   - from Manage › Settings › Save Report;
-  - from the first row of Check Bathrooms' and Check Rules' findings;
+  - from the result dialogs (checks, traffic, egress routes, loads, energy, daylight, solar, carbon, structural results);
   - by `report.write` and `report.list` for scripts and agents.
 
-  Not built yet: Save Report… in the other result dialogs, and PDF reports.
+  Not built yet: PDF reports.
 - **Bundled furniture and equipment libraries** (DM-LIB-006, ARC-FURN-001). Three Component
   Libraries ship with Riviera in `libraries/`, each item a model fragment (IFC4) made by
   Riviera:

@@ -18,6 +18,11 @@ const DELETE: i32 = 7203;
 const FACTORS: i32 = 7204;
 
 /// A list in a dialog with buttons that close it: which one, and the selected row.
+/// The code `list_dialog` returns for a Save Report… button (DOC-OUT-016).
+pub(crate) const REPORT_BUTTON: i32 = 5_901;
+/// A Save Report… button for `list_dialog`.
+pub(crate) const REPORT: (i32, &str, &str) = (REPORT_BUTTON, "Save Report…", "Save this as an HTML, Markdown, CSV or JSON file, on this computer or in FileEngine");
+
 pub(crate) fn list_dialog(frame: &Frame, title: &str, intro: &str, columns: &[(&str, i32)], rows: &[Vec<String>], buttons: &[(i32, &str, &str)], selected: Option<usize>) -> (i32, Option<usize>) {
     let dialog = Dialog::builder(frame, title).with_style(DialogStyle::DefaultDialogStyle | DialogStyle::ResizeBorder).build();
     let text = StaticText::builder(&dialog).with_label(intro).build();

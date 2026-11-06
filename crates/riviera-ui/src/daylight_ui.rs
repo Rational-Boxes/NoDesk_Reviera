@@ -96,9 +96,12 @@ impl Gui {
             &intro,
             &[("Space", 60), ("Name", 110), ("Sensors", 60), ("Avg", 55), ("Min", 55), ("Max", 55), ("Unif.", 55), ("≥ thr.", 60), ("Refl.", 55)],
             &rows,
-            &[(SHOW, "Show on Model", "Colour each sensor's square in 3D views"), (HIDE, "Hide", "Stop showing the study")],
+            &[(SHOW, "Show on Model", "Colour each sensor's square in 3D views"), (HIDE, "Hide", "Stop showing the study"), super::mep_loads_ui::REPORT],
             None,
         );
+        if code == super::mep_loads_ui::REPORT_BUTTON {
+            return self.save_report("daylight.results", json!({}), "Daylight Results");
+        }
         match code {
             SHOW => {
                 self.daylight_shown = r["id"].as_str().map(str::to_owned);

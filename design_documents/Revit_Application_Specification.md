@@ -27058,7 +27058,12 @@ All output commands work on an immutable **model snapshot** taken when the comma
   In HTML, rows whose severity is `error` or `note` are marked.
 - **Where it goes.** A local path, or, with FileEngine connected, a `fileengine://` address. The file is then uploaded into that FileEngine folder, as a new version of a file of the same name there, with metadata naming the command and the model (COL-FE-012). FileEngine stays optional: every report can be saved locally.
 - **In the window.**
-  - The findings dialogs of Check Bathrooms and Check Rules have **Save Report…** as their first row, and offer it when nothing is found.
+  - Result dialogs offer **Save Report…**:
+    - finding lists as their first row: Check Bathrooms, Check Rules, Check Elevators, Check Lobbies, Check Escalators and Check Stairlifts;
+    - result messages beside Close: Elevator Traffic, Egress Route, Platform Clearing, Report Coordinates, Structural Analysis Results, and a check that finds nothing;
+    - result tables as a button: Heating & Cooling Loads, Energy Model, Annual Energy, Embodied Carbon, Daylight, Solar, and Paths of Travel.
+
+    Each saves the command's result as shown, with the same arguments.
   - **Manage › Settings › Save Report…** (also in the File menu) lists the checks and reports and saves any of them.
 
   Both ask for a local file. With FileEngine connected, they offer *Save to FileEngine…* with a folder and file name.
@@ -27070,9 +27075,9 @@ All output commands work on an immutable **model snapshot** taken when the comma
 - [x] `report.write` of `rules.check` to a `.html` path writes a page with the header and one table of findings, the error rows marked; to `.csv` the same findings one row each; to `.json` the findings as returned.
 - [x] A command that edits the model is refused.
 - [x] A report written to a `fileengine://` address is uploaded into that FileEngine folder.
-- [x] Check Bathrooms and Check Rules offer Save Report…, and Save Report… lists the checks.
+- [x] The result dialogs above offer Save Report…, and Save Report… lists the checks. Every command they save is read-only.
 
-*Built (2026-11-06):* `report.write` and `report.list` (`riviera-app` `report_files`), Save Report… in the two findings dialogs, and Manage › Settings › Save Report…. The reports that write their own files already took FileEngine addresses (COL-FE-012). Not yet: a Save Report… button in the other result dialogs (elevators, escalators, egress routes, platform clearing, lobbies, energy). Their commands are in Save Report…'s list, or `report.write` takes them directly. Reports in PDF are not built either.
+*Built (2026-11-06):* `report.write` and `report.list` (`riviera-app` `report_files`), Save Report… in the result dialogs listed above (`report_message`, `pick_or_report`, and `list_dialog`'s `REPORT` button), and Manage › Settings › Save Report…. The reports that write their own files already took FileEngine addresses (COL-FE-012). `structural_connection.check` records the checks it makes, so it is not a report; its `check_report` writes its own file. Not yet: PDF reports. Results shown only in Properties rows (growing layouts, tile set-outs, connection status) are saved through Save Report…'s list or `report.write`.
 
 ### Background jobs
 **ID:** DOC-OUT-013 · **Priority:** P1 · **Ref:** research/04 §6.2 *Export in background*

@@ -188,9 +188,12 @@ impl Gui {
             &intro,
             &[("By", 80), ("Name", 180), ("A1–A3", 80), ("A–C", 80), ("D", 70), ("Biogenic", 70), ("m³", 70)],
             &rows,
-            &[(EXPORT, "Export…", "Write the run as CSV or JSON")],
+            &[(EXPORT, "Export…", "Write the run as CSV or JSON"), super::mep_loads_ui::REPORT],
             None,
         );
+        if code == super::mep_loads_ui::REPORT_BUTTON {
+            return self.save_report("embodied_carbon.results", json!({}), "Embodied Carbon Results");
+        }
         if code == EXPORT {
             let Some(path) = self.save_target("Export Embodied Carbon", "CSV (*.csv)|*.csv|JSON (*.json)|*.json", "") else {
             return;

@@ -149,6 +149,35 @@ impl Gui {
         }
     }
 
+    /// A result shown as a message, with Save Report… beside Close (DOC-OUT-016): the report is the
+    /// command's result, written by `report.write`.
+    pub(crate) fn report_message(&mut self, title: &str, message: &str, command: &str, args: serde_json::Value) {
+        let frame = self.frame;
+        let d = MessageDialog::builder(&frame, message, title).with_style(MessageDialogStyle::YesNo | MessageDialogStyle::IconInformation).build();
+        d.set_yes_no_labels("Save Report…", "Close");
+        if d.show_modal() == ID_YES {
+            self.save_report(command, args, title);
+        }
+    }
+
+    /// Findings to pick from, after a first row that saves them all as a report (DOC-OUT-016);
+    /// the finding picked, by index.
+    pub(crate) fn pick_or_report(&mut self, title: &str, prompt: &str, rows: &[String], command: &str, args: serde_json::Value) -> Option<usize> {
+        let frame = self.frame;
+        let labels: Vec<&str> = std::iter::once("Save Report…").chain(rows.iter().map(String::as_str)).collect();
+        let dialog = SingleChoiceDialog::builder(&frame, &format!("{prompt}\n(or save them all as a report)"), title, &labels).build();
+        if dialog.show_modal() != ID_OK {
+            return None;
+        }
+        let picked = usize::try_from(dialog.get_selection()).ok();
+        dialog.destroy();
+        if picked == Some(0) {
+            self.save_report(command, args, title);
+            return None;
+        }
+        picked.and_then(|i| i.checked_sub(1))
+    }
+
     /// Manage › Settings › Save Report… (DOC-OUT-016): any of the checks and reports, saved.
     pub(crate) fn save_any_report(&mut self) {
         let frame = self.frame;

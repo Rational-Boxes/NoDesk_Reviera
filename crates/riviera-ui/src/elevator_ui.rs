@@ -137,11 +137,7 @@ impl Gui {
         };
         let packs = in_use.join("; ");
         if found.is_empty() {
-            let d = MessageDialog::builder(&frame, &format!("No problems found under: {packs}.\nHoistway and landing intrusions are listed by Check Clearances."), "Check Elevators")
-                .with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation)
-                .build();
-            d.show_modal();
-            return;
+            return self.report_message("Check Elevators", &format!("No problems found under: {packs}.\nHoistway and landing intrusions are listed by Check Clearances."), "elevator.check", json!({}));
         }
         let rows: Vec<String> = found
             .iter()
@@ -155,15 +151,9 @@ impl Gui {
                 row
             })
             .collect();
-        let labels: Vec<&str> = rows.iter().map(String::as_str).collect();
         let errors = found.iter().filter(|f| f["severity"] == "error").count();
-        let dialog = SingleChoiceDialog::builder(&frame, &format!("{errors} error(s) and {} note(s) under: {packs}.\nPick one to select and frame the elevator:", found.len() - errors), "Check Elevators", &labels).build();
-        if dialog.show_modal() != ID_OK {
-            return;
-        }
-        let picked = usize::try_from(dialog.get_selection()).ok();
-        dialog.destroy();
-        let Some(f) = picked.and_then(|i| found.get(i)) else {
+        let prompt = format!("{errors} error(s) and {} note(s) under: {packs}.\nPick one to select and frame the elevator:", found.len() - errors);
+        let Some(f) = self.pick_or_report("Check Elevators", &prompt, &rows, "elevator.check", json!({})).and_then(|i| found.get(i)) else {
             return;
         };
         let _ = self.run("selection.set", json!({ "ids": [f["elevator"]] }));
@@ -281,7 +271,7 @@ impl Gui {
             return;
         }
         let args = typed.map_or_else(|| json!({}), |n| json!({ "occupants": n }));
-        let lobbies = match self.run("elevator.check_lobbies", args) {
+        let lobbies = match self.run("elevator.check_lobbies", args.clone()) {
             Ok(v) => v.as_array().cloned().unwrap_or_default(),
             Err(e) => return error(&frame, &format!("The check did not run:\n{e}")),
         };
@@ -290,18 +280,11 @@ impl Gui {
         }
         let problems: Vec<(Value, String)> = lobbies.iter().flat_map(|l| l["problems"].as_array().cloned().unwrap_or_default().into_iter().map(move |p| (l["elevator"].clone(), p.as_str().unwrap_or_default().to_owned()))).collect();
         if problems.is_empty() {
-            let d = MessageDialog::builder(&frame, &format!("All {} lobbies are large enough and reach an exit stair.", lobbies.len()), "Check Lobbies").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build();
-            d.show_modal();
-            return;
+            return self.report_message("Check Lobbies", &format!("All {} lobbies are large enough and reach an exit stair.", lobbies.len()), "elevator.check_lobbies", args);
         }
-        let labels: Vec<&str> = problems.iter().map(|(_, p)| p.as_str()).collect();
-        let dialog = SingleChoiceDialog::builder(&frame, &format!("{} problem(s) in {} lobbies. Pick one to select and frame the elevator:", problems.len(), lobbies.len()), "Check Lobbies", &labels).build();
-        if dialog.show_modal() != ID_OK {
-            return;
-        }
-        let picked = usize::try_from(dialog.get_selection()).ok();
-        dialog.destroy();
-        let Some((lift, text)) = picked.and_then(|i| problems.get(i)).cloned() else { return };
+        let rows: Vec<String> = problems.iter().map(|(_, p)| p.clone()).collect();
+        let prompt = format!("{} problem(s) in {} lobbies. Pick one to select and frame the elevator:", problems.len(), lobbies.len());
+        let Some((lift, text)) = self.pick_or_report("Check Lobbies", &prompt, &rows, "elevator.check_lobbies", args).and_then(|i| problems.get(i)).cloned() else { return };
         let _ = self.run("selection.set", json!({ "ids": [lift] }));
         self.selection_changed();
         self.zoom_to_fit();
@@ -692,25 +675,14 @@ impl Gui {
             Err(e) => return error(&frame, &format!("The check did not run:\n{e}")),
         };
         if found.is_empty() {
-            let d = MessageDialog::builder(&frame, "No problems found.\nHeadroom, side clearance and landing zones are checked by Check Clearances.", "Check Escalators")
-                .with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation)
-                .build();
-            d.show_modal();
-            return;
+            return self.report_message("Check Escalators", "No problems found.\nHeadroom, side clearance and landing zones are checked by Check Clearances.", "escalator.check", json!({}));
         }
         let rows: Vec<String> = found
             .iter()
             .enumerate()
             .map(|(k, f)| format!("{}. {}: {} — {} [{}]", k + 1, if f["severity"] == "note" { "Note" } else { "Error" }, f["pack"].as_str().unwrap_or_default(), f["message"].as_str().unwrap_or_default(), f["confidence"].as_str().unwrap_or_default()))
             .collect();
-        let labels: Vec<&str> = rows.iter().map(String::as_str).collect();
-        let dialog = SingleChoiceDialog::builder(&frame, "Pick one to select and frame it:", "Check Escalators", &labels).build();
-        if dialog.show_modal() != ID_OK {
-            return;
-        }
-        let picked = usize::try_from(dialog.get_selection()).ok();
-        dialog.destroy();
-        let Some(f) = picked.and_then(|i| found.get(i)) else {
+        let Some(f) = self.pick_or_report("Check Escalators", "Pick one to select and frame it:", &rows, "escalator.check", json!({})).and_then(|i| found.get(i)) else {
             return;
         };
         let _ = self.run("selection.set", json!({ "ids": [f["escalator"]] }));
@@ -796,25 +768,14 @@ impl Gui {
             Err(e) => return error(&frame, &format!("The check did not run:\n{e}")),
         };
         if found.is_empty() {
-            let d = MessageDialog::builder(&frame, "No problems found.\nRunning envelopes, head boxes and landings are checked by Check Clearances.", "Check Stairlifts")
-                .with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation)
-                .build();
-            d.show_modal();
-            return;
+            return self.report_message("Check Stairlifts", "No problems found.\nRunning envelopes, head boxes and landings are checked by Check Clearances.", "stairlift.check", json!({}));
         }
         let rows: Vec<String> = found
             .iter()
             .enumerate()
             .map(|(k, f)| format!("{}. {}: {} — {} [{}]", k + 1, if f["severity"] == "note" { "Note" } else { "Error" }, f["pack"].as_str().unwrap_or_default(), f["message"].as_str().unwrap_or_default(), f["confidence"].as_str().unwrap_or_default()))
             .collect();
-        let labels: Vec<&str> = rows.iter().map(String::as_str).collect();
-        let dialog = SingleChoiceDialog::builder(&frame, "Pick one to select and frame it:", "Check Stairlifts", &labels).build();
-        if dialog.show_modal() != ID_OK {
-            return;
-        }
-        let picked = usize::try_from(dialog.get_selection()).ok();
-        dialog.destroy();
-        let Some(f) = picked.and_then(|i| found.get(i)) else {
+        let Some(f) = self.pick_or_report("Check Stairlifts", "Pick one to select and frame it:", &rows, "stairlift.check", json!({})).and_then(|i| found.get(i)) else {
             return;
         };
         let _ = self.run("selection.set", json!({ "ids": [f["stairlift"]] }));
@@ -845,7 +806,7 @@ impl Gui {
         if !ok {
             return;
         }
-        let groups = match self.run("elevator.traffic", args) {
+        let groups = match self.run("elevator.traffic", args.clone()) {
             Ok(v) => v.as_array().cloned().unwrap_or_default(),
             Err(e) => return error(&frame, &format!("The traffic was not calculated:\n{e}")),
         };
@@ -881,7 +842,6 @@ impl Gui {
                 )
             })
             .collect();
-        let d = MessageDialog::builder(&frame, &text.join("\n\n"), "Elevator Traffic").with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation).build();
-        d.show_modal();
+        self.report_message("Elevator Traffic", &text.join("\n\n"), "elevator.traffic", args);
     }
 }

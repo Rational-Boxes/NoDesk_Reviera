@@ -124,9 +124,12 @@ impl Gui {
             &intro,
             &[("Element", 70), ("Face", 50), ("m²", 60), ("kWh/m²", 70), ("kWh", 80), ("PV kWh/yr", 80), ("Payback yr", 80)],
             &rows,
-            &[(SHOW, "Show on Model", "Colour each grid point on its face in 3D views"), (HIDE, "Hide", "Stop showing the study"), (EXPORT, "Export…", "Per-face results as CSV")],
+            &[(SHOW, "Show on Model", "Colour each grid point on its face in 3D views"), (HIDE, "Hide", "Stop showing the study"), (EXPORT, "Export…", "Per-face results as CSV"), super::mep_loads_ui::REPORT],
             None,
         );
+        if code == super::mep_loads_ui::REPORT_BUTTON {
+            return self.save_report("solar.results", json!({}), "Solar Results");
+        }
         match code {
             SHOW => {
                 self.solar_shown = r["id"].as_str().map(str::to_owned);
