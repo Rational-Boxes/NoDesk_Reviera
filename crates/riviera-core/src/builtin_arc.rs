@@ -343,6 +343,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(MeshObjectTypes),
         registry.add(LibraryCreate),
         registry.add(LibraryOpen),
+        registry.add(LibraryBundled),
+        registry.add(FurnishingCatalogue),
+        registry.add(FurnishingLoad),
         registry.add(LibraryList),
         registry.add(LibraryImportFiles),
         registry.add(LibraryGetMeta),
@@ -4076,6 +4079,46 @@ read_command!(
     crate::library::OpenParams,
     crate::library::LibraryInfo,
     crate::library::open_library
+);
+
+read_command!(
+    LibraryBundled,
+    "library.bundled",
+    "List the bundled Component Libraries",
+    "Lists the Component Libraries that ship with Riviera (DM-LIB-006): interiors furniture, gym \
+     equipment, and retail and checkout fixtures, each a folder of model fragments (IFC files) with its \
+     manifest. Each has its path, id, name and item count; place an item with component.place_fragment \
+     (`library` = its path, `item` = the fragment's path in it).",
+    [Effect::FileRead],
+    Option<crate::library::BundledParams>,
+    Vec<crate::library::LibraryInfo>,
+    crate::library::bundled
+);
+
+read_command!(
+    FurnishingCatalogue,
+    "furnishing.catalogue",
+    "List the generic furniture and equipment",
+    "Lists the generic furniture and equipment the bundled libraries are made from (ARC-FURN-001), or one \
+     library's (`interiors`, `gym`, `retail`): each item's folder, name, IFC predefined type and kind, \
+     Uniclass code, size, description and sources.",
+    Option<crate::furnishings::CatalogueParams>,
+    Vec<crate::furnishings::ItemInfo>,
+    crate::furnishings::list
+);
+
+edit_command!(
+    FurnishingLoad,
+    "furnishing.load",
+    "Load generic furniture and equipment",
+    "Loads generic furniture and equipment into the project as types, by name, or all (ARC-FURN-001): \
+     each with its IFC predefined type or kind, so the rule packs choose it, and power connectors where it \
+     has a supply (treadmills, checkstands). A type of the same name already there is reused. Place \
+     copies with mesh_object.place. Returns the types by name.",
+    "Load Furnishings",
+    crate::furnishings::LoadParams,
+    std::collections::BTreeMap<String, ElementId>,
+    crate::furnishings::load
 );
 
 read_command!(

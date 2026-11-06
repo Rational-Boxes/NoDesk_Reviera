@@ -631,8 +631,21 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
   or its kind carries use zones as virtual volumes. View › Coordination › Check Rules lists what
   stands in them. One command family lists, chooses, adds and removes packs in every domain,
   bathroom and vertical transport included (`rules.packs`, `rules.set_packs`, `rules.add_pack`,
-  `rules.remove_pack`, `rules.set_accessible`, `rules.check`). Not built yet: the furniture
-  library, room layouts, hotel floors, retail fixtures, checkouts and gyms the plan goes on to.
+  `rules.remove_pack`, `rules.set_accessible`, `rules.check`). Not built yet: room layouts,
+  hotel floors, fixture runs, front ends and gym layouts, which the plan goes on to.
+- **Bundled furniture and equipment libraries** (DM-LIB-006, ARC-FURN-001). Three Component
+  Libraries ship with Riviera in `libraries/`, each item a model fragment (IFC4) made by
+  Riviera:
+  - *Riviera Interiors*: beds in US and UK sizes, casegoods, seating, tables, desks, a reception
+    desk, and sets;
+  - *Riviera Gym Equipment*: cardio, strength and free-weight equipment;
+  - *Riviera Retail and Checkout Fixtures*: gondolas, apparel racks, showcases, carts, checkstands
+    and self-checkouts.
+
+  Each item is typed for IFC (BED, DESK, …, or USERDEFINED with its kind) and for the rule
+  packs, at research sizes with their sources, and powered items carry connectors. The
+  libraries are always listed in the Component Library panel. `library.bundled`,
+  `furnishing.catalogue` and `furnishing.load` serve scripts and agents.
 - **Grab bars** (ARC-BATH-003): round bars on a wall face, on brackets, following their wall,
   saved as `IfcRailing` HANDRAIL with swept-disk geometry. View › Coordination › Place Grab Bars
   puts the bars the packs ask for at fixtures (the ADA's WC side and rear bars), and Check

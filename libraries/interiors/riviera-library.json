@@ -1,0 +1,562 @@
+{
+  "format": "riviera-library",
+  "version": 1,
+  "id": "eb245aae-893e-4b31-a350-ab475e37c1ee",
+  "name": "Riviera Interiors",
+  "description": "Generic furniture that ship with Riviera: placeholders at the sizes research note 15 gives, each a model fragment (IFC) with its IFC class and predefined type or kind, so the rule packs choose it. Generated from riviera_core::furnishings (ARC-FURN-001); regenerate with RIVIERA_REGEN_LIBRARIES=1.",
+  "author": "Riviera contributors",
+  "licence": "CC0-1.0",
+  "defaults": {},
+  "items": {
+    "Bedroom/bed_double_1350_x_1900.ifc": {
+      "guid": "83873f5e-6c3a-468f-97ad-bed83ecb0525",
+      "name": "Bed, double 1350 × 1900",
+      "description": "Approved Document M's other double bed, 1350 × 1900 mm.",
+      "tags": [
+        "bedroom",
+        "bed",
+        "Uniclass Pr_40_50_06_24"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1465"
+      },
+      "sha256": "572f0b29b99e4148d7f08db6cbd313d7a8060cd86835b5a2ba9668eb18316b02"
+    },
+    "Bedroom/bed_full_54_x_75_in.ifc": {
+      "guid": "4b8a0cb2-71ad-4018-b32c-de9019c99fa5",
+      "name": "Bed, full 54 × 75 in",
+      "description": "A full (double) mattress 54 × 75 in on its frame; mattress top 24 in.",
+      "tags": [
+        "bedroom",
+        "bed",
+        "Uniclass Pr_40_50_06_24"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1476"
+      },
+      "sha256": "4bb6535603979508e40cb6434b4cdceaa959c7deb2ad64f4200ff62bff39ad2d"
+    },
+    "Bedroom/bed_king_76_x_80_in.ifc": {
+      "guid": "bc807098-3cda-4fed-b124-c66c0e68da59",
+      "name": "Bed, king 76 × 80 in",
+      "description": "An Eastern king mattress 76 × 80 in on its frame; mattress top 24 in.",
+      "tags": [
+        "bedroom",
+        "bed",
+        "Uniclass Pr_40_50_06_24"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1476"
+      },
+      "sha256": "ca1294208b044f7d80754634972ccb1469092a28055362525f3cb16bb1cd9047"
+    },
+    "Bedroom/bed_principal_double_1500_x_2000.ifc": {
+      "guid": "c493f8b8-5171-4380-99dd-60946afd0ffe",
+      "name": "Bed, principal double 1500 × 2000",
+      "description": "Approved Document M's principal double bed, 1500 × 2000 mm.",
+      "tags": [
+        "bedroom",
+        "bed",
+        "Uniclass Pr_40_50_06_24"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1465"
+      },
+      "sha256": "cb297d3c89f6677faf00f55ed4a8d1094437c028451861e0c70915497a50241c"
+    },
+    "Bedroom/bed_queen_60_x_80_in.ifc": {
+      "guid": "cbc45f50-dc8f-468b-a364-39bf27712d28",
+      "name": "Bed, queen 60 × 80 in",
+      "description": "A queen mattress 60 × 80 in on its frame; mattress top 24 in.",
+      "tags": [
+        "bedroom",
+        "bed",
+        "Uniclass Pr_40_50_06_24"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1476"
+      },
+      "sha256": "4b4fcd7cba239d79dd4047e80e6495dc19ffade8320a3b5385940b6f9ff23780"
+    },
+    "Bedroom/bed_single_900_x_1900.ifc": {
+      "guid": "a7b71476-daa2-46fa-b271-c1855b66ca22",
+      "name": "Bed, single 900 × 1900",
+      "description": "Approved Document M's single bed, 900 × 1900 mm.",
+      "tags": [
+        "bedroom",
+        "bed",
+        "Uniclass Pr_40_50_06_77"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1465"
+      },
+      "sha256": "5bdb17dfb55f822f0247d1366c561d7f2b83ef4306236576cb27a90f336dd1e1"
+    },
+    "Bedroom/bed_twin_38_x_75_in.ifc": {
+      "guid": "940f72db-3aaf-41e3-8f5d-a3e119098fe1",
+      "name": "Bed, twin 38 × 75 in",
+      "description": "A twin mattress 38 × 75 in on a frame 2 in larger each side; mattress top 24 in.",
+      "tags": [
+        "bedroom",
+        "bed",
+        "Uniclass Pr_40_50_06_77"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1476"
+      },
+      "sha256": "e7d00c75ab77a0ce3c457347afd599fb92408e846425822cb3ec23cb9383cbe2"
+    },
+    "Bedroom/chest_of_drawers_750_x_450.ifc": {
+      "guid": "5635902c-dc9f-4b30-9cd3-1e83db630c2d",
+      "name": "Chest of drawers 750 × 450",
+      "description": "Approved Document M's chest of drawers, 750 × 450 mm; its 1000 mm height is judgement.",
+      "tags": [
+        "bedroom",
+        "ChestOfDrawers"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1465"
+      },
+      "sha256": "bc044c4680a145bf0dd1d5be3423ebc17767cc69df96fccb4f471cf6f0a1ec42"
+    },
+    "Bedroom/dresser.ifc": {
+      "guid": "bf17e283-9c2d-4dd5-8636-5657b0156d03",
+      "name": "Dresser",
+      "description": "60 in wide and 30 in high; its 19 in depth is unverified.",
+      "tags": [
+        "bedroom",
+        "Dresser"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1503"
+      },
+      "sha256": "f1183f961ffc9fa5a251421e84ac2d7aa2c4e44c9929094cbb36b55004f7e833"
+    },
+    "Bedroom/luggage_rack.ifc": {
+      "guid": "1f1c9b64-77da-431f-a772-b721ef089483",
+      "name": "Luggage rack",
+      "description": "A hotel luggage rack, 24 × 17½ in and 22 in high.",
+      "tags": [
+        "bedroom",
+        "LuggageRack"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1499"
+      },
+      "sha256": "c7513f79d5f30de50816444ad84fac0449273a729c37a25a517d1d897454bad3"
+    },
+    "Bedroom/nightstand.ifc": {
+      "guid": "e0c2b513-0267-4e8d-88e5-5376393d951e",
+      "name": "Nightstand",
+      "description": "22 × 16 in, 26 in high: about level with a mattress top.",
+      "tags": [
+        "bedroom",
+        "Nightstand"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1503"
+      },
+      "sha256": "bcdfc9a3a723af0c1024b99f0f9a909d167176dadbdfab5be575311e1ca6ac09"
+    },
+    "Bedroom/wardrobe_double_1200_x_600.ifc": {
+      "guid": "d9b2628d-568d-4056-997e-6e2d0d74c0b3",
+      "name": "Wardrobe, double 1200 × 600",
+      "description": "Approved Document M's double wardrobe, 1200 × 600 mm, 2010 mm high (a PAX frame's height).",
+      "tags": [
+        "bedroom",
+        "Wardrobe"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1465 S1477"
+      },
+      "sha256": "94bc17e288683fc011c80ef0f155352660adee7b5d8a693dfd9b469a893c5ec7"
+    },
+    "Dining/counter_stool.ifc": {
+      "guid": "f2a038e8-9c4d-4c96-ad27-571cc7c1937b",
+      "name": "Counter stool",
+      "description": "Seat 25 in high for a 36 in counter; 16 in square by judgement.",
+      "tags": [
+        "dining",
+        "Stool",
+        "chair",
+        "Uniclass Pr_40_50_12_85"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1491"
+      },
+      "sha256": "20a6b2b858a63cec16752a5c1bdc272972a4c3ce53d9308cd2fbd3c2aca07b56"
+    },
+    "Dining/dining_chair.ifc": {
+      "guid": "8d05ead8-9651-4f2c-81fc-1c3d62bd1847",
+      "name": "Dining chair",
+      "description": "Seat 19 in wide at 18 in high; 20 in deep and 34 in to the top of the back by judgement.",
+      "tags": [
+        "dining",
+        "chair"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1503"
+      },
+      "sha256": "d83bc0c273dbf4f9834a7fcbf1639532c4144ac5056018a074dc1299845c0e6f"
+    },
+    "Dining/dining_table_4_seats_48_x_30_in.ifc": {
+      "guid": "5d857055-a443-401a-b653-b412502ecf46",
+      "name": "Dining table, 4 seats 48 × 30 in",
+      "description": "A rectangular table for four, 48 × 30 in, 29 in high.",
+      "tags": [
+        "dining",
+        "DiningTable",
+        "table",
+        "Uniclass Pr_40_50_21_22"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1479 S1503"
+      },
+      "sha256": "620b37bdeaf0c75e9140552a3945a2a777cb899ca0848a772f2d8e8680d5cc40"
+    },
+    "Dining/dining_table_6_seats_72_x_36_in.ifc": {
+      "guid": "7f2c5c24-5526-45de-b33b-1149fbb448f9",
+      "name": "Dining table, 6 seats 72 × 36 in",
+      "description": "A rectangular table for six, 72 × 36 in, 29 in high.",
+      "tags": [
+        "dining",
+        "DiningTable",
+        "table",
+        "Uniclass Pr_40_50_21_22"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1479 S1503"
+      },
+      "sha256": "44e7bc3cfe647ebccc9291eed0994027b9dedafdad1badd8b3714ae93bec1711"
+    },
+    "Dining/dining_table_round_42_in.ifc": {
+      "guid": "458006b1-5379-482d-a79b-84f5f2a1d876",
+      "name": "Dining table, round 42 in",
+      "description": "A round table for two to four, 42 in across, 29 in high.",
+      "tags": [
+        "dining",
+        "DiningTable",
+        "table",
+        "Uniclass Pr_40_50_21_22"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1479 S1503"
+      },
+      "sha256": "9686896d8202e19dfdd165c6c310e32924934113e1c09ca3be0cff12828a6307"
+    },
+    "Living/armchair_850_x_850.ifc": {
+      "guid": "971874a6-80a7-4c9c-a15b-c4eb1249d7de",
+      "name": "Armchair 850 × 850",
+      "description": "Approved Document M's armchair, 850 × 850 mm.",
+      "tags": [
+        "living",
+        "chair",
+        "Uniclass Pr_40_50_12_48"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1465 S1490"
+      },
+      "sha256": "ef1dc55b43b404d622f30ee18915603f829da9652cb9c0a35e1fe68fdb703a7d"
+    },
+    "Living/coffee_table_1050_x_500.ifc": {
+      "guid": "85c4fc9e-6f3f-494c-95e6-2dad3afd3a2a",
+      "name": "Coffee table 1050 × 500",
+      "description": "Approved Document M's coffee table, 1050 × 500 mm; its 450 mm height is judgement.",
+      "tags": [
+        "living",
+        "CoffeeTable",
+        "table",
+        "Uniclass Pr_40_50_21_14"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1465"
+      },
+      "sha256": "340d57e27b19701328288d8322c7ba9838714de6ab7dcda08aa12b32f86cbded"
+    },
+    "Living/occasional_table_450_x_450.ifc": {
+      "guid": "77a51566-d159-4ac7-9767-f5546807f8db",
+      "name": "Occasional table 450 × 450",
+      "description": "Approved Document M's occasional table, 450 × 450 mm, 550 mm high.",
+      "tags": [
+        "living",
+        "SideTable",
+        "table"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1465"
+      },
+      "sha256": "027176b47eb455449f5484716ac614c0d7eabbe807e023f40512aafd1aeb62dc"
+    },
+    "Living/rug_8_x_10_ft.ifc": {
+      "guid": "ea8c7739-b1e3-4f5b-b7d6-05922bf30879",
+      "name": "Rug 8 × 10 ft",
+      "description": "A living-room rug, 8 × 10 ft.",
+      "tags": [
+        "living",
+        "Rug",
+        "Uniclass Pr_40_50_81"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1480"
+      },
+      "sha256": "e02a805b2621ddf6c082fff74ff98ec6884eccdf4a4216e8669474c446e111d4"
+    },
+    "Living/sofa_2_seat_1300_x_850.ifc": {
+      "guid": "cf6edb45-1a30-480e-8e0c-d52affb3f589",
+      "name": "Sofa, 2-seat 1300 × 850",
+      "description": "Approved Document M's 2-seat settee, 1300 × 850 mm.",
+      "tags": [
+        "living",
+        "sofa",
+        "Uniclass Pr_40_50_12_76"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1465 S1490"
+      },
+      "sha256": "ed2f0403a13eb0e33157b086dbd1752789e6101ddd73471656a8b70d53d55e75"
+    },
+    "Living/sofa_3_seat_1850_x_850.ifc": {
+      "guid": "7bc64b89-d1b0-4a00-90e0-aaaea0d682b0",
+      "name": "Sofa, 3-seat 1850 × 850",
+      "description": "Approved Document M's 3-seat settee, 1850 × 850 mm; seat 430 mm, back 850 mm.",
+      "tags": [
+        "living",
+        "sofa",
+        "Uniclass Pr_40_50_12_81"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1465 S1490"
+      },
+      "sha256": "679434fbb5e03688ba7cafb1e85248b85759a87e17729f3ca2d98833623e54d0"
+    },
+    "Living/storage_unit_1500_x_500.ifc": {
+      "guid": "d8326a38-f241-4393-92ae-282e85dd4f5b",
+      "name": "Storage unit 1500 × 500",
+      "description": "Approved Document M's storage unit for four people, 1500 × 500 mm; its 750 mm height is judgement.",
+      "tags": [
+        "living",
+        "StorageUnit"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1465"
+      },
+      "sha256": "7e0918a2560666937082c43d3d925c4f80d0471a38bbacd8450271319d8818ee"
+    },
+    "Office/bookcase_36_in.ifc": {
+      "guid": "1af9e5c9-5409-4f18-8bec-8ced529de077",
+      "name": "Bookcase 36 in",
+      "description": "Five shelves 36 in wide; its 12 in depth and 72 in height are unverified.",
+      "tags": [
+        "office",
+        "shelf"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0"
+      },
+      "sha256": "49357770fa255dc43d66698cfe5103982bc35bc6a2ca2e6226b6c098cd798acb"
+    },
+    "Office/conference_table_8_seats_96_x_42_in.ifc": {
+      "guid": "f250f168-f7d4-47b6-a881-7c944a1fc70b",
+      "name": "Conference table, 8 seats 96 × 42 in",
+      "description": "A table for eight, 96 × 42 in (24 in of edge a seat), 29 in high.",
+      "tags": [
+        "office",
+        "ConferenceTable",
+        "table",
+        "Uniclass Pr_40_50_21_15"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1479 S1485"
+      },
+      "sha256": "2b88f4236b6e0a2baf442309ec45378d2241351ac74dd0ada73535cb35efeb49"
+    },
+    "Office/desk_60_x_30_in.ifc": {
+      "guid": "a9fab1ac-6084-474d-a302-0d11c00fed84",
+      "name": "Desk 60 × 30 in",
+      "description": "The commonest desk, 60 × 30 in and 29 in high.",
+      "tags": [
+        "office",
+        "desk",
+        "Uniclass Pr_40_50_21_96"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1503"
+      },
+      "sha256": "300ee627e43b3f4c6cb648795a445c5269d83d014d5955c644acde63f85f8a68"
+    },
+    "Office/reception_desk_72_x_30_in.ifc": {
+      "guid": "734af12c-b161-492f-b642-bcf11c9bec07",
+      "name": "Reception desk 72 × 30 in",
+      "description": "A work surface at 29 in behind a 42 in transaction ledge, 72 × 30 in.",
+      "tags": [
+        "office",
+        "ServiceCounter"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1492"
+      },
+      "sha256": "ef53a37e2c696eb5e060266eb2e89ec1486514e03608ef7c3f3a84cdeb002c7c"
+    },
+    "Office/standing_desk_60_x_30_in.ifc": {
+      "guid": "b1f1c24c-9045-4127-b2a7-5753d707a1c9",
+      "name": "Standing desk 60 × 30 in",
+      "description": "A sit-stand desk, 60 × 30 in, shown at 42 in (BIFMA G1 range 22.0–50.2 in).",
+      "tags": [
+        "office",
+        "StandingDesk",
+        "desk",
+        "Uniclass Pr_40_50_21_83"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1482 S1503"
+      },
+      "sha256": "f37cd293fa7b9db096d383ece09fca337feb0a2cf11d85a5cde097c1882cb310"
+    },
+    "Office/task_chair.ifc": {
+      "guid": "2e4fb205-8348-44cf-b457-f7db161d5531",
+      "name": "Task chair",
+      "description": "Seat 20 in wide at 18 in (adjustable about 15–20 in); 24 in square and 40 in high by judgement.",
+      "tags": [
+        "office",
+        "TaskChair",
+        "chair",
+        "Uniclass Pr_40_50_12_57"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1482 S1483"
+      },
+      "sha256": "3b1011bb3505be0873c6c9ad6ac81389e044e817f18581cfec4c98a1f5895809"
+    },
+    "Sets/bedroom_set_queen.ifc": {
+      "guid": "bb1f82a3-538d-4811-90c2-635c414fa138",
+      "name": "Bedroom set, queen",
+      "description": "A queen bed with a nightstand each side of its head, 20 mm clear of it.",
+      "tags": [
+        "set"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0"
+      },
+      "sha256": "2d815f6f05fa3779a1499ba9fbc66589297c2a419393475f2e541c5b9dfe70f6"
+    },
+    "Sets/dining_set_4_seats.ifc": {
+      "guid": "d65dbc28-5706-4a17-8140-6cb5cf8be81e",
+      "name": "Dining set, 4 seats",
+      "description": "A 48 × 30 in dining table with two chairs on each long side, pushed in.",
+      "tags": [
+        "set"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0"
+      },
+      "sha256": "552f5d95b229c8529b5dee1fedd3acf967c2aee3b8bf3817f88afd59229973a9"
+    },
+    "Sets/office_workstation.ifc": {
+      "guid": "f7f6cc6d-b5b6-4f59-b16c-a9857e5387dc",
+      "name": "Office workstation",
+      "description": "A 60 × 30 in desk with its task chair in front of it.",
+      "tags": [
+        "set"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0"
+      },
+      "sha256": "1ed570ac8db7380ba7f9b8ce69235915fa2ecee3faf5c579ec66433ea5bb8109"
+    }
+  }
+}

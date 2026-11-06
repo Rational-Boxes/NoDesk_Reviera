@@ -5,7 +5,8 @@
 //! Place Component tool and Import Object.
 //!
 //! - **Component Library** (docked on the right): the libraries the user has open (a folder with
-//!   a `riviera-library.json`; the list is kept per user), the selected library's folders as a
+//!   a `riviera-library.json`; the list is kept per user) and the bundled libraries of generic
+//!   furniture and equipment (DM-LIB-006), the selected library's folders as a
 //!   tree, and the selected folder's components as thumbnails. *Open…* opens a folder as a
 //!   library (offering to make one when it has no manifest), *New…* makes one, *Import…* copies
 //!   3D files into the folder shown. Clicking a component picks it up: the Place Component tool
@@ -73,26 +74,37 @@ fn sample_library() -> Option<PathBuf> {
         .then(|| std::fs::canonicalize(&lib).unwrap_or(lib))
 }
 
-/// The libraries the user has open, kept in `libraries.json`; the sample library the first time.
+/// The libraries the user has open, kept in `libraries.json` (the sample library the first
+/// time), then the bundled libraries (DM-LIB-006), which are always there.
 fn load_libraries() -> Vec<PathBuf> {
     let saved: Option<Vec<PathBuf>> = config_dir()
         .and_then(|d| std::fs::read(d.join("libraries.json")).ok())
         .and_then(|b| serde_json::from_slice(&b).ok());
-    match saved {
+    let mut out: Vec<PathBuf> = match saved {
         Some(list) => list
             .into_iter()
             .filter(|p| library::manifest_in(p).is_file())
             .collect(),
         None => sample_library().into_iter().collect(),
+    };
+    for b in library::bundled_dirs() {
+        if !out.contains(&b) {
+            out.push(b);
+        }
     }
+    out
 }
 
+/// Keeps the user's list; the bundled libraries are found again each time, wherever Riviera is
+/// installed.
 fn save_libraries(list: &[PathBuf]) {
+    let bundled = library::bundled_dirs();
+    let own: Vec<&PathBuf> = list.iter().filter(|p| !bundled.contains(p)).collect();
     if let Some(d) = config_dir() {
         let _ = std::fs::create_dir_all(&d);
         let _ = std::fs::write(
             d.join("libraries.json"),
-            serde_json::to_vec_pretty(list).expect("serialises"),
+            serde_json::to_vec_pretty(&own).expect("serialises"),
         );
     }
 }

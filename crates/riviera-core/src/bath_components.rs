@@ -31,14 +31,14 @@ pub fn is_component(e: &crate::element::Element) -> bool {
 
 /// Triangles built from prisms.
 #[derive(Debug, Default)]
-struct Shape {
-    p: Vec<[f64; 3]>,
-    t: Vec<[u32; 3]>,
+pub(crate) struct Shape {
+    pub(crate) p: Vec<[f64; 3]>,
+    pub(crate) t: Vec<[u32; 3]>,
 }
 
 impl Shape {
     /// A convex polygon (counter-clockwise from above) extruded from `z0` to `z1`.
-    fn prism(mut self, poly: &[V2], z0: f64, z1: f64) -> Self {
+    pub(crate) fn prism(mut self, poly: &[V2], z0: f64, z1: f64) -> Self {
         let n = poly.len() as u32;
         let base = self.p.len() as u32;
         for z in [z0, z1] {
@@ -58,13 +58,13 @@ impl Shape {
         self
     }
 
-    fn cuboid(self, x: V2, y: V2, z: V2) -> Self {
+    pub(crate) fn cuboid(self, x: V2, y: V2, z: V2) -> Self {
         self.prism(&[[x[0], y[0]], [x[1], y[0]], [x[1], y[1]], [x[0], y[1]]], z[0], z[1])
     }
 }
 
 /// A rectangle with rounded corners, centred on `c`.
-fn rounded(c: V2, w: f64, d: f64, r: f64) -> Vec<V2> {
+pub(crate) fn rounded(c: V2, w: f64, d: f64, r: f64) -> Vec<V2> {
     let r = r.min(w / 2.0).min(d / 2.0);
     let (hx, hy) = (w / 2.0 - r, d / 2.0 - r);
     let mut out = Vec::new();

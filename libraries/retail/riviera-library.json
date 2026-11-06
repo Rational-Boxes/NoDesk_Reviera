@@ -1,0 +1,317 @@
+{
+  "format": "riviera-library",
+  "version": 1,
+  "id": "3af3c064-34b1-4fa2-9bff-510d33a31954",
+  "name": "Riviera Retail and Checkout Fixtures",
+  "description": "Generic retail and checkout fixtures that ship with Riviera: placeholders at the sizes research note 15 gives, each a model fragment (IFC) with its IFC class and predefined type or kind, so the rule packs choose it. Generated from riviera_core::furnishings (ARC-FURN-001); regenerate with RIVIERA_REGEN_LIBRARIES=1.",
+  "author": "Riviera contributors",
+  "licence": "CC0-1.0",
+  "defaults": {},
+  "items": {
+    "Apparel/garment_rack_4_way.ifc": {
+      "guid": "a0aeb9b5-539d-493e-a293-d56823f342ba",
+      "name": "Garment rack, 4-way",
+      "description": "A 42½ in square 4-way, its arms at 60 in (adjustable 48–72 in).",
+      "tags": [
+        "apparel",
+        "GarmentRack",
+        "Uniclass Pr_40_30_78_16"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1403"
+      },
+      "sha256": "2157794a8eca24c9c4e59a3805ebc4bf46b7d1a7176bd845c2d977cfccd6abe4"
+    },
+    "Apparel/garment_rounder_42_in.ifc": {
+      "guid": "76c1acef-4b5d-4c69-b9af-4e87e561697d",
+      "name": "Garment rounder 42 in",
+      "description": "A round rack 42 in across, its rail at 54 in (adjustable 45–72 in).",
+      "tags": [
+        "apparel",
+        "GarmentRack",
+        "Uniclass Pr_40_30_78_16"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1403"
+      },
+      "sha256": "1638b6b0781ca02f4cc8cb9a53d3f2aa4c89ee21cecccec5213066fa653a4589"
+    },
+    "Apparel/mannequin.ifc": {
+      "guid": "f521987d-6327-43f5-a598-13992f37a497",
+      "name": "Mannequin",
+      "description": "About 20 in across its base and 74 in tall: no source was found.",
+      "tags": [
+        "apparel",
+        "Mannequin"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0"
+      },
+      "sha256": "49502dda6b226a2bc8c872613197da349cf31e16474544edc9ad5150421a1c2d"
+    },
+    "Carts and security/eas_pedestal.ifc": {
+      "guid": "7caed3a9-fe67-472c-a068-bdc2aaeca252",
+      "name": "EAS pedestal",
+      "description": "A security pedestal 0.42 m wide, 0.10 m deep and 1.55 m high; pairs at most about 1.8 m apart, on their own circuit.",
+      "tags": [
+        "carts and security",
+        "EASPedestal"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1409"
+      },
+      "sha256": "300e1ebd03c6d90efcd98c129676ca8a1a16ec7da4128420a0d50369faaab89e"
+    },
+    "Carts and security/shopping_cart.ifc": {
+      "guid": "68729d2e-3262-43c9-ad8f-530d789fe1fe",
+      "name": "Shopping cart",
+      "description": "A wire cart 43¾ × 24½ in and 41 5/16 in high (Unarco M125); carts nest 12½ in.",
+      "tags": [
+        "carts and security",
+        "ShoppingCart",
+        "Uniclass Pr_40_50_90_76"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1411"
+      },
+      "sha256": "0f8d84e30d89337efc1934be0d30c801253e4feb2adaa03e162f93dabc16d32a"
+    },
+    "Checkouts/attendant_station.ifc": {
+      "guid": "18e7d31f-60b4-4af7-a312-e6f725d04173",
+      "name": "Attendant station",
+      "description": "A remote attendant station about 1077 × 660 mm and 1038 mm high (NCR, crated size).",
+      "tags": [
+        "checkouts",
+        "AttendantStation"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1408"
+      },
+      "sha256": "c9d2eda41c21b29a35966fafeebf32d6b00e81588505280678a3f3086213943c"
+    },
+    "Checkouts/cash_desk_compact_2500_x_1250.ifc": {
+      "guid": "5709995d-febc-4680-a0ee-fc032c69aa83",
+      "name": "Cash desk, compact 2500 × 1250",
+      "description": "A compact tandem cash desk for baskets, 2500 × 1250 mm and 970 mm high (ITAB CheckMate Tandem); 230 V, 3 A.",
+      "tags": [
+        "checkouts",
+        "Checkstand",
+        "Uniclass Pr_40_30_65_65"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1436"
+      },
+      "sha256": "cdf6231f613ca7d9bb93fe82a7790e1628cda543d0348bceef9d699be3516421"
+    },
+    "Checkouts/checkstand_belted_take_away_150_x_48_in.ifc": {
+      "guid": "a581ef00-81b4-490e-ab02-3470b1be5c4d",
+      "name": "Checkstand, belted take-away 150 × 48 in",
+      "description": "A scan-and-pass lane with a belted take-away, 150 × 48 in, its deck at 36 in (Pan-Oston).",
+      "tags": [
+        "checkouts",
+        "Checkstand",
+        "Uniclass Pr_40_30_65_65"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1432 S1406"
+      },
+      "sha256": "7e3d2e8621fde03125958abedc750c2fb7a0dffb6d76041cb0b05e9c59ed053a"
+    },
+    "Checkouts/checkstand_carousel_rear_142_x_48_in.ifc": {
+      "guid": "97f5eebf-cf1c-4d2b-b468-bf630651d346",
+      "name": "Checkstand, carousel rear 142 × 48 in",
+      "description": "A convertible lane with a carousel rear, 142 × 48 in, its deck at 36 in (Pan-Oston); its lane light 2380 mm up.",
+      "tags": [
+        "checkouts",
+        "Checkstand",
+        "Uniclass Pr_40_30_65_65"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1432 S1406"
+      },
+      "sha256": "b03332c9c0c3ba7da1ee04502ba4c32c29acd131258e9255a5b4dcb4c2e15028"
+    },
+    "Checkouts/self_checkout_lane.ifc": {
+      "guid": "1e159f09-f1be-4e81-9b66-612e731aed8a",
+      "name": "Self-checkout lane",
+      "description": "A full scan-and-bag lane 3068 × 1359 mm (NCR SelfServ 7350, core with bumper, no bag well); its 915 mm deck height is judgement.",
+      "tags": [
+        "checkouts",
+        "SelfCheckout",
+        "Uniclass Pr_40_30_65_60"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1408"
+      },
+      "sha256": "da23afe332b0fbc1d958a7dbfb5ea29d15004874da29db863adff9fcd0627790"
+    },
+    "Checkouts/self_checkout_pedestal.ifc": {
+      "guid": "910a7932-5b53-4b39-93a6-f69269951197",
+      "name": "Self-checkout, pedestal",
+      "description": "A pedestal self-checkout 440 mm wide, 718 mm deep and 1490 mm high (Diebold Nixdorf EASY eXpress).",
+      "tags": [
+        "checkouts",
+        "SelfCheckout",
+        "Uniclass Pr_40_30_65_60"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1439"
+      },
+      "sha256": "387dbbcab49e5c962dbf632c192c7711314e32cd56345c7b189137439279c2be"
+    },
+    "Shelving/gondola_end_cap_36_in.ifc": {
+      "guid": "5b85cc1d-a74f-4f48-a280-dd593feb1ff8",
+      "name": "Gondola end cap 36 in",
+      "description": "An end unit as wide as a 16 + 16 in island (36 in), 72 in high.",
+      "tags": [
+        "shelving",
+        "EndCap",
+        "shelf",
+        "Uniclass Pr_40_30_78_71"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1400"
+      },
+      "sha256": "bbd32fa20565bcbdbd1076cfe26240567f115413a8a3828e0f72acfdbd18b3d0"
+    },
+    "Shelving/gondola_island_48_in_x_72_in.ifc": {
+      "guid": "59a3c911-1378-4211-a235-ac22a8fa90ae",
+      "name": "Gondola, island 48 in × 72 in",
+      "description": "A 48 in island section of two 16 in decks each side of a 2½ in upright (35¾ in overall with the 1¼ in allowance), 72 in high, four shelves a side.",
+      "tags": [
+        "shelving",
+        "Gondola",
+        "shelf",
+        "Uniclass Pr_40_30_78_71"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1400"
+      },
+      "sha256": "0a029a973fc1b728d04194d78cd7c9b1a6d70ff7999210f3afb2184dbc010112"
+    },
+    "Shelving/gondola_wall_48_in_x_84_in.ifc": {
+      "guid": "16700861-8cb3-4946-a973-4255afcba9be",
+      "name": "Gondola, wall 48 in × 84 in",
+      "description": "A 48 in wall section, a 16 in deck, 84 in high, five shelves.",
+      "tags": [
+        "shelving",
+        "Gondola",
+        "shelf",
+        "Uniclass Pr_40_30_78_71"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1400"
+      },
+      "sha256": "7033f3a64c52ab4c6bb3ca9ffefda2b4b994cec67791dddb2b7b6727d771b429"
+    },
+    "Shelving/pallet_rack_bay_96_x_42_in.ifc": {
+      "guid": "a79002d7-c5a3-4133-92d3-ae8e1bf7810d",
+      "name": "Pallet rack bay 96 × 42 in",
+      "description": "A selective rack bay 96 in wide and 42 in deep, 16 ft high, with beams at 6 and 11 ft; anchored, and restrained above 8 ft in public areas.",
+      "tags": [
+        "shelving",
+        "PalletRack",
+        "Uniclass Pr_40_30_78_70"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1399"
+      },
+      "sha256": "ff6c45ee660e49d99383bb22275a8c310ffa74a109d0eb9527d5c511c43129ee"
+    },
+    "Shelving/produce_table_72_x_48_in.ifc": {
+      "guid": "60fae669-a36d-48b1-9419-b9ca0717d4b8",
+      "name": "Produce table 72 × 48 in",
+      "description": "A display table 72 × 48 in, its deck at 34 in: no primary sheet was found.",
+      "tags": [
+        "shelving",
+        "ProduceTable",
+        "table",
+        "Uniclass Pr_40_30_25_71"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0"
+      },
+      "sha256": "6482a8cf2df63c3677c9b61f8a52834541ef4a881d08b622216d9eae6c65929e"
+    },
+    "Showcases/cash_wrap_72_x_22_in.ifc": {
+      "guid": "08bb40da-1b54-4fa1-9bec-489191d95db8",
+      "name": "Cash wrap 72 × 22 in",
+      "description": "A sales counter 72 × 22 × 42 in, with a 36 in long lowered section at 36 in for ADA §904.4.",
+      "tags": [
+        "showcases",
+        "CashWrap",
+        "Uniclass Pr_40_30_65_65"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1460 S1354"
+      },
+      "sha256": "acf3e3cb3956695f5c8aa44d3adaa5486a71ea11255f1c0cb1988e142c0344ed"
+    },
+    "Showcases/showcase_counter_70_in.ifc": {
+      "guid": "6284ec3b-acc8-4e11-a97c-b6276a9eb327",
+      "name": "Showcase, counter 70 in",
+      "description": "A counter-height showcase 70 × 20 in, 38 in high, glass above a base; served across, it is a sales counter (ADA §904.4).",
+      "tags": [
+        "showcases",
+        "Showcase",
+        "Uniclass Pr_40_30_78_24"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1405"
+      },
+      "sha256": "7402e87ceffe858cd15404a04686bf39a25f20f7af6a197222c627ff3449af66"
+    }
+  }
+}

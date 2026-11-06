@@ -1,0 +1,279 @@
+{
+  "format": "riviera-library",
+  "version": 1,
+  "id": "a5714528-ba5a-4142-9de1-fea52b1baf9d",
+  "name": "Riviera Gym Equipment",
+  "description": "Generic gym equipment that ship with Riviera: placeholders at the sizes research note 15 gives, each a model fragment (IFC) with its IFC class and predefined type or kind, so the rule packs choose it. Generated from riviera_core::furnishings (ARC-FURN-001); regenerate with RIVIERA_REGEN_LIBRARIES=1.",
+  "author": "Riviera contributors",
+  "licence": "CC0-1.0",
+  "defaults": {},
+  "items": {
+    "Cardio/elliptical.ifc": {
+      "guid": "5133c5ac-31ac-4b66-bf1f-3d2ae356097b",
+      "name": "Elliptical",
+      "description": "203 × 76 cm, 170 cm high (Precor EFX 885); self-powered.",
+      "tags": [
+        "cardio",
+        "Elliptical",
+        "Uniclass Pr_40_70_84_26"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1368"
+      },
+      "sha256": "9cc8e39139ce58599c09a7792320439bfa3a5d05f2630cbbcab8a56f08aef04e"
+    },
+    "Cardio/indoor_cycle.ifc": {
+      "guid": "5c0beb4e-90a2-487f-9002-0d1118ac085a",
+      "name": "Indoor cycle",
+      "description": "114 × 66 cm, 124 cm high (Keiser M3i); no mains power.",
+      "tags": [
+        "cardio",
+        "ExerciseBike",
+        "Uniclass Pr_40_70_84_27"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1369"
+      },
+      "sha256": "350468f9ece23dc37ee77d713a599ad87e1e2fdfa951078388e3e1b641a00925"
+    },
+    "Cardio/recumbent_bike.ifc": {
+      "guid": "4380b719-13f0-4071-bad8-53e177ef4079",
+      "name": "Recumbent bike",
+      "description": "166 × 69 cm, 135 cm high (Life Fitness 95R).",
+      "tags": [
+        "cardio",
+        "ExerciseBike",
+        "Uniclass Pr_40_70_84_27"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1369"
+      },
+      "sha256": "cc363ce6533805fdb64e6f6e04388e9a8c396e40aafa2ae2b68370e918eca858"
+    },
+    "Cardio/rower.ifc": {
+      "guid": "675eb42f-a02a-4810-84e3-302e95251875",
+      "name": "Rower",
+      "description": "244 × 61 cm assembled (Concept2 RowErg); its use area is 274 × 122 cm. Its 0.5 m height is judgement.",
+      "tags": [
+        "cardio",
+        "Rower",
+        "Uniclass Pr_40_70_84_72"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1360"
+      },
+      "sha256": "6d083487b4da3bda4cb9d0856eea1ea0fd1bfa3c42cfdff67a275d1a82ba447b"
+    },
+    "Cardio/stair_climber.ifc": {
+      "guid": "55f8c7bf-0ed8-4d2a-a3e2-78b36a146a7c",
+      "name": "Stair climber",
+      "description": "147 × 86 cm, 200 cm high (StairMaster 8Gx); a 12 V supply from an ordinary outlet. Its height and the user's rise need a tall ceiling.",
+      "tags": [
+        "cardio",
+        "StairClimber",
+        "Uniclass Pr_40_70_84_84"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1367"
+      },
+      "sha256": "6374c915411bd0c73c6a8d8680216eab94f8a7f545a804de5aa6526961c003f6"
+    },
+    "Cardio/treadmill_commercial.ifc": {
+      "guid": "5ac248bf-0762-41d7-9934-7d07efbd1db4",
+      "name": "Treadmill, commercial",
+      "description": "211 × 89 cm and 173 cm high (Precor TRM 885); 120 V on its own 20 A circuit. Its user steps on at the rear, its front here.",
+      "tags": [
+        "cardio",
+        "Treadmill",
+        "Uniclass Pr_40_70_84_91"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1356"
+      },
+      "sha256": "649e12ba1d56d31ed2edbdf2d1485384d2c7f01ea3ed494e3ed310da55b09aac"
+    },
+    "Cardio/upright_bike.ifc": {
+      "guid": "5a6a0e23-d0e2-4b11-8bc1-e13025641fde",
+      "name": "Upright bike",
+      "description": "111 × 54 cm, 152 cm high (Life Fitness 95C).",
+      "tags": [
+        "cardio",
+        "ExerciseBike",
+        "Uniclass Pr_40_70_84_27"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1369"
+      },
+      "sha256": "bd987e4d4d2042a87d93d7720da41a068d971a2f529890edc5003d1cb2be40dc"
+    },
+    "Free weights/dumbbell_rack_two_tier.ifc": {
+      "guid": "bbee08e6-42f2-45c6-96d8-46bbbcf53eb0",
+      "name": "Dumbbell rack, two-tier",
+      "description": "229 × 64 cm, 84 cm high (Life Fitness SDR2); its live area is 229 × 155 cm.",
+      "tags": [
+        "free weights",
+        "DumbbellRack",
+        "shelf"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1366"
+      },
+      "sha256": "bb0c18c9eeb9ba679f74c6b4a0a6b7867c8977948dc7efa12b30d9daea4033bf"
+    },
+    "Free weights/flat_bench.ifc": {
+      "guid": "193e8eab-88f1-4bfa-9a83-329c0238d540",
+      "name": "Flat bench",
+      "description": "About 1.3 × 0.6 m and 0.45 m high: no maker's sheet was found.",
+      "tags": [
+        "free weights",
+        "WeightBench"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0"
+      },
+      "sha256": "ca536a0701a00e908ecb4921f8e6e93d2b1c83e2e566ac944ccd7b26264fef95"
+    },
+    "Free weights/lifting_platform_8_x_8_ft.ifc": {
+      "guid": "cf65c993-46fe-41cb-99ef-f0df8b3ac3e2",
+      "name": "Lifting platform 8 × 8 ft",
+      "description": "An 8 × 8 ft (2.44 m) lifting area in a 2.54 m square frame (Rogue 8 × 8 ft Oly), 50 mm high.",
+      "tags": [
+        "free weights",
+        "LiftingPlatform"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1363"
+      },
+      "sha256": "895c8bfae587c1d263fbeb8491d06052f3a78f63ef9061a985e074034c535e7e"
+    },
+    "Free weights/plate_tree.ifc": {
+      "guid": "189be05f-1dd4-4008-bc83-f6502468da5b",
+      "name": "Plate tree",
+      "description": "A 0.7 × 0.7 m base, 1.2 m high: no maker's sheet was found.",
+      "tags": [
+        "free weights",
+        "PlateTree"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0"
+      },
+      "sha256": "8f4f0790f7bd94452438310f269046a431ba63ac4c4586834fc8684828b0e784"
+    },
+    "Strength/cable_crossover.ifc": {
+      "guid": "8c597f1a-a056-4cc7-a6a9-856dd546325e",
+      "name": "Cable crossover",
+      "description": "425 cm wide, 73 cm deep and 239 cm high (Life Fitness Signature CMACO): it must clear ceiling services.",
+      "tags": [
+        "strength",
+        "CableCrossover",
+        "Uniclass Pr_40_70_84_11"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1364"
+      },
+      "sha256": "02b3fde1f4e9f8ab8271ed8832a6c5a2d822e3567286c49234d167887c7c6264"
+    },
+    "Strength/half_rack.ifc": {
+      "guid": "c454f164-4730-4e4e-bb86-832532cd8489",
+      "name": "Half rack",
+      "description": "122 × 124 cm and 234 cm high (Rogue HR-2).",
+      "tags": [
+        "strength",
+        "HalfRack",
+        "Uniclass Pr_40_70_84_66"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1362"
+      },
+      "sha256": "1225aff19d160eed2e6a973bf0d42cd34f5afceff5019b94e1e4432c6f6ad618"
+    },
+    "Strength/leg_press_selectorised.ifc": {
+      "guid": "18a0a347-64c4-4699-bd51-123792da2cfa",
+      "name": "Leg press, selectorised",
+      "description": "201 × 109 cm, 178 cm high (Life Fitness Signature seated leg press); 367 kg.",
+      "tags": [
+        "strength",
+        "LegPress",
+        "Uniclass Pr_40_70_84_46"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1365"
+      },
+      "sha256": "339641d7591d2c96ff7b325120a54263cbca3a28b946d946f16926aaa54d7d2f"
+    },
+    "Strength/power_rack.ifc": {
+      "guid": "fb84ce75-b688-4564-be64-ac944eae70ca",
+      "name": "Power rack",
+      "description": "135 × 86 cm and 230 cm high (Rogue R-3); to be bolted to the floor.",
+      "tags": [
+        "strength",
+        "PowerRack",
+        "Uniclass Pr_40_70_84_66"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1361"
+      },
+      "sha256": "f5df84128e8c78011981436798eae7b159832e78f5c217e8dadaa3139232a491"
+    },
+    "Strength/smith_machine.ifc": {
+      "guid": "c2280891-5862-4a02-a12c-e9d1c75bdf82",
+      "name": "Smith machine",
+      "description": "204 × 141 cm and 229 cm high (Matrix Varsity Smith).",
+      "tags": [
+        "strength",
+        "SmithMachine",
+        "Uniclass Pr_40_70_84_80"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1371"
+      },
+      "sha256": "a5a8ffb6dfe435f5bab8aecd9ac0c23b61af873a2cdd776f44783d964121f5b4"
+    }
+  }
+}

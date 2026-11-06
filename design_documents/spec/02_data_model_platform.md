@@ -2072,6 +2072,35 @@ The Place Component tool is the UI over `component.place`.
 - [ ] Neither the interface nor the help uses the word "family" for components.
 - [ ] Edit Component on a placed copy opens its IFC file; saving updates the copies in the open model.
 
+### 2.8.20 Bundled Component Libraries
+**ID:** DM-LIB-006 · **Priority:** P1 · **Ref:** owner requirements (2026-11-06: "build out bundled furniture and equipment component libraries"; "build out model fragments as standard Component Libraries"); DM-LIB-001 … 004; ARC-FURN-001; `INTERIORS_PLAN.md` §4.1, §5.1, §7.1
+
+**Purpose.** Give every project generic furniture and equipment from the start, as ordinary Component Libraries that users can read, copy and extend. They also show what a library of model fragments looks like.
+
+**Behaviour & rules.**
+- **Three libraries ship with Riviera**, in `libraries/`. Each is a standard Component Library (DM-LIB-004), a folder with its manifest:
+  - *Riviera Interiors*: bedroom, living, dining and office furniture, and sets;
+  - *Riviera Gym Equipment*: cardio, strength and free-weight equipment;
+  - *Riviera Retail and Checkout Fixtures*: shelving, apparel, showcases, carts and security, and checkouts.
+- **Every item is a model fragment** (DM-LIB-003): an IFC4 file written by Create Component from the generic catalogue (ARC-FURN-001). It holds one typed custom object, or a set of them: a dining set, a queen bedroom set, an office workstation. Placing an item brings in its type with its IFC class, predefined type or kind, and connectors. The rule packs therefore pick it up at once (ARC-RULE-002).
+- **Manifest entries** give each item its name, description, tags (its folder, kind or predefined type, and Uniclass 2015 code), and provenance: author, licence CC0-1.0, the generator, and the source IDs of its sizes. Each item keeps its GUID, so placed copies find their item after a rebuild (DM-LIB-001 updates).
+- **Where they are found:** `RIVIERA_LIBRARIES`, else beside the program (`libraries`, `../share/riviera/libraries`, macOS `../Resources/libraries`), else the source tree's `libraries`. The Component Library panel always lists them after the user's own libraries, and never saves their install path in the user's list. `library.bundled` lists them for scripts and agents.
+- **They are read-only where installed** (a Flatpak's `/app`, Program Files). To change an item, copy it into a library of your own.
+- **Rebuilding:** `RIVIERA_REGEN_LIBRARIES=1 cargo test -p riviera-app --test bundled_libraries` rewrites them from the catalogue, keeping each library's id and each item's GUID.
+
+**Data.** `libraries/<interiors|gym|retail>/` with `riviera-library.json` and one `.ifc` per item; packaged to `share/riviera/libraries` (Flatpak), `libraries\` beside `riviera.exe` (Windows) and `Contents/Resources/libraries` (macOS).
+
+**Commands.** `library.bundled`; items are placed with `component.place_fragment`.
+
+**Acceptance criteria.**
+- [x] Every catalogue item is a fragment in its library with its manifest entry, and every fragment passes IfcOpenShell's schema and EXPRESS-rule validation.
+- [x] Each item, placed into a new model, comes in as one copy of a type with the catalogue's predefined type and kind. Each set comes in with all its members.
+- [x] Under the ADA rule set, every placed bed has its clear spaces, and the sets are placed with nothing in their own use zones.
+- [x] Rebuilding keeps each library's id and every item's GUID.
+- [x] The guest room sample is furnished from the Interiors library.
+
+*Built (2026-11-06):* 64 items and 3 sets (67 fragments), `library.bundled`, the panel listing, and packaging for Flatpak, Windows and macOS. Not yet: classification references in the fragments (the Uniclass code is a tag), variants, thumbnails rendered ahead of time, and product swaps (ARC-BATH-006's pattern) for furniture.
+
 ---
 
 ## 2.9 Parameters and units
@@ -4885,6 +4914,7 @@ All commands defined in this chapter. Every command in this table is also a Lua 
 | `library.import_files` | paths[], to_folder_ref, options? | {item_refs[], report} | No | DM-LIB-004 |
 | `library.undo_import` | import_id | — | No | DM-LIB-004 |
 | `library.open` | path | library_id | No | DM-LIB-004 |
+| `library.bundled` | — | [{path, id, name, description, items, writable}] | No (query) | DM-LIB-006 |
 | `library.create` | path, name | library_id | No | DM-LIB-004 |
 | `library.close` | library_id | — | No | DM-LIB-004 |
 | `param.definition` | param_ref | definition | No | DM-PARAM-002 |

@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Riviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Riviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 905 numbered requirements (320 P0 · 345 P1 · 233 P2 · 7 P3), 2,363 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 907 numbered requirements (320 P0 · 347 P1 · 233 P2 · 7 P3), 2,366 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Riviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Riviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,363 commands; 905 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,366 commands; 907 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -6166,6 +6166,35 @@ The Place Component tool is the UI over `component.place`.
 - [ ] Neither the interface nor the help uses the word "family" for components.
 - [ ] Edit Component on a placed copy opens its IFC file; saving updates the copies in the open model.
 
+### 2.8.20 Bundled Component Libraries
+**ID:** DM-LIB-006 · **Priority:** P1 · **Ref:** owner requirements (2026-11-06: "build out bundled furniture and equipment component libraries"; "build out model fragments as standard Component Libraries"); DM-LIB-001 … 004; ARC-FURN-001; `INTERIORS_PLAN.md` §4.1, §5.1, §7.1
+
+**Purpose.** Give every project generic furniture and equipment from the start, as ordinary Component Libraries that users can read, copy and extend. They also show what a library of model fragments looks like.
+
+**Behaviour & rules.**
+- **Three libraries ship with Riviera**, in `libraries/`. Each is a standard Component Library (DM-LIB-004), a folder with its manifest:
+  - *Riviera Interiors*: bedroom, living, dining and office furniture, and sets;
+  - *Riviera Gym Equipment*: cardio, strength and free-weight equipment;
+  - *Riviera Retail and Checkout Fixtures*: shelving, apparel, showcases, carts and security, and checkouts.
+- **Every item is a model fragment** (DM-LIB-003): an IFC4 file written by Create Component from the generic catalogue (ARC-FURN-001). It holds one typed custom object, or a set of them: a dining set, a queen bedroom set, an office workstation. Placing an item brings in its type with its IFC class, predefined type or kind, and connectors. The rule packs therefore pick it up at once (ARC-RULE-002).
+- **Manifest entries** give each item its name, description, tags (its folder, kind or predefined type, and Uniclass 2015 code), and provenance: author, licence CC0-1.0, the generator, and the source IDs of its sizes. Each item keeps its GUID, so placed copies find their item after a rebuild (DM-LIB-001 updates).
+- **Where they are found:** `RIVIERA_LIBRARIES`, else beside the program (`libraries`, `../share/riviera/libraries`, macOS `../Resources/libraries`), else the source tree's `libraries`. The Component Library panel always lists them after the user's own libraries, and never saves their install path in the user's list. `library.bundled` lists them for scripts and agents.
+- **They are read-only where installed** (a Flatpak's `/app`, Program Files). To change an item, copy it into a library of your own.
+- **Rebuilding:** `RIVIERA_REGEN_LIBRARIES=1 cargo test -p riviera-app --test bundled_libraries` rewrites them from the catalogue, keeping each library's id and each item's GUID.
+
+**Data.** `libraries/<interiors|gym|retail>/` with `riviera-library.json` and one `.ifc` per item; packaged to `share/riviera/libraries` (Flatpak), `libraries\` beside `riviera.exe` (Windows) and `Contents/Resources/libraries` (macOS).
+
+**Commands.** `library.bundled`; items are placed with `component.place_fragment`.
+
+**Acceptance criteria.**
+- [x] Every catalogue item is a fragment in its library with its manifest entry, and every fragment passes IfcOpenShell's schema and EXPRESS-rule validation.
+- [x] Each item, placed into a new model, comes in as one copy of a type with the catalogue's predefined type and kind. Each set comes in with all its members.
+- [x] Under the ADA rule set, every placed bed has its clear spaces, and the sets are placed with nothing in their own use zones.
+- [x] Rebuilding keeps each library's id and every item's GUID.
+- [x] The guest room sample is furnished from the Interiors library.
+
+*Built (2026-11-06):* 64 items and 3 sets (67 fragments), `library.bundled`, the panel listing, and packaging for Flatpak, Windows and macOS. Not yet: classification references in the fragments (the Uniclass code is a tag), variants, thumbnails rendered ahead of time, and product swaps (ARC-BATH-006's pattern) for furniture.
+
 ---
 
 ## 2.9 Parameters and units
@@ -8979,6 +9008,7 @@ All commands defined in this chapter. Every command in this table is also a Lua 
 | `library.import_files` | paths[], to_folder_ref, options? | {item_refs[], report} | No | DM-LIB-004 |
 | `library.undo_import` | import_id | — | No | DM-LIB-004 |
 | `library.open` | path | library_id | No | DM-LIB-004 |
+| `library.bundled` | — | [{path, id, name, description, items, writable}] | No (query) | DM-LIB-006 |
 | `library.create` | path, name | library_id | No | DM-LIB-004 |
 | `library.close` | library_id | — | No | DM-LIB-004 |
 | `param.definition` | param_ref | definition | No | DM-PARAM-002 |
@@ -15677,6 +15707,37 @@ unchanged. The first domain on the shared format is **interiors**: use zones aro
 
 *Built (2026-11-06):* use zones in `clearances::all` (kind `use_zone`, green like fixture spaces), `rules.check` in `riviera-app`, and View › Coordination › Check Rules, which lists the findings and selects and frames the one picked. A rule selects an element by its own predefined type and ObjectType, else its type's predefined type and ElementType. `mesh_object.set_type` now sets a type's `predefined_type` and `element_type`; the Properties palette shows them as *IFC Type* and *Kind*. Sample *An accessible hotel guest room*. Not yet: one clear space shared by two beds (§806.2.3's exception; mark one bed not accessible), turning spaces, and furniture from the interiors library.
 
+### 3.9b.3 Generic furniture and equipment
+**ID:** ARC-FURN-001 · **Priority:** P1 · **Ref:** `INTERIORS_PLAN.md` §4.1, §5.1, §7.1, §8.1 (the owner accepted the IFC mapping); research/15 A1, B1–B7, C2, C7, D1, E2; DM-LIB-006
+
+**Purpose.** Stand-in furniture and equipment at their usual sizes, typed for IFC and for the rule packs, until a product is chosen.
+
+**Behaviour & rules.**
+- **The catalogue** (`riviera_core::furnishings`) holds 64 items in three libraries:
+  - *Interiors*: beds (US twin, full, queen and king; Approved Document M's single, double and principal double), nightstand, dresser, chest of drawers, double wardrobe, luggage rack, sofas, armchair, coffee and occasional tables, storage unit, rug, dining tables (4 and 6 seats, round), dining chair, counter stool, desks (fixed and standing), task chair, conference table, bookcase and reception desk;
+  - *Gym*: commercial treadmill, elliptical, stair climber, upright and recumbent bikes, indoor cycle, rower, leg press, cable crossover, power and half racks, Smith machine, dumbbell rack, flat bench, plate tree and lifting platform;
+  - *Retail*: island, wall and end-cap gondolas, a pallet rack bay, produce table, garment rounder and 4-way, mannequin, counter showcase, cash wrap, shopping cart, EAS pedestal, two checkstands, a compact cash desk, two self-checkouts and an attendant station.
+- **Sizes** are research/15's, from manufacturers' sheets, Approved Document M's furniture schedule and planning guides, each with its source IDs. Sizes no source gave (a dresser's depth, a bench, a plate tree, a mannequin, a produce table, a rower's height) are judgement, and their descriptions say so (E-103).
+- **IFC** (`INTERIORS_PLAN.md` §8.1):
+  - Furniture has its `IfcFurnitureTypeEnum` value (BED, TABLE, DESK, CHAIR, SOFA, SHELF), else USERDEFINED with its kind as ElementType (Nightstand, Dresser, Treadmill, Gondola, Checkstand, SelfCheckout, …).
+  - The EAS pedestal is an `IfcSensor` USERDEFINED ("EASPedestal").
+  - Each has its description.
+- **Shape and frame.** Simple prisms, centred on the insertion point and standing on the floor. The front, the side a person uses, is −y: a bed's foot, a dresser's drawers, a treadmill's rear where the user steps on.
+- **Connectors.** Powered items carry a power connector at the back:
+  - the treadmill: 120 V, 1920 VA, on its own circuit;
+  - the stair climber's supply;
+  - the EAS pedestal;
+  - checkstands, self-checkouts and the attendant station.
+- `furnishing.catalogue` lists the items (folder, IFC type, kind, Uniclass code, size, description, sources). `furnishing.load` loads them as types, reusing one of the same name.
+
+**Commands.** `furnishing.catalogue`, `furnishing.load`.
+
+**Acceptance criteria.**
+- [x] Every item has a valid predefined type for its class, a kind when USERDEFINED, sources in `SOURCE_REGISTER.md`, and stands on the floor.
+- [x] A treadmill loaded into a project has a 120 V power connector, and a bed is chosen by the ADA interiors pack.
+
+*Built (2026-11-06):* `riviera_core::furnishings`, made into the bundled libraries (DM-LIB-006). Not yet: kitchen cabinets and appliances (`KITCHENS_PLAN.md`), lighting fixtures for interiors (`INTERIORS_PLAN.md` §4.5), and detailed shapes.
+
 ---
 
 ## 3.11 Massing and site
@@ -16884,6 +16945,8 @@ All commands below are registered once in the command registry and exposed autom
 | `scopebox.set_extents` | id, min, max, rotation? | — | Yes | ARC-SCOPE-001 |
 | `datum.assign_scope_box` | datum_ids, scope_box_id \| null | — | Yes | ARC-SCOPE-001 |
 | `view.assign_scope_box` | view_ids, scope_box_id \| null | — | Yes | ARC-SCOPE-001 |
+| `furnishing.catalogue` | library? | [{library, folder, name, predefined_type, kind, uniclass, description, source, size}] | No (query) | ARC-FURN-001 |
+| `furnishing.load` | names? | {name: type_id} | Yes | ARC-FURN-001 |
 | `rules.packs` | domain? | [{domain, id, title, format, layer, jurisdiction, edition, rules, in_use, shipped}] | No (query) | ARC-RULE-001 |
 | `rules.set_packs` | domain, packs? (none for automatic) | — | Yes | ARC-RULE-001 |
 | `rules.add_pack` | pack (riviera.rules-1, bath-rules-1 or vt-rules-1) | {domain, id} | Yes | ARC-RULE-001 |
@@ -30351,15 +30414,15 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 | Area | P0 | P1 | P2 | P3 | Total |
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 39 | 8 | 0 | 123 |
-| DM | 91 | 65 | 34 | 3 | 193 |
-| ARC | 77 | 103 | 37 | 1 | 218 |
+| DM | 91 | 66 | 34 | 3 | 194 |
+| ARC | 77 | 104 | 37 | 1 | 219 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 32 | 0 | 33 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
 | COL | 8 | 52 | 16 | 1 | 77 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **345** | **233** | **7** | **905** |
+| **Total** | **320** | **347** | **233** | **7** | **907** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -30414,7 +30477,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.2a Riviera-originated features
 
-150 requirements are Riviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
+151 requirements are Riviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
 
 | Requirement | Ch | Feature |
 |-------------|----|---------|
@@ -30451,6 +30514,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | DM-LIB-002 | 2 | 2.8.16 Stamps: placing components again and again (Place Component) |
 | DM-LIB-003 | 2 | 2.8.17 Model fragments in the library |
 | DM-LIB-004 | 2 | 2.8.18 Library folders and large libraries |
+| DM-LIB-006 | 2 | 2.8.20 Bundled Component Libraries |
 | DM-CODE-001 | 2 | 2.9.5a Building code |
 | DM-FILE-007 | 2 | 2.11.9 Remote file locations (WebDAV) |
 | DM-IMP-013 | 2 | 2.11.10 CADCraft interoperability |
@@ -30571,7 +30635,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2363 unique commands** in 442 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2366 unique commands** in 443 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -30745,6 +30809,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `frame` | 3 |
 | `framing` | 7 |
 | `funicular` | 3 |
+| `furnishing` | 2 |
 | `gbxml` | 2 |
 | `geom` | 1 |
 | `geometry` | 7 |
@@ -30781,7 +30846,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `keynotes` | 2 |
 | `legend` | 3 |
 | `level` | 5 |
-| `library` | 29 |
+| `library` | 30 |
 | `lighting` | 1 |
 | `lighting_fixture` | 1 |
 | `line` | 1 |
@@ -31888,6 +31953,8 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `funicular.check` | 3 | demand? | [{funicular, severity, rule, message}] | No (query) | ARC-VT-024 |
 | `funicular.create` | 3 | alignment_id, layout?, gauge?, car_length?, car_width?, car_height?, car_floor?, car_capacity?, speed?, dwell?, walkway? | {funicular, length, rise, max_grade, passing_loop, trip, capacity, …} | Yes | ARC-VT-024 |
 | `funicular.list` | 3 | — | [{funicular, layout, gauge, length, rise, max_grade, trip, capacity, …}] | No (query) | ARC-VT-024 |
+| `furnishing.catalogue` | 3 | library? | [{library, folder, name, predefined_type, kind, uniclass, description, source, size}] | No (query) | ARC-FURN-001 |
+| `furnishing.load` | 3 | names? | {name: type_id} | Yes | ARC-FURN-001 |
 | `gbxml.export` | 4 | path, source: "energy_model"\ | "spaces" | — | No |
 | `gbxml.import_loads` | 4 | path | report | Yes | ANA-EM-004 |
 | `geom.raycast` | 2 | origin, direction, filter? | hit[] | No | DM-LUA-010 |
@@ -32051,6 +32118,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `library.add_item` | 2 | element_or_type_id, library?, name?, tags? | item_ref | No | DM-LIB-002 |
 | `library.add_variant` | 2 | item_ref, element_ids[], variant_name | variant_ref | No | DM-LIB-003 |
 | `library.browse` | 2 | query?, source? | — | No | DM-LIB-001 |
+| `library.bundled` | 2 | — | [{path, id, name, description, items, writable}] | No (query) | DM-LIB-006 |
 | `library.close` | 2 | library_id | — | No | DM-LIB-004 |
 | `library.copy_folder` | 2 | path, to_folder_ref, options? | job_id | No | DM-LIB-004 |
 | `library.create` | 2 | path, name | library_id | No | DM-LIB-004 |

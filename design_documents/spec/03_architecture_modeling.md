@@ -5451,6 +5451,37 @@ unchanged. The first domain on the shared format is **interiors**: use zones aro
 
 *Built (2026-11-06):* use zones in `clearances::all` (kind `use_zone`, green like fixture spaces), `rules.check` in `riviera-app`, and View › Coordination › Check Rules, which lists the findings and selects and frames the one picked. A rule selects an element by its own predefined type and ObjectType, else its type's predefined type and ElementType. `mesh_object.set_type` now sets a type's `predefined_type` and `element_type`; the Properties palette shows them as *IFC Type* and *Kind*. Sample *An accessible hotel guest room*. Not yet: one clear space shared by two beds (§806.2.3's exception; mark one bed not accessible), turning spaces, and furniture from the interiors library.
 
+### 3.9b.3 Generic furniture and equipment
+**ID:** ARC-FURN-001 · **Priority:** P1 · **Ref:** `INTERIORS_PLAN.md` §4.1, §5.1, §7.1, §8.1 (the owner accepted the IFC mapping); research/15 A1, B1–B7, C2, C7, D1, E2; DM-LIB-006
+
+**Purpose.** Stand-in furniture and equipment at their usual sizes, typed for IFC and for the rule packs, until a product is chosen.
+
+**Behaviour & rules.**
+- **The catalogue** (`riviera_core::furnishings`) holds 64 items in three libraries:
+  - *Interiors*: beds (US twin, full, queen and king; Approved Document M's single, double and principal double), nightstand, dresser, chest of drawers, double wardrobe, luggage rack, sofas, armchair, coffee and occasional tables, storage unit, rug, dining tables (4 and 6 seats, round), dining chair, counter stool, desks (fixed and standing), task chair, conference table, bookcase and reception desk;
+  - *Gym*: commercial treadmill, elliptical, stair climber, upright and recumbent bikes, indoor cycle, rower, leg press, cable crossover, power and half racks, Smith machine, dumbbell rack, flat bench, plate tree and lifting platform;
+  - *Retail*: island, wall and end-cap gondolas, a pallet rack bay, produce table, garment rounder and 4-way, mannequin, counter showcase, cash wrap, shopping cart, EAS pedestal, two checkstands, a compact cash desk, two self-checkouts and an attendant station.
+- **Sizes** are research/15's, from manufacturers' sheets, Approved Document M's furniture schedule and planning guides, each with its source IDs. Sizes no source gave (a dresser's depth, a bench, a plate tree, a mannequin, a produce table, a rower's height) are judgement, and their descriptions say so (E-103).
+- **IFC** (`INTERIORS_PLAN.md` §8.1):
+  - Furniture has its `IfcFurnitureTypeEnum` value (BED, TABLE, DESK, CHAIR, SOFA, SHELF), else USERDEFINED with its kind as ElementType (Nightstand, Dresser, Treadmill, Gondola, Checkstand, SelfCheckout, …).
+  - The EAS pedestal is an `IfcSensor` USERDEFINED ("EASPedestal").
+  - Each has its description.
+- **Shape and frame.** Simple prisms, centred on the insertion point and standing on the floor. The front, the side a person uses, is −y: a bed's foot, a dresser's drawers, a treadmill's rear where the user steps on.
+- **Connectors.** Powered items carry a power connector at the back:
+  - the treadmill: 120 V, 1920 VA, on its own circuit;
+  - the stair climber's supply;
+  - the EAS pedestal;
+  - checkstands, self-checkouts and the attendant station.
+- `furnishing.catalogue` lists the items (folder, IFC type, kind, Uniclass code, size, description, sources). `furnishing.load` loads them as types, reusing one of the same name.
+
+**Commands.** `furnishing.catalogue`, `furnishing.load`.
+
+**Acceptance criteria.**
+- [x] Every item has a valid predefined type for its class, a kind when USERDEFINED, sources in `SOURCE_REGISTER.md`, and stands on the floor.
+- [x] A treadmill loaded into a project has a 120 V power connector, and a bed is chosen by the ADA interiors pack.
+
+*Built (2026-11-06):* `riviera_core::furnishings`, made into the bundled libraries (DM-LIB-006). Not yet: kitchen cabinets and appliances (`KITCHENS_PLAN.md`), lighting fixtures for interiors (`INTERIORS_PLAN.md` §4.5), and detailed shapes.
+
 ---
 
 ## 3.11 Massing and site
@@ -6658,6 +6689,8 @@ All commands below are registered once in the command registry and exposed autom
 | `scopebox.set_extents` | id, min, max, rotation? | — | Yes | ARC-SCOPE-001 |
 | `datum.assign_scope_box` | datum_ids, scope_box_id \| null | — | Yes | ARC-SCOPE-001 |
 | `view.assign_scope_box` | view_ids, scope_box_id \| null | — | Yes | ARC-SCOPE-001 |
+| `furnishing.catalogue` | library? | [{library, folder, name, predefined_type, kind, uniclass, description, source, size}] | No (query) | ARC-FURN-001 |
+| `furnishing.load` | names? | {name: type_id} | Yes | ARC-FURN-001 |
 | `rules.packs` | domain? | [{domain, id, title, format, layer, jurisdiction, edition, rules, in_use, shipped}] | No (query) | ARC-RULE-001 |
 | `rules.set_packs` | domain, packs? (none for automatic) | — | Yes | ARC-RULE-001 |
 | `rules.add_pack` | pack (riviera.rules-1, bath-rules-1 or vt-rules-1) | {domain, id} | Yes | ARC-RULE-001 |

@@ -178,6 +178,8 @@ fi
 install -m644 "$ROOT"/test-data/samples/samples.json "$STAGE/samples/"
 # The sample Component Library beside the samples (crates/riviera-ui/src/components.rs).
 rm -rf "$STAGE/library" && cp -r "$ROOT/test-data/library" "$STAGE/library"
+# The bundled Component Libraries beside the exe (crates/riviera-core/src/library.rs: bundled_root).
+rm -rf "$STAGE/libraries" && cp -r "$ROOT/libraries" "$STAGE/libraries"
 for n in $(python3 -c "import json;print(' '.join(s['name'] for s in json.load(open('$ROOT/test-data/samples/samples.json'))))"); do
     for ext in ifc lua md; do
         [ -f "$ROOT/test-data/samples/$n.$ext" ] && install -m644 "$ROOT/test-data/samples/$n.$ext" "$STAGE/samples/"

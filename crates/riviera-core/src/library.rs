@@ -331,6 +331,45 @@ pub fn open_library(_: &Store, p: OpenParams) -> Result<LibraryInfo> {
     Ok(info(&root, &m))
 }
 
+/// Where the bundled Component Libraries are (DM-LIB-006): `RIVIERA_LIBRARIES`, beside the
+/// program (`libraries`, `../share/riviera/libraries`, or macOS's `../Resources/libraries`), or
+/// the source tree's `libraries` in a development build. The first that exists.
+pub fn bundled_root() -> Option<PathBuf> {
+    let mut candidates: Vec<PathBuf> = Vec::new();
+    if let Some(d) = std::env::var_os("RIVIERA_LIBRARIES") {
+        candidates.push(PathBuf::from(d));
+    }
+    if let Ok(exe) = std::env::current_exe()
+        && let Some(dir) = exe.parent()
+    {
+        candidates.push(dir.join("libraries"));
+        candidates.push(dir.join("../share/riviera/libraries"));
+        candidates.push(dir.join("../Resources/libraries"));
+        // target/debug/riviera in the source tree.
+        candidates.push(dir.join("../../libraries"));
+    }
+    candidates.push(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../libraries"));
+    candidates.into_iter().find(|d| d.is_dir()).map(|d| std::fs::canonicalize(&d).unwrap_or(d))
+}
+
+/// The bundled Component Libraries' folders, by name.
+pub fn bundled_dirs() -> Vec<PathBuf> {
+    let Some(root) = bundled_root() else { return Vec::new() };
+    let Ok(entries) = std::fs::read_dir(&root) else { return Vec::new() };
+    let mut out: Vec<PathBuf> = entries.flatten().map(|e| e.path()).filter(|p| manifest_in(p).is_file()).collect();
+    out.sort();
+    out
+}
+
+#[derive(Debug, Default, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct BundledParams {}
+
+/// The Component Libraries that ship with Riviera (`library.bundled`).
+pub fn bundled(_: &Store, _: Option<BundledParams>) -> Result<Vec<LibraryInfo>> {
+    bundled_dirs().iter().map(|root| Ok(info(root, &open(root)?))).collect()
+}
+
 /// Calls `f(relative path, kind)` for every item under `dir`, skipping hidden folders.
 fn walk(root: &Path, dir: &Path, f: &mut dyn FnMut(&Path, ItemKind)) {
     let Ok(entries) = std::fs::read_dir(dir) else {

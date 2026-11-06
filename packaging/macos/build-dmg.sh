@@ -119,6 +119,8 @@ cp "$ROOT"/test-data/samples/samples.json "$ROOT"/test-data/samples/*.ifc \
 cp -R "$ROOT"/test-data/samples/*.resources "$APP/Contents/Resources/samples/"
 # The sample Component Library beside the samples (crates/riviera-ui/src/components.rs).
 rm -rf "$APP/Contents/Resources/library" && cp -R "$ROOT/test-data/library" "$APP/Contents/Resources/library"
+# The bundled Component Libraries (crates/riviera-core/src/library.rs: bundled_root).
+rm -rf "$APP/Contents/Resources/libraries" && cp -R "$ROOT/libraries" "$APP/Contents/Resources/libraries"
 cp "$ROOT/LICENSE" "$APP/Contents/Resources/COPYING"
 cp "$ROOT/packaging/THIRD-PARTY-NOTICES.txt" "$APP/Contents/Resources/"
 

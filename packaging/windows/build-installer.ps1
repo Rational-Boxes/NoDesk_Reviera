@@ -257,6 +257,8 @@ foreach ($pattern in @('*.ifc', '*.lua', '*.md')) { Copy-Item (Join-Path $sample
 Get-ChildItem -Directory (Join-Path $sampleSrc '*.resources') | ForEach-Object { Copy-Item -Recurse -Force $_.FullName $samples }
 # The sample Component Library beside the samples (crates/riviera-ui/src/components.rs).
 Copy-Item -Recurse -Force (Join-Path $Root 'test-data\library') (Join-Path $Stage 'library')
+# The bundled Component Libraries beside the exe (crates/riviera-core/src/library.rs: bundled_root).
+Copy-Item -Recurse -Force (Join-Path $Root 'libraries') (Join-Path $Stage 'libraries')
 Copy-Item (Join-Path $Root 'LICENSE') (Join-Path $Stage 'COPYING.txt')
 Copy-Item (Join-Path $Root 'packaging\THIRD-PARTY-NOTICES.txt') $Stage
 Copy-Item (Join-Path $Root 'packaging\icons\riviera.ico') $Stage

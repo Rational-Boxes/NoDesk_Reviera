@@ -221,6 +221,8 @@ modules:
       - cp -r test-data/samples/*.resources /app/share/riviera/samples/
       # The sample Component Library beside them (crates/riviera-ui/src/components.rs).
       - mkdir -p /app/share/riviera/library && cp -r test-data/library/. /app/share/riviera/library/
+      # The bundled Component Libraries (crates/riviera-core/src/library.rs: bundled_root).
+      - mkdir -p /app/share/riviera/libraries && cp -r libraries/. /app/share/riviera/libraries/
       - install -Dm644 packaging/THIRD-PARTY-NOTICES.txt -t /app/share/licenses/${FLATPAK_ID}
       - install -Dm644 LICENSE /app/share/licenses/${FLATPAK_ID}/COPYING
       - install -Dm644 packaging/flatpak/${FLATPAK_ID}.desktop -t /app/share/applications

@@ -7,9 +7,9 @@
 -- Riviera sample model (test-data/samples): shared rule packs and use zones (ARC-RULE-001/002).
 -- The ADA rule set brings in `ada_2010_interiors`; `practice_interiors` is added by name for its
 -- notes (36 in round a dining table, 30 in in front of a dresser, 24 in at the foot of a bed).
--- The furniture is box types until the interiors library comes (INTERIORS_PLAN.md §4.1): each
--- type is given its IFC predefined type (BED, DESK, CHAIR) or, for USERDEFINED, its kind
--- (Dresser, Nightstand), which is how the packs select it.
+-- The furniture is from the bundled Interiors library, each piece typed with its IFC predefined
+-- type (BED, DESK, CHAIR) or, for USERDEFINED, its kind (Dresser, Nightstand), which is how the
+-- packs select it.
 
 local l1 = riviera.level.list()[1].id
 riviera.clearance.set_rule_set{ standard = "ada_2010" }
@@ -33,47 +33,42 @@ riviera.floor.create{ loops = { loop }, level_id = l1 }
 -- The entrance from the corridor, near the room's south-west corner.
 riviera.door.place{ host_wall_id = south, point_along = 1.0 }
 
--- Box furniture types (width × depth × height; a type's front is its −y side).
-local function furniture(name, size, kind, color)
-  local ty = riviera.mep_type.create{ name = name, category = "furniture", size = size, color = color }
-  if kind:match("^%u+$") then
-    riviera.mesh_object.set_type{ type_id = ty, predefined_type = kind }
-  else
-    riviera.mesh_object.set_type{ type_id = ty, element_type = kind }
-  end
-  return ty
+-- The furniture comes from the bundled Interiors library (DM-LIB-006): each piece a model
+-- fragment carrying its IFC type (BED, DESK) or kind (Nightstand, Dresser).
+local interiors
+for _, l in ipairs(riviera.library.bundled()) do
+  if l.name == "Riviera Interiors" then interiors = l.path end
 end
-local wood = { 0.55, 0.40, 0.25, 1.0 }
-local bed = furniture("Queen bed 60 × 80 in", { 1.524, 2.032, 0.6 }, "BED", { 0.85, 0.85, 0.80, 1.0 })
-local stand = furniture("Nightstand", { 0.5, 0.4, 0.6 }, "Nightstand", wood)
-local dresser = furniture("Dresser", { 1.5, 0.5, 0.8 }, "Dresser", wood)
-local desk = furniture("Desk", { 1.2, 0.6, 0.75 }, "DESK", wood)
-local chair = furniture("Desk chair", { 0.5, 0.5, 0.85 }, "CHAIR", { 0.25, 0.30, 0.40, 1.0 })
-
-local function place(ty, x, y, rotation)
-  return riviera.mesh_object.place{ type_id = ty, point = { x, y }, level = l1, rotation = rotation or 0 }
+assert(interiors, "the bundled Interiors library")
+local function place(item, x, y, rotation)
+  return riviera.component.place_fragment{ library = interiors, item = item, point = { x, y }, level = l1, rotation = rotation or 0 }
 end
--- The bed's head 20 mm off the north wall, centred 2.0 m from the west wall: a 30 in (762 mm)
--- space along each side, 48 in (1219 mm) from its foot, clear to the walls.
-local the_bed = place(bed, 2.0, 5.4 - 1.016 - 0.02)
-place(stand, 2.0 - 0.762 - 0.25 - 0.02, 5.4 - 0.2 - 0.02)
-place(stand, 2.0 + 0.762 + 0.25 + 0.02, 5.4 - 0.2 - 0.02)
--- The dresser against the east wall, facing west, with 30 in clear in front of it.
-place(dresser, 4.0 - 0.25 - 0.02, 1.6, "-90°")
--- The desk against the west wall, facing east, clear of the door's maneuvering space.
-place(desk, 0.3 + 0.02, 2.45, "90°")
+-- The queen bed (1624 × 2132 mm on its frame) with its head 20 mm off the north wall, centred
+-- 2.0 m from the west wall: a 30 in (762 mm) space along each side, 48 in (1219 mm) from its
+-- foot, clear to the walls.
+local bed_y = 5.4 - 1.066 - 0.02
+place("Bedroom/bed_queen_60_x_80_in.ifc", 2.0, bed_y)
+-- A nightstand (22 × 16 in) each side of the head, 20 mm from the bed.
+place("Bedroom/nightstand.ifc", 2.0 - 0.812 - 0.02 - 0.279, 5.4 - 0.203 - 0.02)
+place("Bedroom/nightstand.ifc", 2.0 + 0.812 + 0.02 + 0.279, 5.4 - 0.203 - 0.02)
+-- The dresser (60 × 19 in) against the east wall, facing west, with 30 in clear in front of it.
+place("Bedroom/dresser.ifc", 4.0 - 0.2415 - 0.02, 1.6, "-90°")
+-- The desk (60 × 30 in) against the west wall, facing east, clear of the door's maneuvering space.
+place("Office/desk_60_x_30_in.ifc", 0.02 + 0.381, 2.4, "90°")
 
--- A chair left beside the bed takes its left clear space: an error against §806.2.3.
-local the_chair = place(chair, 0.85, 3.9)
+-- A task chair from the catalogue (furnishing.load), left beside the bed: it takes the bed's
+-- left clear space, an error against §806.2.3.
+local chair = riviera.furnishing.load{ names = { "Task chair" } }["Task chair"]
+local the_chair = riviera.mesh_object.place{ type_id = chair, point = { 0.85, 3.9 }, level = l1 }
 local found = riviera.rules.check{}
 assert(#found == 1 and found[1].rule == "ADA 2010 806.2.3 left" and found[1].severity == "error", "the chair is in the bed's clear space")
 print(string.format("%s: %s (%s, %s)", found[1].severity, found[1].message, found[1].edition, found[1].source))
--- Pushed in at the desk, it is clear.
-riviera.mesh_object.set{ element_ids = { the_chair }, point = { 0.9, 2.45 }, rotation = "-90°" }
+-- Pushed to the desk, facing it, it is clear of the bed's spaces and the 24 in at its foot.
+riviera.mesh_object.set{ element_ids = { the_chair }, point = { 0.782 + 0.02 + 0.305, 2.3 }, rotation = "-90°" }
 assert(#riviera.rules.check{} == 0, "nothing in the furniture's use zones")
 
 local zones = 0
-for _, z in ipairs(riviera.clearance.list{ element_ids = { the_bed } }) do
+for _, z in ipairs(riviera.clearance.list{}) do
   if z.kind == "use_zone" then zones = zones + 1 end
 end
-print(string.format("bed: %d use zones; the room checks clean", zones))
+print(string.format("%d use zones; the room checks clean", zones))
