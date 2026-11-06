@@ -435,6 +435,9 @@ pub(crate) fn set_type(txn: &mut crate::txn::Transaction<'_>, p: SetTypeParams) 
             txn.modify(id, |w| {
                 w.params.insert("@type".into(), Value::String(guid));
             })?;
+            // A member given a beam type takes its member-type sibling (and a beam the reverse).
+            let class = e.class.clone();
+            crate::beams::match_type_class(txn, id, &class)?;
             crate::beams::regenerate(txn.store(), txn.store().get(id).expect("exists"))?;
         } else if walls::wall_recipe(e).is_some() {
             if walls::type_width(ty).is_none() {

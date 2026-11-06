@@ -189,6 +189,21 @@ fn beams_on_grids_usage_joins_and_ifc() {
     let e = doc.store().get(purlin).unwrap();
     assert_eq!(e.class, "IfcMember");
     assert_eq!(e.param("@PredefinedType").unwrap(), "PURLIN");
+    // Typed by an IfcMemberType: the joist's beam type's sibling, the same section and name
+    // (IFC rule CorrectTypeAssigned).
+    let type_of = |doc: &Document, e: ElementId| {
+        let s = doc.store();
+        let g = s.get(e).unwrap().param("@type").unwrap().as_str().unwrap().to_owned();
+        s.get(s.find_by_guid(&riviera_core::GlobalId::parse(&g).unwrap()).unwrap()).unwrap().clone()
+    };
+    let (beam_ty, member_ty) = (type_of(&doc, joist), type_of(&doc, purlin));
+    assert_eq!((beam_ty.class.as_str(), member_ty.class.as_str()), ("IfcBeamType", "IfcMemberType"));
+    assert_eq!(member_ty.name, beam_ty.name);
+    assert_eq!(beams::beam_type(&member_ty).unwrap().designation, beams::beam_type(&beam_ty).unwrap().designation);
+    // Given the beam type again, it keeps to the same sibling; none is made twice.
+    run(&r, &mut doc, "element.set_type", json!({ "element_ids": [purlin.0], "type_id": beam_ty.id().0 })).unwrap();
+    assert_eq!(type_of(&doc, purlin).id(), member_ty.id());
+    assert_eq!(doc.store().iter().filter(|e| e.class == "IfcMemberType").count(), 1);
 
     // Usage locked by hand, then automatic again.
     run(

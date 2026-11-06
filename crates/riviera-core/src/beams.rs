@@ -1061,7 +1061,7 @@ fn create_one(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> Result<
 /// Types a framing element by a type of its own class: an `IfcMember` by an `IfcMemberType`,
 /// an `IfcBeam` by an `IfcBeamType` (IFC rule CorrectTypeAssigned). A framing type of the other
 /// class gets a sibling of this one, the same section and name, made once and shared.
-fn match_type_class(txn: &mut crate::txn::Transaction<'_>, id: ElementId, class: &str) -> Result<()> {
+pub(crate) fn match_type_class(txn: &mut crate::txn::Transaction<'_>, id: ElementId, class: &str) -> Result<()> {
     let store = txn.store().clone();
     let Some(t) = store.get(id).and_then(|e| e.param("@type")).and_then(|v| v.as_str()).and_then(|g| find(&store, g)).and_then(|t| store.get(t)) else {
         return Ok(());
