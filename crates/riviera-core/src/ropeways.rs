@@ -270,36 +270,39 @@ pub(crate) fn create(txn: &mut Transaction<'_>, p: CreateParams) -> Result<Creat
             }
         }
     }
+    // The ropes: a member of their own (IfcMember in IFC 4.3), part of the ropeway, starting where
+    // a station's building ends.
+    let mut ropes = (Vec::new(), Vec::new());
     for (i, w) in supports.windows(2).enumerate() {
         let (sa, sb) = (&w[0], &w[1]);
         let l = sb.station - sa.station;
         let f = r.spans[i].sag;
-        let n = ((l / 10.0).ceil() as usize).max(2);
+        let x0 = if sa.kind == SupportKind::Tower { 0.0 } else { 15.0 };
+        let x1 = if sb.kind == SupportKind::Tower { l } else { l - 15.0 };
+        if x1 <= x0 {
+            continue;
+        }
+        let n = (((x1 - x0) / 10.0).ceil() as usize).max(2);
         for side in [-1.0, 1.0] {
             let pts: Vec<V3> = (0..=n)
                 .map(|k| {
-                    let x = l * k as f64 / n as f64;
+                    let x = x0 + (x1 - x0) * k as f64 / n as f64;
                     let (q, d, _, _) = a.at(sa.station + x);
                     let off = side * gauge / 2.0;
                     [q[0] - d[1] * off, q[1] + d[0] * off, rope_at(sa.rope, sb.rope, l, f, x) - z0]
                 })
                 .collect();
             for seg in pts.windows(2) {
-                merge(&mut mesh, beam(seg[0], seg[1], 0.06, 0.06));
+                merge(&mut ropes, beam(seg[0], seg[1], 0.06, 0.06));
             }
         }
     }
-    let tris: Vec<[u32; 3]> = mesh.1.chunks(3).map(|c| [c[0], c[1], c[2]]).collect();
     let towers = supports.iter().filter(|s| s.kind == SupportKind::Tower).count();
     let name = format!("Ropeway, {:.0} m, {towers} towers", length);
-    let ty = crate::mesh_objects::create_generated_type(txn, &name, crate::mesh_objects::Category::Transport, &mesh.0, &tris, [0.35, 0.37, 0.40, 1.0], Vec::new(), Some("USERDEFINED"))?;
-    txn.modify(ty, |e| {
-        e.params.insert("@ElementType".into(), "ROPEWAY".into());
-    })?;
-    let id = crate::mesh_objects::place(
-        txn,
-        crate::mesh_objects::PlaceParams { type_id: ElementRef::Id(ty), point: [0.0, 0.0], level: ElementRef::Id(level_id), offset: 0.0, rotation: 0.0, mirror: false, scale: 1.0 },
-    )?;
+    let id = crate::mesh_objects::place_generated(txn, level_id, &name, crate::mesh_objects::Category::Transport, &mesh, [0.35, 0.37, 0.40, 1.0], "Ropeway")?;
+    let rope = crate::mesh_objects::place_generated(txn, level_id, "Ropeway ropes", crate::mesh_objects::Category::GenericModel, &ropes, [0.20, 0.20, 0.22, 1.0], "HaulRope")?;
+    crate::mesh_objects::ifc4x3_class(txn, rope, "IfcMember")?;
+    crate::mesh_objects::part_of(txn, rope, id)?;
     let data = serde_json::to_value(&r).expect("serialises");
     let props = vec![
         ("Riviera_Ropeway.SystemType".to_owned(), measure("IfcLabel", "MGD")),
@@ -310,7 +313,6 @@ pub(crate) fn create(txn: &mut Transaction<'_>, p: CreateParams) -> Result<Creat
     ];
     txn.modify(id, |e| {
         e.name = Some("Ropeway".into());
-        e.params.insert("@ObjectType".into(), "Ropeway".into());
         e.params.insert(DATA_KEY.into(), data);
         e.params.extend(props);
     })?;

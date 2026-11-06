@@ -36,6 +36,11 @@ use crate::store::Store;
 use crate::walls::RECIPE_KEY;
 
 pub const TYPE_RECIPE: &str = "recipe.mesh_object_type";
+/// The class an element (and, with `Type`, its type) is written as in an IFC4X3 project, where
+/// IFC 4.3 has a better one than its category gives in IFC4 (IfcVehicle, IfcRail, …).
+pub const IFC4X3_CLASS_KEY: &str = "rxd:ifc4x3_class";
+/// The element a part belongs to (GlobalId): deleted with it.
+pub const PART_OF_KEY: &str = "rxd:part_of";
 pub const RECIPE: &str = "recipe.mesh_object";
 /// Above this many triangles an import needs `allow_large`.
 pub const LARGE_TRIANGLES: usize = 1_000_000;
@@ -1643,4 +1648,50 @@ mod tests {
             (q[0] - 12.0).abs() < 1e-9 && (q[1] - 2.0).abs() < 1e-9 && (q[2] - 5.0).abs() < 1e-9
         );
     }
+}
+
+/// Writes `instance` as `class`, and its type as `class`Type, in IFC4X3 projects.
+pub(crate) fn ifc4x3_class(txn: &mut crate::txn::Transaction<'_>, instance: ElementId, class: &str) -> Result<()> {
+    let ty = txn.store().get(instance).and_then(|e| e.param("@type")).and_then(|v| v.as_str()).and_then(crate::id::GlobalId::parse).and_then(|g| txn.store().find_by_guid(&g));
+    let class = class.to_owned();
+    if let Some(ty) = ty {
+        let type_class = format!("{class}Type");
+        txn.modify(ty, |e| {
+            e.params.insert(IFC4X3_CLASS_KEY.into(), type_class.into());
+        })?;
+    }
+    txn.modify(instance, |e| {
+        e.params.insert(IFC4X3_CLASS_KEY.into(), class.into());
+    })
+}
+
+/// Marks `part` as belonging to `whole`, so it is deleted with it.
+pub(crate) fn part_of(txn: &mut crate::txn::Transaction<'_>, part: ElementId, whole: ElementId) -> Result<()> {
+    let guid = txn.store().get(whole).expect("exists").guid().to_string();
+    txn.modify(part, |e| {
+        e.params.insert(PART_OF_KEY.into(), guid.into());
+    })
+}
+
+/// Places a generated mesh of category `category` at the origin of `level` as a new type and its
+/// instance, named `name`, with `object_type`.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn place_generated(
+    txn: &mut crate::txn::Transaction<'_>,
+    level: ElementId,
+    name: &str,
+    category: Category,
+    mesh: &crate::bodies::Mesh,
+    color: [f32; 4],
+    object_type: &str,
+) -> Result<ElementId> {
+    let tris: Vec<[u32; 3]> = mesh.1.chunks(3).map(|c| [c[0], c[1], c[2]]).collect();
+    let ty = create_generated_type(txn, name, category, &mesh.0, &tris, color, Vec::new(), Some("USERDEFINED"))?;
+    let id = place(txn, PlaceParams { type_id: crate::id::ElementRef::Id(ty), point: [0.0, 0.0], level: crate::id::ElementRef::Id(level), offset: 0.0, rotation: 0.0, mirror: false, scale: 1.0 })?;
+    let (name, object_type) = (name.to_owned(), object_type.to_owned());
+    txn.modify(id, |e| {
+        e.name = Some(name);
+        e.params.insert("@ObjectType".into(), object_type.into());
+    })?;
+    Ok(id)
 }

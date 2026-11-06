@@ -310,9 +310,8 @@ fn length(v: f64) -> AttrValue {
 
 /// The alignment's horizontal geometry: a composite curve of line and arc segments.
 fn representation(ifc: &mut IfcModel, a: &Alignment, context: StepId, scale: f64) -> Result<StepId> {
-    let n = a.pieces.len();
     let mut segments = Vec::new();
-    for (k, p) in a.pieces.iter().enumerate() {
+    for p in &a.pieces {
         let (start, dir, parent, len) = match p {
             Piece::Line { start, end, length } => {
                 let d = [(end[0] - start[0]) / length, (end[1] - start[1]) / length];
@@ -337,7 +336,6 @@ fn representation(ifc: &mut IfcModel, a: &Alignment, context: StepId, scale: f64
         let loc = point2(ifc, start, scale)?;
         let refd = dir2(ifc, dir)?;
         let placement = create(ifc, "IfcAxis2Placement2D", &[("Location", r(loc)), ("RefDirection", r(refd))])?;
-        let _ = n;
         let transition = "CONTSAMEGRADIENT";
         let seg = create(
             ifc,

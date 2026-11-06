@@ -494,6 +494,7 @@ pub fn dependents_of(store: &crate::store::Store, id: ElementId) -> Vec<ElementI
                 .strip_prefix(crate::annotations::CLASS_PREFIX)
                 .is_some_and(|rest| rest.starts_with(&format!("{guid}/")))
                 || e.param("@type").and_then(serde_json::Value::as_str) == Some(guid.as_str())
+                || e.param(crate::mesh_objects::PART_OF_KEY).and_then(serde_json::Value::as_str) == Some(guid.as_str())
                 || crate::inserts::insert_recipe(e).is_some_and(|r| r.host == guid)
                 || crate::mep_coverings::covering_recipe(e).is_some_and(|r| r.host == guid)
                 || crate::floors::slab_recipe(e).is_some_and(|(_, r)| r.level == guid)

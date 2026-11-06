@@ -4130,7 +4130,7 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
   - **Defaults:** a 1 m gauge; cars 12 m long, the gauge + 1.2 m wide and 3 m high, for 60 persons; floors `level` or `stepped`; 5 m/s; a 60 s stop at each station. The tracks are a car's width plus 0.6 m apart where the cars pass.
   - The alignment must be long enough for a car at each station, plus the loop.
   - **Reports:** the track along the slope, the rise, the steepest grade, the loop's middle and length, the trip (starting and stopping at 0.5 m/s²), and the capacity each way (a car's persons every trip and stop).
-  - **The object:** the rails, the two cars (one at each station) and the drive house at the top are one transport object for now (USERDEFINED "FUNICULAR", `Riviera_Funicular`).
+  - **The objects:** the rails are the funicular (ObjectType "Funicular", `Riviera_Funicular`; `IfcRail` in an IFC 4.3 project, a transport element in IFC4). The two cars (one at each station; `IfcVehicle` in IFC 4.3) and the drive house at the top are parts of it, deleted with it.
 - `funicular.check(demand?)` reports:
   - a gauge outside the reference lines' 762–1524 mm (a note);
   - a capacity each way below `demand` persons an hour;
@@ -4139,9 +4139,10 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 - **In the window:** Architecture › Circulation › *Funicular* on the selected alignment.
 
 **Acceptance criteria.**
+- [x] In an IFC 4.3 project a funicular is written as one `IfcRail` and two `IfcVehicle`s with their types; in IFC4 as transport elements. Deleting it deletes its cars and drive.
 - [x] Along a 300 m alignment rising 90 m: the track is √(300² + 90²) m long at 30 %; the trip is that ÷ 5 + 10 s; 60 persons every trip and a minute's stop; the loop is at 150 m and 52 m long. A demand of 2000 an hour and the missing walkway are reported. Four rails at standard gauge with a walkway have no loop and nothing to report at 500 an hour. A flat alignment, or one too short, is refused.
 
-*Built (2026-11-05):* `riviera_core::funiculars`, the Funicular action; the sample *A funicular up a hillside* (an IFC 4.3 project: 327 m rising 100 m, steepest 43.75 %, 75 s a trip, 1,594 an hour each way). Not yet: IFC 4.3 classes (IfcRailway "FUNICULAR", IfcRail, IfcVehicle × 2, HAULINGGEAR), stations and platforms (stepped or level), the haul rope and pulleys, the walkway, tunnels and viaducts, three-rail layouts, bottom tail ropes, levelling cabins.
+*Built (2026-11-05):* `riviera_core::funiculars`, the Funicular action; the sample *A funicular up a hillside* (an IFC 4.3 project: 327 m rising 100 m, steepest 43.75 %, 75 s a trip, 1,594 an hour each way). Not yet: the IfcRailway facility around it and the drive as HAULINGGEAR, stations and platforms (stepped or level), the haul rope and pulleys, the walkway, tunnels and viaducts, three-rail layouts, bottom tail ropes, levelling cabins.
 
 ### 3.7a.25 APM guideways
 **ID:** ARC-VT-025 · **Priority:** P2 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §7 (step 10); research/16 Q3 B2 and Q5 (ACRP Report 37); ARC-ALN-001; EXPERT_REVIEW E-99
@@ -4177,7 +4178,7 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
   - **platform:** `side` platforms outside the lanes (the default), or one `centre` platform between two lanes far enough apart (the envelope and the platform);
   - **length:** the train (`cars` × 12.2 m, default 2 cars, at most 6) and 6 m;
   - **width and height:** `platform_width` wide (default 4 m), at the vehicle floor 1 m above the running surface;
-  - **the train:** standing at the platform on each lane;
+  - **the train:** standing at the platform on each lane, a vehicle of its own (`IfcVehicle` in an IFC 4.3 project), part of the station and deleted with it;
   - **screen doors:** platform screen doors, on by default.
   - A station running off the guideway is refused.
 - The station is a transport object (USERDEFINED "APMSTATION", `Riviera_ApmStation`).
@@ -4198,7 +4199,7 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
   - **Supports:** a terminal station at each end and an angle station at each corner of the alignment. Towers are spaced evenly along each leg at most `tower_spacing` apart (default 152 m), `tower_height` above the ground (default 18.3 m). The ground is the highest current toposolid at the point, or the level.
   - **Ropes:** the two directions' ropes are `gauge` apart (default 6.4 m). The rope is 6 m above the ground at stations and sags 4 % of each span when loaded (a parabola). Cabins hang 3.5 m below it.
   - **Reports:** for each span its length, sag, least cabin clearance to the ground (away from the 30 m nearest a station, where cabins come down to board), the clearance required, and the highest cabin above the ground; the loaded rope's turn over each tower; the capacity each way, 3600 × `cabin_capacity` ÷ `headway` (defaults 10 and 15 s); and the trip at `speed` (default 6 m/s).
-  - **The object:** towers (seated on the highest ground under them), stations and ropes are one transport object (USERDEFINED "ROPEWAY", `Riviera_Ropeway`).
+  - **The objects:** the towers (seated on the highest ground under them) and stations are the ropeway (ObjectType "Ropeway", `Riviera_Ropeway`). The ropes, starting where a station's building ends, are a part of it (ObjectType "HaulRope"; `IfcMember` in an IFC 4.3 project), deleted with it.
 - `ropeway.check(demand?)` reports:
   - a span whose loaded cabin comes nearer the ground than RM2's 4 m (2.5 m on spans under 200 m);
   - the highest overflight, a note for the rescue concept;

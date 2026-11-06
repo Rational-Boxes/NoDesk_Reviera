@@ -4,8 +4,8 @@
 //! Funiculars (ARC-VT-024): two cars on one haul rope, counterbalancing each other, running along
 //! an alignment (ARC-ALN-001) from its start (the bottom station) to its end (the top station),
 //! up its curves and grades. Two rails with an Abt passing loop half way, where the cars pass,
-//! or four rails (two tracks) throughout; the drive at the top station. The rails, the two cars
-//! and the drive house are one transport object for now. Reference lines and layouts:
+//! or four rails (two tracks) throughout; the drive at the top station. The rails are the
+//! funicular (IfcRail in IFC 4.3); the two cars (IfcVehicle) and the drive house are its parts. Reference lines and layouts:
 //! research/16 Q4 C3 (E-98).
 
 use schemars::JsonSchema;
@@ -240,41 +240,40 @@ pub(crate) fn create(txn: &mut Transaction<'_>, p: CreateParams) -> Result<Creat
             break;
         }
     }
+    // The rails are the funicular itself (IfcRail in IFC 4.3); the two cars (IfcVehicle) and the
+    // drive house are parts of it.
+    let level = crate::alignments::recipe(txn.store().get(aid).expect("resolved")).expect("an alignment").level;
+    let level_id = crate::levels::list(txn.store()).into_iter().find(|l| l.guid == level).map(|l| l.id).ok_or_else(|| bad("vt.invalid", "the alignment's level is gone"))?;
+    let name = format!("Funicular, {:.0} m rising {:.0} m", length, rise);
+    let id = crate::mesh_objects::place_generated(txn, level_id, &name, crate::mesh_objects::Category::Transport, &mesh, [0.62, 0.30, 0.22, 1.0], "Funicular")?;
+    crate::mesh_objects::ifc4x3_class(txn, id, "IfcRail")?;
     // The two cars: one at each station, on their own tracks (the loop's sides), level-floored or
     // along the slope.
-    for (s0, side) in [(start + car_length / 2.0 + 1.0, -1.0), (a.end_station() - car_length / 2.0 - 1.0, 1.0)] {
+    for (k, (s0, side)) in [(start + car_length / 2.0 + 1.0, -1.0), (a.end_station() - car_length / 2.0 - 1.0, 1.0)].into_iter().enumerate() {
         let c = centre(s0, side);
         let (p0, p1) = (at(&a, s0 - car_length / 2.0, c, 0.3), at(&a, s0 + car_length / 2.0, c, 0.3));
-        match p.car_floor {
-            CarFloor::Stepped => merge(&mut mesh, beam([p0[0], p0[1], p0[2] + car_height], [p1[0], p1[1], p1[2] + car_height], car_width, car_height)),
+        let car = match p.car_floor {
+            CarFloor::Stepped => beam([p0[0], p0[1], p0[2] + car_height], [p1[0], p1[1], p1[2] + car_height], car_width, car_height),
             CarFloor::Level => {
                 let z = p0[2].min(p1[2]);
-                merge(&mut mesh, beam([p0[0], p0[1], z + car_height], [p1[0], p1[1], z + car_height], car_width, car_height));
+                beam([p0[0], p0[1], z + car_height], [p1[0], p1[1], z + car_height], car_width, car_height)
             }
-        }
+        };
+        let car = crate::mesh_objects::place_generated(txn, level_id, &format!("Funicular car {}", k + 1), crate::mesh_objects::Category::Transport, &car, [0.80, 0.25, 0.20, 1.0], "FunicularCar")?;
+        crate::mesh_objects::ifc4x3_class(txn, car, "IfcVehicle")?;
+        crate::mesh_objects::part_of(txn, car, id)?;
     }
     // The drive house beyond the top of the track.
     let end = a.end_station();
     let (q, d, z, _) = a.at(end);
     let (d0, d1) = ([q[0] + d[0] * 1.0, q[1] + d[1] * 1.0], [q[0] + d[0] * 7.0, q[1] + d[1] * 7.0]);
-    merge(&mut mesh, beam([d0[0], d0[1], z + 4.0], [d1[0], d1[1], z + 4.0], (car_width + 2.0).max(5.0), 4.0));
-    let tris: Vec<[u32; 3]> = mesh.1.chunks(3).map(|c| [c[0], c[1], c[2]]).collect();
-    let name = format!("Funicular, {:.0} m rising {:.0} m", length, rise);
-    let ty = crate::mesh_objects::create_generated_type(txn, &name, crate::mesh_objects::Category::Transport, &mesh.0, &tris, [0.62, 0.30, 0.22, 1.0], Vec::new(), Some("USERDEFINED"))?;
-    txn.modify(ty, |e| {
-        e.params.insert("@ElementType".into(), "FUNICULAR".into());
-    })?;
-    let level = crate::alignments::recipe(txn.store().get(aid).expect("resolved")).expect("an alignment").level;
-    let level_id = crate::levels::list(txn.store()).into_iter().find(|l| l.guid == level).map(|l| l.id).ok_or_else(|| bad("vt.invalid", "the alignment's level is gone"))?;
-    let id = crate::mesh_objects::place(
-        txn,
-        crate::mesh_objects::PlaceParams { type_id: ElementRef::Id(ty), point: [0.0, 0.0], level: ElementRef::Id(level_id), offset: 0.0, rotation: 0.0, mirror: false, scale: 1.0 },
-    )?;
+    let house = beam([d0[0], d0[1], z + 4.0], [d1[0], d1[1], z + 4.0], (car_width + 2.0).max(5.0), 4.0);
+    let drive = crate::mesh_objects::place_generated(txn, level_id, "Funicular drive", crate::mesh_objects::Category::Transport, &house, [0.55, 0.55, 0.55, 1.0], "FunicularDrive")?;
+    crate::mesh_objects::part_of(txn, drive, id)?;
     let data = serde_json::to_value(&f).expect("serialises");
     let props = properties(&f);
     txn.modify(id, |e| {
         e.name = Some("Funicular".into());
-        e.params.insert("@ObjectType".into(), "Funicular".into());
         e.params.insert(DATA_KEY.into(), data);
         e.params.extend(props);
     })?;

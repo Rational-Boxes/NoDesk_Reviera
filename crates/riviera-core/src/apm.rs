@@ -273,14 +273,18 @@ pub(crate) fn create_station(txn: &mut Transaction<'_>, p: StationParams) -> Res
     for o in &offsets {
         merge(&mut mesh, band(&a, s0, s1, *o, width, FLOOR_HEIGHT, FLOOR_HEIGHT));
     }
-    // The train at the platform, on each lane.
-    let train = f64::from(cars) * CAR[0];
-    for o in &lanes {
-        merge(&mut mesh, band(&a, p.station - train / 2.0, p.station + train / 2.0, *o, CAR[1], 0.3 + CAR[2], CAR[2]));
-    }
     let n = stations(store).len() + 1;
     let name = p.name.unwrap_or_else(|| format!("Station {n}"));
+    let train = f64::from(cars) * CAR[0];
     let id = place(txn, level, &format!("APM Station {name}"), "APMSTATION", mesh, [0.80, 0.78, 0.72, 1.0])?;
+    // The train at the platform on each lane: a vehicle of its own (IfcVehicle in IFC 4.3), part
+    // of the station.
+    for (k, o) in lanes.iter().enumerate() {
+        let body = band(&a, p.station - train / 2.0, p.station + train / 2.0, *o, CAR[1], 0.3 + CAR[2], CAR[2]);
+        let v = crate::mesh_objects::place_generated(txn, level, &format!("{name} train {}", k + 1), crate::mesh_objects::Category::Transport, &body, [0.85, 0.85, 0.90, 1.0], "APMVehicle")?;
+        crate::mesh_objects::ifc4x3_class(txn, v, "IfcVehicle")?;
+        crate::mesh_objects::part_of(txn, v, id)?;
+    }
     let s = Station { guideway: store_guid(txn.store(), gid), station: p.station, name: name.clone(), platform: p.platform, cars, platform_length: length, platform_width: width, screen_doors: p.screen_doors.unwrap_or(true) };
     let data = serde_json::to_value(&s).expect("serialises");
     let props = vec![
@@ -319,7 +323,11 @@ pub fn zones(store: &Store) -> Vec<Clearance> {
 /// What may stand in an envelope besides the guideway: its alignment, and stations (their trains
 /// run in it).
 pub fn may_share(store: &Store, other: ElementId) -> bool {
-    store.get(other).is_some_and(|e| crate::alignments::recipe(e).is_some() || station(e).is_some())
+    store.get(other).is_some_and(|e| {
+        crate::alignments::recipe(e).is_some()
+            || station(e).is_some()
+            || e.param(crate::mesh_objects::PART_OF_KEY).and_then(|v| v.as_str()).and_then(crate::id::GlobalId::parse).and_then(|g| store.find_by_guid(&g)).and_then(|w| store.get(w)).is_some_and(|w| station(w).is_some())
+    })
 }
 
 #[derive(Debug, Default, Deserialize, JsonSchema)]

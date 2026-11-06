@@ -52,3 +52,29 @@ fn a_funicular_climbs_its_alignment_and_passes_half_way() {
     let short = ok(&mut app, "alignment.create", json!({ "level": level, "points": [[0.0, 40.0], [60.0, 40.0]], "profile": [{ "station": 0.0, "elevation": 0.0 }, { "station": 60.0, "elevation": 20.0 }] }))["alignment"].clone();
     assert!(app.execute("funicular.create", json!({ "alignment_id": short }), &Caller::user()).is_err());
 }
+
+#[test]
+fn in_ifc_4_3_the_funicular_is_rails_and_vehicles_and_goes_with_its_parts() {
+    let dir = tempfile::tempdir().unwrap();
+    for schema in ["IFC4X3", "IFC4"] {
+        let mut app = App::new(AppConfig { live: None, untitled_dir: dir.path().join(format!("untitled-{schema}")) });
+        ok(&mut app, "file.new", json!({ "schema": schema }));
+        let level = ok(&mut app, "level.list", json!({}))[0]["id"].clone();
+        let line = ok(&mut app, "alignment.create", json!({ "level": level, "points": [[0.0, 0.0], [300.0, 0.0]], "profile": [{ "station": 0.0, "elevation": 0.0 }, { "station": 300.0, "elevation": 90.0 }] }))["alignment"].clone();
+        let fun = ok(&mut app, "funicular.create", json!({ "alignment_id": line }))["funicular"].clone();
+        let model = dir.path().join(format!("funicular-{schema}.ifc"));
+        ok(&mut app, "file.save_as", json!({ "path": model }));
+        let rows = riviera_ifc::IfcModel::open(&model).unwrap().step_rows().unwrap();
+        let count = |class: &str| rows.iter().filter(|r| r.class == class).count();
+        if schema == "IFC4X3" {
+            assert_eq!((count("IFCRAIL"), count("IFCVEHICLE"), count("IFCRAILTYPE"), count("IFCVEHICLETYPE")), (1, 2, 1, 2));
+        } else {
+            assert_eq!((count("IFCRAIL"), count("IFCVEHICLE")), (0, 0), "IFC4 has no such classes");
+        }
+        // Deleting the funicular takes its cars and drive with it.
+        // (the rails, two cars and the drive house).
+        let gone = ok(&mut app, "element.delete", json!({ "element_ids": [fun] }));
+        assert!(gone.as_array().unwrap().len() >= 4, "{gone:#}");
+        assert_eq!(ok(&mut app, "funicular.list", json!({})), json!([]));
+    }
+}

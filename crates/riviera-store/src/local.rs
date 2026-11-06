@@ -643,7 +643,8 @@ impl LocalProject {
                 Some(step) => {
                     let class = self.ifc.class_of(*step)?;
                     // An alignment written natively stays an IfcAlignment (ARC-ALN-002).
-                    let aligned = class.eq_ignore_ascii_case("IfcAlignment") && riviera_core::alignments::recipe(e).is_some();
+                    let aligned = (class.eq_ignore_ascii_case("IfcAlignment") && riviera_core::alignments::recipe(e).is_some())
+                        || e.param(riviera_core::mesh_objects::IFC4X3_CLASS_KEY).and_then(|v| v.as_str()).is_some_and(|c| class.eq_ignore_ascii_case(c));
                     if !class.eq_ignore_ascii_case(&e.class) && !aligned {
                         return Err(unsupported(format!(
                             "element {id}: changing {class} to {} is not supported yet",
@@ -661,8 +662,12 @@ impl LocalProject {
                         )));
                     }
                     // In an IFC4X3 project an alignment is an IfcAlignment (ARC-ALN-002).
+                    // And an element IFC 4.3 has a better class for (IfcVehicle, IfcRail, …).
+                    let better = e.param(riviera_core::mesh_objects::IFC4X3_CLASS_KEY).and_then(|v| v.as_str());
                     let class = if riviera_core::alignments::recipe(e).is_some() && crate::alignments::native(&self.ifc) {
                         "IfcAlignment"
+                    } else if let Some(c) = better.filter(|_| crate::alignments::native(&self.ifc)) {
+                        c
                     } else {
                         e.class.as_str()
                     };
