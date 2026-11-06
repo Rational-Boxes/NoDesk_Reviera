@@ -87,7 +87,8 @@ fn an_ifc4x3_project_writes_an_ifc_alignment_with_its_layouts() {
     // two saves.
     assert_eq!((count("IFCALIGNMENT"), count("IFCANNOTATION")), (1, 0));
     assert_eq!((count("IFCALIGNMENTHORIZONTAL"), count("IFCALIGNMENTVERTICAL")), (1, 1));
-    assert_eq!((count("IFCALIGNMENTHORIZONTALSEGMENT"), count("IFCALIGNMENTVERTICALSEGMENT"), count("IFCALIGNMENTSEGMENT")), (3, 3, 6));
+    // Each layout ends with a zero-length segment (concept template "Alignment Geometry").
+    assert_eq!((count("IFCALIGNMENTHORIZONTALSEGMENT"), count("IFCALIGNMENTVERTICALSEGMENT"), count("IFCALIGNMENTSEGMENT")), (4, 4, 8));
     let arc = rows.iter().find(|r| r.class == "IFCALIGNMENTHORIZONTALSEGMENT" && r.attributes.contains(".CIRCULARARC.")).expect("the curve");
     assert!(arc.attributes.contains("30.") && !arc.attributes.contains("-30."), "turning left, radius 30: {}", arc.attributes);
     assert_eq!(rows.iter().filter(|r| r.class == "IFCALIGNMENTVERTICALSEGMENT" && r.attributes.contains(".PARABOLICARC.")).count(), 1);
@@ -97,9 +98,12 @@ fn an_ifc4x3_project_writes_an_ifc_alignment_with_its_layouts() {
         let c = |class: &str| rows.iter().filter(|r| r.class == class).count();
         (c("IFCCOMPOSITECURVE"), c("IFCCURVESEGMENT"), c("IFCCIRCLE"), c("IFCREFERENT"))
     };
-    assert_eq!(geometry(&rows), (1, 3, 1, 1));
-    let curve = rows.iter().find(|r| r.class == "IFCSHAPEREPRESENTATION" && r.attributes.contains("'Axis'") && r.attributes.contains("'Curve2D'"));
-    assert!(curve.is_some(), "an Axis Curve2D representation");
+    assert_eq!(geometry(&rows), (1, 4, 1, 1));
+    let zero = rows.iter().filter(|r| r.class == "IFCCURVESEGMENT" && r.attributes.contains("IFCLENGTHMEASURE(0.),IFCLENGTHMEASURE(0.)")).count();
+    assert_eq!(zero, 1, "a zero-length segment ends the curve");
+    // With a profile the plan curve is the footprint.
+    let curve = rows.iter().find(|r| r.class == "IFCSHAPEREPRESENTATION" && r.attributes.contains("'FootPrint'") && r.attributes.contains("'Curve2D'"));
+    assert!(curve.is_some(), "a FootPrint Curve2D representation");
     assert!(rows.iter().any(|r| r.class == "IFCREFERENT" && r.attributes.contains(".STATION.")));
     assert!(rows.iter().any(|r| r.class == "IFCPROPERTYSET" && r.attributes.contains("'Pset_Stationing'")));
     assert!(rows.iter().any(|r| r.class == "IFCPROPERTYSINGLEVALUE" && r.attributes.contains("'Station'") && r.attributes.contains("IFCLENGTHMEASURE(1000.")));
@@ -116,9 +120,9 @@ fn an_ifc4x3_project_writes_an_ifc_alignment_with_its_layouts() {
     assert!((f(&z["elevation"]) - 2.0).abs() < 1e-9);
     ok(&mut again, "file.save", json!({}));
     let rows = riviera_ifc::IfcModel::open(&model).unwrap().step_rows().unwrap();
-    assert_eq!(rows.iter().filter(|r| r.class == "IFCALIGNMENTSEGMENT").count(), 6);
-    assert_eq!(geometry(&rows), (1, 3, 1, 1), "replaced, not doubled");
-    assert_eq!(rows.iter().filter(|r| r.class == "IFCLINE").count(), 2);
+    assert_eq!(rows.iter().filter(|r| r.class == "IFCALIGNMENTSEGMENT").count(), 8);
+    assert_eq!(geometry(&rows), (1, 4, 1, 1), "replaced, not doubled");
+    assert_eq!(rows.iter().filter(|r| r.class == "IFCLINE").count(), 3);
 }
 
 #[test]
@@ -179,6 +183,7 @@ fn spirals_ease_into_and_out_of_a_curve() {
     ok(&mut app, "file.save_as", json!({ "path": model }));
     let rows = riviera_ifc::IfcModel::open(&model).unwrap().step_rows().unwrap();
     assert_eq!(rows.iter().filter(|r| r.class == "IFCALIGNMENTHORIZONTALSEGMENT" && r.attributes.contains(".CLOTHOID.")).count(), 2);
+    assert_eq!(rows.iter().filter(|r| r.class == "IFCALIGNMENTHORIZONTALSEGMENT").count(), 6, "line, spiral, arc, spiral, line and the zero-length end");
     assert_eq!(rows.iter().filter(|r| r.class == "IFCCOMPOSITECURVE").count(), 0);
 
     // Spirals that turn more than the corner: refused.

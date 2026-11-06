@@ -207,6 +207,24 @@ fn horizontal(ifc: &mut IfcModel, a: &Alignment, owner_history: Option<StepId>, 
         ifc.set_attribute(seg, "DesignParameters", &r(params))?;
         segments.push(seg);
     }
+    // The zero-length segment that ends the list (concept template "Alignment Geometry").
+    let (end, d, _, _) = a.at(a.end_station());
+    let point = create(ifc, "IfcCartesianPoint", &[("Coordinates", AttrValue::List(vec![AttrValue::Real(end[0] / scale), AttrValue::Real(end[1] / scale)]))])?;
+    let params = create(
+        ifc,
+        "IfcAlignmentHorizontalSegment",
+        &[
+            ("StartPoint", r(point)),
+            ("StartDirection", AttrValue::Real(d[1].atan2(d[0]))),
+            ("StartRadiusOfCurvature", AttrValue::Real(0.0)),
+            ("EndRadiusOfCurvature", AttrValue::Real(0.0)),
+            ("SegmentLength", AttrValue::Real(0.0)),
+            ("PredefinedType", e("LINE")),
+        ],
+    )?;
+    let seg = rooted(ifc, "IfcAlignmentSegment", owner_history, "End")?;
+    ifc.set_attribute(seg, "DesignParameters", &r(params))?;
+    segments.push(seg);
     nest(ifc, owner_history, layout, segments)?;
     Ok(layout)
 }
@@ -256,6 +274,24 @@ fn vertical(ifc: &mut IfcModel, a: &Alignment, owner_history: Option<StepId>, sc
         ifc.set_attribute(seg, "DesignParameters", &r(params))?;
         segments.push(seg);
     }
+    // The zero-length segment that ends the list.
+    let last = (a.end_station() - a.recipe.start_station).max(0.0);
+    let (z, g) = alignments::elevation(profile, a.end_station());
+    let params = create(
+        ifc,
+        "IfcAlignmentVerticalSegment",
+        &[
+            ("StartDistAlong", AttrValue::Real(last / scale)),
+            ("HorizontalLength", AttrValue::Real(0.0)),
+            ("StartHeight", AttrValue::Real(z / scale)),
+            ("StartGradient", AttrValue::Real(g)),
+            ("EndGradient", AttrValue::Real(g)),
+            ("PredefinedType", e("CONSTANTGRADIENT")),
+        ],
+    )?;
+    let seg = rooted(ifc, "IfcAlignmentSegment", owner_history, "End")?;
+    ifc.set_attribute(seg, "DesignParameters", &r(params))?;
+    segments.push(seg);
     nest(ifc, owner_history, layout, segments)?;
     Ok(Some(layout))
 }
@@ -301,7 +337,8 @@ fn representation(ifc: &mut IfcModel, a: &Alignment, context: StepId, scale: f64
         let loc = point2(ifc, start, scale)?;
         let refd = dir2(ifc, dir)?;
         let placement = create(ifc, "IfcAxis2Placement2D", &[("Location", r(loc)), ("RefDirection", r(refd))])?;
-        let transition = if k + 1 == n { "DISCONTINUOUS" } else { "CONTSAMEGRADIENT" };
+        let _ = n;
+        let transition = "CONTSAMEGRADIENT";
         let seg = create(
             ifc,
             "IfcCurveSegment",
@@ -309,11 +346,29 @@ fn representation(ifc: &mut IfcModel, a: &Alignment, context: StepId, scale: f64
         )?;
         segments.push(seg);
     }
+    // The zero-length segment that ends it, at the end point.
+    {
+        let (end, d, _, _) = a.at(a.end_station());
+        let o = point2(ifc, [0.0, 0.0], 1.0)?;
+        let x = dir2(ifc, [1.0, 0.0])?;
+        let v = create(ifc, "IfcVector", &[("Orientation", r(x)), ("Magnitude", AttrValue::Real(1.0))])?;
+        let line = create(ifc, "IfcLine", &[("Pnt", r(o)), ("Dir", r(v))])?;
+        let loc = point2(ifc, end, scale)?;
+        let refd = dir2(ifc, d)?;
+        let placement = create(ifc, "IfcAxis2Placement2D", &[("Location", r(loc)), ("RefDirection", r(refd))])?;
+        segments.push(create(
+            ifc,
+            "IfcCurveSegment",
+            &[("Transition", e("DISCONTINUOUS")), ("Placement", r(placement)), ("SegmentStart", length(0.0)), ("SegmentLength", length(0.0)), ("ParentCurve", r(line))],
+        )?);
+    }
     let curve = create(ifc, "IfcCompositeCurve", &[("Segments", AttrValue::List(segments.into_iter().map(r).collect())), ("SelfIntersect", AttrValue::Bool(false))])?;
     let rep = create(
         ifc,
         "IfcShapeRepresentation",
-        &[("ContextOfItems", r(context)), ("RepresentationIdentifier", s("Axis")), ("RepresentationType", s("Curve2D")), ("Items", AttrValue::List(vec![r(curve)]))],
+        // With a vertical layout the plan curve is the footprint and the 3D gradient curve the
+        // axis (concept template "Alignment Geometry - Horizontal and Vertical").
+        &[("ContextOfItems", r(context)), ("RepresentationIdentifier", s(if a.recipe.profile.len() >= 2 { "FootPrint" } else { "Axis" })), ("RepresentationType", s("Curve2D")), ("Items", AttrValue::List(vec![r(curve)]))],
     )?;
     create(ifc, "IfcProductDefinitionShape", &[("Representations", AttrValue::List(vec![r(rep)]))])
 }

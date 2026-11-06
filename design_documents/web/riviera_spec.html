@@ -29454,7 +29454,9 @@ CREATE TABLE base_rxd (
   - A line is an <code>IfcLine</code> and an arc an <code>IfcCircle</code> of its radius, each cut from length 0.
   - Each is placed at the piece's start point with its start direction as <code>RefDirection</code>, as the segment's start is its placement's reference point.
   - A clockwise arc's <code>SegmentLength</code> is negative: it runs against the circle's sense.
-  - The joins are <code>CONTSAMEGRADIENT</code> and the last segment <code>DISCONTINUOUS</code>.
+  - The joins are <code>CONTSAMEGRADIENT</code>. A zero-length segment at the end point, <code>DISCONTINUOUS</code>, ends the curve.
+  - The plan curve is <code>Axis</code> / <code>Curve2D</code> without a profile, and <code>FootPrint</code> / <code>Curve2D</code> with one: there the 3D <code>IfcGradientCurve</code> is to be the <code>Axis</code> (concept template <em>Alignment Geometry - Horizontal and Vertical</em>).
+- <strong>End segments:</strong> each layout's list of segments ends with a zero-length segment at its end (horizontal: a <code>LINE</code> at the end point and direction; vertical: a <code>CONSTANTGRADIENT</code> at the end height and gradient), as the concept templates require.
 - <strong>Stationing:</strong> an <code>IfcReferent</code> (STATION) named Start, nested in the alignment, carries the start chainage as <code>Pset_Stationing.Station</code>.
 - <strong>Project:</strong> the alignments are aggregated in the project (<code>IfcRelAggregates</code>).
 - The layouts, referent, stationing set, aggregation and representation carry the <code>rxd:alignment</code> mark or hang from the alignment. They are replaced at the next save and never read as elements of their own.
@@ -29462,7 +29464,7 @@ CREATE TABLE base_rxd (
 <p><strong>Acceptance criteria.</strong>
 - [x] An IFC4X3 project's alignment of a line, a 30 m left-hand curve and a line, with a profile of two grades and a parabolic curve, is written as one <code>IfcAlignment</code> with one horizontal and one vertical layout of three segments each (the curve's radius +30), once after two saves; opened again it is the same alignment, and saved again it is not doubled.
 - [x] In an IFC4 project the same alignment is an <code>IfcAnnotation</code> and no alignment entities are written.
-- [x] The IFC4X3 alignment has an <code>Axis</code> <code>Curve2D</code> representation of one composite curve of three curve segments (one an <code>IfcCircle</code>), a STATION referent with <code>Pset_Stationing.Station</code> 1000, a placement, and aggregation in the project, once after saving, reopening and saving again.</p>
+- [x] The IFC4X3 alignment (with its profile) has a <code>FootPrint</code> <code>Curve2D</code> representation of one composite curve of four curve segments (one an <code>IfcCircle</code>, one of zero length at the end); its layouts have four segments each, the last of zero length; a STATION referent with <code>Pset_Stationing.Station</code> 1000, a placement, and aggregation in the project, once after saving, reopening and saving again.</p>
 <p><em>Built (2026-11-05):</em> <code>riviera_store::alignments</code>, File › New IFC 4.3 Project; the sample <em>A drive set out by chainage</em> is an IFC 4.3 project. Not yet: the vertical geometry (<code>IfcGradientCurve</code> over the composite curve), linear placements for referents and elements along the alignment, the geometry of spirals (<code>IfcClothoid</code>), <code>IfcAlignmentCant</code>, reading other tools' <code>IfcAlignment</code>s without a recipe. The curve-segment conventions follow the IFC 4.3 documentation's attribute definitions; validation against bSI's checker is still to be done (E-96).</p>
 
 <h2 id="312-modify-tools">3.12 Modify tools</h2>
