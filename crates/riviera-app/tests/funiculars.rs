@@ -68,8 +68,40 @@ fn in_ifc_4_3_the_funicular_is_rails_and_vehicles_and_goes_with_its_parts() {
         let count = |class: &str| rows.iter().filter(|r| r.class == class).count();
         if schema == "IFC4X3" {
             assert_eq!((count("IFCRAIL"), count("IFCVEHICLE"), count("IFCRAILTYPE"), count("IFCVEHICLETYPE")), (1, 2, 1, 2));
+            // A USERDEFINED type names its kind (IFC rule CorrectPredefinedType).
+            assert!(rows.iter().filter(|r| r.class == "IFCVEHICLETYPE").all(|r| r.attributes.contains("'FunicularCar'")), "ElementType set");
+            // The funicular is a railway facility in the site, referencing the device, its rails,
+            // cars and drive, and its alignment.
+            let railway = || -> (usize, String, usize, bool) {
+                let ifc = riviera_ifc::IfcModel::open(&model).unwrap();
+                let rows = ifc.step_rows().unwrap();
+                let railways: Vec<_> = rows.iter().filter(|r| r.class == "IFCRAILWAY").collect();
+                let rw = railways[0];
+                assert!(rw.attributes.contains("'Funicular'") && rw.attributes.contains(".USERDEFINED."), "{}", rw.attributes);
+                let refs = rows.iter().find(|r| r.class == "IFCRELREFERENCEDINSPATIALSTRUCTURE" && r.attributes.ends_with(&format!("#{})", rw.id.0)) || r.attributes.contains(&format!(",#{})", rw.id.0))).expect("referenced elements");
+                let members = match ifc.attribute(refs.id, "RelatedElements").unwrap() {
+                    riviera_ifc::AttrValue::List(items) => items.len(),
+                    other => panic!("{other:?}"),
+                };
+                let alignment = rows.iter().find(|r| r.class == "IFCALIGNMENT").unwrap();
+                let site = rows.iter().find(|r| r.class == "IFCSITE").unwrap();
+                let aggregated = rows.iter().any(|r| r.class == "IFCRELAGGREGATES" && r.attributes.contains(&format!("#{},(#{})", site.id.0, rw.id.0)));
+                assert!(refs.attributes.contains(&format!("#{}", alignment.id.0)), "the alignment is referenced: {}", refs.attributes);
+                let guid = rw.attributes.split('\'').nth(1).unwrap().to_owned();
+                (railways.len(), guid, members, aggregated)
+            };
+            let (n, guid, members, aggregated) = railway();
+            // The device, its two cars and drive (the rails are the device), and the alignment.
+            assert_eq!((n, members, aggregated), (1, 5, true));
+            // Saved again, and opened and saved again: still one, with the same GlobalId.
+            ok(&mut app, "file.save", json!({}));
+            let mut again = App::new(AppConfig { live: None, untitled_dir: dir.path().join("untitled-again") });
+            ok(&mut again, "file.open", json!({ "path": model }));
+            ok(&mut again, "file.save", json!({}));
+            assert_eq!(railway(), (1, guid, 5, true));
+            assert_eq!(ok(&mut again, "funicular.list", json!({})).as_array().unwrap().len(), 1, "not read back as an element");
         } else {
-            assert_eq!((count("IFCRAIL"), count("IFCVEHICLE")), (0, 0), "IFC4 has no such classes");
+            assert_eq!((count("IFCRAIL"), count("IFCVEHICLE"), count("IFCRAILWAY")), (0, 0, 0), "IFC4 has no such classes");
         }
         // Deleting the funicular takes its cars and drive with it.
         // (the rails, two cars and the drive house).

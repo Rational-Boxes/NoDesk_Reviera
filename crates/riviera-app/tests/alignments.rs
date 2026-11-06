@@ -257,6 +257,10 @@ fn an_ifc4x3_project_writes_an_ifc_alignment_with_its_layouts() {
         assert!((f(&z["elevation"]) - p[1]).abs() < 1e-6, "at {} the file says {}, the alignment {}", p[0], p[1], f(&z["elevation"]));
     }
     assert!(rows.iter().any(|r| r.class == "IFCREFERENT" && r.attributes.contains(".STATION.")));
+    // Placed linearly at 0 along the gradient curve (IfcPositioningElement needs a placement).
+    let gradient_id = ifc.entities_of_type("IfcGradientCurve").unwrap()[0].id;
+    assert!(rows.iter().any(|r| r.class == "IFCPOINTBYDISTANCEEXPRESSION" && r.attributes.ends_with(&format!("#{})", gradient_id.0))));
+    assert_eq!(count("IFCLINEARPLACEMENT"), 1);
     assert!(rows.iter().any(|r| r.class == "IFCPROPERTYSET" && r.attributes.contains("'Pset_Stationing'")));
     assert!(rows.iter().any(|r| r.class == "IFCPROPERTYSINGLEVALUE" && r.attributes.contains("'Station'") && r.attributes.contains("IFCLENGTHMEASURE(1000.")));
     let alignment = rows.iter().find(|r| r.class == "IFCALIGNMENT").unwrap();
@@ -274,6 +278,7 @@ fn an_ifc4x3_project_writes_an_ifc_alignment_with_its_layouts() {
     let rows = riviera_ifc::IfcModel::open(&model).unwrap().step_rows().unwrap();
     assert_eq!(rows.iter().filter(|r| r.class == "IFCALIGNMENTSEGMENT").count(), 8);
     assert_eq!(geometry(&rows), (1, 8, 1, 1), "replaced, not doubled");
+    assert_eq!(rows.iter().filter(|r| r.class == "IFCLINEARPLACEMENT").count(), 1, "the referent's placement replaced too");
     assert_eq!(rows.iter().filter(|r| r.class == "IFCLINE").count(), 3 + 3);
 }
 

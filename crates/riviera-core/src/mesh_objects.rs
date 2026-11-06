@@ -1687,6 +1687,11 @@ pub(crate) fn place_generated(
 ) -> Result<ElementId> {
     let tris: Vec<[u32; 3]> = mesh.1.chunks(3).map(|c| [c[0], c[1], c[2]]).collect();
     let ty = create_generated_type(txn, name, category, &mesh.0, &tris, color, Vec::new(), Some("USERDEFINED"))?;
+    // A USERDEFINED type names its kind (IFC rule CorrectPredefinedType).
+    let kind = object_type.to_owned();
+    txn.modify(ty, |e| {
+        e.params.insert("@ElementType".into(), kind.into());
+    })?;
     let id = place(txn, PlaceParams { type_id: crate::id::ElementRef::Id(ty), point: [0.0, 0.0], level: crate::id::ElementRef::Id(level), offset: 0.0, rotation: 0.0, mirror: false, scale: 1.0 })?;
     let (name, object_type) = (name.to_owned(), object_type.to_owned());
     txn.modify(id, |e| {

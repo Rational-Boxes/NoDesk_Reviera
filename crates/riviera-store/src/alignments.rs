@@ -84,8 +84,25 @@ const GEOMETRY: &[&str] = &[
     "IFCPOLYNOMIALCURVE",
 ];
 
+/// The classes of the placements written for referents and facilities: removed with them.
+const PLACEMENT: &[&str] = &[
+    "IFCLOCALPLACEMENT",
+    "IFCLINEARPLACEMENT",
+    "IFCAXIS2PLACEMENTLINEAR",
+    "IFCPOINTBYDISTANCEEXPRESSION",
+    "IFCAXIS2PLACEMENT3D",
+    "IFCCARTESIANPOINT",
+    "IFCDIRECTION",
+];
+
 /// Removes a representation tree written for an alignment.
 fn remove_tree(ifc: &mut IfcModel, root: StepId) -> Result<()> {
+    remove_from(ifc, root, GEOMETRY)
+}
+
+/// Removes the tree of `classes` under `root`, not following what it is placed relative to or
+/// measured along.
+fn remove_from(ifc: &mut IfcModel, root: StepId, classes: &[&str]) -> Result<()> {
     let mut stack = vec![root];
     let mut seen = Vec::new();
     while let Some(id) = stack.pop() {
@@ -93,12 +110,15 @@ fn remove_tree(ifc: &mut IfcModel, root: StepId) -> Result<()> {
             continue;
         }
         let Ok(class) = ifc.class_of(id) else { continue };
-        if !GEOMETRY.contains(&class.to_ascii_uppercase().as_str()) {
+        if !classes.contains(&class.to_ascii_uppercase().as_str()) {
             continue;
         }
         seen.push(id);
         let e = ifc.attributes_many(&[id])?.remove(0);
-        for v in e.attributes.values() {
+        for (name, v) in &e.attributes {
+            if name == "PlacementRelTo" || name == "BasisCurve" {
+                continue;
+            }
             match v {
                 AttrValue::Ref(r) => stack.push(StepId(*r)),
                 AttrValue::List(items) => stack.extend(items.iter().filter_map(|i| if let AttrValue::Ref(r) = i { Some(StepId(*r)) } else { None })),
@@ -115,7 +135,18 @@ fn remove_tree(ifc: &mut IfcModel, root: StepId) -> Result<()> {
 /// Removes what an earlier save wrote: the nesting, aggregation and stationing, the layouts and
 /// segments, and their design parameters.
 fn remove_earlier(ifc: &mut IfcModel) -> Result<()> {
-    for class in ["IfcRelNests", "IfcRelAggregates", "IfcRelDefinesByProperties"] {
+    for class in ["IfcRailway", "IfcFacility"] {
+        for f in ifc.entities_of_type(class)? {
+            if !ours(ifc, f.id) || !ifc.class_of(f.id)?.eq_ignore_ascii_case(class) {
+                continue;
+            }
+            if let AttrValue::Ref(p) = ifc.attribute(f.id, "ObjectPlacement")? {
+                remove_from(ifc, StepId(p), PLACEMENT)?;
+            }
+            ifc.remove(f.id)?;
+        }
+    }
+    for class in ["IfcRelNests", "IfcRelAggregates", "IfcRelDefinesByProperties", "IfcRelReferencedInSpatialStructure"] {
         for rel in ifc.entities_of_type(class)? {
             if ours(ifc, rel.id) {
                 ifc.remove(rel.id)?;
@@ -137,6 +168,9 @@ fn remove_earlier(ifc: &mut IfcModel) -> Result<()> {
     }
     for referent in ifc.entities_of_type("IfcReferent")? {
         if ours(ifc, referent.id) {
+            if let AttrValue::Ref(p) = ifc.attribute(referent.id, "ObjectPlacement")? {
+                remove_from(ifc, StepId(p), PLACEMENT)?;
+            }
             ifc.remove(referent.id)?;
         }
     }
@@ -335,7 +369,8 @@ fn length(v: f64) -> AttrValue {
 }
 
 /// The alignment's horizontal geometry: a composite curve of line and arc segments.
-fn representation(ifc: &mut IfcModel, a: &Alignment, context: StepId, scale: f64) -> Result<StepId> {
+/// Also returns the axis curve: the gradient curve with a profile, the plan curve without.
+fn representation(ifc: &mut IfcModel, a: &Alignment, context: StepId, scale: f64) -> Result<(StepId, StepId)> {
     let mut segments = Vec::new();
     for p in &a.pieces {
         // Where along its parent curve the segment starts (a placement carries that point and
@@ -410,15 +445,17 @@ fn representation(ifc: &mut IfcModel, a: &Alignment, context: StepId, scale: f64
         &[("ContextOfItems", r(context)), ("RepresentationIdentifier", s(if profiled { "FootPrint" } else { "Axis" })), ("RepresentationType", s("Curve2D")), ("Items", AttrValue::List(vec![r(curve)]))],
     )?;
     let mut reps = vec![r(rep)];
+    let mut axis = curve;
     if profiled {
         let gradient = gradient_curve(ifc, a, curve, scale)?;
+        axis = gradient;
         reps.push(r(create(
             ifc,
             "IfcShapeRepresentation",
             &[("ContextOfItems", r(context)), ("RepresentationIdentifier", s("Axis")), ("RepresentationType", s("Curve3D")), ("Items", AttrValue::List(vec![r(gradient)]))],
         )?));
     }
-    create(ifc, "IfcProductDefinitionShape", &[("Representations", AttrValue::List(reps))])
+    Ok((create(ifc, "IfcProductDefinitionShape", &[("Representations", AttrValue::List(reps))])?, axis))
 }
 
 /// Signed arc length of y = a·x² from its vertex to x.
@@ -498,9 +535,28 @@ fn origin(ifc: &mut IfcModel) -> Result<StepId> {
 }
 
 /// The alignment's start chainage: a STATION referent with `Pset_Stationing.Station`.
-fn stationing(ifc: &mut IfcModel, a: &Alignment, owner_history: Option<StepId>, scale: f64) -> Result<StepId> {
+/// It is placed linearly at distance 0 along the axis curve, relative to the alignment's
+/// placement, with its Cartesian position (as in bSI's sample models; IfcPositioningElement
+/// requires a placement).
+fn stationing(ifc: &mut IfcModel, a: &Alignment, owner_history: Option<StepId>, scale: f64, relative_to: &AttrValue, axis: StepId) -> Result<StepId> {
     let referent = rooted(ifc, "IfcReferent", owner_history, "Start")?;
     ifc.set_attribute(referent, "PredefinedType", &e("STATION"))?;
+    let zero = || AttrValue::Real(0.0);
+    let at = create(
+        ifc,
+        "IfcPointByDistanceExpression",
+        &[("DistanceAlong", length(0.0)), ("OffsetLateral", zero()), ("OffsetVertical", zero()), ("OffsetLongitudinal", zero()), ("BasisCurve", r(axis))],
+    )?;
+    let linear = create(ifc, "IfcAxis2PlacementLinear", &[("Location", r(at))])?;
+    let (p, d, _, _) = a.at(a.recipe.start_station);
+    let z = if a.recipe.profile.len() >= 2 { alignments::elevation(&a.recipe.profile, a.recipe.start_station).0 } else { 0.0 };
+    let reals = |v: &[f64]| AttrValue::List(v.iter().copied().map(AttrValue::Real).collect());
+    let o = create(ifc, "IfcCartesianPoint", &[("Coordinates", reals(&[p[0] / scale, p[1] / scale, z / scale]))])?;
+    let x = create(ifc, "IfcDirection", &[("DirectionRatios", reals(&[d[0], d[1], 0.0]))])?;
+    let up = create(ifc, "IfcDirection", &[("DirectionRatios", reals(&[0.0, 0.0, 1.0]))])?;
+    let cartesian = create(ifc, "IfcAxis2Placement3D", &[("Location", r(o)), ("Axis", r(up)), ("RefDirection", r(x))])?;
+    let placement = create(ifc, "IfcLinearPlacement", &[("PlacementRelTo", relative_to.clone()), ("RelativePlacement", r(linear)), ("CartesianPosition", r(cartesian))])?;
+    ifc.set_attribute(referent, "ObjectPlacement", &r(placement))?;
     let value = AttrValue::Typed { type_name: "IfcLengthMeasure".into(), value: Box::new(AttrValue::Real(a.recipe.start_station / scale)) };
     let prop = create(ifc, "IfcPropertySingleValue", &[("Name", s("Station")), ("NominalValue", value)])?;
     let set = rooted(ifc, "IfcPropertySet", owner_history, "Pset_Stationing")?;
@@ -509,6 +565,90 @@ fn stationing(ifc: &mut IfcModel, a: &Alignment, owner_history: Option<StepId>, 
     ifc.set_attribute(rel, "RelatedObjects", &AttrValue::List(vec![r(referent)]))?;
     ifc.set_attribute(rel, "RelatingPropertyDefinition", &r(set))?;
     Ok(referent)
+}
+
+/// A facility's GlobalId, fixed by the device it stands for so it survives every save.
+fn facility_guid(whole: &GlobalId) -> GlobalId {
+    let mut b = *whole.to_uuid().as_bytes();
+    for x in &mut b[8..] {
+        *x ^= 0xa5;
+    }
+    GlobalId::from_uuid(uuid::Uuid::from_bytes(b))
+}
+
+/// The guideway devices as IFC 4.3 facilities (ARC-ALN-002): a funicular an `IfcRailway`
+/// (USERDEFINED, "Funicular"); a people mover and a ropeway an `IfcFacility` ("AutomatedPeopleMover",
+/// "AerialRopeway"), since neither runs on rails in the IfcRailway sense. Each is aggregated in the
+/// site and references (`IfcRelReferencedInSpatialStructure`) the device, its parts and its
+/// alignment; the elements stay contained in their storeys.
+fn write_facilities(ifc: &mut IfcModel, doc: &Document, steps: &HashMap<ElementId, StepId>, owner_history: Option<StepId>) -> Result<()> {
+    use riviera_core::{apm, funiculars, mesh_objects, ropeways};
+    let store = doc.store();
+    // (whole, class, object type, alignment guid, other wholes whose parts go with it)
+    let mut devices: Vec<(ElementId, &str, &str, String, Vec<ElementId>)> = Vec::new();
+    for (id, f) in funiculars::funiculars(store) {
+        devices.push((id, "IfcRailway", "Funicular", f.alignment, Vec::new()));
+    }
+    let stations = apm::stations(store);
+    for (id, g) in apm::guideways(store) {
+        let Some(guid) = store.get(id).map(|e| e.guid().as_str().to_owned()) else { continue };
+        let own: Vec<ElementId> = stations.iter().filter(|(_, s)| s.guideway == guid).map(|(sid, _)| *sid).collect();
+        devices.push((id, "IfcFacility", "AutomatedPeopleMover", g.alignment, own));
+    }
+    for (id, w) in ropeways::ropeways(store) {
+        devices.push((id, "IfcFacility", "AerialRopeway", w.alignment, Vec::new()));
+    }
+    if devices.is_empty() {
+        return Ok(());
+    }
+    let site = ifc.entities_of_type("IfcSite")?.first().map(|s| s.id);
+    let Some(host) = site.or(ifc.entities_of_type("IfcProject")?.first().map(|p| p.id)) else { return Ok(()) };
+    let host_placement = match site {
+        Some(s) => ifc.attribute(s, "ObjectPlacement")?,
+        None => AttrValue::Null,
+    };
+    let mut facilities = Vec::new();
+    for (whole, class, kind, alignment, more) in devices {
+        let Some(device) = store.get(whole) else { continue };
+        let wholes: Vec<ElementId> = std::iter::once(whole).chain(more).collect();
+        let guids: Vec<String> = wholes.iter().filter_map(|w| store.get(*w)).map(|w| w.guid().as_str().to_owned()).collect();
+        let mut members: Vec<StepId> = wholes.iter().filter_map(|w| steps.get(w).copied()).collect();
+        members.extend(
+            store
+                .iter()
+                .filter(|p| p.param(mesh_objects::PART_OF_KEY).and_then(serde_json::Value::as_str).is_some_and(|g| guids.iter().any(|w| w == g)))
+                .filter_map(|p| steps.get(&p.id()).copied()),
+        );
+        if let Some(a) = GlobalId::parse(&alignment).and_then(|g| store.find_by_guid(&g)).and_then(|a| steps.get(&a)) {
+            members.push(*a);
+        }
+        let name = device.name.clone().unwrap_or_else(|| kind.to_owned());
+        let id = ifc.create_rooted(class, &facility_guid(device.guid()))?;
+        if let Some(oh) = owner_history {
+            ifc.set_attribute(id, "OwnerHistory", &r(oh))?;
+        }
+        ifc.set_attribute(id, "Name", &s(&name))?;
+        ifc.set_attribute(id, "Description", &s(TAG))?;
+        ifc.set_attribute(id, "ObjectType", &s(kind))?;
+        ifc.set_attribute(id, "CompositionType", &e("ELEMENT"))?;
+        if class == "IfcRailway" {
+            ifc.set_attribute(id, "PredefinedType", &e("USERDEFINED"))?;
+        }
+        let o = create(ifc, "IfcCartesianPoint", &[("Coordinates", AttrValue::List(vec![AttrValue::Real(0.0); 3]))])?;
+        let axis = create(ifc, "IfcAxis2Placement3D", &[("Location", r(o))])?;
+        let placement = create(ifc, "IfcLocalPlacement", &[("PlacementRelTo", host_placement.clone()), ("RelativePlacement", r(axis))])?;
+        ifc.set_attribute(id, "ObjectPlacement", &r(placement))?;
+        if !members.is_empty() {
+            let rel = rooted(ifc, "IfcRelReferencedInSpatialStructure", owner_history, &name)?;
+            ifc.set_attribute(rel, "RelatedElements", &AttrValue::List(members.into_iter().map(r).collect()))?;
+            ifc.set_attribute(rel, "RelatingStructure", &r(id))?;
+        }
+        facilities.push(id);
+    }
+    let rel = rooted(ifc, "IfcRelAggregates", owner_history, "Facilities")?;
+    ifc.set_attribute(rel, "RelatingObject", &r(host))?;
+    ifc.set_attribute(rel, "RelatedObjects", &AttrValue::List(facilities.into_iter().map(r).collect()))?;
+    Ok(())
 }
 
 /// Writes every alignment's layouts (IFC4X3 projects only).
@@ -530,18 +670,19 @@ pub(crate) fn write_alignments(ifc: &mut IfcModel, doc: &Document, steps: &HashM
             parts.push(v);
         }
         nest(ifc, owner_history, step, parts)?;
-        let referent = stationing(ifc, &a, owner_history, scale)?;
-        nest(ifc, owner_history, step, vec![referent])?;
         // Its geometry, replaced at every save.
         if let AttrValue::Ref(old) = ifc.attribute(step, "Representation")? {
             remove_tree(ifc, StepId(old))?;
         }
-        let shape = representation(ifc, &a, context, scale)?;
+        let (shape, axis) = representation(ifc, &a, context, scale)?;
         ifc.set_attribute(step, "Representation", &r(shape))?;
         if ifc.attribute(step, "ObjectPlacement")? == AttrValue::Null {
             let placement = origin(ifc)?;
             ifc.set_attribute(step, "ObjectPlacement", &r(placement))?;
         }
+        let placed = ifc.attribute(step, "ObjectPlacement")?;
+        let referent = stationing(ifc, &a, owner_history, scale, &placed, axis)?;
+        nest(ifc, owner_history, step, vec![referent])?;
     }
     // In the project.
     if !native.is_empty()
@@ -551,5 +692,5 @@ pub(crate) fn write_alignments(ifc: &mut IfcModel, doc: &Document, steps: &HashM
         ifc.set_attribute(rel, "RelatingObject", &r(project))?;
         ifc.set_attribute(rel, "RelatedObjects", &AttrValue::List(native.into_iter().map(r).collect()))?;
     }
-    Ok(())
+    write_facilities(ifc, doc, steps, owner_history)
 }

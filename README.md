@@ -445,8 +445,10 @@ Create … Boundary* tab:
   chainage and offset (`alignment.create`, `alignment.point_at`, `alignment.station_of`,
   `alignment.list`). It is the shared foundation for roads, drives and guideway devices. In an IFC 4.3
   project (File › New IFC 4.3 Project) it is saved as an `IfcAlignment` with its horizontal and
-  vertical layouts (ARC-ALN-002). Not built yet: cant, the IFC geometry of spirals and of the profile,
-  placing elements by chainage, road cross sections and corridors.
+  vertical layouts, its plan curve (lines, arcs and clothoids) and a gradient curve over it
+  (ARC-ALN-002). Funiculars are saved as `IfcRailway` facilities, people movers and ropeways as
+  `IfcFacility`s, in the site. Not built yet: cant, placing elements by chainage, road cross
+  sections and corridors.
 - **Parts** (Modify › Parts): walls split into one part per layer (openings and joins
   included) and floors, ceilings, roofs, columns and beams into one part each, following their
   element; divided by lines or by levels, grids and reference planes with a gap, merged,

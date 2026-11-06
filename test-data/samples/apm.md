@@ -24,6 +24,9 @@ Start with **File › New IFC 4.3 Project**.
 
 ## Gaps
 
+- In IFC 4.3 the trains are `IfcVehicle`s, and each guideway is an `IfcFacility`
+  ("AutomatedPeopleMover") in the site. The facility references the guideway, its stations, their
+  trains and the alignment.
 - **[gap]** Vehicles are boxes standing at the stations. Guideway spans and columns, crossovers,
-  the power rail, maintenance and storage, and IFC 4.3's railway classes are not modelled.
+  the power rail, maintenance and storage are not modelled.
 - **[gap]** Platform clearing (ANA-ROUTE-005) does not yet read APM station platforms.

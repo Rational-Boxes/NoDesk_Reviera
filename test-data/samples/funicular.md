@@ -31,7 +31,8 @@ Start with **File › New IFC 4.3 Project**, so the funicular's line is saved as
 
 ## Gaps
 
+- In IFC 4.3 the track is an `IfcRail` and the cars are `IfcVehicle`s. The whole funicular is an
+  `IfcRailway` facility in the site, which references the track, cars, drive and alignment.
 - **[gap]** The stations (platforms, stepped or level), the haul rope and its pulleys, the
-  walkway itself, tunnels and viaducts are not modelled. The track is one object, not separate
-  rails and vehicles yet.
+  walkway itself, tunnels and viaducts are not modelled.
 - **[gap]** Three-rail layouts and bottom tail ropes come later.

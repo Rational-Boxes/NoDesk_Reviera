@@ -1196,6 +1196,10 @@ fn the_funicular_sample_keeps_its_loop_and_capacity() {
     assert!((f(&fun["max_grade"]) - 43.75).abs() < 0.01 && f(&fun["capacity"]) > 600.0);
     assert_eq!(ok(&mut app, "funicular.check", json!({ "demand": 600.0 })), json!([]));
     assert_eq!(ok(&mut app, "alignment.list", json!({}))[0]["name"], "Funicular line");
+    // In IFC 4.3 it is a railway facility in the site, and stays one after another save.
+    ok(&mut app, "file.save", json!({}));
+    let rows = riviera_ifc::IfcModel::open(&work.path().join("funicular.ifc")).unwrap().step_rows().unwrap();
+    assert_eq!(rows.iter().filter(|r| r.class == "IFCRAILWAY" && r.attributes.contains("'Funicular'")).count(), 1);
 }
 
 #[test]
@@ -1208,6 +1212,8 @@ fn the_apm_sample_keeps_its_stations_and_capacity() {
     let c = ok(&mut app, "apm.check", json!({ "headway": 120.0, "cars": 2, "passengers": 60.0, "demand": 3000.0 }));
     assert_eq!((f(&c["capacity"]), c["findings"].as_array().unwrap().len()), (3600.0, 0), "{c:#}");
     assert_eq!(ok(&mut app, "clearance.check", json!({})), json!([]));
+    let rows = riviera_ifc::IfcModel::open(&work.path().join("apm.ifc")).unwrap().step_rows().unwrap();
+    assert_eq!(rows.iter().filter(|r| r.class == "IFCFACILITY" && r.attributes.contains("'AutomatedPeopleMover'")).count(), 1);
 }
 
 #[test]

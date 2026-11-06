@@ -14368,7 +14368,7 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 - [x] In an IFC 4.3 project a funicular is written as one `IfcRail` and two `IfcVehicle`s with their types; in IFC4 as transport elements. Deleting it deletes its cars and drive.
 - [x] Along a 300 m alignment rising 90 m: the track is √(300² + 90²) m long at 30 %; the trip is that ÷ 5 + 10 s; 60 persons every trip and a minute's stop; the loop is at 150 m and 52 m long. A demand of 2000 an hour and the missing walkway are reported. Four rails at standard gauge with a walkway have no loop and nothing to report at 500 an hour. A flat alignment, or one too short, is refused.
 
-*Built (2026-11-05):* `riviera_core::funiculars`, the Funicular action; the sample *A funicular up a hillside* (an IFC 4.3 project: 327 m rising 100 m, steepest 43.75 %, 75 s a trip, 1,594 an hour each way). Not yet: the IfcRailway facility around it and the drive as HAULINGGEAR, stations and platforms (stepped or level), the haul rope and pulleys, the walkway, tunnels and viaducts, three-rail layouts, bottom tail ropes, levelling cabins.
+*Built (2026-11-05):* `riviera_core::funiculars`, the Funicular action; the sample *A funicular up a hillside* (an IFC 4.3 project: 327 m rising 100 m, steepest 43.75 %, 75 s a trip, 1,594 an hour each way). In IFC 4.3 it is an `IfcRailway` facility (ARC-ALN-002, added 2026-11-06). Not yet: the drive as HAULINGGEAR, stations and platforms (stepped or level), the haul rope and pulleys, the walkway, tunnels and viaducts, three-rail layouts, bottom tail ropes, levelling cabins.
 
 ### 3.7a.25 APM guideways
 **ID:** ARC-VT-025 · **Priority:** P2 · **Ref:** `VERTICAL_TRANSPORT_PLAN.md` §7 (step 10); research/16 Q3 B2 and Q5 (ACRP Report 37); ARC-ALN-001; EXPERT_REVIEW E-99
@@ -14392,7 +14392,7 @@ Owner requirement (2026-11-01: "Elevators, both passenger and freight"; 2026-11-
 **Acceptance criteria.**
 - [x] A two-lane guideway with a walkway along a level alignment with a 120 m curve has a 9.02 m deck, two clear envelopes, and nothing to report at 3,600 an hour for a 3,000 demand. A 60 s headway is noted, and an 8,000 demand reported. An 8 % grade, a 60 m curve (a warning) and a 40 m curve (an error) are reported on another.
 
-*Built (2026-11-05):* `riviera_core::apm`, the APM Guideway action; the sample *An airport people mover*. Not yet: spans, columns and footings, crossovers and switches, the power rail, superelevation and spirals, maintenance and storage, IFC 4.3's railway classes (IfcRailwayPart TRACK, IfcVehicle).
+*Built (2026-11-05):* `riviera_core::apm`, the APM Guideway action; the sample *An airport people mover*. Not yet: spans, columns and footings, crossovers and switches, the power rail, superelevation and spirals, maintenance and storage, IfcRailwayPart TRACK. In IFC 4.3 the guideway is an `IfcFacility` and its trains are `IfcVehicle`s (ARC-ALN-002).
 
 ### 3.7a.26 APM stations
 **ID:** ARC-VT-026 · **Priority:** P2 · **Ref:** ARC-VT-025; research/16 Q5 (APM station); EXPERT_REVIEW E-99
@@ -16013,7 +16013,12 @@ All family-editor commands from the DM chapter can be used inside the session.
   - A zero-length `DISCONTINUOUS` segment ends it.
 - **Extent:** the vertical layout and the gradient curve stop where the profile or the plan ends, whichever comes first, and the zero-length end segments are placed there.
 - **End segments:** each layout's list of segments ends with a zero-length segment at its end (horizontal: a `LINE` at the end point and direction; vertical: a `CONSTANTGRADIENT` at the end height and gradient), as the concept templates require.
-- **Stationing:** an `IfcReferent` (STATION) named Start, nested in the alignment, carries the start chainage as `Pset_Stationing.Station`.
+- **Stationing:** an `IfcReferent` (STATION) named Start, nested in the alignment, carries the start chainage as `Pset_Stationing.Station`. It is placed by an `IfcLinearPlacement` at distance 0 along the axis curve (the gradient curve with a profile), relative to the alignment's placement, with its Cartesian position. IfcPositioningElement requires a placement.
+- **Facilities:** each guideway device is a facility aggregated in the site, with a placement relative to the site's. It references its device, the device's parts and its alignment through `IfcRelReferencedInSpatialStructure`; the elements stay contained in their storeys.
+  - A funicular is an `IfcRailway` (USERDEFINED, ObjectType "Funicular").
+  - A people mover is an `IfcFacility` ("AutomatedPeopleMover") that also references its stations and their trains. A ropeway is an `IfcFacility` ("AerialRopeway"). Neither runs on rails in IfcRailway's sense (E-101).
+  - A facility's GlobalId is derived from its device's, so it stays the same from save to save.
+- **Types:** a generated device type with PredefinedType USERDEFINED names its kind in ElementType (FunicularCar, APMVehicle, HaulRope, …), as the CorrectPredefinedType rule requires.
 - **Project:** the alignments are aggregated in the project (`IfcRelAggregates`).
 - The layouts, referent, stationing set, aggregation and representation carry the `rxd:alignment` mark or hang from the alignment. They are replaced at the next save and never read as elements of their own.
 - In an IFC4 project an alignment stays an `IfcAnnotation` ("Alignment").
@@ -16022,6 +16027,9 @@ All family-editor commands from the DM chapter can be used inside the session.
 - [x] An IFC4X3 project's alignment of a line, a 30 m left-hand curve and a line, with a profile of two grades and a parabolic curve, is written as one `IfcAlignment` with one horizontal and one vertical layout of three segments each (the curve's radius +30), once after two saves; opened again it is the same alignment, and saved again it is not doubled.
 - [x] In an IFC4 project the same alignment is an `IfcAnnotation` and no alignment entities are written.
 - [x] The IFC4X3 alignment (with its profile) has a `FootPrint` `Curve2D` representation of one composite curve of four curve segments (one an `IfcCircle`, one of zero length at the end); its layouts have four segments each, the last of zero length; a STATION referent with `Pset_Stationing.Station` 1000, a placement, and aggregation in the project, once after saving, reopening and saving again.
+- [x] The STATION referent has an `IfcLinearPlacement` along the gradient curve, written once after saving, reopening and saving again.
+- [x] In IFC 4.3 a funicular is one `IfcRailway` in the site. It references the device, its two cars, its drive and its alignment (5 elements), and keeps its GlobalId through a save, a reopen and another save. A people mover and a ropeway are two `IfcFacility`s; the people mover's references include its alignment and trains.
+- [x] The funicular, people mover and drive samples pass IfcOpenShell's schema validation and its EXPRESS rules with no issues.
 - [x] That alignment also has an `Axis` `Curve3D` `IfcGradientCurve` of a grade, an `IfcPolynomialCurve` and a grade, plus the zero-length end. Read back with the bSI placement convention, each segment ends where the next starts, and every sampled height matches `alignment.point_at` to 1e-6 m.
 - [x] An alignment with 40 m spirals each side of a 100 m curve has two `IfcClothoid` segments, A = ±63.246. Read back, every sampled point of its composite curve lies on the alignment (offset < 0.1 mm), and the curve ends on the last point. IfcOpenShell's own evaluation of the sample also ends both plan curves on their last points, and keeps the gradient curve within 1 mm of the profile.
 
