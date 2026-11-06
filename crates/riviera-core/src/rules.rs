@@ -120,6 +120,16 @@ pub struct Zone {
     pub height: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub door_swing: Option<DoorSwing>,
+    /// Elements that may stand in it (a dining table's chairs).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub allows: Option<Selector>,
+}
+
+impl Zone {
+    /// Whether `e` may stand in it.
+    pub fn allows(&self, store: &Store, e: &Element) -> bool {
+        self.allows.as_ref().is_some_and(|s| s.selects_element(store, e))
+    }
 }
 
 /// A shared-format rule pack.
@@ -345,6 +355,12 @@ pub fn use_zones(store: &Store) -> Vec<UseZone> {
 /// The use zones as virtual volumes (`clearances::all`).
 pub fn zones(store: &Store) -> Vec<Clearance> {
     use_zones(store).into_iter().map(|z| z.clearance).collect()
+}
+
+/// Whether the use zone `rule` of `owner` lets `other` stand in it (its rule's `allows`).
+pub fn zone_allows(store: &Store, owner: ElementId, rule: &str, other: ElementId) -> bool {
+    let (Some(o), Some(e)) = (store.get(owner), store.get(other)) else { return false };
+    all_active(store).iter().flat_map(|p| &p.zones).any(|z| z.id == rule && z.applies_to.selects_element(store, o) && z.allows(store, e))
 }
 
 /// What may stand in a use zone besides the element itself: floors and floor coverings (a rug),

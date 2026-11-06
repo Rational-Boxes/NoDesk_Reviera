@@ -183,6 +183,10 @@
             "forbidden"
           ],
           "description": "Whether a door may swing into it (default allowed)."
+        },
+        "allows": {
+          "$ref": "#/$defs/selector",
+          "description": "Elements that may stand in it, such as a dining table's chairs (default none)."
         }
       }
     },

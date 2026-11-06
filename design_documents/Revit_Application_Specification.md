@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Riviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Riviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 909 numbered requirements (320 P0 · 349 P1 · 233 P2 · 7 P3), 2,369 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 910 numbered requirements (320 P0 · 350 P1 · 233 P2 · 7 P3), 2,371 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Riviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Riviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,369 commands; 909 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,371 commands; 910 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -15690,7 +15690,7 @@ unchanged. The first domain on the shared format is **interiors**: use zones aro
   - *out*: from its **front**, positive in front of it, or from its **back**, positive behind it.
 
   Each zone runs from just above the floor to its rule's height (1.0 m unless the rule says otherwise).
-- **What may be in a zone.** The element itself may; so may floors, floor coverings (a rug), accessories, and other elements' zones (clear floor spaces may overlap, ADA 305.2). Any other element's body is an intrusion. A rule marked `door_swing: forbidden` is also intruded on by any door's swing.
+- **What may be in a zone.** The element itself may; so may floors, floor coverings (a rug), accessories, and other elements' zones (clear floor spaces may overlap, ADA 305.2). So may whatever the rule's `allows` selects: a dining table's 36 in pull-back zone allows chairs. Any other element's body is an intrusion. A rule marked `door_swing: forbidden` is also intruded on by any door's swing.
 - **Accessible elements.** The accessible layer's rules apply to an element unless it is marked not accessible (`rules.set_accessible`, RXD `rxd:accessible`): the ADA asks only some rooms and beds to comply. Code and guidance packs apply to every element.
 - **`rules.check`** checks every element with zones (or those given, or one domain's) and returns findings, each with the element, the pack, its domain, edition and layer, the rule ID, its source and confidence, and the intruding element with its depth and where. A finding from a `recommended` pack or an `advisory` rule is a **note**; any other is an **error**. Errors come first. `clearance.check` and `clearance.list` include use zones.
 - **Display.** Views show use zones with the other virtual volumes.
@@ -15706,6 +15706,44 @@ unchanged. The first domain on the shared format is **interiors**: use zones aro
 - [x] A bed's zones follow it when it is moved and turned.
 
 *Built (2026-11-06):* use zones in `clearances::all` (kind `use_zone`, green like fixture spaces), `rules.check` in `riviera-app`, and View › Coordination › Check Rules, which lists the findings and selects and frames the one picked. A rule selects an element by its own predefined type and ObjectType, else its type's predefined type and ElementType. `mesh_object.set_type` now sets a type's `predefined_type` and `element_type`; the Properties palette shows them as *IFC Type* and *Kind*. Sample *An accessible hotel guest room*. Not yet: one clear space shared by two beds (§806.2.3's exception; mark one bed not accessible), turning spaces, and furniture from the interiors library.
+
+### 3.9b.4 Room layouts
+**ID:** ARC-INT-001 · **Priority:** P1 · **Ref:** `INTERIORS_PLAN.md` §4.2; ARC-BATH-005 (the bathroom layout pattern); ARC-RULE-002; ARC-FURN-001; research/15 D1, D2
+
+**Purpose.** Furnish a room in one step from a template, sized so that every piece has the clear space the rule packs in use ask for, and say how much bigger the room must be when it does not fit.
+
+**Behaviour & rules.**
+- **Templates** (`interior.layouts`):
+
+| Template | What it places |
+|---|---|
+| `bedroom_queen`, `bedroom_king` | The bed with its head on the head wall, a nightstand each side, the dresser opposite |
+| `bedroom_twin` | Two twin beds 0.8 m apart with a nightstand between, the dresser opposite |
+| `bedroom_uk_double` | Approved Document M's principal double bed and bedside tables, a chest of drawers opposite, the wardrobe on the side wall |
+| `living_room` | The 3-seat sofa, a coffee table 450 mm in front of it, an armchair each side, the storage unit opposite |
+| `dining_4`, `dining_6` | The table in the middle, its chairs along the long sides |
+| `home_office` | The desk, its chair, a bookcase on the side wall |
+| `private_office` | The desk and chair, two visitor chairs facing it, a bookcase |
+| `meeting_room_8` | The conference table in the middle, three chairs each side and one at each end |
+
+- **The room** is the rectangle closed by walls round the clicked point. The template's main piece goes against the **head wall**: the one named (`wall_id`), else one of the longer walls. Other pieces go against the opposite or a side wall, or stand free, each facing a set way. The pieces are the generic furnishings (ARC-FURN-001), loaded as types.
+- **The fit.**
+  - Each piece's footprint and each use zone the rule packs in use give it (ARC-RULE-002) must stay inside the room. Pieces placed from the middle or the head wall count toward the length and depth needed. Pieces set against a side or the opposite wall reach that wall whatever the room's size, so they count only through the two checks below.
+  - No piece may stand in another piece's footprint.
+  - No piece may stand in another piece's use zone unless the zone allows it.
+
+  When the layout does not fit, nothing is placed. The result gives the length and depth needed and short, and each conflict.
+- `replace` removes the pieces an earlier layout put in the same room (the room is known by its four walls). `fit_only` reports without placing. Each piece is tagged with its template and room (RXD `rxd:interior_layout`).
+
+**Commands.** `interior.layouts`, `interior.layout(template, point, level, wall_id?, replace?, fit_only?) -> {placed, fit{length, length_needed, length_short, depth, depth_needed, depth_short, conflicts}, packs}`.
+
+**Acceptance criteria.**
+- [x] Under the ADA and practice packs, a queen bedroom fits a 4.0 × 5.0 m room. The bed's head is at the named wall, its ADA spaces run 48 in from its foot, and Check Rules finds nothing. Laid out again with `replace`, the room still has one bed.
+- [x] The same layout in a 3.0 × 3.0 m room places nothing and reports the length needed: the bed plus two 30 in spaces.
+- [x] Every template fits a 6 × 6 m room with Check Rules finding nothing in its pieces' zones.
+- [x] The sample *A furnished apartment* furnishes four rooms with no overlaps or clearance intrusions.
+
+*Built (2026-11-06):* `riviera_core::interior_layouts`, Architecture › Build › Room Layout (a template, then a click in the room). Defaults are E-104. Not yet: furniture already in the room (other than an earlier layout) is not avoided, doors' clearances are not part of the fit, and rooms must be rectangles; hotel rooms come with ARC-INT-002.
 
 ### 3.9b.3 Generic furniture and equipment
 **ID:** ARC-FURN-001 · **Priority:** P1 · **Ref:** `INTERIORS_PLAN.md` §4.1, §5.1, §7.1, §8.1 (the owner accepted the IFC mapping); research/15 A1, B1–B7, C2, C7, D1, E2; DM-LIB-006
@@ -16945,6 +16983,8 @@ All commands below are registered once in the command registry and exposed autom
 | `scopebox.set_extents` | id, min, max, rotation? | — | Yes | ARC-SCOPE-001 |
 | `datum.assign_scope_box` | datum_ids, scope_box_id \| null | — | Yes | ARC-SCOPE-001 |
 | `view.assign_scope_box` | view_ids, scope_box_id \| null | — | Yes | ARC-SCOPE-001 |
+| `interior.layouts` | — | [{id, title, items}] | No (query) | ARC-INT-001 |
+| `interior.layout` | template, point, level, wall_id?, replace?, fit_only? | {placed, fit, packs} | Yes | ARC-INT-001 |
 | `furnishing.catalogue` | library? | [{library, folder, name, predefined_type, kind, uniclass, description, source, size}] | No (query) | ARC-FURN-001 |
 | `furnishing.load` | names? | {name: type_id} | Yes | ARC-FURN-001 |
 | `rules.packs` | domain? | [{domain, id, title, format, layer, jurisdiction, edition, rules, in_use, shipped}] | No (query) | ARC-RULE-001 |
@@ -30481,14 +30521,14 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 39 | 8 | 0 | 123 |
 | DM | 91 | 66 | 34 | 3 | 194 |
-| ARC | 77 | 104 | 37 | 1 | 219 |
+| ARC | 77 | 105 | 37 | 1 | 220 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 32 | 0 | 33 |
 | DOC | 68 | 42 | 13 | 1 | 124 |
 | COL | 8 | 52 | 16 | 1 | 77 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **349** | **233** | **7** | **909** |
+| **Total** | **320** | **350** | **233** | **7** | **910** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -30702,7 +30742,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2369 unique commands** in 444 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2371 unique commands** in 445 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -30906,6 +30946,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `inplace` | 5 |
 | `insert` | 4 |
 | `instance` | 5 |
+| `interior` | 2 |
 | `issues` | 11 |
 | `job` | 4 |
 | `journal` | 1 |
@@ -32152,6 +32193,8 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `instance.pick_new_host` | 2 | element_id, host_id, face_ref? | — | Yes | DM-INST-001 |
 | `instance.place` | 2 | type_id, placement, host_id?, level_id?, params? | element_id | Yes | DM-INST-001 |
 | `instance.place_adaptive` | 2 | type_id, points[], hosts?[] | element_id | Yes | DM-INST-001 |
+| `interior.layout` | 3 | template, point, level, wall_id?, replace?, fit_only? | {placed, fit, packs} | Yes | ARC-INT-001 |
+| `interior.layouts` | 3 | — | [{id, title, items}] | No (query) | ARC-INT-001 |
 | `issues.add_view` | 6 | title?, text, fields?, view_id?, in_model=false / id, view_id? | issue | Yes | COL-BCF-004 |
 | `issues.comment` | 6 | id, text / id, resolved / id, fields | issue | Yes | COL-BCF-004 |
 | `issues.delete` | 6 | id / ids[]? / path, ids[]?, version | () / publish_report / export_report | Yes / No / No | COL-BCF-004 |

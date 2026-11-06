@@ -497,7 +497,8 @@ No standard set exists for retail, checkout or gym data (E1). Three sets are pro
   - the bundled Interiors, Gym and Retail Component Libraries (DM-LIB-006, ARC-FURN-001), which
     also bring steps 7 and 10's generic fixtures and equipment ahead of time;
   - the FF&E schedule (DOC-SCH-016).
-- Next is step 3, room layouts.
+- Step 3 is built: room layouts for dwellings and workplaces (ARC-INT-001).
+- Next is step 4, decorative lighting.
 
 Each step gets its spec section first, its samples and a help walkthrough. Every tool is a
 registered command, exposed to Lua and MCP:

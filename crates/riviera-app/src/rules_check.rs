@@ -129,6 +129,7 @@ pub(crate) fn check(app: &mut App, p: CheckParams) -> Result<Vec<Finding>> {
                 let other = if a == e.id() { b } else { a };
                 other == e.id()
                     || riviera_core::clearances::may_share(store, z.clearance.kind, other)
+                    || store.get(other).is_some_and(|o| z.zone.allows(store, o))
                     || riviera_core::bodies::related(store, a, b)
                     || riviera_core::overlap_accept::is_accepted(store, a, b)
             };

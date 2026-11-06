@@ -1380,3 +1380,25 @@ fn the_guest_room_sample_keeps_its_bed_spaces_clear() {
     let text = std::fs::read_to_string(&page).unwrap();
     assert!(text.contains("<dd>guest_room</dd>") && text.contains("Nothing to report."), "{text}");
 }
+
+#[test]
+fn the_furnished_apartment_sample_keeps_its_layouts_clear() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "furnished_apartment");
+    // Every piece's clear spaces are free, and nothing intrudes in any clearance.
+    assert_eq!(ok(&mut app, "rules.check", json!({})), json!([]));
+    assert_eq!(ok(&mut app, "clearance.check", json!({})), json!([]));
+    // The four rooms' pieces, counted by room in the FF&E schedule.
+    let s = store(&app).iter().find(|e| e.name.as_deref() == Some("FF&E Schedule")).map(|e| e.id().0).expect("the FF&E schedule");
+    let table = ok(&mut app, "schedule.get_table", json!({ "schedule_id": s }));
+    let col = |n: &str| table["fields"].as_array().unwrap().iter().position(|f| f == n).unwrap();
+    let mut by_room: std::collections::BTreeMap<String, u64> = Default::default();
+    for r in table["rows"].as_array().unwrap() {
+        let room = r["cells"][col("room")]["text"].as_str().unwrap().to_owned();
+        *by_room.entry(room.split_once(' ').map_or(room.clone(), |(_, n)| n.to_owned())).or_default() += r["cells"][col("count")]["text"].as_str().unwrap().parse::<u64>().unwrap();
+    }
+    assert_eq!(by_room.get("Bedroom"), Some(&4), "{by_room:?}");
+    assert_eq!(by_room.get("Living room"), Some(&5), "{by_room:?}");
+    assert_eq!(by_room.get("Dining room"), Some(&5), "{by_room:?}");
+    assert_eq!(by_room.get("Office"), Some(&3), "{by_room:?}");
+}

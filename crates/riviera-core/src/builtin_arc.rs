@@ -346,6 +346,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(LibraryBundled),
         registry.add(FurnishingCatalogue),
         registry.add(FurnishingLoad),
+        registry.add(InteriorLayouts),
+        registry.add(InteriorLayout),
         registry.add(LibraryList),
         registry.add(LibraryImportFiles),
         registry.add(LibraryGetMeta),
@@ -4119,6 +4121,33 @@ edit_command!(
     crate::furnishings::LoadParams,
     std::collections::BTreeMap<String, ElementId>,
     crate::furnishings::load
+);
+
+read_command!(
+    InteriorLayouts,
+    "interior.layouts",
+    "List the room layout templates",
+    "Lists the room layout templates (ARC-INT-001): bedrooms (queen, king, two twins, a UK double), a living \
+     room, dining rooms for 4 and 6, a home office, a private office and a meeting room for 8, each with \
+     the furnishings it places.",
+    Option<crate::interior_layouts::NoParams>,
+    Vec<crate::interior_layouts::Template>,
+    crate::interior_layouts::list
+);
+
+edit_command!(
+    InteriorLayout,
+    "interior.layout",
+    "Lay out a room from a template",
+    "Furnishes the rectangular room round `point` from a template (ARC-INT-001): its main piece (a bed's \
+     head, a sofa's back, a desk) against `wall_id` or one of the longer walls, the rest round it. It fits \
+     when every piece, and every use zone the rule packs in use give it, stays in the room and clear of the \
+     other pieces. When it does not, nothing is placed and the shortfall along and across the room is \
+     reported. `replace` removes an earlier layout in the room first; `fit_only` reports without placing.",
+    "Room Layout",
+    crate::interior_layouts::LayoutParams,
+    crate::interior_layouts::Layout,
+    crate::interior_layouts::layout
 );
 
 read_command!(

@@ -278,6 +278,7 @@ impl HostCommand for ClearanceCheck {
                 riviera_core::bodies::related(store, a, b)
                     || riviera_core::overlap_accept::is_accepted(store, a, b)
                     || riviera_core::clearances::may_share(store, c.kind, other)
+                    || (c.kind == riviera_core::clearances::ClearanceKind::UseZone && riviera_core::rules::zone_allows(store, c.element, &c.rule, other))
             };
             for ov in overlap::find(&[c.body()], Some(&bodies), &skip, &o) {
                 let other = if ov.a == c.element { ov.b } else { ov.a };

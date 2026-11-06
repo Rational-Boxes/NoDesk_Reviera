@@ -288,6 +288,31 @@ impl Gui {
         }
     }
 
+    /// Architecture › Build › Room Layout (ARC-INT-001): a bedroom, living or dining room,
+    /// office or meeting room furnished from a template, fitted with the interiors rule packs'
+    /// use zones; then a click inside the room.
+    pub(crate) fn room_layout(&mut self) {
+        let frame = self.frame;
+        let templates = match self.run("interior.layouts", json!({})) {
+            Ok(v) => v.as_array().cloned().unwrap_or_default(),
+            Err(e) => return error(&frame, &e),
+        };
+        let f = super::reinforcement_ui::Form::new(&frame, "Room Layout");
+        let titles: Vec<String> = templates.iter().map(|t| t["title"].as_str().unwrap_or_default().to_owned()).collect();
+        let t = f.choice("Template", &titles, 0);
+        let replace = f.choice("An earlier layout here", &["Replace it".to_owned(), "Keep it".to_owned()], 0);
+        let ok = f.show("Then click inside a room closed by walls, in a plan. The main piece (a bed's head, a sofa's back, a desk) goes against one of the longer walls; every piece and its use zones must fit.", "Choose Room");
+        let k = t.get_selection().map_or(0, |k| k as usize);
+        let keep = replace.get_selection() == Some(1);
+        f.dialog.destroy();
+        let Some(id) = templates.get(k).and_then(|t| t["id"].as_str()).filter(|_| ok).map(str::to_owned) else { return };
+        self.start_room_tool();
+        if let Some(tool) = self.room_tool.as_mut() {
+            tool.layout = Some(json!({ "command": "interior.layout", "template": id, "replace": !keep }));
+            frame.set_status_text("Room Layout: click inside the room; Esc ends", 0);
+        }
+    }
+
     /// Lays out a bathroom where the Bathroom Layout tool was clicked, and reports the fit.
     pub(crate) fn layout_bathroom_at(&mut self, mut args: serde_json::Value) {
         let frame = self.frame;
@@ -317,6 +342,26 @@ impl Gui {
         }
         match self.app.execute(&command, args, &super::user()) {
             Ok(out) => {
+                if command == "interior.layout" {
+                    let fit = &out.result["fit"];
+                    let placed = out.result["placed"].as_array().map_or(0, Vec::len);
+                    if placed == 0 {
+                        let mut why = Vec::new();
+                        if fit["length_short"].as_f64().unwrap_or(0.0) > 0.0 {
+                            why.push(format!("{:.0} mm short along the wall ({:.0} needed)", fit["length_short"].as_f64().unwrap_or(0.0) * 1000.0, fit["length_needed"].as_f64().unwrap_or(0.0) * 1000.0));
+                        }
+                        if fit["depth_short"].as_f64().unwrap_or(0.0) > 0.0 {
+                            why.push(format!("{:.0} mm short across the room ({:.0} needed)", fit["depth_short"].as_f64().unwrap_or(0.0) * 1000.0, fit["depth_needed"].as_f64().unwrap_or(0.0) * 1000.0));
+                        }
+                        for c in fit["conflicts"].as_array().into_iter().flatten() {
+                            why.push(format!("{} — {} — {}", c[0].as_str().unwrap_or(""), c[1].as_str().unwrap_or(""), c[2].as_str().unwrap_or("")));
+                        }
+                        return error(&frame, &format!("The room is too small for this layout, so nothing was placed:\n{}", why.join("\n")));
+                    }
+                    self.refresh_scene(&frame);
+                    let problems = self.run("rules.check", json!({ "element_ids": out.result["placed"] })).ok().and_then(|v| v.as_array().map(|a| a.iter().filter(|f| f["severity"] == "error").count())).unwrap_or(0);
+                    return frame.set_status_text(&format!("{placed} piece(s) laid out; Check Rules finds {problems} error(s)"), 0);
+                }
                 if command == "fare_line.create" {
                     self.refresh_scene(&frame);
                     return frame.set_status_text(

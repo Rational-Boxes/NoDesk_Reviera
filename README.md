@@ -633,6 +633,15 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
   bathroom and vertical transport included (`rules.packs`, `rules.set_packs`, `rules.add_pack`,
   `rules.remove_pack`, `rules.set_accessible`, `rules.check`). Not built yet: room layouts,
   hotel floors, fixture runs, front ends and gym layouts, which the plan goes on to.
+- **Room layouts** (ARC-INT-001). Architecture › Build › Room Layout furnishes a room closed by
+  walls from a template:
+  - queen, king, twin and UK double bedrooms;
+  - a living room, and dining rooms for 4 and 6;
+  - home and private offices, and a meeting room for 8.
+
+  It fits every piece and its clear spaces from the interiors rule packs, or places nothing and
+  reports how much bigger the room must be (`interior.layouts`, `interior.layout`). The sample
+  *A furnished apartment* lays out four rooms.
 - **FF&E schedules** (DOC-SCH-016). A schedule can cover several categories. View › Schedules ›
   New Schedule › *FF&E* lists furniture, casework, lighting and equipment by room and type, with
   each type's mark and description and how many of each are in a room (`schedule.create_ffe`).

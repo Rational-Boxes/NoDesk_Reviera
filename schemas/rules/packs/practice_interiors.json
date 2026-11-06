@@ -10,7 +10,7 @@
   "zones": [
     {
       "id": "Dining table edge",
-      "description": "36 in round a dining table's edge, to pull chairs back and pass",
+      "description": "36 in round a dining table's edge, to pull chairs back and pass; its chairs may stand in it",
       "applies_to": {
         "classes": [
           "IfcFurniture"
@@ -44,7 +44,15 @@
       ],
       "height": 0.75,
       "source": "S1479",
-      "confidence": "secondary"
+      "confidence": "secondary",
+      "allows": {
+        "classes": [
+          "IfcFurniture"
+        ],
+        "predefined_types": [
+          "CHAIR"
+        ]
+      }
     },
     {
       "id": "Dresser front",

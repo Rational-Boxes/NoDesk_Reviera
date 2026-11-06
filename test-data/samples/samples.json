@@ -339,6 +339,19 @@
     ]
   },
   {
+    "name": "furnished_apartment",
+    "title": "A furnished apartment",
+    "group": "Architecture",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "furnished_apartment.lua"
+        }
+      }
+    ]
+  },
+  {
     "name": "wet_room",
     "title": "Family bathroom and wet room (England)",
     "group": "Architecture",
