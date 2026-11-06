@@ -3250,6 +3250,42 @@ All output commands work on an immutable **model snapshot** taken when the comma
 - [ ] A room name starting with "=" is written as text.
 - [ ] Every element in the COBie Component table is present, with the same GlobalId, in a Basic FM Handover IFC export of the same model state.
 
+### Report files
+**ID:** DOC-OUT-016 · **Priority:** P1 · **Ref:** owner requirement (2026-11-06): "All reports should have the option to write a report file, both local and if connected to a FileEngine service."; COL-FE-012 (FileEngine wherever a file is written)
+
+**Purpose.** Make every check and report a file that can be kept, sent or filed with the project, not only something read on screen.
+
+**Behaviour & rules.**
+- **Any report can be saved.** `report.write` runs a read-only command (a check, a report, a list, a summary) with its arguments and writes its result as a report file. Commands that change the model or write files of their own are refused.
+- **Formats**, from the path's extension or chosen:
+  - **HTML**, the default: a self-contained page;
+  - **Markdown**: the same tables;
+  - **CSV**: the report's main table (the result, or its largest list);
+  - **JSON**: the result as it is, with a header object.
+- **Contents.** A header names the title, the model, the date and time (UTC), the Riviera version, and the command with its arguments. The result follows as tables:
+  - a list of records is one table, its columns the records' fields;
+  - a record's plain values go in a summary table, and each list in it gets a table of its own;
+  - nested values are written compactly.
+
+  In HTML, rows whose severity is `error` or `note` are marked.
+- **Where it goes.** A local path, or, with FileEngine connected, a `fileengine://` address. The file is then uploaded into that FileEngine folder, as a new version of a file of the same name there, with metadata naming the command and the model (COL-FE-012). FileEngine stays optional: every report can be saved locally.
+- **In the window.**
+  - The findings dialogs of Check Bathrooms and Check Rules have **Save Report…** as their first row, and offer it when nothing is found.
+  - **Manage › Settings › Save Report…** (also in the File menu) lists the checks and reports and saves any of them.
+
+  Both ask for a local file. With FileEngine connected, they offer *Save to FileEngine…* with a folder and file name.
+- Reports that already write their own files (`bath.report`, `clash.export_report`, `structural_connection.check_report`, `docs.report`, `pressure_loss_report.export`, `profiler.export_report`) take FileEngine addresses in the same way.
+
+**Commands.** `report.write(command, args?, path, format?: html|markdown|csv|json, title?) -> {path, format, command, tables, rows}` · `report.list() -> [{command, label, summary}]` *(query)*
+
+**Acceptance criteria.**
+- [x] `report.write` of `rules.check` to a `.html` path writes a page with the header and one table of findings, the error rows marked; to `.csv` the same findings one row each; to `.json` the findings as returned.
+- [x] A command that edits the model is refused.
+- [x] A report written to a `fileengine://` address is uploaded into that FileEngine folder.
+- [x] Check Bathrooms and Check Rules offer Save Report…, and Save Report… lists the checks.
+
+*Built (2026-11-06):* `report.write` and `report.list` (`riviera-app` `report_files`), Save Report… in the two findings dialogs, and Manage › Settings › Save Report…. The reports that write their own files already took FileEngine addresses (COL-FE-012). Not yet: a Save Report… button in the other result dialogs (elevators, escalators, egress routes, platform clearing, lobbies, energy). Their commands are in Save Report…'s list, or `report.write` takes them directly. Reports in PDF are not built either.
+
 ### Background jobs
 **ID:** DOC-OUT-013 · **Priority:** P1 · **Ref:** research/04 §6.2 *Export in background*
 
@@ -3703,6 +3739,8 @@ Every command below is registered once in the command registry and is therefore 
 | `print.setup_save` | name, settings | setup_id | Yes | DOC-OUT-002 |
 | `print.setup_delete` | setup_id | () | Yes | DOC-OUT-002 |
 | `print.preview` | range, setup_id? | page_images[] | No | DOC-OUT-002 |
+| `report.write` | command, args?, path, format?, title? | {path, format, command, tables, rows} | No (file) | DOC-OUT-016 |
+| `report.list` | — | [{command, label, summary}] | No (query) | DOC-OUT-016 |
 | `export.pdf` | range, set_id?, setup_id?, path_or_folder, combine?, naming_rule?, background? | job_id | No | DOC-OUT-003 |
 | `export.pdf_setup_save` | name, settings | setup_id | Yes | DOC-OUT-003 |
 | `export.pdf_setup_delete` | setup_id | () | Yes | DOC-OUT-003 |

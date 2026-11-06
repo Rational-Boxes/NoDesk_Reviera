@@ -61,6 +61,8 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add_host(crate::overlaps::ClearanceCheck),
         registry.add_host(crate::bathrooms::BathCheck),
         registry.add_host(crate::rules_check::RulesCheck),
+        registry.add_host(crate::report_files::ReportWrite),
+        registry.add_host(crate::report_files::ReportList),
         registry.add_host(crate::bath_report::BathReport),
         registry.add_host(crate::bath_report::BcfFromBathCheck),
         registry.add_host(crate::bathrooms::BathSwapProduct),

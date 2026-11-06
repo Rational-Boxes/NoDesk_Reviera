@@ -32,7 +32,7 @@ impl Gui {
             Ok(v) => v.as_array().cloned().unwrap_or_default(),
             Err(e) => return error(&frame, &format!("The check did not run:\n{e}")),
         };
-        self.show_findings("Check Bathrooms", &in_use.join("; "), &found);
+        self.show_findings("Check Bathrooms", "bath.check", &in_use.join("; "), &found);
     }
 
     /// Check Rules (ARC-RULE-002): furniture's use zones under the shared rule packs in use.
@@ -57,37 +57,38 @@ impl Gui {
             Ok(v) => v.as_array().cloned().unwrap_or_default(),
             Err(e) => return error(&frame, &format!("The check did not run:\n{e}")),
         };
-        self.show_findings("Check Rules", &in_use.join("; "), &found);
+        self.show_findings("Check Rules", "rules.check", &in_use.join("; "), &found);
     }
 
-    /// Lists a check's findings; the one picked is selected and framed with what is in its way.
-    fn show_findings(&mut self, title: &str, packs: &str, found: &[serde_json::Value]) {
+    /// Lists a check's findings, after a first row that saves them as a report (DOC-OUT-016); the
+    /// one picked is selected and framed with what is in its way.
+    fn show_findings(&mut self, title: &str, command: &str, packs: &str, found: &[serde_json::Value]) {
         let frame = self.frame;
         if found.is_empty() {
-            let d = MessageDialog::builder(&frame, &format!("No problems found under: {packs}."), title)
-                .with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation)
+            let d = MessageDialog::builder(&frame, &format!("No problems found under: {packs}.\n\nSave a report of this check?"), title)
+                .with_style(MessageDialogStyle::YesNo | MessageDialogStyle::IconInformation)
                 .build();
-            d.show_modal();
+            if d.show_modal() == ID_YES {
+                self.save_report(command, json!({}), title);
+            }
             return;
         }
-        let rows: Vec<String> = found
-            .iter()
-            .enumerate()
-            .map(|(k, f)| {
+        let rows: Vec<String> = std::iter::once("Save Report…".to_owned())
+            .chain(found.iter().enumerate().map(|(k, f)| {
                 let severity = if f["severity"] == "note" { "Note" } else { "Error" };
                 let mut row = format!("{}. {severity}: {}", k + 1, f["message"].as_str().unwrap_or_default());
                 if f["confidence"] != "verified" {
                     row.push_str(&format!(" [{}]", f["confidence"].as_str().unwrap_or_default()));
                 }
                 row
-            })
+            }))
             .collect();
         let labels: Vec<&str> = rows.iter().map(String::as_str).collect();
         let errors = found.iter().filter(|f| f["severity"] == "error").count();
         let dialog = SingleChoiceDialog::builder(
             &frame,
             &format!(
-                "{errors} error(s) and {} note(s) under: {packs}.\nPick one to select and frame it:",
+                "{errors} error(s) and {} note(s) under: {packs}.\nPick one to select and frame it, or save them all as a report:",
                 found.len() - errors
             ),
             title,
@@ -99,7 +100,10 @@ impl Gui {
         }
         let picked = usize::try_from(dialog.get_selection()).ok();
         dialog.destroy();
-        let Some(f) = picked.and_then(|i| found.get(i)) else {
+        if picked == Some(0) {
+            return self.save_report(command, json!({}), title);
+        }
+        let Some(f) = picked.and_then(|i| found.get(i.checked_sub(1)?)) else {
             return;
         };
         // Show the clear spaces, then the fixture and what is in its way.
@@ -127,6 +131,42 @@ impl Gui {
             ),
             0,
         );
+    }
+
+    /// Saves a check or report as a file (DOC-OUT-016): on this computer, or in a FileEngine
+    /// folder when one is connected; HTML, Markdown, CSV or JSON by the name's extension.
+    pub(crate) fn save_report(&mut self, command: &str, args: serde_json::Value, title: &str) {
+        let frame = self.frame;
+        let stem: String = title.chars().map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '-' }).collect();
+        let default = format!("{}.html", stem.trim_matches('-'));
+        let wildcard = "HTML report (*.html)|*.html|Markdown (*.md)|*.md|CSV table (*.csv)|*.csv|JSON (*.json)|*.json";
+        let Some(path) = self.save_target(&format!("Save Report: {title}"), wildcard, &default) else {
+            return;
+        };
+        match self.run("report.write", json!({ "command": command, "args": args, "path": path, "title": title })) {
+            Ok(v) => frame.set_status_text(&format!("Report saved: {} ({} rows)", path, v["rows"].as_u64().unwrap_or(0)), 0),
+            Err(e) => error(&frame, &format!("The report was not saved:\n{e}")),
+        }
+    }
+
+    /// Manage › Settings › Save Report… (DOC-OUT-016): any of the checks and reports, saved.
+    pub(crate) fn save_any_report(&mut self) {
+        let frame = self.frame;
+        let list = self.run("report.list", json!({})).ok().and_then(|v| v.as_array().cloned()).unwrap_or_default();
+        if list.is_empty() {
+            return frame.set_status_text("Open a model first", 0);
+        }
+        let labels: Vec<String> = list.iter().map(|r| r["label"].as_str().unwrap_or_default().to_owned()).collect();
+        let refs: Vec<&str> = labels.iter().map(String::as_str).collect();
+        let d = SingleChoiceDialog::builder(&frame, "Which check or report?", "Save Report", &refs).build();
+        if d.show_modal() != ID_OK {
+            return;
+        }
+        let picked = usize::try_from(d.get_selection()).ok();
+        d.destroy();
+        let Some(r) = picked.and_then(|i| list.get(i)) else { return };
+        let (command, label) = (r["command"].as_str().unwrap_or_default().to_owned(), labels[picked.unwrap_or(0)].clone());
+        self.save_report(&command, json!({}), &label);
     }
 
     pub(crate) fn place_grab_bars(&mut self) {

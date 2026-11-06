@@ -1011,6 +1011,12 @@ icon = "clash"
 help = "Run clash tests out of process and step through the results: select and frame each clash, isolate or box it, set its status, comment, resolve and export"
 
 [[action]]
+id = "ui.save_report"
+label = "Save Report"
+icon = "save_report"
+help = "Save any check or report (bathrooms, interiors rules, elevators, clearances, loads, …) as an HTML, Markdown, CSV or JSON file, on this computer or in a FileEngine folder (DOC-OUT-016)"
+
+[[action]]
 id = "ui.model_properties"
 label = "Model Properties"
 icon = "model_properties"
@@ -4415,6 +4421,7 @@ tools = [
 label = "Settings"
 tools = [
   { action = "ui.model_properties", size = "large" },
+  { action = "ui.save_report", size = "large" },
   { action = "global.manage", size = "large" },
   { action = "paramlib.manage", size = "large" },
   { action = "standards.transfer", size = "large" },
@@ -4849,7 +4856,7 @@ panels = [{ label = "Window", tools = [{ action = "insert.flip_facing", size = "
 
 [[menu]]
 label = "&File"
-items = ["file.new", "ui.new_ifc4x3", "file.open", "file.save", "file.save_as", "file.close", "-", "ui.fileengine_open", "ui.fileengine_save", "ui.fileengine_versions", "ui.publish_fileengine", "ui.material_documents", "ui.publish_local_documents", "-", "ui.bimserver", "-", "ui.model_properties", "ui.remote_analysis", "ui.profiler", "-", "export.pdf", "export.cobie", "gbxml.export", "gbxml.import_loads", "hbjson.export", "bcf.import", "bcf.export", "bcf.export_viewpoint", "bcf.import_viewpoint", "-", "app.exit"]
+items = ["file.new", "ui.new_ifc4x3", "file.open", "file.save", "file.save_as", "file.close", "-", "ui.fileengine_open", "ui.fileengine_save", "ui.fileengine_versions", "ui.publish_fileengine", "ui.material_documents", "ui.publish_local_documents", "-", "ui.bimserver", "-", "ui.model_properties", "ui.save_report", "ui.remote_analysis", "ui.profiler", "-", "export.pdf", "export.cobie", "gbxml.export", "gbxml.import_loads", "hbjson.export", "bcf.import", "bcf.export", "bcf.export_viewpoint", "bcf.import_viewpoint", "-", "app.exit"]
 
 [[menu]]
 label = "&Edit"

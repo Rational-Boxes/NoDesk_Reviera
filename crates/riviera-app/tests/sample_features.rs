@@ -1365,4 +1365,10 @@ fn the_guest_room_sample_keeps_its_bed_spaces_clear() {
     rules.sort();
     assert_eq!(rules, ["ADA 2010 806.2.3 left", "ADA 2010 806.2.3 right", "Bed foot", "Dresser front"]);
     assert_eq!(ok(&mut app, "rules.check", json!({})), json!([]));
+    // Its check, kept as a report file (DOC-OUT-016).
+    let page = work.path().join("guest-room-check.html");
+    let w = ok(&mut app, "report.write", json!({ "command": "rules.check", "path": page, "title": "Guest room check" }));
+    assert_eq!(w["rows"], 0);
+    let text = std::fs::read_to_string(&page).unwrap();
+    assert!(text.contains("<dd>guest_room</dd>") && text.contains("Nothing to report."), "{text}");
 }

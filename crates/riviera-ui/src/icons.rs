@@ -1430,6 +1430,10 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "bath_check" => format!(
             r#"<path d="M4 3h24" {s}/><rect x="11" y="4" width="10" height="4" fill="{f}" {s}/><ellipse cx="16" cy="13" rx="4.5" ry="5" fill="{f}" {s}/><rect x="6" y="19" width="20" height="9" fill="none" {sa} stroke-dasharray="3 2"/>"#
         ),
+        // A page with lines of a table and a down arrow into a tray.
+        "save_report" => format!(
+            r#"<path d="M7 3h13l5 5v12H7z" fill="{f}" {s}/><path d="M11 9h10M11 13h10M11 17h6" {s}/><path d="M16 21v6M13 24l3 3 3-3" fill="none" {sa}/><path d="M6 27v2h20v-2" fill="none" {s}/>"#
+        ),
         // A bed in plan with a dashed clear space beside it and a tick.
         "rules_check" => format!(
             r#"<rect x="13" y="4" width="12" height="18" rx="1" fill="{f}" {s}/><path d="M13 9h12" {s}/><rect x="4" y="10" width="8" height="12" fill="none" {sa} stroke-dasharray="3 2"/><path d="M6 26l3 3 6-6" fill="none" {s}/>"#

@@ -41,6 +41,11 @@ Start with **File › New**. In **Manage › Model Properties**:
    and frame the bed and the chair.
 5. **Clear it.** Move the chair to the desk, at (1.107, 2.3) turned −90°, facing it, and run
    **Check Rules** again: no problems found.
+6. **Keep the result.** Answer *Yes* to *Save a report of this check?*, or choose **Manage ›
+   Settings › Save Report** › *Interiors rules*. Save to this computer, or to a FileEngine folder
+   when one is connected. The `.html` page names the model, the date and the rule packs' check.
+   A `.csv` gives the findings as a table, `.md` as Markdown, and `.json` as Riviera returns them
+   (`report.write`).
 
 ## Gaps
 

@@ -633,6 +633,14 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
   bathroom and vertical transport included (`rules.packs`, `rules.set_packs`, `rules.add_pack`,
   `rules.remove_pack`, `rules.set_accessible`, `rules.check`). Not built yet: room layouts,
   hotel floors, fixture runs, front ends and gym layouts, which the plan goes on to.
+- **Report files** (DOC-OUT-016). Any check or report can be saved as an HTML, Markdown, CSV or
+  JSON file. The file names the model, the date and the command, then gives the results as
+  tables. It can be saved on this computer, or in a FileEngine folder when one is connected:
+  - from Manage › Settings › Save Report;
+  - from the first row of Check Bathrooms' and Check Rules' findings;
+  - by `report.write` and `report.list` for scripts and agents.
+
+  Not built yet: Save Report… in the other result dialogs, and PDF reports.
 - **Bundled furniture and equipment libraries** (DM-LIB-006, ARC-FURN-001). Three Component
   Libraries ship with Riviera in `libraries/`, each item a model fragment (IFC4) made by
   Riviera:

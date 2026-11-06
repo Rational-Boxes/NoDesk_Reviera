@@ -4780,6 +4780,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "overlap.find" => with(gui, Gui::check_overlaps),
         "bath.check" => with(gui, Gui::check_bathrooms),
         "rules.check" => with(gui, Gui::check_rules),
+        "ui.save_report" => with(gui, Gui::save_any_report),
         "elevator.check" => with(gui, Gui::check_elevators),
         "escalator.check" => with(gui, Gui::check_escalators),
         "stairlift.check" => with(gui, Gui::check_stairlifts),

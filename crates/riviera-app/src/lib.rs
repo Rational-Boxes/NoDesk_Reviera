@@ -34,6 +34,7 @@ pub mod notes;
 pub mod output;
 pub mod bath_report;
 pub mod bathrooms;
+pub mod report_files;
 pub mod rules_check;
 pub mod overlaps;
 pub mod schedules;

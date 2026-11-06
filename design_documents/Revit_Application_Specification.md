@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Riviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Riviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 907 numbered requirements (320 P0 · 347 P1 · 233 P2 · 7 P3), 2,366 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 908 numbered requirements (320 P0 · 348 P1 · 233 P2 · 7 P3), 2,368 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Riviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Riviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,366 commands; 907 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,368 commands; 908 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -27038,6 +27038,42 @@ All output commands work on an immutable **model snapshot** taken when the comma
 - [ ] A room name starting with "=" is written as text.
 - [ ] Every element in the COBie Component table is present, with the same GlobalId, in a Basic FM Handover IFC export of the same model state.
 
+### Report files
+**ID:** DOC-OUT-016 · **Priority:** P1 · **Ref:** owner requirement (2026-11-06): "All reports should have the option to write a report file, both local and if connected to a FileEngine service."; COL-FE-012 (FileEngine wherever a file is written)
+
+**Purpose.** Make every check and report a file that can be kept, sent or filed with the project, not only something read on screen.
+
+**Behaviour & rules.**
+- **Any report can be saved.** `report.write` runs a read-only command (a check, a report, a list, a summary) with its arguments and writes its result as a report file. Commands that change the model or write files of their own are refused.
+- **Formats**, from the path's extension or chosen:
+  - **HTML**, the default: a self-contained page;
+  - **Markdown**: the same tables;
+  - **CSV**: the report's main table (the result, or its largest list);
+  - **JSON**: the result as it is, with a header object.
+- **Contents.** A header names the title, the model, the date and time (UTC), the Riviera version, and the command with its arguments. The result follows as tables:
+  - a list of records is one table, its columns the records' fields;
+  - a record's plain values go in a summary table, and each list in it gets a table of its own;
+  - nested values are written compactly.
+
+  In HTML, rows whose severity is `error` or `note` are marked.
+- **Where it goes.** A local path, or, with FileEngine connected, a `fileengine://` address. The file is then uploaded into that FileEngine folder, as a new version of a file of the same name there, with metadata naming the command and the model (COL-FE-012). FileEngine stays optional: every report can be saved locally.
+- **In the window.**
+  - The findings dialogs of Check Bathrooms and Check Rules have **Save Report…** as their first row, and offer it when nothing is found.
+  - **Manage › Settings › Save Report…** (also in the File menu) lists the checks and reports and saves any of them.
+
+  Both ask for a local file. With FileEngine connected, they offer *Save to FileEngine…* with a folder and file name.
+- Reports that already write their own files (`bath.report`, `clash.export_report`, `structural_connection.check_report`, `docs.report`, `pressure_loss_report.export`, `profiler.export_report`) take FileEngine addresses in the same way.
+
+**Commands.** `report.write(command, args?, path, format?: html|markdown|csv|json, title?) -> {path, format, command, tables, rows}` · `report.list() -> [{command, label, summary}]` *(query)*
+
+**Acceptance criteria.**
+- [x] `report.write` of `rules.check` to a `.html` path writes a page with the header and one table of findings, the error rows marked; to `.csv` the same findings one row each; to `.json` the findings as returned.
+- [x] A command that edits the model is refused.
+- [x] A report written to a `fileengine://` address is uploaded into that FileEngine folder.
+- [x] Check Bathrooms and Check Rules offer Save Report…, and Save Report… lists the checks.
+
+*Built (2026-11-06):* `report.write` and `report.list` (`riviera-app` `report_files`), Save Report… in the two findings dialogs, and Manage › Settings › Save Report…. The reports that write their own files already took FileEngine addresses (COL-FE-012). Not yet: a Save Report… button in the other result dialogs (elevators, escalators, egress routes, platform clearing, lobbies, energy). Their commands are in Save Report…'s list, or `report.write` takes them directly. Reports in PDF are not built either.
+
 ### Background jobs
 **ID:** DOC-OUT-013 · **Priority:** P1 · **Ref:** research/04 §6.2 *Export in background*
 
@@ -27491,6 +27527,8 @@ Every command below is registered once in the command registry and is therefore 
 | `print.setup_save` | name, settings | setup_id | Yes | DOC-OUT-002 |
 | `print.setup_delete` | setup_id | () | Yes | DOC-OUT-002 |
 | `print.preview` | range, setup_id? | page_images[] | No | DOC-OUT-002 |
+| `report.write` | command, args?, path, format?, title? | {path, format, command, tables, rows} | No (file) | DOC-OUT-016 |
+| `report.list` | — | [{command, label, summary}] | No (query) | DOC-OUT-016 |
 | `export.pdf` | range, set_id?, setup_id?, path_or_folder, combine?, naming_rule?, background? | job_id | No | DOC-OUT-003 |
 | `export.pdf_setup_save` | name, settings | setup_id | Yes | DOC-OUT-003 |
 | `export.pdf_setup_delete` | setup_id | () | Yes | DOC-OUT-003 |
@@ -30419,10 +30457,10 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 32 | 0 | 33 |
-| DOC | 68 | 40 | 13 | 1 | 122 |
+| DOC | 68 | 41 | 13 | 1 | 123 |
 | COL | 8 | 52 | 16 | 1 | 77 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **347** | **233** | **7** | **907** |
+| **Total** | **320** | **348** | **233** | **7** | **908** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -30477,7 +30515,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.2a Riviera-originated features
 
-151 requirements are Riviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
+152 requirements are Riviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
 
 | Requirement | Ch | Feature |
 |-------------|----|---------|
@@ -30604,6 +30642,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | DOC-RBE-002 | 5 | Backend hosting and licensing |
 | DOC-ANN-025 | 5 | Annotation floating in 3D views |
 | DOC-OUT-015 | 5 | COBie export |
+| DOC-OUT-016 | 5 | Report files |
 | COL-BIM-001 | 6 | Server profiles and login |
 | COL-BIM-002 | 6 | Project and revision browser |
 | COL-BIM-003 | 6 | Open and download |
@@ -30635,7 +30674,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2366 unique commands** in 443 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2368 unique commands** in 444 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -30958,6 +30997,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `reinforcement_numbering` | 2 |
 | `reinforcement_settings` | 2 |
 | `render` | 15 |
+| `report` | 2 |
 | `results` | 11 |
 | `revcloud` | 2 |
 | `revision` | 8 |
@@ -32590,6 +32630,8 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `render.save_to_project` | 5 | job_id, name | view_id | Yes | DOC-OUT-011 |
 | `render.start` | 5 | view_id, settings, renderer?, region? | job_id | No | DOC-OUT-011 |
 | `render.stop` | 5 | job_id | () | No | DOC-OUT-011 |
+| `report.list` | 5 | — | [{command, label, summary}] | No (query) | DOC-OUT-016 |
+| `report.write` | 5 | command, args?, path, format?, title? | {path, format, command, tables, rows} | No (file) | DOC-OUT-016 |
 | `results.apply_preset` | 4 | view_id, preset_id | — | No | STR-RES-001 |
 | `results.delete_package` | 4 | package_id | — | Yes | STR-RES-001 |
 | `results.delete_preset` | 4 | preset_id | — | Yes | STR-RES-001 |
