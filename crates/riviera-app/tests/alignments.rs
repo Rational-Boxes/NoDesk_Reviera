@@ -17,6 +17,143 @@ fn f(v: &Value) -> f64 {
     v.as_f64().unwrap()
 }
 
+/// Reads IFC 4.3 curve segments back the way buildingSMART's sample models build them: the parent
+/// curve's point at `SegmentStart`, and its tangent there in the segment's sense, are carried to the
+/// placement's location and direction.
+mod segments {
+    use riviera_ifc::{AttrValue, IfcModel, StepId};
+
+    fn rf(v: &AttrValue) -> StepId {
+        match v {
+            AttrValue::Ref(r) => StepId(*r),
+            other => panic!("not a reference: {other:?}"),
+        }
+    }
+
+    fn num(v: &AttrValue) -> f64 {
+        match v {
+            AttrValue::Real(x) => *x,
+            AttrValue::Int(i) => *i as f64,
+            AttrValue::Typed { value, .. } => num(value),
+            other => panic!("not a number: {other:?}"),
+        }
+    }
+
+    fn nums(v: &AttrValue) -> Vec<f64> {
+        match v {
+            AttrValue::List(items) => items.iter().map(num).collect(),
+            other => panic!("not a list: {other:?}"),
+        }
+    }
+
+    fn get(ifc: &IfcModel, id: StepId, name: &str) -> AttrValue {
+        ifc.attribute(id, name).unwrap()
+    }
+
+    /// A 2D placement's location and direction angle.
+    pub fn placement(ifc: &IfcModel, id: StepId) -> ([f64; 2], f64) {
+        let p = nums(&get(ifc, rf(&get(ifc, id, "Location")), "Coordinates"));
+        let a = match get(ifc, id, "RefDirection") {
+            AttrValue::Null => 0.0,
+            d => {
+                let d = nums(&get(ifc, rf(&d), "DirectionRatios"));
+                d[1].atan2(d[0])
+            }
+        };
+        ([p[0], p[1]], a)
+    }
+
+    /// The parent curve's point `s` along it, in its own coordinates.
+    fn parent_at(ifc: &IfcModel, curve: StepId, s: f64) -> [f64; 2] {
+        let class = ifc.class_of(curve).unwrap().to_ascii_uppercase();
+        match class.as_str() {
+            "IFCLINE" => {
+                let o = nums(&get(ifc, rf(&get(ifc, curve, "Pnt")), "Coordinates"));
+                let v = rf(&get(ifc, curve, "Dir"));
+                let d = nums(&get(ifc, rf(&get(ifc, v, "Orientation")), "DirectionRatios"));
+                let n = d[0].hypot(d[1]);
+                [o[0] + s * d[0] / n, o[1] + s * d[1] / n]
+            }
+            "IFCCIRCLE" => {
+                let (c, a0) = placement(ifc, rf(&get(ifc, curve, "Position")));
+                let r = num(&get(ifc, curve, "Radius"));
+                let a = a0 + s / r;
+                [c[0] + r * a.cos(), c[1] + r * a.sin()]
+            }
+            "IFCCLOTHOID" => {
+                let (c, a0) = placement(ifc, rf(&get(ifc, curve, "Position")));
+                assert!(c == [0.0, 0.0] && a0 == 0.0, "a clothoid at the origin");
+                let k = num(&get(ifc, curve, "ClothoidConstant"));
+                let n = 4000;
+                let (mut x, mut y) = (0.0, 0.0);
+                for i in 0..n {
+                    let t = (i as f64 + 0.5) * s / n as f64;
+                    let th = t * t / (2.0 * k * k.abs());
+                    x += th.cos() * s / n as f64;
+                    y += th.sin() * s / n as f64;
+                }
+                [x, y]
+            }
+            "IFCPOLYNOMIALCURVE" => {
+                let cx = nums(&get(ifc, curve, "CoefficientsX"));
+                let cy = nums(&get(ifc, curve, "CoefficientsY"));
+                assert_eq!((cx.as_slice(), cy.len(), cy[0], cy[1]), (&[0.0, 1.0][..], 3, 0.0, 0.0), "y = a·x²");
+                let a = cy[2];
+                // The x whose arc length from the vertex is s.
+                let len = |x: f64| {
+                    let q = 2.0 * a * x;
+                    x * (1.0 + q * q).sqrt() / 2.0 + q.asinh() / (4.0 * a)
+                };
+                let (mut lo, mut hi) = (-1e6, 1e6);
+                for _ in 0..200 {
+                    let mid = (lo + hi) / 2.0;
+                    if len(mid) < s { lo = mid } else { hi = mid }
+                }
+                [lo, a * lo * lo]
+            }
+            other => panic!("unexpected parent curve {other}"),
+        }
+    }
+
+    /// A segment's start (its placement), and its point `t` of the way along it.
+    pub fn point(ifc: &IfcModel, seg: StepId, t: f64) -> [f64; 2] {
+        let (p, a) = placement(ifc, rf(&get(ifc, seg, "Placement")));
+        let s0 = num(&get(ifc, seg, "SegmentStart"));
+        let l = num(&get(ifc, seg, "SegmentLength"));
+        let parent = rf(&get(ifc, seg, "ParentCurve"));
+        let q0 = parent_at(ifc, parent, s0);
+        let e = 1e-6 * l.signum();
+        let q1 = parent_at(ifc, parent, s0 + e);
+        let turn = a - (q1[1] - q0[1]).atan2(q1[0] - q0[0]);
+        let q = parent_at(ifc, parent, s0 + t * l);
+        let (dx, dy) = (q[0] - q0[0], q[1] - q0[1]);
+        [p[0] + dx * turn.cos() - dy * turn.sin(), p[1] + dx * turn.sin() + dy * turn.cos()]
+    }
+
+    /// The segments of a composite or gradient curve.
+    pub fn of(ifc: &IfcModel, curve: StepId) -> Vec<StepId> {
+        match get(ifc, curve, "Segments") {
+            AttrValue::List(items) => items.iter().map(rf).collect(),
+            other => panic!("{other:?}"),
+        }
+    }
+
+    /// Checks each segment ends where the next starts; the points `samples` along each.
+    pub fn walk(ifc: &IfcModel, curve: StepId, samples: usize) -> Vec<[f64; 2]> {
+        let segs = of(ifc, curve);
+        let mut out = Vec::new();
+        for w in segs.windows(2) {
+            let end = point(ifc, w[0], 1.0);
+            let next = point(ifc, w[1], 0.0);
+            assert!((end[0] - next[0]).hypot(end[1] - next[1]) < 1e-4, "segment #{} ends at {end:?}, the next starts at {next:?}", w[0].0);
+            for k in 0..samples {
+                out.push(point(ifc, w[0], k as f64 / samples as f64));
+            }
+        }
+        out
+    }
+}
+
 #[test]
 fn an_l_shaped_alignment_curves_round_its_corner_and_rises_on_its_profile() {
     let dir = tempfile::tempdir().unwrap();
@@ -63,6 +200,10 @@ fn an_l_shaped_alignment_curves_round_its_corner_and_rises_on_its_profile() {
     assert!(app.execute("alignment.create", json!({ "level": level, "points": [[0.0, 0.0], [10.0, 0.0], [10.0, 10.0]], "radii": [30.0] }), &Caller::user()).is_err());
 }
 
+fn list_id(app: &mut App) -> Value {
+    ok(app, "alignment.list", json!({}))[0]["alignment"].clone()
+}
+
 fn drive(app: &mut App) -> Value {
     let level = ok(app, "level.list", json!({}))[0]["id"].clone();
     ok(app, "alignment.create", json!({
@@ -98,12 +239,23 @@ fn an_ifc4x3_project_writes_an_ifc_alignment_with_its_layouts() {
         let c = |class: &str| rows.iter().filter(|r| r.class == class).count();
         (c("IFCCOMPOSITECURVE"), c("IFCCURVESEGMENT"), c("IFCCIRCLE"), c("IFCREFERENT"))
     };
-    assert_eq!(geometry(&rows), (1, 4, 1, 1));
+    assert_eq!(geometry(&rows), (1, 4 + 4, 1, 1), "four plan segments and four profile segments");
     let zero = rows.iter().filter(|r| r.class == "IFCCURVESEGMENT" && r.attributes.contains("IFCLENGTHMEASURE(0.),IFCLENGTHMEASURE(0.)")).count();
-    assert_eq!(zero, 1, "a zero-length segment ends the curve");
+    assert_eq!(zero, 2, "a zero-length segment ends the plan curve, and the gradient curve");
     // With a profile the plan curve is the footprint.
     let curve = rows.iter().find(|r| r.class == "IFCSHAPEREPRESENTATION" && r.attributes.contains("'FootPrint'") && r.attributes.contains("'Curve2D'"));
     assert!(curve.is_some(), "a FootPrint Curve2D representation");
+    // And the profile is a gradient curve over it, the Axis: a grade, a parabola, a grade and
+    // the end. Read back it rises as the alignment does.
+    assert!(rows.iter().any(|r| r.class == "IFCSHAPEREPRESENTATION" && r.attributes.contains("'Axis'") && r.attributes.contains("'Curve3D'")));
+    assert_eq!(count("IFCPOLYNOMIALCURVE"), 1);
+    let gradient = ifc.entities_of_type("IfcGradientCurve").unwrap()[0].id;
+    let profile = segments::walk(&ifc, gradient, 10);
+    let id = list_id(&mut app);
+    for p in profile.iter().step_by(3) {
+        let z = ok(&mut app, "alignment.point_at", json!({ "alignment_id": id, "station": 1000.0 + p[0] }));
+        assert!((f(&z["elevation"]) - p[1]).abs() < 1e-6, "at {} the file says {}, the alignment {}", p[0], p[1], f(&z["elevation"]));
+    }
     assert!(rows.iter().any(|r| r.class == "IFCREFERENT" && r.attributes.contains(".STATION.")));
     assert!(rows.iter().any(|r| r.class == "IFCPROPERTYSET" && r.attributes.contains("'Pset_Stationing'")));
     assert!(rows.iter().any(|r| r.class == "IFCPROPERTYSINGLEVALUE" && r.attributes.contains("'Station'") && r.attributes.contains("IFCLENGTHMEASURE(1000.")));
@@ -121,8 +273,8 @@ fn an_ifc4x3_project_writes_an_ifc_alignment_with_its_layouts() {
     ok(&mut again, "file.save", json!({}));
     let rows = riviera_ifc::IfcModel::open(&model).unwrap().step_rows().unwrap();
     assert_eq!(rows.iter().filter(|r| r.class == "IFCALIGNMENTSEGMENT").count(), 8);
-    assert_eq!(geometry(&rows), (1, 4, 1, 1), "replaced, not doubled");
-    assert_eq!(rows.iter().filter(|r| r.class == "IFCLINE").count(), 3);
+    assert_eq!(geometry(&rows), (1, 8, 1, 1), "replaced, not doubled");
+    assert_eq!(rows.iter().filter(|r| r.class == "IFCLINE").count(), 3 + 3);
 }
 
 #[test]
@@ -177,14 +329,27 @@ fn spirals_ease_into_and_out_of_a_curve() {
     let back = ok(&mut app, "alignment.station_of", json!({ "alignment_id": id, "point": side["point"] }));
     assert!((f(&back["station"]) - (cs + 10.0)).abs() < 1e-4 && (f(&back["offset"]) - 3.0).abs() < 1e-4, "{back:#}");
 
-    // In IFC 4.3: two CLOTHOID segments from a straight (radius 0) to the curve and back; no
-    // composite curve yet.
+    // In IFC 4.3: two CLOTHOID segments from a straight (radius 0) to the curve and back, and
+    // IfcClothoid curve segments that, read back, follow the alignment.
     let model = dir.path().join("spirals.ifc");
     ok(&mut app, "file.save_as", json!({ "path": model }));
-    let rows = riviera_ifc::IfcModel::open(&model).unwrap().step_rows().unwrap();
+    let ifc = riviera_ifc::IfcModel::open(&model).unwrap();
+    let rows = ifc.step_rows().unwrap();
     assert_eq!(rows.iter().filter(|r| r.class == "IFCALIGNMENTHORIZONTALSEGMENT" && r.attributes.contains(".CLOTHOID.")).count(), 2);
     assert_eq!(rows.iter().filter(|r| r.class == "IFCALIGNMENTHORIZONTALSEGMENT").count(), 6, "line, spiral, arc, spiral, line and the zero-length end");
-    assert_eq!(rows.iter().filter(|r| r.class == "IFCCOMPOSITECURVE").count(), 0);
+    assert_eq!(rows.iter().filter(|r| r.class == "IFCCLOTHOID").count(), 2);
+    // The entry spiral turns left from 0 (A = √(RL) = √4000), the exit spiral ends at its
+    // inflection point (A negative, starting at −L).
+    let constants: Vec<&str> = rows.iter().filter(|r| r.class == "IFCCLOTHOID").map(|r| r.attributes.as_str()).collect();
+    assert!(constants[0].contains("63.245") && constants[1].contains("-63.245"), "{constants:?}");
+    let curve = ifc.entities_of_type("IfcCompositeCurve").unwrap()[0].id;
+    for p in segments::walk(&ifc, curve, 8) {
+        let back = ok(&mut app, "alignment.station_of", json!({ "alignment_id": id, "point": p }));
+        assert!(f(&back["offset"]).abs() < 1e-4, "{p:?} is {} off the alignment", f(&back["offset"]));
+    }
+    let segs = segments::of(&ifc, curve);
+    let end = segments::point(&ifc, segs[segs.len() - 2], 1.0);
+    assert!((end[0] - 400.0).hypot(end[1] - 200.0) < 1e-4, "the curve ends at {end:?}");
 
     // Spirals that turn more than the corner: refused.
     assert!(app.execute("alignment.create", json!({ "level": level, "points": [[0.0, 0.0], [200.0, 0.0], [400.0, 200.0]], "radii": [100.0], "spirals": [200.0] }), &Caller::user()).is_err());

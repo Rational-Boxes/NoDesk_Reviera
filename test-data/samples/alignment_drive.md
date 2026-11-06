@@ -48,6 +48,6 @@ Start with **File › New IFC 4.3 Project**: in an IFC 4.3 project the drive is 
 ## Gaps
 
 - **[gap]** No chainage labels in the plan yet, and no grips to move the points.
-- **[gap]** Cant and cross sections come later, and so does the vertical geometry (a gradient
-  curve). The drive's horizontal geometry, the start chainage (a STATION referent) and the layouts
-  are written; the bypass's spirals are in its layout but not yet in its curve geometry.
+- **[gap]** Cant and cross sections come later. Both alignments are written with their layouts
+  and their geometry. The drive's plan curve has a gradient curve over it, so a viewer shows it
+  rising in 3D. The bypass's spirals are clothoid segments.

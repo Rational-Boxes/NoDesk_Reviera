@@ -9,11 +9,12 @@
 //! arcs). The layouts are derived from the recipe each time the model is saved, and are not read
 //! back as elements of their own.
 //!
-//! The alignment also gets (ARC-ALN-002): a placement at the origin and an `Axis` / `Curve2D`
-//! representation, an `IfcCompositeCurve` of `IfcCurveSegment`s (an `IfcLine` or an `IfcCircle`
-//! cut from its start, placed at the segment's start point and direction, a clockwise arc's
-//! length negative); an `IfcReferent` (STATION) at its start with `Pset_Stationing.Station`; and
-//! aggregation in the project.
+//! The alignment also gets (ARC-ALN-002): a placement at the origin and an `Axis` (with a
+//! profile, `FootPrint`) / `Curve2D` representation, an `IfcCompositeCurve` of `IfcCurveSegment`s
+//! (an `IfcLine`, `IfcCircle` or `IfcClothoid`, its point at `SegmentStart` and the tangent there
+//! carried to the segment's start point and direction, a clockwise arc's length negative); with
+//! a profile, an `Axis` / `Curve3D` `IfcGradientCurve` over it; an `IfcReferent` (STATION) at its
+//! start with `Pset_Stationing.Station`; and aggregation in the project.
 
 use std::collections::HashMap;
 
@@ -78,6 +79,9 @@ const GEOMETRY: &[&str] = &[
     "IFCLINE",
     "IFCVECTOR",
     "IFCCIRCLE",
+    "IFCCLOTHOID",
+    "IFCGRADIENTCURVE",
+    "IFCPOLYNOMIALCURVE",
 ];
 
 /// Removes a representation tree written for an alignment.
@@ -229,6 +233,43 @@ fn horizontal(ifc: &mut IfcModel, a: &Alignment, owner_history: Option<StepId>, 
     Ok(layout)
 }
 
+/// Where each stretch of an alignment's profile starts and ends, and whether it is a vertical
+/// curve; cut to the plan, which the layouts and the gradient curve may not run past.
+fn stretches(a: &Alignment) -> Vec<(f64, f64, bool)> {
+    let (from, to) = (a.recipe.start_station, a.end_station());
+    profile_stretches(&a.recipe.profile)
+        .into_iter()
+        .filter_map(|(s0, s1, c)| {
+            let (s0, s1) = (s0.max(from), s1.min(to));
+            (s1 > s0 + 1e-9).then_some((s0, s1, c))
+        })
+        .collect()
+}
+
+/// Where the profile's last stretch ends (at the latest, the plan's end).
+fn profile_end(a: &Alignment) -> f64 {
+    stretches(a).last().map_or(a.recipe.start_station, |s| s.1)
+}
+
+fn profile_stretches(profile: &[alignments::Pvi]) -> Vec<(f64, f64, bool)> {
+    let mut out = Vec::new();
+    let mut from = profile[0].station;
+    for (i, pvi) in profile.iter().enumerate().skip(1) {
+        let l = if i + 1 < profile.len() { pvi.curve.unwrap_or(0.0) } else { 0.0 };
+        let bvc = pvi.station - l / 2.0;
+        if bvc > from + 1e-9 {
+            out.push((from, bvc, false));
+        }
+        if l > 0.0 {
+            out.push((bvc, bvc + l, true));
+            from = bvc + l;
+        } else {
+            from = pvi.station;
+        }
+    }
+    out
+}
+
 /// The vertical layout's segments: constant gradients between the vertical curves, which are
 /// parabolic arcs (their radius the curve's length over its change of grade).
 fn vertical(ifc: &mut IfcModel, a: &Alignment, owner_history: Option<StepId>, scale: f64) -> Result<Option<StepId>> {
@@ -236,25 +277,9 @@ fn vertical(ifc: &mut IfcModel, a: &Alignment, owner_history: Option<StepId>, sc
     if profile.len() < 2 {
         return Ok(None);
     }
-    // Where each stretch starts and ends along the profile, and whether it is a curve.
-    let mut stretches: Vec<(f64, f64, bool)> = Vec::new();
-    let mut from = profile[0].station;
-    for (i, pvi) in profile.iter().enumerate().skip(1) {
-        let l = if i + 1 < profile.len() { pvi.curve.unwrap_or(0.0) } else { 0.0 };
-        let bvc = pvi.station - l / 2.0;
-        if bvc > from + 1e-9 {
-            stretches.push((from, bvc, false));
-        }
-        if l > 0.0 {
-            stretches.push((bvc, bvc + l, true));
-            from = bvc + l;
-        } else {
-            from = pvi.station;
-        }
-    }
     let layout = rooted(ifc, "IfcAlignmentVertical", owner_history, "Vertical")?;
     let mut segments = Vec::new();
-    for (k, (s0, s1, curve)) in stretches.into_iter().enumerate() {
+    for (k, (s0, s1, curve)) in stretches(a).into_iter().enumerate() {
         let (z0, g0) = alignments::elevation(profile, s0 + 1e-9);
         let (_, g1) = alignments::elevation(profile, s1 - 1e-9);
         let mut attrs = vec![
@@ -274,9 +299,10 @@ fn vertical(ifc: &mut IfcModel, a: &Alignment, owner_history: Option<StepId>, sc
         ifc.set_attribute(seg, "DesignParameters", &r(params))?;
         segments.push(seg);
     }
-    // The zero-length segment that ends the list.
-    let last = (a.end_station() - a.recipe.start_station).max(0.0);
-    let (z, g) = alignments::elevation(profile, a.end_station());
+    // The zero-length segment that ends the list, where the profile or the plan ends.
+    let end = profile_end(a);
+    let last = (end - a.recipe.start_station).max(0.0);
+    let (z, g) = alignments::elevation(profile, end);
     let params = create(
         ifc,
         "IfcAlignmentVerticalSegment",
@@ -312,6 +338,9 @@ fn length(v: f64) -> AttrValue {
 fn representation(ifc: &mut IfcModel, a: &Alignment, context: StepId, scale: f64) -> Result<StepId> {
     let mut segments = Vec::new();
     for p in &a.pieces {
+        // Where along its parent curve the segment starts (a placement carries that point and
+        // its tangent to the segment's start).
+        let mut cut_from = 0.0;
         let (start, dir, parent, len) = match p {
             Piece::Line { start, end, length } => {
                 let d = [(end[0] - start[0]) / length, (end[1] - start[1]) / length];
@@ -331,7 +360,18 @@ fn representation(ifc: &mut IfcModel, a: &Alignment, context: StepId, scale: f64
                 // Anticlockwise along the circle; a clockwise arc runs against it.
                 (*start, d, circle, if *left { *length } else { -*length })
             }
-            Piece::Spiral { .. } => unreachable!("alignments with spirals have no representation yet"),
+            // A clothoid at the origin, its curvature s / (A·|A|) at s from its inflection point,
+            // cut where the curvature is k0 (bSI sample "linear-placement-of-signal": an exit
+            // spiral starts at −L with A negative turning left).
+            Piece::Spiral { start, heading, k0, k1, length, .. } => {
+                let c = length / (k1 - k0);
+                let o = point2(ifc, [0.0, 0.0], 1.0)?;
+                let x = dir2(ifc, [1.0, 0.0])?;
+                let pos = create(ifc, "IfcAxis2Placement2D", &[("Location", r(o)), ("RefDirection", r(x))])?;
+                let clothoid = create(ifc, "IfcClothoid", &[("Position", r(pos)), ("ClothoidConstant", AttrValue::Real(c.signum() * c.abs().sqrt() / scale))])?;
+                cut_from = k0 * c;
+                (*start, [heading.cos(), heading.sin()], clothoid, *length)
+            }
         };
         let loc = point2(ifc, start, scale)?;
         let refd = dir2(ifc, dir)?;
@@ -340,7 +380,7 @@ fn representation(ifc: &mut IfcModel, a: &Alignment, context: StepId, scale: f64
         let seg = create(
             ifc,
             "IfcCurveSegment",
-            &[("Transition", e(transition)), ("Placement", r(placement)), ("SegmentStart", length(0.0)), ("SegmentLength", length(len / scale)), ("ParentCurve", r(parent))],
+            &[("Transition", e(transition)), ("Placement", r(placement)), ("SegmentStart", length(cut_from / scale)), ("SegmentLength", length(len / scale)), ("ParentCurve", r(parent))],
         )?;
         segments.push(seg);
     }
@@ -361,14 +401,92 @@ fn representation(ifc: &mut IfcModel, a: &Alignment, context: StepId, scale: f64
         )?);
     }
     let curve = create(ifc, "IfcCompositeCurve", &[("Segments", AttrValue::List(segments.into_iter().map(r).collect())), ("SelfIntersect", AttrValue::Bool(false))])?;
+    let profiled = a.recipe.profile.len() >= 2;
     let rep = create(
         ifc,
         "IfcShapeRepresentation",
         // With a vertical layout the plan curve is the footprint and the 3D gradient curve the
         // axis (concept template "Alignment Geometry - Horizontal and Vertical").
-        &[("ContextOfItems", r(context)), ("RepresentationIdentifier", s(if a.recipe.profile.len() >= 2 { "FootPrint" } else { "Axis" })), ("RepresentationType", s("Curve2D")), ("Items", AttrValue::List(vec![r(curve)]))],
+        &[("ContextOfItems", r(context)), ("RepresentationIdentifier", s(if profiled { "FootPrint" } else { "Axis" })), ("RepresentationType", s("Curve2D")), ("Items", AttrValue::List(vec![r(curve)]))],
     )?;
-    create(ifc, "IfcProductDefinitionShape", &[("Representations", AttrValue::List(vec![r(rep)]))])
+    let mut reps = vec![r(rep)];
+    if profiled {
+        let gradient = gradient_curve(ifc, a, curve, scale)?;
+        reps.push(r(create(
+            ifc,
+            "IfcShapeRepresentation",
+            &[("ContextOfItems", r(context)), ("RepresentationIdentifier", s("Axis")), ("RepresentationType", s("Curve3D")), ("Items", AttrValue::List(vec![r(gradient)]))],
+        )?));
+    }
+    create(ifc, "IfcProductDefinitionShape", &[("Representations", AttrValue::List(reps))])
+}
+
+/// Signed arc length of y = a·x² from its vertex to x.
+fn parabola_length(a: f64, x: f64) -> f64 {
+    let q = 2.0 * a * x;
+    x * (1.0 + q * q).sqrt() / 2.0 + q.asinh() / (4.0 * a)
+}
+
+/// The profile as an `IfcGradientCurve` over the plan curve: segments in the plane of distance
+/// along the plan (from its start) and elevation, their lengths measured along them (bSI sample
+/// "linear-placement-of-signal": a 250.00375 m stretch at −1 % is 250.01625 long). Gradients are
+/// lines, vertical curves `IfcPolynomialCurve`s y = a·x² cut from the vertex (template
+/// "Parabolic Transition Segment").
+fn gradient_curve(ifc: &mut IfcModel, a: &Alignment, base: StepId, scale: f64) -> Result<StepId> {
+    let profile = &a.recipe.profile;
+    let line = |ifc: &mut IfcModel| -> Result<StepId> {
+        let o = point2(ifc, [0.0, 0.0], 1.0)?;
+        let x = dir2(ifc, [1.0, 0.0])?;
+        let v = create(ifc, "IfcVector", &[("Orientation", r(x)), ("Magnitude", AttrValue::Real(1.0))])?;
+        create(ifc, "IfcLine", &[("Pnt", r(o)), ("Dir", r(v))])
+    };
+    let mut segments = Vec::new();
+    for (s0, s1, curve) in stretches(a) {
+        let (z0, g0) = alignments::elevation(profile, s0 + 1e-9);
+        let (_, g1) = alignments::elevation(profile, s1 - 1e-9);
+        let l = s1 - s0;
+        let (parent, from, len) = if curve && (g1 - g0).abs() > 1e-12 {
+            // In file units: y = a·x², the segment starting where its slope is g0.
+            let k = (g1 - g0) / (2.0 * l) * scale;
+            let x0 = g0 / (2.0 * k);
+            let x1 = x0 + l / scale;
+            let o = point2(ifc, [0.0, 0.0], 1.0)?;
+            let x = dir2(ifc, [1.0, 0.0])?;
+            let pos = create(ifc, "IfcAxis2Placement2D", &[("Location", r(o)), ("RefDirection", r(x))])?;
+            let reals = |v: &[f64]| AttrValue::List(v.iter().copied().map(AttrValue::Real).collect());
+            let poly = create(ifc, "IfcPolynomialCurve", &[("Position", r(pos)), ("CoefficientsX", reals(&[0.0, 1.0])), ("CoefficientsY", reals(&[0.0, 0.0, k]))])?;
+            (poly, parabola_length(k, x0), parabola_length(k, x1) - parabola_length(k, x0))
+        } else {
+            (line(ifc)?, 0.0, l * (1.0 + g0 * g0).sqrt() / scale)
+        };
+        let loc = point2(ifc, [s0 - a.recipe.start_station, z0], scale)?;
+        let n = (1.0 + g0 * g0).sqrt();
+        let refd = dir2(ifc, [1.0 / n, g0 / n])?;
+        let placement = create(ifc, "IfcAxis2Placement2D", &[("Location", r(loc)), ("RefDirection", r(refd))])?;
+        segments.push(create(
+            ifc,
+            "IfcCurveSegment",
+            &[("Transition", e("CONTSAMEGRADIENT")), ("Placement", r(placement)), ("SegmentStart", length(from)), ("SegmentLength", length(len)), ("ParentCurve", r(parent))],
+        )?);
+    }
+    // The zero-length segment that ends it.
+    let end = profile_end(a);
+    let (z, g) = alignments::elevation(profile, end);
+    let parent = line(ifc)?;
+    let loc = point2(ifc, [(end - a.recipe.start_station).max(0.0), z], scale)?;
+    let n = (1.0 + g * g).sqrt();
+    let refd = dir2(ifc, [1.0 / n, g / n])?;
+    let placement = create(ifc, "IfcAxis2Placement2D", &[("Location", r(loc)), ("RefDirection", r(refd))])?;
+    segments.push(create(
+        ifc,
+        "IfcCurveSegment",
+        &[("Transition", e("DISCONTINUOUS")), ("Placement", r(placement)), ("SegmentStart", length(0.0)), ("SegmentLength", length(0.0)), ("ParentCurve", r(parent))],
+    )?);
+    create(
+        ifc,
+        "IfcGradientCurve",
+        &[("Segments", AttrValue::List(segments.into_iter().map(r).collect())), ("SelfIntersect", AttrValue::Bool(false)), ("BaseCurve", r(base))],
+    )
 }
 
 /// A placement at the origin, for an alignment that has none.
@@ -414,16 +532,12 @@ pub(crate) fn write_alignments(ifc: &mut IfcModel, doc: &Document, steps: &HashM
         nest(ifc, owner_history, step, parts)?;
         let referent = stationing(ifc, &a, owner_history, scale)?;
         nest(ifc, owner_history, step, vec![referent])?;
-        // Its geometry, replaced at every save. With spirals it is left out: how IFC 4.3 places a
-        // clothoid's parent curve is not settled here (E-96), and wrong geometry is worse than none.
+        // Its geometry, replaced at every save.
         if let AttrValue::Ref(old) = ifc.attribute(step, "Representation")? {
             remove_tree(ifc, StepId(old))?;
-            ifc.set_attribute(step, "Representation", &AttrValue::Null)?;
         }
-        if !a.pieces.iter().any(|p| matches!(p, Piece::Spiral { .. })) {
-            let shape = representation(ifc, &a, context, scale)?;
-            ifc.set_attribute(step, "Representation", &r(shape))?;
-        }
+        let shape = representation(ifc, &a, context, scale)?;
+        ifc.set_attribute(step, "Representation", &r(shape))?;
         if ifc.attribute(step, "ObjectPlacement")? == AttrValue::Null {
             let placement = origin(ifc)?;
             ifc.set_attribute(step, "ObjectPlacement", &r(placement))?;
