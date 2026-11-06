@@ -4,6 +4,9 @@
 **Owner's request (2026-10-31):** "launch a research session on kitchens. include residential and
 commercial, including grocery store refrigeration hardware."
 
+**See also:** `INTERIORS_PLAN.md` (2026-11-06), for furniture, retail fixtures, checkouts and
+gyms. It shares this plan's rules schema (§3.1) and its cabinet runs and countertops (§4).
+
 FileEngine is optional (standing rule). Every tool here works on a local project. Product
 reference data held in FileEngine is a later, optional workflow, as for bathrooms.
 **Research:** `research/14_kitchens_refrigeration.md` uses public sources only. It covers 172
