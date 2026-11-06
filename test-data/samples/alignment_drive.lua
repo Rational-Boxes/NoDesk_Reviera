@@ -2,7 +2,7 @@
 -- Copyright (C) 2026 Riviera contributors
 
 -- title: A drive set out by chainage
--- description: An S-shaped drive up a slope as an alignment: three straights joined by a 25 m curve to the left and a 40 m curve to the right, chainage from 1+000, and a vertical profile climbing at 6 % then easing to 2 % over an 80 m crest curve. The sample reads it back by chainage and offset, finds the chainage of a point beside it, and lists its curves. It is an IFC 4.3 project, so the drive is saved as an IfcAlignment with its horizontal and vertical layouts.
+-- description: An S-shaped drive up a slope as an alignment: three straights joined by a 25 m curve to the left and a 40 m curve to the right, chainage from 1+000, and a vertical profile climbing at 6 % then easing to 2 % over an 80 m crest curve. The sample reads it back by chainage and offset, finds the chainage of a point beside it, and lists its curves. It is an IFC 4.3 project, so the drive is saved as an IfcAlignment with its horizontal and vertical layouts and its curve geometry; a bypass beside it eases into its curve with transition spirals.
 --
 -- Riviera sample model (test-data/samples): alignments (ARC-ALN-001), the shared foundation for
 -- roads, drives and guideway devices. Drawn in plans as a dash-dot centreline with a tick every
@@ -40,3 +40,16 @@ local post = riviera.alignment.point_at{ alignment_id = drive.alignment, station
 local back = riviera.alignment.station_of{ alignment_id = drive.alignment, point = post.point }
 assert(math.abs(back.station - 1100) < 1e-6 and math.abs(back.offset + 3) < 1e-6, "the post's chainage and offset")
 print(string.format("post at (%.2f, %.2f), elevation %.2f m on the crest curve", post.point[1], post.point[2], post.elevation))
+
+-- A bypass south of the drive, eased into and out of its 120 m curve by 30 m transition spirals
+-- (clothoids) each side, so the curvature builds up evenly instead of all at once. Its layout
+-- has CLOTHOID segments; its IFC curve geometry waits until clothoids' placement is settled.
+local bypass = riviera.alignment.create{
+  level = level, name = "Bypass",
+  points = { { 0, -40 }, { 120, -40 }, { 220, -140 } },
+  radii = { 120 },
+  spirals = { 30 },
+}
+local b = riviera.alignment.list()[2]
+assert(b.curves[1].spiral == 30, "spirals each side of the curve")
+print(string.format("bypass: %.2f m, curve %.0f m with %.0f m spirals", bypass.length, b.curves[1].radius, b.curves[1].spiral))

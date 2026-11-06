@@ -36,9 +36,18 @@ Start with **File › New IFC 4.3 Project**: in an IFC 4.3 project the drive is 
    - a lamp post 3 m to the right of 1+100 comes back from `alignment.station_of` as chainage
      1+100, offset −3.
 
+5. **A bypass with spirals.** Another **Alignment**:
+   ```
+   0, -40
+   120, -40, 120, 30
+   220, -140
+   ```
+   The fourth number is the transition spiral each side of the 120 m curve. Over each 30 m
+   spiral the curvature builds up evenly, so the road eases into the curve.
+
 ## Gaps
 
 - **[gap]** No chainage labels in the plan yet, and no grips to move the points.
-- **[gap]** Spirals, cant and cross sections come later, and so does the vertical geometry (a
-  gradient curve). The horizontal geometry, the start chainage (a STATION referent) and the
-  layouts are written.
+- **[gap]** Cant and cross sections come later, and so does the vertical geometry (a gradient
+  curve). The drive's horizontal geometry, the start chainage (a STATION referent) and the layouts
+  are written; the bypass's spirals are in its layout but not yet in its curve geometry.

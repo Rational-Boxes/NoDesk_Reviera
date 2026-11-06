@@ -133,3 +133,54 @@ fn an_ifc4_project_keeps_an_alignment_as_an_annotation() {
     assert!(rows.iter().any(|r| r.class == "IFCANNOTATION" && r.attributes.contains("'Alignment'")));
     assert!(!rows.iter().any(|r| r.class.starts_with("IFCALIGNMENT")));
 }
+
+#[test]
+fn spirals_ease_into_and_out_of_a_curve() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = App::new(AppConfig { live: None, untitled_dir: dir.path().join("untitled") });
+    ok(&mut app, "file.new", json!({ "schema": "IFC4X3" }));
+    let level = ok(&mut app, "level.list", json!({}))[0]["id"].clone();
+    // A 45° corner, a 100 m curve with 40 m spirals each side.
+    let made = ok(&mut app, "alignment.create", json!({ "level": level, "points": [[0.0, 0.0], [200.0, 0.0], [400.0, 200.0]], "radii": [100.0], "spirals": [40.0] }));
+    let id = made["alignment"].clone();
+    let end = f(&made["end_station"]);
+    // Walk it every half metre: no jumps, curvature never above 1/R, and it ends on the last point.
+    let at = |app: &mut App, s: f64| {
+        let p = ok(app, "alignment.point_at", json!({ "alignment_id": id, "station": s }));
+        ([f(&p["point"][0]), f(&p["point"][1])], f(&p["direction"][1]).atan2(f(&p["direction"][0])))
+    };
+    let n = (end / 0.5).floor() as usize;
+    let mut prev = at(&mut app, 0.0);
+    let mut steepest = 0.0f64;
+    for k in 1..=n {
+        let cur = at(&mut app, 0.5 * k as f64);
+        let step = (cur.0[0] - prev.0[0]).hypot(cur.0[1] - prev.0[1]);
+        assert!((step - 0.5).abs() < 1e-3, "a jump of {step} m at {}", 0.5 * k as f64);
+        steepest = steepest.max((cur.1 - prev.1).abs() / 0.5);
+        prev = cur;
+    }
+    assert!(steepest <= 1.0 / 100.0 + 1e-6, "curvature {steepest}");
+    let last = at(&mut app, end).0;
+    assert!((last[0] - 400.0).hypot(last[1] - 200.0) < 1e-6, "ends at {last:?}");
+    let listed = ok(&mut app, "alignment.list", json!({}));
+    assert_eq!((f(&listed[0]["curves"][0]["spiral"]), f(&listed[0]["curves"][0]["radius"])), (40.0, 100.0), "{listed:#}");
+    // Halfway along the entry spiral the curvature is about half the curve's.
+    let cs = f(&listed[0]["curves"][0]["start_station"]);
+    let (a, b) = (at(&mut app, cs + 19.5).1, at(&mut app, cs + 20.5).1);
+    assert!(((b - a) - 1.0 / 200.0).abs() < 1e-4, "{}", b - a);
+    // And a point beside it reads back its chainage.
+    let side = ok(&mut app, "alignment.point_at", json!({ "alignment_id": id, "station": cs + 10.0, "offset": 3.0 }));
+    let back = ok(&mut app, "alignment.station_of", json!({ "alignment_id": id, "point": side["point"] }));
+    assert!((f(&back["station"]) - (cs + 10.0)).abs() < 1e-4 && (f(&back["offset"]) - 3.0).abs() < 1e-4, "{back:#}");
+
+    // In IFC 4.3: two CLOTHOID segments from a straight (radius 0) to the curve and back; no
+    // composite curve yet.
+    let model = dir.path().join("spirals.ifc");
+    ok(&mut app, "file.save_as", json!({ "path": model }));
+    let rows = riviera_ifc::IfcModel::open(&model).unwrap().step_rows().unwrap();
+    assert_eq!(rows.iter().filter(|r| r.class == "IFCALIGNMENTHORIZONTALSEGMENT" && r.attributes.contains(".CLOTHOID.")).count(), 2);
+    assert_eq!(rows.iter().filter(|r| r.class == "IFCCOMPOSITECURVE").count(), 0);
+
+    // Spirals that turn more than the corner: refused.
+    assert!(app.execute("alignment.create", json!({ "level": level, "points": [[0.0, 0.0], [200.0, 0.0], [400.0, 200.0]], "radii": [100.0], "spirals": [200.0] }), &Caller::user()).is_err());
+}

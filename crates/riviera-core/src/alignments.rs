@@ -45,6 +45,9 @@ pub struct AlignmentRecipe {
     pub points: Vec<V2>,
     /// One per interior PI (0: no curve).
     pub radii: Vec<f64>,
+    /// The transition spiral (clothoid) each side of each interior PI's curve (m; 0: none).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub spirals: Vec<f64>,
     pub start_station: f64,
     #[serde(default)]
     pub profile: Vec<Pvi>,
@@ -62,12 +65,31 @@ pub enum Piece {
     Line { start: V2, end: V2, length: f64 },
     /// From `start` round `centre`, turning left when `left`, through `angle` radians.
     Arc { start: V2, end: V2, centre: V2, radius: f64, left: bool, angle: f64, length: f64 },
+    /// A transition spiral (clothoid): from `start` heading `heading` (radians), its curvature
+    /// (positive turning left) changing evenly from `k0` to `k1` over `length`.
+    Spiral { start: V2, end: V2, heading: f64, k0: f64, k1: f64, length: f64 },
+}
+
+/// The point reached along a clothoid from the origin heading `h`, its curvature changing evenly
+/// from `k0` to `k1` over `l`, after `s` (Simpson's rule).
+fn spiral_point(h: f64, k0: f64, k1: f64, l: f64, s: f64) -> V2 {
+    let theta = |u: f64| h + k0 * u + (k1 - k0) * u * u / (2.0 * l);
+    let n = (((s / 0.25).ceil() as usize).max(4) + 1) & !1;
+    let step = s / n as f64;
+    let (mut x, mut y) = (0.0, 0.0);
+    for i in 0..=n {
+        let w = if i == 0 || i == n { 1.0 } else if i % 2 == 1 { 4.0 } else { 2.0 };
+        let t = theta(step * i as f64);
+        x += w * t.cos();
+        y += w * t.sin();
+    }
+    [x * step / 3.0, y * step / 3.0]
 }
 
 impl Piece {
     fn length(&self) -> f64 {
         match self {
-            Piece::Line { length, .. } | Piece::Arc { length, .. } => *length,
+            Piece::Line { length, .. } | Piece::Arc { length, .. } | Piece::Spiral { length, .. } => *length,
         }
     }
 
@@ -86,6 +108,11 @@ impl Piece {
                 let d = if *left { [-a.sin(), a.cos()] } else { [a.sin(), -a.cos()] };
                 (p, d)
             }
+            Piece::Spiral { start, heading, k0, k1, length, .. } => {
+                let o = spiral_point(*heading, *k0, *k1, *length, s);
+                let t = heading + k0 * s + (k1 - k0) * s * s / (2.0 * length);
+                ([start[0] + o[0], start[1] + o[1]], [t.cos(), t.sin()])
+            }
         }
     }
 }
@@ -98,25 +125,22 @@ fn norm(a: V2) -> f64 {
     a[0].hypot(a[1])
 }
 
-/// A curve fitted at a PI: where it leaves the back leg and joins the forward one, its centre,
-/// radius, hand and angle.
-#[derive(Clone, Copy)]
+/// A curve fitted at a PI: where it leaves the back leg and joins the forward one, and its
+/// pieces (an arc, or a spiral, an arc and a spiral).
+#[derive(Clone)]
 struct Cut {
     pc: V2,
     pt: V2,
-    centre: V2,
-    radius: f64,
-    left: bool,
-    angle: f64,
+    pieces: Vec<Piece>,
 }
 
-/// The tangent lines and arcs of a horizontal layout.
-pub fn pieces(points: &[V2], radii: &[f64]) -> Result<Vec<Piece>> {
+/// The tangent lines, arcs and spirals of a horizontal layout.
+pub fn pieces(points: &[V2], radii: &[f64], spirals: &[f64]) -> Result<Vec<Piece>> {
     if points.len() < 2 {
         return Err(bad("an alignment needs two or more points"));
     }
-    if radii.len() > points.len().saturating_sub(2) {
-        return Err(bad("one radius per interior point at most"));
+    if radii.len() > points.len().saturating_sub(2) || spirals.len() > points.len().saturating_sub(2) {
+        return Err(bad("one radius and one spiral length per interior point at most"));
     }
     for w in points.windows(2) {
         if norm(sub(w[1], w[0])) < 1e-6 {
@@ -142,13 +166,52 @@ pub fn pieces(points: &[V2], radii: &[f64]) -> Result<Vec<Piece>> {
         if delta.abs() < 1e-9 {
             continue;
         }
-        let t = r * (delta.abs() / 2.0).tan();
+        let ls = spirals.get(i - 1).copied().unwrap_or(0.0);
+        if !(ls.is_finite() && ls >= 0.0) {
+            return Err(bad("a spiral length must be 0 or more"));
+        }
         let left = delta > 0.0;
-        let pc = [p[0] - u[0] * t, p[1] - u[1] * t];
-        let pt = [p[0] + v[0] * t, p[1] + v[1] * t];
+        let sgn = if left { 1.0 } else { -1.0 };
         let n = if left { [-u[1], u[0]] } else { [u[1], -u[0]] };
-        let centre = [pc[0] + n[0] * r, pc[1] + n[1] * r];
-        cuts[i] = Some(Cut { pc, pt, centre, radius: r, left, angle: delta.abs() });
+        let h0 = u[1].atan2(u[0]);
+        let arc_from = |start: V2, heading: f64, angle: f64| -> Piece {
+            let nh = [-heading.sin() * sgn, heading.cos() * sgn];
+            let centre = [start[0] + nh[0] * r, start[1] + nh[1] * r];
+            let a0 = (start[1] - centre[1]).atan2(start[0] - centre[0]) + sgn * angle;
+            let end = [centre[0] + r * a0.cos(), centre[1] + r * a0.sin()];
+            Piece::Arc { start, end, centre, radius: r, left, angle, length: r * angle }
+        };
+        if ls <= 0.0 {
+            let t = r * (delta.abs() / 2.0).tan();
+            let pc = [p[0] - u[0] * t, p[1] - u[1] * t];
+            let pt = [p[0] + v[0] * t, p[1] + v[1] * t];
+            let arc = arc_from(pc, h0, delta.abs());
+            let _ = n;
+            cuts[i] = Some(Cut { pc, pt, pieces: vec![arc] });
+            used[i] = t;
+            continue;
+        }
+        // Spiral, arc, spiral: each spiral turns ls / 2r; the arc takes the rest of the turn.
+        let ts = ls / (2.0 * r);
+        if 2.0 * ts >= delta.abs() - 1e-9 {
+            return Err(bad(format!("the spirals at point {} turn {:.1}° between them, more than the {:.1}° corner: shorter spirals or a larger radius", i + 1, (2.0 * ts).to_degrees(), delta.abs().to_degrees())));
+        }
+        let e = spiral_point(0.0, 0.0, 1.0 / r, ls, ls);
+        let (xs, ys) = (e[0], e[1]);
+        let shift = ys - r * (1.0 - ts.cos());
+        let k = xs - r * ts.sin();
+        let t = (r + shift) * (delta.abs() / 2.0).tan() + k;
+        let ts_point = [p[0] - u[0] * t, p[1] - u[1] * t];
+        let st_point = [p[0] + v[0] * t, p[1] + v[1] * t];
+        let sc = [ts_point[0] + u[0] * xs + n[0] * ys, ts_point[1] + u[1] * xs + n[1] * ys];
+        let entry = Piece::Spiral { start: ts_point, end: sc, heading: h0, k0: 0.0, k1: sgn / r, length: ls };
+        let arc = arc_from(sc, h0 + sgn * ts, delta.abs() - 2.0 * ts);
+        let cs = match arc {
+            Piece::Arc { end, .. } => end,
+            _ => unreachable!(),
+        };
+        let exit = Piece::Spiral { start: cs, end: st_point, heading: h0 + sgn * (delta.abs() - ts), k0: sgn / r, k1: 0.0, length: ls };
+        cuts[i] = Some(Cut { pc: ts_point, pt: st_point, pieces: vec![entry, arc, exit] });
         used[i] = t;
     }
     for i in 0..points.len() - 1 {
@@ -160,14 +223,14 @@ pub fn pieces(points: &[V2], radii: &[f64]) -> Result<Vec<Piece>> {
     let mut out = Vec::new();
     let mut from = points[0];
     for i in 1..points.len() {
-        let to = cuts[i].map_or(points[i], |c| c.pc);
+        let to = cuts[i].as_ref().map_or(points[i], |c| c.pc);
         let l = norm(sub(to, from));
         if l > 1e-9 {
             out.push(Piece::Line { start: from, end: to, length: l });
         }
-        if let Some(Cut { pc, pt, centre, radius, left, angle }) = cuts[i] {
-            out.push(Piece::Arc { start: pc, end: pt, centre, radius, left, angle, length: radius * angle });
-            from = pt;
+        if let Some(c) = cuts[i].take() {
+            out.extend(c.pieces);
+            from = c.pt;
         } else {
             from = to;
         }
@@ -235,7 +298,7 @@ pub struct Alignment {
 
 impl Alignment {
     pub fn of(r: AlignmentRecipe) -> Result<Self> {
-        let pieces = pieces(&r.points, &r.radii)?;
+        let pieces = pieces(&r.points, &r.radii, &r.spirals)?;
         let length = pieces.iter().map(Piece::length).sum();
         Ok(Alignment { recipe: r, pieces, length })
     }
@@ -272,6 +335,27 @@ impl Alignment {
                     let t = (w[0] * d[0] + w[1] * d[1]).clamp(0.0, *length);
                     (t, d[0] * w[1] - d[1] * w[0])
                 }
+                Piece::Spiral { length, .. } => {
+                    // Nearest of points every 0.5 m, then refined by halving.
+                    let d2 = |t: f64| {
+                        let (pt, _) = p.at(t);
+                        (pt[0] - q[0]).powi(2) + (pt[1] - q[1]).powi(2)
+                    };
+                    let n = ((length / 0.5).ceil() as usize).max(2);
+                    let mut best_t = (0..=n).map(|k| length * k as f64 / n as f64).min_by(|a, b| d2(*a).total_cmp(&d2(*b))).unwrap_or(0.0);
+                    let mut step = length / n as f64;
+                    for _ in 0..40 {
+                        step /= 2.0;
+                        for c in [best_t - step, best_t + step] {
+                            if (0.0..=*length).contains(&c) && d2(c) < d2(best_t) {
+                                best_t = c;
+                            }
+                        }
+                    }
+                    let (pt, d) = p.at(best_t);
+                    let w = sub(q, pt);
+                    (best_t, d[0] * w[1] - d[1] * w[0])
+                }
                 Piece::Arc { start, centre, radius, left, angle, .. } => {
                     let a0 = (start[1] - centre[1]).atan2(start[0] - centre[0]);
                     let aq = (q[1] - centre[1]).atan2(q[0] - centre[0]);
@@ -302,7 +386,7 @@ impl Alignment {
         for p in &self.pieces {
             let n = match p {
                 Piece::Line { .. } => 1,
-                Piece::Arc { length, .. } => ((length / step).ceil() as usize).max(2),
+                Piece::Arc { length, .. } | Piece::Spiral { length, .. } => ((length / step).ceil() as usize).max(2),
             };
             for k in 1..=n {
                 out.push(p.at(p.length() * k as f64 / n as f64).0);
@@ -321,6 +405,9 @@ pub struct CreateParams {
     /// The curve radius at each interior point (0: none).
     #[serde(default)]
     pub radii: Vec<f64>,
+    /// The transition spiral each side of each interior point's curve (m; 0 or omitted: none).
+    #[serde(default)]
+    pub spirals: Vec<f64>,
     /// The chainage at the first point (default 0).
     #[serde(default)]
     pub start_station: f64,
@@ -348,7 +435,7 @@ pub(crate) fn create(txn: &mut Transaction<'_>, p: CreateParams) -> Result<Creat
         return Err(bad("points and stations must be finite"));
     }
     check_profile(&p.profile)?;
-    let r = AlignmentRecipe { kind: RECIPE.into(), level: guid, points: p.points, radii: p.radii, start_station: p.start_station, profile: p.profile };
+    let r = AlignmentRecipe { kind: RECIPE.into(), level: guid, points: p.points, radii: p.radii, spirals: p.spirals, start_station: p.start_station, profile: p.profile };
     let a = Alignment::of(r.clone())?;
     let n = store.iter().filter(|e| recipe(e).is_some()).count() + 1;
     let id = txn.create(
@@ -425,6 +512,8 @@ pub struct NoParams {}
 pub struct CurveInfo {
     pub radius: f64,
     pub length: f64,
+    /// The transition spiral each side (m; 0: none).
+    pub spiral: f64,
     /// Its chainage where it starts and ends, and whether it turns left.
     pub start_station: f64,
     pub end_station: f64,
@@ -457,9 +546,15 @@ pub(crate) fn list(store: &Store, _: Option<NoParams>) -> Result<Vec<Info>> {
         .map(|(id, a)| {
             let mut s0 = a.recipe.start_station;
             let mut curves = Vec::new();
+            let mut spiral = 0.0;
             for p in &a.pieces {
-                if let Piece::Arc { radius, left, length, .. } = p {
-                    curves.push(CurveInfo { radius: *radius, length: *length, start_station: s0, end_station: s0 + length, left: *left });
+                match p {
+                    Piece::Spiral { length, k0, .. } if *k0 == 0.0 => spiral = *length,
+                    Piece::Arc { radius, left, length, .. } => {
+                        curves.push(CurveInfo { radius: *radius, length: *length, spiral, start_station: s0 - spiral, end_station: s0 + length + spiral, left: *left });
+                        spiral = 0.0;
+                    }
+                    _ => {}
                 }
                 s0 += p.length();
             }

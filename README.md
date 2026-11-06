@@ -439,12 +439,13 @@ Create … Boundary* tab:
   `toposolid.simplify`, `site.set_settings`, `propertyline.create`, `sitecomponent.place`;
   ARC-TOPO-001 … 005, ARC-SITE-001).
 - **Alignments** (Massing & Site › Alignment; ARC-ALN-001): a route set out by chainage, made
-  of straights and circular curves fitted at points of intersection, with a vertical profile of
+  of straights and circular curves fitted at points of intersection, eased in and out by transition
+  spirals where given, with a vertical profile of
   grades and parabolic curves. It is drawn in plans with chainage ticks, and read back by
   chainage and offset (`alignment.create`, `alignment.point_at`, `alignment.station_of`,
   `alignment.list`). It is the shared foundation for roads, drives and guideway devices. In an IFC 4.3
   project (File › New IFC 4.3 Project) it is saved as an `IfcAlignment` with its horizontal and
-  vertical layouts (ARC-ALN-002). Not built yet: spirals and cant, the alignment's IFC geometry,
+  vertical layouts (ARC-ALN-002). Not built yet: cant, the IFC geometry of spirals and of the profile,
   placing elements by chainage, road cross sections and corridors.
 - **Parts** (Modify › Parts): walls split into one part per layer (openings and joins
   included) and floors, ceilings, roofs, columns and beams into one part each, following their

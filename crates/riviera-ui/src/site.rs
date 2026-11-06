@@ -343,16 +343,19 @@ impl Gui {
             return super::error(&frame, "The model has no level.");
         };
         let nums = |line: &str| -> Vec<f64> { line.split([',', ' ', '\t']).filter_map(|s| s.trim().parse().ok()).collect() };
-        let (points, radii): (Vec<[f64; 2]>, Vec<f64>) = if let Some(chain) = self.selected_chain() {
+        let (points, radii, spirals): (Vec<[f64; 2]>, Vec<f64>, Vec<f64>) = if let Some(chain) = self.selected_chain() {
             let n = chain.len().saturating_sub(2);
-            let Some(r) = super::notes::ask_text(&frame, "Alignment: the curve radius at each of the inner corners, in metres (0: none), one a row", &"0\n".repeat(n)) else { return };
-            (chain, r.lines().filter_map(|l| l.trim().parse().ok()).collect())
+            let Some(r) = super::notes::ask_text(&frame, "Alignment: at each inner corner, one a row, the curve radius and the transition spiral each side, in metres (0: none)", &"0, 0\n".repeat(n)) else { return };
+            let rows: Vec<Vec<f64>> = r.lines().map(nums).filter(|v| !v.is_empty()).collect();
+            (chain, rows.iter().map(|v| v[0]).collect(), rows.iter().map(|v| v.get(1).copied().unwrap_or(0.0)).collect())
         } else {
-            let Some(text) = super::notes::ask_text(&frame, "Alignment: one point of intersection a row, x, y in metres, and the curve radius at inner corners (or select model lines first)", "0, 0\n100, 0, 30\n100, 100\n") else { return };
+            let Some(text) = super::notes::ask_text(&frame, "Alignment: one point of intersection a row, x, y in metres, and at inner corners the curve radius and the transition spiral each side (or select model lines first)", "0, 0\n100, 0, 30\n100, 100\n") else { return };
             let rows: Vec<Vec<f64>> = text.lines().map(nums).filter(|v| v.len() >= 2).collect();
             let n = rows.len();
-            let radii = rows.iter().enumerate().filter(|(i, _)| *i > 0 && *i + 1 < n).map(|(_, r)| r.get(2).copied().unwrap_or(0.0)).collect();
-            (rows.iter().map(|r| [r[0], r[1]]).collect(), radii)
+            let inner: Vec<&Vec<f64>> = rows.iter().enumerate().filter(|(i, _)| *i > 0 && *i + 1 < n).map(|(_, r)| r).collect();
+            let radii = inner.iter().map(|r| r.get(2).copied().unwrap_or(0.0)).collect();
+            let spirals = inner.iter().map(|r| r.get(3).copied().unwrap_or(0.0)).collect();
+            (rows.iter().map(|r| [r[0], r[1]]).collect(), radii, spirals)
         };
         let Some(profile) = super::notes::ask_text(&frame, "Alignment: its vertical profile, one point a row: chainage, elevation and the vertical curve's length (empty: flat)", "") else { return };
         let profile: Vec<Value> = profile
@@ -361,7 +364,7 @@ impl Gui {
             .filter(|v| v.len() >= 2)
             .map(|v| json!({ "station": v[0], "elevation": v[1], "curve": v.get(2).copied().filter(|c| *c > 0.0) }))
             .collect();
-        let args = json!({ "level": level, "points": points, "radii": radii, "profile": profile });
+        let args = json!({ "level": level, "points": points, "radii": radii, "spirals": spirals, "profile": profile });
         if let Some(v) = self.site_run("alignment.create", args, "Alignment made") {
             frame.set_status_text(&format!("Alignment made: {:.2} m, chainage {:.2} to {:.2}", v["length"].as_f64().unwrap_or(0.0), v["start_station"].as_f64().unwrap_or(0.0), v["end_station"].as_f64().unwrap_or(0.0)), 0);
         }

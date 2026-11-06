@@ -284,6 +284,7 @@ pub(crate) fn create(txn: &mut Transaction<'_>, p: CreateParams) -> Result<Creat
             level: ElementRef::Id(lb.id),
             points: vec![b, t],
             radii: Vec::new(),
+            spirals: Vec::new(),
             start_station: 0.0,
             profile: vec![crate::alignments::Pvi { station: 0.0, elevation: 0.0, curve: None }, crate::alignments::Pvi { station: run, elevation: rise, curve: None }],
             name: Some("Inclined Elevator Track".into()),

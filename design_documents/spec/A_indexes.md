@@ -698,7 +698,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `agent_preset.list` | 1 | `preset` / `preset_id` (Lua and UI only) | `presets[]` / `()` | No | UI-AGENT-004 |
 | `agent_preset.set` | 1 | `preset` / `preset_id` (Lua and UI only) | `presets[]` / `()` | No | UI-AGENT-004 |
 | `air_terminal.place` | 4 | type_id, point \ | duct_face_ref, level, flow? | id | Yes |
-| `alignment.create` | 3 | level, points[], radii?[], start_station?, profile?: [{station, elevation, curve?}], name? | {alignment, length, start_station, end_station} | Yes | ARC-ALN-001 |
+| `alignment.create` | 3 | level, points[], radii?[], spirals?[], start_station?, profile?: [{station, elevation, curve?}], name? | {alignment, length, start_station, end_station} | Yes | ARC-ALN-001 |
 | `alignment.list` | 3 | — | [{alignment, level, length, start_station, end_station, curves[], elevations}] | No (query) | ARC-ALN-001 |
 | `alignment.point_at` | 3 | alignment_id, station, offset? | {point, elevation, direction, grade} | No (query) | ARC-ALN-001 |
 | `alignment.station_of` | 3 | alignment_id, point | {station, offset} | No (query) | ARC-ALN-001 |

@@ -29424,29 +29424,33 @@ CREATE TABLE base_rxd (
 <p><strong>Purpose.</strong> A route along the ground, set out by chainage: the shared foundation for roads and drives (research/17), and later for funiculars, inclined elevators, people movers and ropeways (VERTICAL_TRANSPORT_PLAN §7–8). Things are placed along it by chainage and offset.</p>
 <p><strong>Behaviour &amp; rules.</strong>
 - <strong>Horizontal layout:</strong> points of intersection (PIs) in plan. Each interior PI may have a <strong>circular curve</strong> of a given radius, tangent to both legs, so the layout is tangent lines and arcs. A radius too large for its legs (its tangent length longer than the room either side) is refused (<code>alignment.invalid</code>).
+- <strong>Transition spirals:</strong> a curve may be eased in and out by a clothoid <code>spirals[i]</code> long each side (0: none). Over a spiral the curvature changes evenly from 0 (the straight) to 1/R (the curve), and back on the far side.
+  - The curve is shifted inward to make room, and the tangent length becomes (R + p)·tan(Δ/2) + k, where p is the shift and k the advance of the spiral's start.
+  - Spirals that turn more than the corner between them (2 × L ÷ 2R ≥ Δ) are refused.
 - <strong>Chainage (stationing):</strong> measured along the horizontal layout from <code>start_station</code> (default 0) at the first PI.
 - <strong>Vertical profile</strong> (optional): vertical PIs as <code>{station, elevation}</code> in increasing chainage, each interior one with an optional symmetric <strong>parabolic vertical curve</strong> of a given length. Grades are straight between. Without a profile the alignment lies at elevation 0 relative to its level.
-- <code>alignment.create(level, points: [[x, y]], radii?: [m], start_station?, profile?: [{station, elevation, curve?}], name?)</code> makes it. <code>radii</code> gives one radius per interior PI (0: no curve).
+- <code>alignment.create(level, points: [[x, y]], radii?: [m], spirals?: [m], start_station?, profile?: [{station, elevation, curve?}], name?)</code> makes it. <code>radii</code> gives one radius per interior PI (0: no curve), and <code>spirals</code> one transition length per interior PI.
 - <code>alignment.point_at(alignment_id, station, offset?)</code> gives the plan point at that chainage, moved <code>offset</code> metres to the left (positive) or right (negative), with its elevation, the direction and the grade.
 - <code>alignment.station_of(alignment_id, point)</code> gives the chainage and offset of the nearest point on the alignment.
 - <code>alignment.list</code> gives each one's level, length, start and end chainage, its curves (radius, arc length) and its elevation range.
 - <strong>Drawing:</strong> in plans whose range takes in its level, as a dash-dot centreline with a tick across it every 20 m of chainage (longer every 100 m). The Modify tools move, rotate, mirror and copy it; its curves follow its points.
-- <strong>In the window:</strong> Massing &amp; Site › <em>Alignment</em>: the selected model lines (joined end to end) as the PIs, or a typed table of PIs (<code>x, y[, radius]</code> a row), then an optional typed profile (<code>station, elevation[, curve length]</code> a row).</p>
+- <strong>In the window:</strong> Massing &amp; Site › <em>Alignment</em>: the selected model lines (joined end to end) as the PIs, or a typed table of PIs (<code>x, y[, radius[, spiral]]</code> a row), then an optional typed profile (<code>station, elevation[, curve length]</code> a row).</p>
 <p><strong>Data (IFC mapping).</strong> First build: <code>IfcAnnotation</code> (<code>ObjectType = "Alignment"</code>), its definition in RXD element data (<code>recipe.alignment</code>), in IFC4 and IFC4X3 projects alike. Not yet: <code>IfcAlignment</code> with <code>IfcAlignmentHorizontal</code>/<code>IfcAlignmentVertical</code> segments and <code>IfcLinearPlacement</code> in IFC4X3 projects (ARC-ALN-002).</p>
 <p><strong>Acceptance criteria.</strong>
 - [x] An L-shaped alignment, 100 m east and 100 m north with a 30 m curve at the corner, is 200 − 2 × 30 + 30 × π ÷ 2 m long; the point at the chainage half way round the curve lies 30 m from its centre; a point 5 m off to the left reports that offset and its chainage back.
 - [x] With a profile rising from 0 to 10 m over 200 m with a 100 m vertical curve at a high point, the elevations at the PVIs' chainages away from the curve match the straight grades, and the curve's top is below the PVI by A × L ÷ 8.
-- [x] A radius too large for its legs is refused.</p>
-<p><em>Built (2026-11-05):</em> <code>riviera_core::alignments</code>, drawn in plans, the Alignment action; the sample <em>A drive set out by chainage</em>. Not yet: chainage labels in plans, spirals (clothoids) and cant, IFC 4.3 <code>IfcAlignment</code> export and import (ARC-ALN-002), elements placed by chainage and offset (roads, drives, guideway devices), cross sections and corridors, editing the PIs with grips.</p>
+- [x] A radius too large for its legs is refused.
+- [x] A 45° corner with a 100 m curve and 40 m spirals, walked every half metre, has no jumps, its curvature never above 1/R and about 1/2R half way along a spiral; it ends exactly on its last point, lists its spirals, and reads back a point 3 m beside a spiral as that chainage and offset. Spirals that turn more than the corner are refused.</p>
+<p><em>Built (2026-11-05):</em> <code>riviera_core::alignments</code>, drawn in plans, the Alignment action; the sample <em>A drive set out by chainage</em>. Spirals added the same day. Not yet: chainage labels in plans, cant, IFC 4.3 <code>IfcAlignment</code> export and import (ARC-ALN-002), elements placed by chainage and offset (roads, drives, guideway devices), cross sections and corridors, editing the PIs with grips.</p>
 <h3 id="31112-alignments-in-ifc-43">3.11.12 Alignments in IFC 4.3</h3>
 <p><strong>ID:</strong> <code class="rid" id="ARC-ALN-002">ARC-ALN-002</code> · <strong>Priority:</strong> <span class="pri pri-p2">P2</span> · <strong>Ref:</strong> ARC-ALN-001; IFC 4.3 ADD2 alignment entities; EXPERT_REVIEW E-96</p>
 <p><strong>Purpose.</strong> Write alignments as IFC 4.3's own <code>IfcAlignment</code>, so that road, rail and infrastructure tools read them as alignments.</p>
 <p><strong>Behaviour &amp; rules.</strong>
 - In an IFC4X3 project (File › <em>New IFC 4.3 Project</em>, or <code>file.new</code> with <code>schema: "IFC4X3"</code>), an alignment is written as an <code>IfcAlignment</code> instead of the <code>IfcAnnotation</code> used in IFC4 projects. Its recipe (<code>recipe.alignment</code>) is kept with it, and it reads back as the same alignment.
 - Its layouts are derived from the recipe at every save and nested in it (<code>IfcRelNests</code>):
-  - an <code>IfcAlignmentHorizontal</code> of <code>IfcAlignmentSegment</code>s whose design parameters are <code>IfcAlignmentHorizontalSegment</code>s: <code>LINE</code> (radius 0) or <code>CIRCULARARC</code> (radius positive turning left, negative right), each with its start point, start direction (radians) and length;
+  - an <code>IfcAlignmentHorizontal</code> of <code>IfcAlignmentSegment</code>s whose design parameters are <code>IfcAlignmentHorizontalSegment</code>s: <code>LINE</code> (radius 0), <code>CIRCULARARC</code> (radius positive turning left, negative right) or <code>CLOTHOID</code> (start and end radii, 0 at its straight end), each with its start point, start direction (radians) and length;
   - with a profile, an <code>IfcAlignmentVertical</code> of <code>CONSTANTGRADIENT</code> and <code>PARABOLICARC</code> <code>IfcAlignmentVerticalSegment</code>s, each with its distance along the horizontal layout from its start, horizontal length, start height, start and end gradients and, for a curve, its length over its change of grade as the radius of curvature.
-- <strong>Geometry:</strong> the alignment gets a placement at the origin and an <code>Axis</code> / <code>Curve2D</code> representation: an <code>IfcCompositeCurve</code> of <code>IfcCurveSegment</code>s, one a piece.
+- <strong>Geometry:</strong> the alignment gets a placement at the origin and an <code>Axis</code> / <code>Curve2D</code> representation: an <code>IfcCompositeCurve</code> of <code>IfcCurveSegment</code>s, one a piece. An alignment with spirals gets no representation yet: how IFC 4.3 places a clothoid's parent curve (its constant's sign, the part before its origin) is not settled here, and wrong geometry would be worse than none (E-96).
   - A line is an <code>IfcLine</code> and an arc an <code>IfcCircle</code> of its radius, each cut from length 0.
   - Each is placed at the piece's start point with its start direction as <code>RefDirection</code>, as the segment's start is its placement's reference point.
   - A clockwise arc's <code>SegmentLength</code> is negative: it runs against the circle's sense.
@@ -29459,7 +29463,7 @@ CREATE TABLE base_rxd (
 - [x] An IFC4X3 project's alignment of a line, a 30 m left-hand curve and a line, with a profile of two grades and a parabolic curve, is written as one <code>IfcAlignment</code> with one horizontal and one vertical layout of three segments each (the curve's radius +30), once after two saves; opened again it is the same alignment, and saved again it is not doubled.
 - [x] In an IFC4 project the same alignment is an <code>IfcAnnotation</code> and no alignment entities are written.
 - [x] The IFC4X3 alignment has an <code>Axis</code> <code>Curve2D</code> representation of one composite curve of three curve segments (one an <code>IfcCircle</code>), a STATION referent with <code>Pset_Stationing.Station</code> 1000, a placement, and aggregation in the project, once after saving, reopening and saving again.</p>
-<p><em>Built (2026-11-05):</em> <code>riviera_store::alignments</code>, File › New IFC 4.3 Project; the sample <em>A drive set out by chainage</em> is an IFC 4.3 project. Not yet: the vertical geometry (<code>IfcGradientCurve</code> over the composite curve), linear placements for referents and elements along the alignment, spirals (<code>IfcClothoid</code>), <code>IfcAlignmentCant</code>, reading other tools' <code>IfcAlignment</code>s without a recipe. The curve-segment conventions follow the IFC 4.3 documentation's attribute definitions; validation against bSI's checker is still to be done (E-96).</p>
+<p><em>Built (2026-11-05):</em> <code>riviera_store::alignments</code>, File › New IFC 4.3 Project; the sample <em>A drive set out by chainage</em> is an IFC 4.3 project. Not yet: the vertical geometry (<code>IfcGradientCurve</code> over the composite curve), linear placements for referents and elements along the alignment, the geometry of spirals (<code>IfcClothoid</code>), <code>IfcAlignmentCant</code>, reading other tools' <code>IfcAlignment</code>s without a recipe. The curve-segment conventions follow the IFC 4.3 documentation's attribute definitions; validation against bSI's checker is still to be done (E-96).</p>
 
 <h2 id="312-modify-tools">3.12 Modify tools</h2>
 <p>These tools are on the <strong>Modify</strong> tab and are repeated on every <code>Modify | &lt;Element&gt;</code> contextual tab. All of them support both invocation orders (ARC-TOOL-001). Their options sit on the contextual tab and are remembered for the session. The common rules in ARC-MOD-000 apply to all of them.</p>
@@ -33354,7 +33358,7 @@ CREATE TABLE base_rxd (
 </tr>
 <tr>
 <td><code>alignment.create</code></td>
-<td>level, points[], radii?[], start_station?, profile?: [{station, elevation, curve?}], name?</td>
+<td>level, points[], radii?[], spirals?[], start_station?, profile?: [{station, elevation, curve?}], name?</td>
 <td>{alignment, length, start_station, end_station}</td>
 <td>Yes</td>
 <td>ARC-ALN-001</td>
@@ -57851,7 +57855,7 @@ Ownership is advisory, so step 7 is what gives it force at merge time.</p>
 <tr>
 <td><code>alignment.create</code></td>
 <td>3</td>
-<td>level, points[], radii?[], start_station?, profile?: [{station, elevation, curve?}], name?</td>
+<td>level, points[], radii?[], spirals?[], start_station?, profile?: [{station, elevation, curve?}], name?</td>
 <td>{alignment, length, start_station, end_station}</td>
 <td>Yes</td>
 <td>ARC-ALN-001</td>

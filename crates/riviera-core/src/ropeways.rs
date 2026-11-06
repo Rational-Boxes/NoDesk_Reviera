@@ -159,7 +159,7 @@ pub(crate) fn create(txn: &mut Transaction<'_>, p: CreateParams) -> Result<Creat
     let guid = store.get(aid).expect("resolved").guid().to_string();
     let (level_id, z0) = crate::levels::list(store).into_iter().find(|l| l.guid == rec.level).map(|l| (l.id, l.elevation)).ok_or_else(|| bad("vt.invalid", "the alignment's level is gone"))?;
     let a = Alignment::of(rec)?;
-    if a.pieces.iter().any(|p| matches!(p, Piece::Arc { .. })) {
+    if a.pieces.iter().any(|p| !matches!(p, Piece::Line { .. })) {
         return Err(bad("vt.invalid", "a ropeway runs in straight legs: give its alignment corners without curves (each corner becomes an angle station)"));
     }
     let gauge = p.gauge.unwrap_or(GAUGE);

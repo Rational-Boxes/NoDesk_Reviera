@@ -5741,14 +5741,17 @@ All family-editor commands from the DM chapter can be used inside the session.
 
 **Behaviour & rules.**
 - **Horizontal layout:** points of intersection (PIs) in plan. Each interior PI may have a **circular curve** of a given radius, tangent to both legs, so the layout is tangent lines and arcs. A radius too large for its legs (its tangent length longer than the room either side) is refused (`alignment.invalid`).
+- **Transition spirals:** a curve may be eased in and out by a clothoid `spirals[i]` long each side (0: none). Over a spiral the curvature changes evenly from 0 (the straight) to 1/R (the curve), and back on the far side.
+  - The curve is shifted inward to make room, and the tangent length becomes (R + p)·tan(Δ/2) + k, where p is the shift and k the advance of the spiral's start.
+  - Spirals that turn more than the corner between them (2 × L ÷ 2R ≥ Δ) are refused.
 - **Chainage (stationing):** measured along the horizontal layout from `start_station` (default 0) at the first PI.
 - **Vertical profile** (optional): vertical PIs as `{station, elevation}` in increasing chainage, each interior one with an optional symmetric **parabolic vertical curve** of a given length. Grades are straight between. Without a profile the alignment lies at elevation 0 relative to its level.
-- `alignment.create(level, points: [[x, y]], radii?: [m], start_station?, profile?: [{station, elevation, curve?}], name?)` makes it. `radii` gives one radius per interior PI (0: no curve).
+- `alignment.create(level, points: [[x, y]], radii?: [m], spirals?: [m], start_station?, profile?: [{station, elevation, curve?}], name?)` makes it. `radii` gives one radius per interior PI (0: no curve), and `spirals` one transition length per interior PI.
 - `alignment.point_at(alignment_id, station, offset?)` gives the plan point at that chainage, moved `offset` metres to the left (positive) or right (negative), with its elevation, the direction and the grade.
 - `alignment.station_of(alignment_id, point)` gives the chainage and offset of the nearest point on the alignment.
 - `alignment.list` gives each one's level, length, start and end chainage, its curves (radius, arc length) and its elevation range.
 - **Drawing:** in plans whose range takes in its level, as a dash-dot centreline with a tick across it every 20 m of chainage (longer every 100 m). The Modify tools move, rotate, mirror and copy it; its curves follow its points.
-- **In the window:** Massing & Site › *Alignment*: the selected model lines (joined end to end) as the PIs, or a typed table of PIs (`x, y[, radius]` a row), then an optional typed profile (`station, elevation[, curve length]` a row).
+- **In the window:** Massing & Site › *Alignment*: the selected model lines (joined end to end) as the PIs, or a typed table of PIs (`x, y[, radius[, spiral]]` a row), then an optional typed profile (`station, elevation[, curve length]` a row).
 
 **Data (IFC mapping).** First build: `IfcAnnotation` (`ObjectType = "Alignment"`), its definition in RXD element data (`recipe.alignment`), in IFC4 and IFC4X3 projects alike. Not yet: `IfcAlignment` with `IfcAlignmentHorizontal`/`IfcAlignmentVertical` segments and `IfcLinearPlacement` in IFC4X3 projects (ARC-ALN-002).
 
@@ -5756,8 +5759,9 @@ All family-editor commands from the DM chapter can be used inside the session.
 - [x] An L-shaped alignment, 100 m east and 100 m north with a 30 m curve at the corner, is 200 − 2 × 30 + 30 × π ÷ 2 m long; the point at the chainage half way round the curve lies 30 m from its centre; a point 5 m off to the left reports that offset and its chainage back.
 - [x] With a profile rising from 0 to 10 m over 200 m with a 100 m vertical curve at a high point, the elevations at the PVIs' chainages away from the curve match the straight grades, and the curve's top is below the PVI by A × L ÷ 8.
 - [x] A radius too large for its legs is refused.
+- [x] A 45° corner with a 100 m curve and 40 m spirals, walked every half metre, has no jumps, its curvature never above 1/R and about 1/2R half way along a spiral; it ends exactly on its last point, lists its spirals, and reads back a point 3 m beside a spiral as that chainage and offset. Spirals that turn more than the corner are refused.
 
-*Built (2026-11-05):* `riviera_core::alignments`, drawn in plans, the Alignment action; the sample *A drive set out by chainage*. Not yet: chainage labels in plans, spirals (clothoids) and cant, IFC 4.3 `IfcAlignment` export and import (ARC-ALN-002), elements placed by chainage and offset (roads, drives, guideway devices), cross sections and corridors, editing the PIs with grips.
+*Built (2026-11-05):* `riviera_core::alignments`, drawn in plans, the Alignment action; the sample *A drive set out by chainage*. Spirals added the same day. Not yet: chainage labels in plans, cant, IFC 4.3 `IfcAlignment` export and import (ARC-ALN-002), elements placed by chainage and offset (roads, drives, guideway devices), cross sections and corridors, editing the PIs with grips.
 
 ### 3.11.12 Alignments in IFC 4.3
 **ID:** ARC-ALN-002 · **Priority:** P2 · **Ref:** ARC-ALN-001; IFC 4.3 ADD2 alignment entities; EXPERT_REVIEW E-96
@@ -5767,9 +5771,9 @@ All family-editor commands from the DM chapter can be used inside the session.
 **Behaviour & rules.**
 - In an IFC4X3 project (File › *New IFC 4.3 Project*, or `file.new` with `schema: "IFC4X3"`), an alignment is written as an `IfcAlignment` instead of the `IfcAnnotation` used in IFC4 projects. Its recipe (`recipe.alignment`) is kept with it, and it reads back as the same alignment.
 - Its layouts are derived from the recipe at every save and nested in it (`IfcRelNests`):
-  - an `IfcAlignmentHorizontal` of `IfcAlignmentSegment`s whose design parameters are `IfcAlignmentHorizontalSegment`s: `LINE` (radius 0) or `CIRCULARARC` (radius positive turning left, negative right), each with its start point, start direction (radians) and length;
+  - an `IfcAlignmentHorizontal` of `IfcAlignmentSegment`s whose design parameters are `IfcAlignmentHorizontalSegment`s: `LINE` (radius 0), `CIRCULARARC` (radius positive turning left, negative right) or `CLOTHOID` (start and end radii, 0 at its straight end), each with its start point, start direction (radians) and length;
   - with a profile, an `IfcAlignmentVertical` of `CONSTANTGRADIENT` and `PARABOLICARC` `IfcAlignmentVerticalSegment`s, each with its distance along the horizontal layout from its start, horizontal length, start height, start and end gradients and, for a curve, its length over its change of grade as the radius of curvature.
-- **Geometry:** the alignment gets a placement at the origin and an `Axis` / `Curve2D` representation: an `IfcCompositeCurve` of `IfcCurveSegment`s, one a piece.
+- **Geometry:** the alignment gets a placement at the origin and an `Axis` / `Curve2D` representation: an `IfcCompositeCurve` of `IfcCurveSegment`s, one a piece. An alignment with spirals gets no representation yet: how IFC 4.3 places a clothoid's parent curve (its constant's sign, the part before its origin) is not settled here, and wrong geometry would be worse than none (E-96).
   - A line is an `IfcLine` and an arc an `IfcCircle` of its radius, each cut from length 0.
   - Each is placed at the piece's start point with its start direction as `RefDirection`, as the segment's start is its placement's reference point.
   - A clockwise arc's `SegmentLength` is negative: it runs against the circle's sense.
@@ -5784,7 +5788,7 @@ All family-editor commands from the DM chapter can be used inside the session.
 - [x] In an IFC4 project the same alignment is an `IfcAnnotation` and no alignment entities are written.
 - [x] The IFC4X3 alignment has an `Axis` `Curve2D` representation of one composite curve of three curve segments (one an `IfcCircle`), a STATION referent with `Pset_Stationing.Station` 1000, a placement, and aggregation in the project, once after saving, reopening and saving again.
 
-*Built (2026-11-05):* `riviera_store::alignments`, File › New IFC 4.3 Project; the sample *A drive set out by chainage* is an IFC 4.3 project. Not yet: the vertical geometry (`IfcGradientCurve` over the composite curve), linear placements for referents and elements along the alignment, spirals (`IfcClothoid`), `IfcAlignmentCant`, reading other tools' `IfcAlignment`s without a recipe. The curve-segment conventions follow the IFC 4.3 documentation's attribute definitions; validation against bSI's checker is still to be done (E-96).
+*Built (2026-11-05):* `riviera_store::alignments`, File › New IFC 4.3 Project; the sample *A drive set out by chainage* is an IFC 4.3 project. Not yet: the vertical geometry (`IfcGradientCurve` over the composite curve), linear placements for referents and elements along the alignment, the geometry of spirals (`IfcClothoid`), `IfcAlignmentCant`, reading other tools' `IfcAlignment`s without a recipe. The curve-segment conventions follow the IFC 4.3 documentation's attribute definitions; validation against bSI's checker is still to be done (E-96).
 
 ---
 
@@ -6918,7 +6922,7 @@ All commands below are registered once in the command registry and exposed autom
 | `toposolid.generate_from_surface` | surface_element_id, type_id, level_id | element_id | Yes | ARC-TOPO-006 |
 | `sitecomponent.place` | type_id, point, host_id?, rotation? | element_id | Yes | ARC-SITE-001 |
 | `propertyline.create` | loops \| table: [{distance, bearing, kind, radius?, side?}], origin? | element_id | Yes | ARC-SITE-001 |
-| `alignment.create` | level, points[], radii?[], start_station?, profile?: [{station, elevation, curve?}], name? | {alignment, length, start_station, end_station} | Yes | ARC-ALN-001 |
+| `alignment.create` | level, points[], radii?[], spirals?[], start_station?, profile?: [{station, elevation, curve?}], name? | {alignment, length, start_station, end_station} | Yes | ARC-ALN-001 |
 | `alignment.point_at` | alignment_id, station, offset? | {point, elevation, direction, grade} | No (query) | ARC-ALN-001 |
 | `alignment.station_of` | alignment_id, point | {station, offset} | No (query) | ARC-ALN-001 |
 | `alignment.list` | — | [{alignment, level, length, start_station, end_station, curves[], elevations}] | No (query) | ARC-ALN-001 |

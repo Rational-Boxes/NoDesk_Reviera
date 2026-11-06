@@ -434,9 +434,9 @@ pub(crate) fn check(store: &Store, p: Option<CheckParams>) -> Result<Check> {
             let mut c0 = a.recipe.start_station;
             for p in &a.pieces {
                 let c1 = c0 + match p {
-                    Piece::Line { length, .. } | Piece::Arc { length, .. } => *length,
+                    Piece::Line { length, .. } | Piece::Arc { length, .. } | Piece::Spiral { length, .. } => *length,
                 };
-                if matches!(p, Piece::Arc { .. }) && c0 < s1 && c1 > s0 {
+                if matches!(p, Piece::Arc { .. } | Piece::Spiral { .. }) && c0 < s1 && c1 > s0 {
                     add("warning", "station on a curve", format!("{} stands on a curve: platforms are straight, for the gap to the doors", st.name));
                 }
                 c0 = c1;

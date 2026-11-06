@@ -1169,6 +1169,7 @@ fn the_alignment_drive_sample_keeps_its_curves_and_profile() {
     assert!((f(&a["start_station"]) - 1000.0).abs() < 1e-9 && (f(&a["length"]) - 187.91).abs() < 0.01);
     let z = ok(&mut app, "alignment.point_at", json!({ "alignment_id": a["alignment"], "station": 1040.0 }));
     assert!((f(&z["elevation"]) - 2.4).abs() < 1e-9, "{z:#}");
+    assert_eq!((list[1]["name"].as_str(), f(&list[1]["curves"][0]["spiral"])), (Some("Bypass"), 30.0));
 }
 
 #[test]

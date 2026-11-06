@@ -177,12 +177,17 @@ fn horizontal(ifc: &mut IfcModel, a: &Alignment, owner_history: Option<StepId>, 
     let layout = rooted(ifc, "IfcAlignmentHorizontal", owner_history, "Horizontal")?;
     let mut segments = Vec::new();
     for (k, p) in a.pieces.iter().enumerate() {
-        let (start, dir, radius, length, kind) = match p {
-            Piece::Line { start, end, length } => (*start, (end[1] - start[1]).atan2(end[0] - start[0]), 0.0, *length, "LINE"),
+        let (start, dir, (r0, r1), length, kind) = match p {
+            Piece::Line { start, end, length } => (*start, (end[1] - start[1]).atan2(end[0] - start[0]), (0.0, 0.0), *length, "LINE"),
+            // A spiral's radii (0: a straight end), positive turning left.
+            Piece::Spiral { start, heading, k0, k1, length, .. } => {
+                let inv = |k: f64| if k.abs() < 1e-12 { 0.0 } else { 1.0 / k };
+                (*start, *heading, (inv(*k0), inv(*k1)), *length, "CLOTHOID")
+            }
             Piece::Arc { start, centre, radius, left, length, .. } => {
                 let a0 = (start[1] - centre[1]).atan2(start[0] - centre[0]);
                 let dir = if *left { a0 + std::f64::consts::FRAC_PI_2 } else { a0 - std::f64::consts::FRAC_PI_2 };
-                (*start, dir, if *left { *radius } else { -*radius }, *length, "CIRCULARARC")
+                (*start, dir, if *left { (*radius, *radius) } else { (-*radius, -*radius) }, *length, "CIRCULARARC")
             }
         };
         let point = create(ifc, "IfcCartesianPoint", &[("Coordinates", AttrValue::List(vec![AttrValue::Real(start[0] / scale), AttrValue::Real(start[1] / scale)]))])?;
@@ -192,8 +197,8 @@ fn horizontal(ifc: &mut IfcModel, a: &Alignment, owner_history: Option<StepId>, 
             &[
                 ("StartPoint", r(point)),
                 ("StartDirection", AttrValue::Real(dir)),
-                ("StartRadiusOfCurvature", AttrValue::Real(radius / scale)),
-                ("EndRadiusOfCurvature", AttrValue::Real(radius / scale)),
+                ("StartRadiusOfCurvature", AttrValue::Real(r0 / scale)),
+                ("EndRadiusOfCurvature", AttrValue::Real(r1 / scale)),
                 ("SegmentLength", AttrValue::Real(length / scale)),
                 ("PredefinedType", e(kind)),
             ],
@@ -291,6 +296,7 @@ fn representation(ifc: &mut IfcModel, a: &Alignment, context: StepId, scale: f64
                 // Anticlockwise along the circle; a clockwise arc runs against it.
                 (*start, d, circle, if *left { *length } else { -*length })
             }
+            Piece::Spiral { .. } => unreachable!("alignments with spirals have no representation yet"),
         };
         let loc = point2(ifc, start, scale)?;
         let refd = dir2(ifc, dir)?;
@@ -355,12 +361,16 @@ pub(crate) fn write_alignments(ifc: &mut IfcModel, doc: &Document, steps: &HashM
         nest(ifc, owner_history, step, parts)?;
         let referent = stationing(ifc, &a, owner_history, scale)?;
         nest(ifc, owner_history, step, vec![referent])?;
-        // Its geometry, replaced at every save.
+        // Its geometry, replaced at every save. With spirals it is left out: how IFC 4.3 places a
+        // clothoid's parent curve is not settled here (E-96), and wrong geometry is worse than none.
         if let AttrValue::Ref(old) = ifc.attribute(step, "Representation")? {
             remove_tree(ifc, StepId(old))?;
+            ifc.set_attribute(step, "Representation", &AttrValue::Null)?;
         }
-        let shape = representation(ifc, &a, context, scale)?;
-        ifc.set_attribute(step, "Representation", &r(shape))?;
+        if !a.pieces.iter().any(|p| matches!(p, Piece::Spiral { .. })) {
+            let shape = representation(ifc, &a, context, scale)?;
+            ifc.set_attribute(step, "Representation", &r(shape))?;
+        }
         if ifc.attribute(step, "ObjectPlacement")? == AttrValue::Null {
             let placement = origin(ifc)?;
             ifc.set_attribute(step, "ObjectPlacement", &r(placement))?;
