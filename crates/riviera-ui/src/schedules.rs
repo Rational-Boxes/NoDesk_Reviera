@@ -198,23 +198,28 @@ impl Gui {
         }
     }
 
-    /// View › Schedules: a new schedule of a chosen category, opened.
+    /// View › Schedules: a new schedule of a chosen category, or an FF&E schedule of several
+    /// (DOC-SCH-016), opened.
     pub(crate) fn new_schedule(&mut self) {
         let frame = self.frame;
         let Some(doc) = self.doc else { return };
-        let names: Vec<&str> = CATEGORIES.iter().map(|c| c.1).collect();
+        const FFE: &str = "FF&E (furniture, casework, lighting, equipment)";
+        let names: Vec<&str> = std::iter::once(FFE).chain(CATEGORIES.iter().map(|c| c.1)).collect();
         let dialog =
             SingleChoiceDialog::builder(&frame, "Category:", "New Schedule", &names).build();
         if dialog.show_modal() != ID_OK {
             return;
         }
-        let Some(&(key, _)) = usize::try_from(dialog.get_selection())
-            .ok()
-            .and_then(|i| CATEGORIES.get(i))
-        else {
-            return;
+        let picked = usize::try_from(dialog.get_selection()).ok();
+        let made = if picked == Some(0) {
+            self.run("schedule.create_ffe", json!({}))
+        } else {
+            let Some(&(key, _)) = picked.and_then(|i| CATEGORIES.get(i.checked_sub(1)?)) else {
+                return;
+            };
+            self.run("schedule.create", json!({ "category": key }))
         };
-        match self.run("schedule.create", json!({ "category": key })) {
+        match made {
             Ok(v) => {
                 self.browser_stale = true;
                 self.open_view(doc, v.as_u64().map(ElementId));

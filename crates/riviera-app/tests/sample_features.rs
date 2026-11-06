@@ -1365,6 +1365,14 @@ fn the_guest_room_sample_keeps_its_bed_spaces_clear() {
     rules.sort();
     assert_eq!(rules, ["ADA 2010 806.2.3 left", "ADA 2010 806.2.3 right", "Bed foot", "Dresser front"]);
     assert_eq!(ok(&mut app, "rules.check", json!({})), json!([]));
+    // Its FF&E schedule: each type in the guest room counted (DOC-SCH-016).
+    let s = store(&app).iter().find(|e| e.name.as_deref() == Some("FF&E Schedule")).map(|e| e.id().0).expect("the FF&E schedule");
+    let table = ok(&mut app, "schedule.get_table", json!({ "schedule_id": s }));
+    let col = |n: &str| table["fields"].as_array().unwrap().iter().position(|f| f == n).unwrap();
+    let rows: Vec<(String, String)> = table["rows"].as_array().unwrap().iter().map(|r| (r["cells"][col("type")]["text"].as_str().unwrap().to_owned(), r["cells"][col("count")]["text"].as_str().unwrap().to_owned())).collect();
+    assert_eq!(rows.len(), 5, "{rows:?}");
+    assert!(rows.contains(&("Nightstand".to_owned(), "2".to_owned())), "{rows:?}");
+    assert!(table["rows"].as_array().unwrap().iter().all(|r| r["cells"][col("room")]["text"].as_str().unwrap().ends_with("Guest room")), "{table:#}");
     // Its check, kept as a report file (DOC-OUT-016).
     let page = work.path().join("guest-room-check.html");
     let w = ok(&mut app, "report.write", json!({ "command": "rules.check", "path": page, "title": "Guest room check" }));

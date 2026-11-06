@@ -490,6 +490,7 @@ pub(crate) fn create_schedule(txn: &mut crate::txn::Transaction<'_>, p: Schedule
     let id = crate::schedules::create(
         txn,
         crate::schedules::CreateParams {
+            categories: None,
             category: "cat.structural_rebar".into(),
             name: Some(p.name.unwrap_or_else(|| "Bar Bending Schedule".into())),
             fields: Some(fields.iter().map(|f| (*f).to_owned()).collect()),

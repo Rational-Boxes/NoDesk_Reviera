@@ -113,6 +113,7 @@ pub(crate) fn create(txn: &mut Transaction<'_>, p: CreateParams) -> Result<Eleme
     let taken: Vec<String> = store.iter().filter(|x| schedules::is_schedule(x)).filter_map(|x| x.name.clone()).collect();
     let name = std::iter::once(base.clone()).chain((2..).map(|n| format!("{base} {n}"))).find(|n| !taken.contains(n)).expect("a free name");
     let def = ScheduleDef {
+        categories: Vec::new(),
         kind: KIND_KEYNOTE_LEGEND.into(),
         category: String::new(),
         fields: fields_of(p.fields)?,

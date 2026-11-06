@@ -216,3 +216,52 @@ fn door_and_room_schedules_stay_live_and_edit_the_model() {
         .is_err()
     );
 }
+
+/// An FF&E schedule (DOC-SCH-016): furniture, casework, lighting and equipment of several
+/// categories in one table, counted by the room each piece stands in and its type.
+#[test]
+fn an_ffe_schedule_counts_furniture_by_room_and_type() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut app = App::new(AppConfig { live: None, untitled_dir: dir.path().join("u") });
+    run(&mut app, "file.new", json!({})).unwrap();
+    let level = run(&mut app, "level.list", json!({})).unwrap()[0]["id"].clone();
+    // Two rooms side by side, 4 × 4 m inside, numbered by Room placement.
+    let wall = |app: &mut App, a: [f64; 2], b: [f64; 2]| {
+        run(app, "wall.create", json!({ "curve": { "line": { "start": a, "end": b } }, "base_level": level, "top_constraint": { "unconnected": 2.7 } })).unwrap();
+    };
+    for (a, b) in [([0.0, 0.0], [8.2, 0.0]), ([8.2, 0.0], [8.2, 4.2]), ([8.2, 4.2], [0.0, 4.2]), ([0.0, 4.2], [0.0, 0.0]), ([4.1, 0.0], [4.1, 4.2])] {
+        wall(&mut app, a, b);
+    }
+    run(&mut app, "room.place", json!({ "level_id": level, "point": [2.0, 2.0] })).unwrap();
+    run(&mut app, "room.place", json!({ "level_id": level, "point": [6.0, 2.0] })).unwrap();
+    let t = run(&mut app, "furnishing.load", json!({ "names": ["Bed, queen 60 × 80 in", "Nightstand", "Desk 60 × 30 in"] })).unwrap();
+    let place = |app: &mut App, name: &str, at: [f64; 2]| {
+        run(app, "mesh_object.place", json!({ "type_id": t[name], "point": at, "level": level })).unwrap();
+    };
+    place(&mut app, "Bed, queen 60 × 80 in", [2.0, 2.5]);
+    place(&mut app, "Nightstand", [0.6, 3.6]);
+    place(&mut app, "Nightstand", [3.4, 3.6]);
+    place(&mut app, "Desk 60 × 30 in", [6.0, 1.0]);
+
+    let s = run(&mut app, "schedule.create_ffe", json!({})).unwrap().as_u64().unwrap();
+    let table = run(&mut app, "schedule.get_table", json!({ "schedule_id": s })).unwrap();
+    assert_eq!(table["title"], "FF&E Schedule");
+    let col = |name: &str| table["fields"].as_array().unwrap().iter().position(|f| f == name).unwrap();
+    let rows: Vec<(String, String, String)> = table["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| {
+            let c = |k: usize| r["cells"][k]["text"].as_str().unwrap().to_owned();
+            (c(col("room")), c(col("type")), c(col("count")))
+        })
+        .collect();
+    // Grouped: one row a room and type, counted; rooms in order.
+    assert_eq!(rows.len(), 3, "{rows:?}");
+    assert!(rows[0].0.ends_with("Room") && rows[0].1 == "Bed, queen 60 × 80 in" && rows[0].2 == "1", "{rows:?}");
+    assert_eq!((rows[1].1.as_str(), rows[1].2.as_str()), ("Nightstand", "2"), "{rows:?}");
+    assert!(rows[2].1 == "Desk 60 × 30 in" && rows[2].0 != rows[0].0, "the desk is in the other room: {rows:?}");
+    // The type's description comes with it.
+    let desc = col("param:type.description");
+    assert!(table["rows"][0]["cells"][desc]["text"].as_str().unwrap().contains("queen mattress"), "{table:#}");
+}

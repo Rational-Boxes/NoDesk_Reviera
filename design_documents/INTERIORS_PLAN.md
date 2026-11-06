@@ -491,6 +491,14 @@ No standard set exists for retail, checkout or gym data (E1). Three sets are pro
 10. The *Gym* library, layouts and checks, and building integration (§7).
 11. Department-store specifics, IFC 4.3 signs and signals, and the planogram exchange (§5.4–5.6).
 
+**Progress (2026-11-06):**
+- Step 1 is built: shared rule packs and use zones (ARC-RULE-001/002).
+- Step 2 is built:
+  - the bundled Interiors, Gym and Retail Component Libraries (DM-LIB-006, ARC-FURN-001), which
+    also bring steps 7 and 10's generic fixtures and equipment ahead of time;
+  - the FF&E schedule (DOC-SCH-016).
+- Next is step 3, room layouts.
+
 Each step gets its spec section first, its samples and a help walkthrough. Every tool is a
 registered command, exposed to Lua and MCP:
 - `furniture.*`, `interior.*`, `hotel.*`, `lighting.*`;

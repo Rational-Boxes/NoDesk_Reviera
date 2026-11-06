@@ -126,6 +126,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(StairSetParams),
         registry.add(WallAttach),
         registry.add(ScheduleCreate),
+        registry.add(ScheduleCreateFfe),
         registry.add(CobieSetSettings),
         registry.add(ScheduleSetFields),
         registry.add(ScheduleSetSort),
@@ -2675,11 +2676,25 @@ modify_command!(
     "schedule.create",
     "Create a schedule",
     "Creates a component schedule of a category (`cat.doors`, `cat.rooms`, …) with the given field keys, or \
-     the category's usual fields, sorted by the first field. schedule.fields lists the field keys.",
+     the category's usual fields, sorted by the first field; with `categories`, a multi-category schedule of \
+     the elements of any of them. schedule.fields lists the field keys (`room`, the room an element stands \
+     in, and `category` among them).",
     "New Schedule",
     crate::schedules::CreateParams,
     ElementId,
     crate::schedules::create
+);
+modify_command!(
+    ScheduleCreateFfe,
+    "schedule.create_ffe",
+    "Create an FF&E schedule",
+    "Creates an FF&E schedule (DOC-SCH-016): furniture (with gym, retail and checkout equipment), casework, \
+     lighting fixtures and specialty equipment in one table, counted by room, category and type, with each \
+     type's mark and description. Edit it as any schedule; export it as CSV or a report file.",
+    "New FF&E Schedule",
+    Option<crate::schedules::FfeParams>,
+    ElementId,
+    crate::schedules::create_ffe
 );
 modify_command!(
     ScheduleSetFields,

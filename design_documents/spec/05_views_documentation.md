@@ -2541,6 +2541,28 @@ Schedules are tabular views of live model data. Every schedule definition is an 
 - [ ] A CSV export of a schedule with a hidden field has no column for that field.
 - [ ] A room name starting with "=" is written to CSV so that a spreadsheet shows it as text.
 
+### Multi-category and FF&E schedules
+**ID:** DOC-SCH-016 · **Priority:** P1 · **Ref:** `INTERIORS_PLAN.md` §4.6; research/15 F1 (FF&E schedules are multi-category, keyed by room or type mark); ARC-FURN-001
+
+**Purpose.** List furniture, fixtures and equipment together, room by room, for interiors, hotels, retail and gyms, as FF&E schedules do in practice.
+
+**Behaviour & rules.**
+- **A multi-category schedule** has a main category and more categories (`categories`). Its rows are the elements of any of them. Its fields are the main category's: count, type, level, IFC class, GlobalId, parameters.
+- **Two more fields** for every component schedule:
+  - `category`: the element's category name;
+  - `room`: the room the element stands in, "number name", found from a placed component's room calculation point.
+- **An FF&E schedule** (`schedule.create_ffe`, and *FF&E* first in View › Schedules › New Schedule) covers furniture, casework, lighting fixtures and specialty equipment. Gym, retail and checkout equipment are furniture in IFC (ARC-FURN-001), so they are included.
+  - Its fields: room, category, type, type mark, type description and count.
+  - Its rows are sorted by room, category and type, and grouped (not itemized), so each row counts one type in one room.
+  - It is edited and exported as any schedule: CSV (DOC-SCH-012), or a report file (DOC-OUT-016).
+
+**Commands.** `schedule.create(category, name?, fields?, categories?)` · `schedule.create_ffe(name?)`
+
+**Acceptance criteria.**
+- [x] Two rooms, one with a queen bed and two nightstands and the other with a desk, give an FF&E schedule of three rows: the bed (1) and nightstands (2) in the first room, and the desk (1) in the other. The bed's row carries its type description.
+
+*Built (2026-11-06):* `ScheduleDef.categories`, the `category` and `room` fields, `schedule.create_ffe`, and FF&E in New Schedule. Not yet: finish columns from IFC 4.3's furniture material categories (Finish, Frame, Hardware, Padding, Panel), COBie Component and Type sheets of the same rows, and the type mark's own key schedule.
+
 ---
 
 ## 5.15 Sheets, title blocks and revisions
@@ -3662,6 +3684,7 @@ Every command below is registered once in the command registry and is therefore 
 | `schedule.set_appearance` | schedule_id, appearance | () | Yes | DOC-SCH-008 |
 | `schedule.set_embedded` | schedule_id, category?, definition? | () | Yes | DOC-SCH-009 |
 | `schedule.set_cell` | schedule_id, row_key, field_id, value | () | Yes | DOC-SCH-010 |
+| `schedule.create_ffe` | name? | schedule_id | Yes | DOC-SCH-016 |
 | `schedule.paste` | schedule_id, top_left, tsv_text | () | Yes | DOC-SCH-010 |
 | `schedule.group_headers` | schedule_id, field_ids[], caption | () | Yes | DOC-SCH-010 |
 | `schedule.ungroup_headers` | schedule_id, group_id | () | Yes | DOC-SCH-010 |

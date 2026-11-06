@@ -64,6 +64,10 @@ pub struct ScheduleDef {
     pub kind: String,
     /// The category key (`cat.doors`).
     pub category: String,
+    /// More categories, for a multi-category schedule (an FF&E schedule of furniture, casework,
+    /// lighting and equipment): its rows are the elements of any of them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub categories: Vec<String>,
     pub fields: Vec<Field>,
     #[serde(default)]
     pub sort: Vec<SortLevel>,
@@ -289,6 +293,9 @@ pub fn available_fields(store: &Store, category: &str) -> Vec<FieldInfo> {
     }
     if category != "cat.rooms" {
         out.push(info("type", "Type", false));
+        // The category, for multi-category schedules, and the room an element stands in.
+        out.push(info("category", "Category", false));
+        out.push(info("room", "Room", false));
     }
     out.extend([
         info("level", "Level", false),
@@ -629,6 +636,16 @@ impl Context<'_> {
                     .unwrap_or_default(),
             ),
             "level" => Context::text(self.level(e).unwrap_or_default()),
+            "category" => Context::text(crate::categories::category_of(e).map(|c| c.name.to_owned()).unwrap_or_default()),
+            "room" => Context::text(
+                crate::mep_lighting::room_of(self.store, e)
+                    .and_then(|r| self.store.get(r))
+                    .map(|r| {
+                        let (number, name) = crate::rooms::number_and_name(r);
+                        format!("{number} {name}").trim().to_owned()
+                    })
+                    .unwrap_or_default(),
+            ),
             "ifc_class" => Context::text(e.class.clone()),
             "guid" => Context::text(e.guid().as_str()),
             "room.number" | "room.name" => {
@@ -874,7 +891,7 @@ pub fn table_on_sheet(
     let elements: Vec<&Element> = store
         .iter()
         .filter(|e| !crate::categories::is_type(e) && crate::inspect::in_tree(e))
-        .filter(|e| crate::categories::category_of(e).is_some_and(|c| c.key == def.category))
+        .filter(|e| crate::categories::category_of(e).is_some_and(|c| c.key == def.category || def.categories.iter().any(|k| k == c.key)))
         .collect();
     let cx = Context::new(store, parents);
     let names: HashMap<String, FieldInfo> = available_fields(store, &def.category)
@@ -1088,6 +1105,35 @@ fn check_fields(store: &Store, category: &str, keys: &[String]) -> Result<()> {
 
 // ---- Commands ----
 
+/// The categories of an FF&E schedule (`INTERIORS_PLAN.md` §4.6): furniture (and the gym,
+/// retail and checkout equipment, which is furniture in IFC), casework, lighting fixtures and
+/// specialty equipment.
+pub const FFE_CATEGORIES: &[&str] = &["cat.furniture", "cat.casework", "cat.lighting_fixtures", "cat.specialty_equipment"];
+
+#[derive(Debug, Default, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct FfeParams {
+    /// Default `FF&E Schedule`.
+    pub name: Option<String>,
+}
+
+/// An FF&E schedule (`schedule.create_ffe`, DOC-SCH-016): furniture, casework, lighting and
+/// specialty equipment counted by room and type, with the type mark and description.
+pub(crate) fn create_ffe(txn: &mut crate::txn::Transaction<'_>, p: Option<FfeParams>) -> Result<ElementId> {
+    let p = p.unwrap_or_default();
+    let fields: Vec<String> = ["room", "category", "type", "param:type.type_mark", "param:type.description", "count"].iter().map(|s| (*s).to_owned()).collect();
+    let id = create(
+        txn,
+        CreateParams { category: FFE_CATEGORIES[0].into(), name: Some(p.name.unwrap_or_else(|| "FF&E Schedule".into())), fields: Some(fields), categories: Some(FFE_CATEGORIES[1..].iter().map(|s| (*s).to_owned()).collect()) },
+    )?;
+    let store = txn.store().clone();
+    let mut def = schedule_def(store.get(id).expect("made")).expect("a schedule");
+    def.sort = ["room", "category", "type"].iter().map(|f| SortLevel { field: (*f).into(), descending: false }).collect();
+    def.itemize = false;
+    write(txn, id, &def)?;
+    Ok(id)
+}
+
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CreateParams {
@@ -1097,6 +1143,9 @@ pub struct CreateParams {
     pub name: Option<String>,
     /// Field keys in column order; default the category's usual fields.
     pub fields: Option<Vec<String>>,
+    /// More categories, for a multi-category schedule: its rows are the elements of any of them.
+    #[serde(default)]
+    pub categories: Option<Vec<String>>,
 }
 
 pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> Result<ElementId> {
@@ -1114,6 +1163,10 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
             .collect()
     });
     check_fields(&store, &p.category, &keys)?;
+    let categories = p.categories.clone().unwrap_or_default();
+    for c in &categories {
+        crate::categories::category(c).ok_or_else(|| Error::new("schedule.unknown_category", format!("no category `{c}`")))?;
+    }
     let base = p
         .name
         .unwrap_or_else(|| format!("{} Schedule", cat.name.trim_end_matches('s')));
@@ -1139,6 +1192,7 @@ pub(crate) fn create(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> 
     let def = ScheduleDef {
         kind: KIND_COMPONENT.into(),
         category: p.category,
+        categories,
         fields: keys
             .into_iter()
             .map(|key| Field { key, heading: None })

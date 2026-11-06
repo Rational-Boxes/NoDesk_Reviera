@@ -72,3 +72,9 @@ for _, z in ipairs(riviera.clearance.list{}) do
   if z.kind == "use_zone" then zones = zones + 1 end
 end
 print(string.format("%d use zones; the room checks clean", zones))
+
+-- The room, numbered and named, and an FF&E schedule of what is in it (DOC-SCH-016): one row a
+-- type, counted.
+local room = riviera.room.place{ level_id = l1, point = { 3.0, 0.5 } }
+riviera.room.set{ room_ids = { room }, name = "Guest room" }
+riviera.schedule.create_ffe{}

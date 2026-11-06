@@ -1092,7 +1092,7 @@ pub struct Schedules {
 /// (`bath.schedules`).
 pub(crate) fn schedules(txn: &mut Transaction<'_>, p: SchedulesParams) -> Result<Schedules> {
     let make = |txn: &mut Transaction<'_>, category: &str, name: &str, fields: &[&str]| -> Result<ElementId> {
-        let id = crate::schedules::create(txn, crate::schedules::CreateParams { category: category.into(), name: Some(name.into()), fields: Some(fields.iter().map(|f| (*f).to_owned()).collect()) })?;
+        let id = crate::schedules::create(txn, crate::schedules::CreateParams { categories: None, category: category.into(), name: Some(name.into()), fields: Some(fields.iter().map(|f| (*f).to_owned()).collect()) })?;
         crate::schedules::set_sort(
             txn,
             crate::schedules::SetSortParams {

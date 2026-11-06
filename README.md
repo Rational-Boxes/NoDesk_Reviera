@@ -633,6 +633,10 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
   bathroom and vertical transport included (`rules.packs`, `rules.set_packs`, `rules.add_pack`,
   `rules.remove_pack`, `rules.set_accessible`, `rules.check`). Not built yet: room layouts,
   hotel floors, fixture runs, front ends and gym layouts, which the plan goes on to.
+- **FF&E schedules** (DOC-SCH-016). A schedule can cover several categories. View › Schedules ›
+  New Schedule › *FF&E* lists furniture, casework, lighting and equipment by room and type, with
+  each type's mark and description and how many of each are in a room (`schedule.create_ffe`).
+  Every component schedule gains *Room* (the room an element stands in) and *Category* fields.
 - **Report files** (DOC-OUT-016). Any check or report can be saved as an HTML, Markdown, CSV or
   JSON file. The file names the model, the date and the command, then gives the results as
   tables. It can be saved on this computer, or in a FileEngine folder when one is connected:

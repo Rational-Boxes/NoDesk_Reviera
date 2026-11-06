@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Riviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Riviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 908 numbered requirements (320 P0 · 348 P1 · 233 P2 · 7 P3), 2,368 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 909 numbered requirements (320 P0 · 349 P1 · 233 P2 · 7 P3), 2,369 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Riviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Riviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,368 commands; 908 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,369 commands; 909 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -26329,6 +26329,28 @@ Schedules are tabular views of live model data. Every schedule definition is an 
 - [ ] A CSV export of a schedule with a hidden field has no column for that field.
 - [ ] A room name starting with "=" is written to CSV so that a spreadsheet shows it as text.
 
+### Multi-category and FF&E schedules
+**ID:** DOC-SCH-016 · **Priority:** P1 · **Ref:** `INTERIORS_PLAN.md` §4.6; research/15 F1 (FF&E schedules are multi-category, keyed by room or type mark); ARC-FURN-001
+
+**Purpose.** List furniture, fixtures and equipment together, room by room, for interiors, hotels, retail and gyms, as FF&E schedules do in practice.
+
+**Behaviour & rules.**
+- **A multi-category schedule** has a main category and more categories (`categories`). Its rows are the elements of any of them. Its fields are the main category's: count, type, level, IFC class, GlobalId, parameters.
+- **Two more fields** for every component schedule:
+  - `category`: the element's category name;
+  - `room`: the room the element stands in, "number name", found from a placed component's room calculation point.
+- **An FF&E schedule** (`schedule.create_ffe`, and *FF&E* first in View › Schedules › New Schedule) covers furniture, casework, lighting fixtures and specialty equipment. Gym, retail and checkout equipment are furniture in IFC (ARC-FURN-001), so they are included.
+  - Its fields: room, category, type, type mark, type description and count.
+  - Its rows are sorted by room, category and type, and grouped (not itemized), so each row counts one type in one room.
+  - It is edited and exported as any schedule: CSV (DOC-SCH-012), or a report file (DOC-OUT-016).
+
+**Commands.** `schedule.create(category, name?, fields?, categories?)` · `schedule.create_ffe(name?)`
+
+**Acceptance criteria.**
+- [x] Two rooms, one with a queen bed and two nightstands and the other with a desk, give an FF&E schedule of three rows: the bed (1) and nightstands (2) in the first room, and the desk (1) in the other. The bed's row carries its type description.
+
+*Built (2026-11-06):* `ScheduleDef.categories`, the `category` and `room` fields, `schedule.create_ffe`, and FF&E in New Schedule. Not yet: finish columns from IFC 4.3's furniture material categories (Finish, Frame, Hardware, Padding, Panel), COBie Component and Type sheets of the same rows, and the type mark's own key schedule.
+
 ---
 
 ## 5.15 Sheets, title blocks and revisions
@@ -27450,6 +27472,7 @@ Every command below is registered once in the command registry and is therefore 
 | `schedule.set_appearance` | schedule_id, appearance | () | Yes | DOC-SCH-008 |
 | `schedule.set_embedded` | schedule_id, category?, definition? | () | Yes | DOC-SCH-009 |
 | `schedule.set_cell` | schedule_id, row_key, field_id, value | () | Yes | DOC-SCH-010 |
+| `schedule.create_ffe` | name? | schedule_id | Yes | DOC-SCH-016 |
 | `schedule.paste` | schedule_id, top_left, tsv_text | () | Yes | DOC-SCH-010 |
 | `schedule.group_headers` | schedule_id, field_ids[], caption | () | Yes | DOC-SCH-010 |
 | `schedule.ungroup_headers` | schedule_id, group_id | () | Yes | DOC-SCH-010 |
@@ -30462,10 +30485,10 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 32 | 0 | 33 |
-| DOC | 68 | 41 | 13 | 1 | 123 |
+| DOC | 68 | 42 | 13 | 1 | 124 |
 | COL | 8 | 52 | 16 | 1 | 77 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **348** | **233** | **7** | **908** |
+| **Total** | **320** | **349** | **233** | **7** | **909** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -30679,7 +30702,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2368 unique commands** in 444 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2369 unique commands** in 444 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -31017,7 +31040,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `routing_preferences` | 2 |
 | `rules` | 7 |
 | `rxd` | 9 |
-| `schedule` | 26 |
+| `schedule` | 27 |
 | `scheduleinstance` | 3 |
 | `scopebox` | 4 |
 | `script` | 11 |
@@ -32715,6 +32738,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `schedule.add_field` | 5 | schedule_id, field_source, index? | field_id | Yes | DOC-SCH-002 |
 | `schedule.combine_fields` | 5 | schedule_id, parts[], name | field_id | Yes | DOC-SCH-002 |
 | `schedule.create` | 5 | kind, category, name, phase_id?, include_links?, key_name? | schedule_id | Yes | DOC-SCH-001 |
+| `schedule.create_ffe` | 5 | name? | schedule_id | Yes | DOC-SCH-016 |
 | `schedule.delete_data_row` | 5 | schedule_id, row_key | () | Yes | DOC-SCH-006 |
 | `schedule.export` | 5 | schedule_id, path, format: csv\ | tsv\ | xlsx\ | ods, options? |
 | `schedule.get_table` | 5 | schedule_id, include_hidden? | table | No | DOC-SCH-001 |
