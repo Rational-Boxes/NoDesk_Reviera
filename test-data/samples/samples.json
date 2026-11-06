@@ -326,6 +326,19 @@
     ]
   },
   {
+    "name": "guest_room",
+    "title": "An accessible hotel guest room",
+    "group": "Architecture",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "guest_room.lua"
+        }
+      }
+    ]
+  },
+  {
     "name": "wet_room",
     "title": "Family bathroom and wet room (England)",
     "group": "Architecture",

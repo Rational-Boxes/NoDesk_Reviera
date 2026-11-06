@@ -4,9 +4,9 @@
 //! Manage › Model Properties (UN): the model-wide settings in one place (DM-CODE-001,
 //! DM-UNIT-001, ARC-MOD-031). Units (a preset, and the decimal and grouping symbols), the
 //! building code with its occupancy and the model's own stair headroom, the accessibility
-//! rule set, and the bathroom rule packs (ARC-BATH-001). OK applies what changed through
-//! `units.set_preset`, `units.set_number_format`, `code.set`, `clearance.set_rule_set` and
-//! `bath.set_rule_packs`. Tools use these as their defaults; a tool may use
+//! rule set, the bathroom rule packs (ARC-BATH-001) and the interiors rule packs (ARC-RULE-001).
+//! OK applies what changed through `units.set_preset`, `units.set_number_format`, `code.set`,
+//! `clearance.set_rule_set`, `bath.set_rule_packs` and `rules.set_packs`. Tools use these as their defaults; a tool may use
 //! another code for one operation (the stair opening offer).
 
 use riviera_core::codes::{self, Code, Occupancy};
@@ -50,6 +50,9 @@ impl Gui {
         let packs = riviera_core::bath_rules::available(&store);
         let packs_chosen = riviera_core::bath_rules::chosen(&store);
         let packs_now: Vec<String> = riviera_core::bath_rules::active(&store).into_iter().map(|p| p.id).collect();
+        let interiors = riviera_core::rules::available(&store, "interiors");
+        let interiors_chosen = riviera_core::rules::chosen(&store, "interiors");
+        let interiors_now: Vec<String> = riviera_core::rules::active(&store, "interiors").into_iter().map(|p| p.id).collect();
         let preset_now = PRESETS.iter().position(|(_, p)| {
             UnitSettings::preset(*p).formats.get("length") == units.formats.get("length")
         });
@@ -197,6 +200,41 @@ impl Gui {
         note.wrap(380);
         grid.add(&note, 1, SizerFlag::Expand, 0);
 
+        // Interiors rule packs (ARC-RULE-001), the same way.
+        heading("Interiors rules");
+        let blank = StaticText::builder(&dialog).with_label("").build();
+        grid.add(&blank, 0, SizerFlag::AlignCenterVertical, 0);
+        let interiors_auto = CheckBox::builder(&dialog)
+            .with_label("Choose from the accessibility rule set")
+            .build();
+        interiors_auto.set_value(interiors_chosen.is_none());
+        interiors_auto.set_tooltip("The ADA interiors pack with the ADA rule set");
+        grid.add(&interiors_auto, 1, SizerFlag::Expand, 0);
+        let interiors_boxes: Vec<(String, CheckBox)> = interiors
+            .iter()
+            .map(|p| {
+                let layer = match p.layer {
+                    riviera_core::bath_rules::Layer::Minimum => "Code",
+                    riviera_core::bath_rules::Layer::Accessible => "Accessibility",
+                    riviera_core::bath_rules::Layer::Recommended => "Guidance",
+                };
+                let l = StaticText::builder(&dialog).with_label(layer).build();
+                let b = CheckBox::builder(&dialog).with_label(&p.title).build();
+                b.set_value(interiors_now.contains(&p.id));
+                b.set_tooltip(&p.edition);
+                grid.add(&l, 0, SizerFlag::AlignCenterVertical, 0);
+                grid.add(&b, 1, SizerFlag::Expand, 0);
+                (p.id.clone(), b)
+            })
+            .collect();
+        let blank = StaticText::builder(&dialog).with_label("").build();
+        grid.add(&blank, 0, SizerFlag::AlignCenterVertical, 0);
+        let note = StaticText::builder(&dialog)
+            .with_label("Furniture's use zones show as virtual volumes; Check Rules reports what is in them.")
+            .build();
+        note.wrap(380);
+        grid.add(&note, 1, SizerFlag::Expand, 0);
+
         sizer.add_sizer(&grid, 1, SizerFlag::All | SizerFlag::Expand, 12);
         let ok = Button::builder(&dialog)
             .with_id(ID_OK)
@@ -233,6 +271,8 @@ impl Gui {
         let rule_pick = RULES[sel(&rule)].1;
         let auto_pick = auto.is_checked();
         let packs_pick: Vec<String> = pack_boxes.iter().filter(|(_, b)| b.is_checked()).map(|(id, _)| id.clone()).collect();
+        let interiors_auto_pick = interiors_auto.is_checked();
+        let interiors_pick: Vec<String> = interiors_boxes.iter().filter(|(_, b)| b.is_checked()).map(|(id, _)| id.clone()).collect();
         dialog.destroy();
 
         let mut problems = Vec::new();
@@ -280,6 +320,12 @@ impl Gui {
         let packs_args = if automatic { json!({}) } else { json!({ "packs": packs_pick }) };
         let packs_change = if automatic { packs_chosen.is_some() } else { packs_chosen.as_ref() != Some(&packs_pick) };
         if packs_change && let Err(e) = self.run("bath.set_rule_packs", packs_args) {
+            problems.push(e);
+        }
+        let automatic = interiors_auto_pick && interiors_pick == interiors_now;
+        let args = if automatic { json!({ "domain": "interiors" }) } else { json!({ "domain": "interiors", "packs": interiors_pick }) };
+        let change = if automatic { interiors_chosen.is_some() } else { interiors_chosen.as_ref() != Some(&interiors_pick) };
+        if change && let Err(e) = self.run("rules.set_packs", args) {
             problems.push(e);
         }
         self.properties_stale = true;

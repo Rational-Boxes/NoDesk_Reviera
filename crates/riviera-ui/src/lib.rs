@@ -4779,6 +4779,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
         "railing.create_on_stair" => with(gui, Gui::rail_stairs),
         "overlap.find" => with(gui, Gui::check_overlaps),
         "bath.check" => with(gui, Gui::check_bathrooms),
+        "rules.check" => with(gui, Gui::check_rules),
         "elevator.check" => with(gui, Gui::check_elevators),
         "escalator.check" => with(gui, Gui::check_escalators),
         "stairlift.check" => with(gui, Gui::check_stairlifts),

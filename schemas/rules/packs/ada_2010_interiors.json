@@ -1,0 +1,80 @@
+{
+  "format": "riviera.rules-1",
+  "id": "ada_2010_interiors",
+  "title": "2010 ADA Standards: furniture in accessible rooms",
+  "domain": "interiors",
+  "jurisdiction": "US",
+  "edition": "2010 ADA Standards for Accessible Design, §806.2.3 (guest rooms with mobility features)",
+  "layer": "accessible",
+  "notes": "A117.1-2017 asks 30 × 52 in; the ADA's 30 × 48 in is used here. One clear space between two beds also complies (§806.2.3 exception): mark one bed not accessible when two share a space.",
+  "zones": [
+    {
+      "id": "ADA 2010 806.2.3 left",
+      "description": "30 × 48 in clear floor space for a parallel approach along the bed's left side",
+      "applies_to": {
+        "classes": [
+          "IfcFurniture"
+        ],
+        "predefined_types": [
+          "BED"
+        ]
+      },
+      "across": [
+        [
+          "left",
+          -0.762
+        ],
+        [
+          "left",
+          0.0
+        ]
+      ],
+      "out": [
+        [
+          "front",
+          0.0
+        ],
+        [
+          "front",
+          -1.2192
+        ]
+      ],
+      "source": "S1354",
+      "confidence": "verified"
+    },
+    {
+      "id": "ADA 2010 806.2.3 right",
+      "description": "30 × 48 in clear floor space for a parallel approach along the bed's right side",
+      "applies_to": {
+        "classes": [
+          "IfcFurniture"
+        ],
+        "predefined_types": [
+          "BED"
+        ]
+      },
+      "across": [
+        [
+          "right",
+          0.0
+        ],
+        [
+          "right",
+          0.762
+        ]
+      ],
+      "out": [
+        [
+          "front",
+          0.0
+        ],
+        [
+          "front",
+          -1.2192
+        ]
+      ],
+      "source": "S1354",
+      "confidence": "verified"
+    }
+  ]
+}

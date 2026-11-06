@@ -92,6 +92,8 @@ pub enum ClearanceKind {
     InclinedLanding,
     /// An APM lane's dynamic envelope (ARC-VT-025).
     ApmEnvelope,
+    /// The use zone a shared rule pack keeps clear round furniture or equipment (ARC-RULE-002).
+    UseZone,
 }
 
 impl ClearanceKind {
@@ -115,6 +117,7 @@ impl ClearanceKind {
             Self::StairliftLanding => "Clearance:stairlift_landing/3d",
             Self::InclinedLanding => "Clearance:inclined_landing/3d",
             Self::ApmEnvelope => "Clearance:apm_envelope/3d",
+            Self::UseZone => "Clearance:use_zone/3d",
         }
     }
 
@@ -137,6 +140,7 @@ impl ClearanceKind {
             Self::StairliftLanding => "stairlift landing",
             Self::InclinedLanding => "inclined elevator landing",
             Self::ApmEnvelope => "APM dynamic envelope",
+            Self::UseZone => "use zone",
         }
     }
 }
@@ -328,6 +332,7 @@ pub fn all(store: &Store) -> Vec<Clearance> {
     out.extend(crate::stairlifts::zones(store));
     out.extend(crate::inclined_elevators::zones(store));
     out.extend(crate::apm::zones(store));
+    out.extend(crate::rules::zones(store));
     out
 }
 
@@ -345,6 +350,9 @@ pub fn may_share(store: &Store, kind: ClearanceKind, other: ElementId) -> bool {
     }
     if kind == ClearanceKind::ApmEnvelope {
         return crate::apm::may_share(store, other);
+    }
+    if kind == ClearanceKind::UseZone {
+        return crate::rules::may_share(store, other);
     }
     if matches!(kind, ClearanceKind::Hoistway | ClearanceKind::ElevatorLanding | ClearanceKind::MachineSpace) {
         return crate::elevators::may_share(store, other);

@@ -34,6 +34,7 @@ pub mod notes;
 pub mod output;
 pub mod bath_report;
 pub mod bathrooms;
+pub mod rules_check;
 pub mod overlaps;
 pub mod schedules;
 pub mod scripts;
@@ -520,7 +521,7 @@ impl App {
         for c in riviera_core::clearances::all(store) {
             let color = match c.kind {
                 riviera_core::clearances::ClearanceKind::DoorSwing => [1.0, 0.62, 0.08, 0.3],
-                riviera_core::clearances::ClearanceKind::FixtureSpace => [0.2, 0.75, 0.35, 0.22],
+                riviera_core::clearances::ClearanceKind::FixtureSpace | riviera_core::clearances::ClearanceKind::UseZone => [0.2, 0.75, 0.35, 0.22],
                 riviera_core::clearances::ClearanceKind::ElectricalZone => [1.0, 0.85, 0.1, 0.16],
                 riviera_core::clearances::ClearanceKind::Hoistway => [0.55, 0.35, 0.85, 0.12],
                 riviera_core::clearances::ClearanceKind::ElevatorLanding => [0.2, 0.75, 0.35, 0.22],

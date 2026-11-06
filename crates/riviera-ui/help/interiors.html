@@ -1,0 +1,85 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Copyright (C) 2026 Riviera contributors -->
+<h1>Interiors rules and use zones</h1>
+<p class="lead">Furniture needs room round it: beside a bed to get in and out, in front of a
+dresser to open its drawers, round a table to pull the chairs back. Riviera keeps the rules for
+that room as <b>rule packs</b>, each from one standard or guide. It shows each piece's
+<b>use zones</b> as it is placed. <b>Check Rules</b> then lists what stands in them. The sample
+<a href="riviera:sample/guest_room">An accessible hotel guest room</a> shows the tools.</p>
+<nav class="toc">
+  <a href="#packs">Rule packs</a>
+  <a href="#select">Which furniture a rule applies to</a>
+  <a href="#zones">Use zones</a>
+  <a href="#check">Check Rules</a>
+  <a href="#accessible">Accessible and not</a>
+  <a href="#own">Your own packs</a>
+  <a href="#limits">Limits and what to check</a>
+  <a href="#scripts">Scripts and agents</a>
+</nav>
+
+<h2 id="packs">Rule packs</h2>
+<p>Choose packs in <b>Manage › Model Properties › Interiors rules</b>. With the box ticked, they
+follow the <b>Accessibility rule set</b>: the 2010 ADA Standards bring in the ADA interiors
+pack. Untick it to choose packs yourself. Two packs ship:</p>
+<ul>
+  <li><b>2010 ADA Standards: furniture in accessible rooms.</b> A 30 × 48 in (762 × 1219 mm)
+  clear floor space for a parallel approach along each side of a bed (§806.2.3).</li>
+  <li><b>Interior planning practice.</b> Practice from planning guides, reported as notes:
+  36 in round a dining table's edge, 30 in in front of a dresser, 24 in at the foot of a bed.</li>
+</ul>
+<p>Each rule carries its clause, its source and how sure the reading is. A finding from guidance,
+or from a rule marked <i>advisory</i>, is a note, never an error.</p>
+
+<h2 id="select">Which furniture a rule applies to</h2>
+<p>A rule chooses furniture by its <b>IFC type</b>: BED, TABLE, DESK, CHAIR, SOFA, SHELF or
+FILECABINET. A piece with none of these is <b>USERDEFINED</b>, and then by its
+<b>Kind</b>: <i>Dresser</i>, <i>Nightstand</i>, <i>Treadmill</i>. Select a placed piece and set
+both in the <b>Properties</b> palette's <b>Type</b> rows. Every copy of the type follows them.</p>
+
+<h2 id="zones">Use zones</h2>
+<p>Use zones are virtual volumes, in green like bathroom clear spaces. Show or hide them with
+<b>View › Virtual Volumes</b>. A piece's <i>front</i> is its −y side as modelled: a bed's foot,
+a dresser's drawers. A zone is set out across the piece, from its centre or its left or right
+edge, and from its front or back. Each zone runs from the floor to the rule's height (1.0 m unless
+the rule says otherwise). The zones move and turn with the piece. They never change its
+geometry.</p>
+<p>Floors, rugs and other floor coverings, accessories, and other pieces' zones may share a zone.
+Anything else in it is reported.</p>
+
+<h2 id="check">Check Rules</h2>
+<p><b>View › Coordination › Check Rules</b> lists each finding. A finding gives the rule, the
+pack and its edition, and what stands in the zone. Errors come first. Pick a finding to select
+and frame the piece and what is in its way. <b>Check Overlaps</b> includes use zones too.</p>
+
+<h2 id="accessible">Accessible and not</h2>
+<p>The ADA asks only some beds and rooms to have their clear spaces. The accessibility pack's rules
+apply to every piece unless it is marked not accessible (<code>rules.set_accessible</code>). Mark
+a bed not accessible when it shares one clear space with the next bed, which §806.2.3 also
+allows. Practice packs apply to every piece.</p>
+
+<h2 id="own">Your own packs</h2>
+<p>A pack is a JSON file following the published schema <code>riviera.rules-1</code> (MIT,
+<code>schemas/rules/</code>). <code>rules.add_pack</code> adds one to the project, and it is
+saved with the model. A pack with a shipped pack's id replaces it, which is how to adopt a local
+amendment or an office standard. <code>rules.remove_pack</code> brings the shipped one back.
+The same commands take bathroom and vertical-transport packs and put them where the bathroom and
+elevator tools read them.</p>
+
+<h2 id="limits">Limits and what to check</h2>
+<ul>
+  <li>Furniture is placed from imported or box types for now; a furniture library with IFC types
+  already set is to come.</li>
+  <li>Riviera does not find two beds sharing one clear space; mark one not accessible.</li>
+  <li>Turning spaces, reach ranges and room counts (ADA Table 224.2) are not checked yet.</li>
+  <li>Practice values are from planning guides, not codes. Check them against the brief.</li>
+</ul>
+
+<h2 id="scripts">Scripts and agents</h2>
+<p>Every step is a command, in Lua as <code>riviera.rules.…</code> and through the MCP server:</p>
+<ul>
+  <li>packs: <code>rules.packs</code>, <code>rules.set_packs</code>, <code>rules.add_pack</code>,
+  <code>rules.remove_pack</code>, <code>rules.schema</code>;</li>
+  <li>checks: <code>rules.set_accessible</code>, <code>rules.check</code>;</li>
+  <li>types: <code>mesh_object.set_type</code> with <code>predefined_type</code> or
+  <code>element_type</code>.</li>
+</ul>

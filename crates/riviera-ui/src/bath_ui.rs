@@ -32,9 +32,39 @@ impl Gui {
             Ok(v) => v.as_array().cloned().unwrap_or_default(),
             Err(e) => return error(&frame, &format!("The check did not run:\n{e}")),
         };
-        let packs = in_use.join("; ");
+        self.show_findings("Check Bathrooms", &in_use.join("; "), &found);
+    }
+
+    /// Check Rules (ARC-RULE-002): furniture's use zones under the shared rule packs in use.
+    pub(crate) fn check_rules(&mut self) {
+        let frame = self.frame;
+        let in_use: Vec<String> = self
+            .run("rules.packs", json!({}))
+            .ok()
+            .and_then(|v| v.as_array().cloned())
+            .unwrap_or_default()
+            .iter()
+            .filter(|p| p["in_use"] == true && p["domain"] != "bath" && p["domain"] != "vt")
+            .filter_map(|p| p["title"].as_str().map(str::to_owned))
+            .collect();
+        if in_use.is_empty() {
+            return error(
+                &frame,
+                "No interiors rule packs are in use. Choose them in Manage › Model Properties, or set the accessibility rule set they follow.",
+            );
+        }
+        let found = match self.run("rules.check", json!({})) {
+            Ok(v) => v.as_array().cloned().unwrap_or_default(),
+            Err(e) => return error(&frame, &format!("The check did not run:\n{e}")),
+        };
+        self.show_findings("Check Rules", &in_use.join("; "), &found);
+    }
+
+    /// Lists a check's findings; the one picked is selected and framed with what is in its way.
+    fn show_findings(&mut self, title: &str, packs: &str, found: &[serde_json::Value]) {
+        let frame = self.frame;
         if found.is_empty() {
-            let d = MessageDialog::builder(&frame, &format!("No problems found under: {packs}."), "Check Bathrooms")
+            let d = MessageDialog::builder(&frame, &format!("No problems found under: {packs}."), title)
                 .with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation)
                 .build();
             d.show_modal();
@@ -60,7 +90,7 @@ impl Gui {
                 "{errors} error(s) and {} note(s) under: {packs}.\nPick one to select and frame it:",
                 found.len() - errors
             ),
-            "Check Bathrooms",
+            title,
             &labels,
         )
         .build();

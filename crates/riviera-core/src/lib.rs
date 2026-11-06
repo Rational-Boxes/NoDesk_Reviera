@@ -185,6 +185,7 @@ pub mod steel_fab;
 pub mod roofs;
 pub mod room_separators;
 pub mod rooms;
+pub mod rules;
 pub mod schedules;
 pub mod scope_boxes;
 pub mod sections;

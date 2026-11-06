@@ -212,6 +212,7 @@ pub fn toolset_of(command: &str) -> String {
             | "frame"
             | "growing"
             | "bath"
+            | "rules"
             | "vt"
             | "elevator"
             | "escalator"

@@ -257,6 +257,18 @@ impl Category {
             _ => "NOTDEFINED",
         }
     }
+
+    /// The predefined types a type of this category may be given (IFC4 `IfcFurnitureTypeEnum`
+    /// for furniture; otherwise its default, USERDEFINED or NOTDEFINED).
+    pub fn predefined_types(self) -> Vec<&'static str> {
+        let mut out = match self {
+            Category::Furniture => vec!["CHAIR", "TABLE", "DESK", "BED", "FILECABINET", "SHELF", "SOFA"],
+            _ => vec![self.predefined()],
+        };
+        out.extend(["USERDEFINED", "NOTDEFINED"]);
+        out.dedup();
+        out
+    }
 }
 
 /// The file's length unit.
@@ -1393,6 +1405,11 @@ pub struct SetTypeParams {
     pub colors: Vec<SlotColor>,
     /// Only while the type has no copies (the category decides the copies' IFC class).
     pub category: Option<Category>,
+    /// Its IFC predefined type (`BED`, `TABLE`, …, or `USERDEFINED` with `element_type`); its
+    /// copies take it too.
+    pub predefined_type: Option<String>,
+    /// A USERDEFINED type's kind (`Dresser`, `Treadmill`): its copies' ObjectType.
+    pub element_type: Option<String>,
 }
 
 /// Changes a custom object type (`mesh_object.set_type`): its name, scale, slot colours, and its
@@ -1439,6 +1456,22 @@ pub(crate) fn set_type(txn: &mut crate::txn::Transaction<'_>, p: SetTypeParams) 
         t.category = cat;
         class = Some(cat);
     }
+    let old_kind = store.get(id).and_then(|e| e.param("@ElementType")).and_then(Value::as_str).map(str::to_owned);
+    let kind = p.element_type.clone().or_else(|| old_kind.clone());
+    if let Some(pt) = &p.predefined_type {
+        let pt = pt.to_ascii_uppercase();
+        let allowed = t.category.predefined_types();
+        if !allowed.contains(&pt.as_str()) {
+            return Err(Error::new("mesh_object.bad_predefined_type", format!("a {:?} type may be {}, not {pt}", t.category, allowed.join(", "))));
+        }
+        if pt == "USERDEFINED" && kind.is_none() {
+            return Err(Error::new("mesh_object.bad_predefined_type", "a USERDEFINED type needs its element_type"));
+        }
+        t.predefined = Some(pt);
+    } else if p.element_type.is_some() && t.predefined_type() != "USERDEFINED" {
+        t.predefined = Some("USERDEFINED".into());
+    }
+    let predefined = (p.predefined_type.is_some() || p.element_type.is_some()).then(|| t.predefined_type().to_owned());
     let value = serde_json::to_value(&t).expect("serialises");
     txn.modify(id, |e| {
         e.params.insert(RECIPE_KEY.into(), value);
@@ -1450,7 +1483,39 @@ pub(crate) fn set_type(txn: &mut crate::txn::Transaction<'_>, p: SetTypeParams) 
             e.params
                 .insert("@PredefinedType".into(), c.predefined().into());
         }
+        if let Some(pt) = &predefined {
+            e.params.insert("@PredefinedType".into(), pt.clone().into());
+            match (&kind, pt.as_str()) {
+                (Some(k), "USERDEFINED") => {
+                    e.params.insert("@ElementType".into(), k.clone().into());
+                }
+                _ => {
+                    e.params.remove("@ElementType");
+                }
+            }
+        }
     })?;
+    // Its copies follow its predefined type and kind.
+    if let Some(pt) = predefined {
+        let guid = store.get(id).expect("resolved").guid().to_string();
+        let copies: Vec<ElementId> = txn.store().iter().filter(|e| e.param("@type").and_then(Value::as_str) == Some(guid.as_str())).map(Element::id).collect();
+        for c in copies {
+            let (pt, kind, old) = (pt.clone(), kind.clone(), old_kind.clone());
+            txn.modify(c, |e| {
+                e.params.insert("@PredefinedType".into(), pt.clone().into());
+                let own = e.param("@ObjectType").and_then(Value::as_str).map(str::to_owned);
+                match (&kind, pt.as_str()) {
+                    (Some(k), "USERDEFINED") if own.is_none() || own == old => {
+                        e.params.insert("@ObjectType".into(), k.clone().into());
+                    }
+                    (_, p) if p != "USERDEFINED" && own.is_some() && own == old => {
+                        e.params.remove("@ObjectType");
+                    }
+                    _ => {}
+                }
+            })?;
+        }
+    }
     Ok(())
 }
 

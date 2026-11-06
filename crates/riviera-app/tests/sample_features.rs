@@ -1351,3 +1351,18 @@ fn every_sample_keeps_ifc_invariants() {
         }
     }
 }
+
+#[test]
+fn the_guest_room_sample_keeps_its_bed_spaces_clear() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "guest_room");
+    let packs = ok(&mut app, "rules.packs", json!({ "domain": "interiors" }));
+    let used: Vec<&str> = packs.as_array().unwrap().iter().filter(|p| p["in_use"] == true).map(|p| p["id"].as_str().unwrap()).collect();
+    assert_eq!(used, ["ada_2010_interiors", "practice_interiors"], "{packs:#}");
+    // The bed: an ADA clear space along each side and the practice zone at its foot.
+    let zones = ok(&mut app, "clearance.list", json!({}));
+    let mut rules: Vec<&str> = zones.as_array().unwrap().iter().filter(|z| z["kind"] == "use_zone").map(|z| z["rule"].as_str().unwrap()).collect();
+    rules.sort();
+    assert_eq!(rules, ["ADA 2010 806.2.3 left", "ADA 2010 806.2.3 right", "Bed foot", "Dresser front"]);
+    assert_eq!(ok(&mut app, "rules.check", json!({})), json!([]));
+}

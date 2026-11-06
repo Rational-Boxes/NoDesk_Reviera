@@ -1546,6 +1546,16 @@ impl Gui {
             e.name.clone().unwrap_or_default(),
         ));
         category_row(grid, "mt_category", t.category);
+        // Its IFC predefined type and, for USERDEFINED, its kind: rule packs select furniture by
+        // these (ARC-RULE-002).
+        let kinds = t.category.predefined_types();
+        let at = kinds.iter().position(|k| *k == t.predefined_type()).unwrap_or(kinds.len() - 1) as i32;
+        let labels: Vec<(String, i32)> = kinds.iter().enumerate().map(|(i, k)| ((*k).to_owned(), i as i32)).collect();
+        grid.append(Property::enumeration("IFC Type", "mt_predefined", labels, at));
+        grid.set_help_string("mt_predefined", "The IFC predefined type (BED, TABLE, …); rule packs choose furniture by it");
+        let kind = e.param("@ElementType").and_then(|v| v.as_str()).unwrap_or_default().to_owned();
+        grid.append(Property::string("Kind", "mt_kind", kind));
+        grid.set_help_string("mt_kind", "A user-defined type's kind (Dresser, Treadmill), its copies' ObjectType");
         grid.append(Property::string(
             "Scale (type)",
             "mt_scale",
@@ -1660,6 +1670,8 @@ impl Gui {
                 "name" => a["name"] = json!(text),
                 "scale" => a["scale"] = json!(text.trim().parse::<f64>().unwrap_or(1.0)),
                 "category" => a["category"] = json!(category_value(&text)),
+                "predefined" => a["predefined_type"] = json!(text),
+                "kind" => a["element_type"] = json!(text.trim()),
                 r if r.starts_with("slot_") => {
                     let k: usize = r["slot_".len()..].parse().unwrap_or(0);
                     let store = self.store_now();

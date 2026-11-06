@@ -732,6 +732,12 @@ icon = "bath_check"
 help = "Check bathroom fixtures' clear spaces and distances under the bathroom rule packs in use (Model Properties): what stands in them, doors swinging into them, a WC's distance from its side wall; pick a finding to select and frame it (ARC-BATH-002)"
 
 [[action]]
+id = "rules.check"
+label = "Check Rules"
+icon = "rules_check"
+help = "Check furniture's use zones under the interiors rule packs in use (Model Properties): what stands in a bed's ADA clear spaces, in front of a dresser, round a dining table; pick a finding to select and frame it (ARC-RULE-002)"
+
+[[action]]
 id = "bath.place_grab_bars"
 label = "Place Grab Bars"
 icon = "grab_bar"
@@ -4309,6 +4315,7 @@ tools = [
   { action = "ui.pane.clash", size = "large" },
   { action = "overlap.find", size = "large" },
   { action = "bath.check", size = "large" },
+  { action = "rules.check", size = "large" },
   { action = "ui.bath_report", size = "small" },
   { action = "bcf.from_bath_check", size = "small" },
   { action = "bath.place_grab_bars", size = "large" },
@@ -4862,7 +4869,7 @@ items = [
   "inspect.ghost_others", "inspect.translucent", "inspect.translucent_subtree", "inspect.reset", "inspect.apply_to_view", "-",
   "inspect.hide_in_view", "inspect.hide_category_in_view", "inspect.unhide_all_in_view",
   "inspect.override_in_view", "-",
-  "ui.pane.clash", "overlap.find", "bath.check", "bath.place_grab_bars", "view.set_virtual_volumes", "clearance.set_rule_set",
+  "ui.pane.clash", "overlap.find", "bath.check", "rules.check", "bath.place_grab_bars", "view.set_virtual_volumes", "clearance.set_rule_set",
 ]
 
 [[menu]]

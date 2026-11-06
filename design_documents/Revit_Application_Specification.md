@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Riviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Riviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 903 numbered requirements (320 P0 · 343 P1 · 233 P2 · 7 P3), 2,356 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 905 numbered requirements (320 P0 · 345 P1 · 233 P2 · 7 P3), 2,363 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Riviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Riviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,356 commands; 903 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,363 commands; 905 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -15603,6 +15603,82 @@ All family-editor commands from the DM chapter can be used inside the session.
 
 ---
 
+## 3.9b Shared rule packs and use zones
+
+Owner decision (2026-11-06, `INTERIORS_PLAN.md` §11a and `KITCHENS_PLAN.md` §11a): one rules
+format, `riviera.rules-1`, for every new domain, with one way to list, choose, add and remove
+packs in any domain. Bathroom and vertical-transport packs keep their own formats and are read
+unchanged. The first domain on the shared format is **interiors**: use zones around furniture
+(research/15 Part D, G138–G182).
+
+### 3.9b.1 Shared rule packs
+**ID:** ARC-RULE-001 · **Priority:** P1 · **Ref:** owner decision (2026-11-06); `INTERIORS_PLAN.md` §3; `KITCHENS_PLAN.md` §3.1; ARC-BATH-001; ARC-VT-001; Riviera's own design (Appendix A.2a)
+
+**Purpose.** Give every toolset after bathrooms and vertical transport the same rule packs (jurisdiction, edition, layer, source and confidence on every rule) without writing a loader, a chooser and pack commands for each. Let a user manage every domain's packs in one place.
+
+**Behaviour & rules.**
+- **A pack** is a JSON file following `schemas/rules/riviera.rules-1.schema.json` (MIT). It has:
+  - an `id`, a title, its **domain** (`interiors` first; later `kitchen`, `foodservice`, `refrigeration`, `retail`, `checkout`, `gym`), its jurisdiction and edition, and a **layer** (`minimum`, `accessible` or `recommended`, as bathroom packs);
+  - rules of the kinds the format defines. The first kind is **zones** (ARC-RULE-002). Later kinds (type coverage, array counts, path distances, product values, integration rules) are added to the same format as their tools are built.
+
+  Each rule has an ID (its clause), a description, the elements it applies to, a source ID from `SOURCE_REGISTER.md`, a confidence (`verified`, `secondary` or `advisory`), and optionally the occupancy it applies to (`dwelling` or `other`).
+- **Packs that ship** for interiors (values in research/15 Part G):
+
+| Pack | Layer | Covers |
+|---|---|---|
+| `ada_2010_interiors` | accessible | 2010 ADA Standards §806.2.3: a 30 × 48 in clear floor space for a parallel approach along each side of a bed (G139) |
+| `practice_interiors` | recommended | Practice clearances, as notes: 36 in round a dining table's edge, to pull chairs back and pass; 30 in in front of a dresser (36 in preferred); 24 in at the foot of a bed (research/15 D2, S1478 and S1479, [guide]) |
+
+- **Choosing packs.** A project uses the packs it names for a domain (`rules.set_packs`), or packs chosen automatically: for interiors, `ada_2010_interiors` when the accessibility rule set (ARC-MOD-031) is the ADA. `practice_interiors` is only chosen by name.
+- **One command family for every domain.**
+  - `rules.packs` lists the packs of every domain, or of one: bathroom (ARC-BATH-001), vertical transport (ARC-VT-001) and the shared-format domains. Each has its domain, format, layer, jurisdiction and edition, its rule count, whether it is in use, and whether it ships.
+  - `rules.set_packs`, `rules.add_pack` and `rules.remove_pack` choose, add and remove packs in any domain. A pack is routed by its `format`: a bathroom or vertical-transport pack goes to its domain's own store, so the `bath.*` and `vt.*` pack commands see the same packs.
+- **Project packs** of the shared format are kept in RXD on the project (`rxd:rule_packs`, a list) with the chosen ids per domain (`rxd:rule_choice`). A project pack with a shipped pack's id replaces it for that project.
+
+**Data (IFC mapping).** RXD only: `rxd:rule_packs` and `rxd:rule_choice` on `IfcProject`.
+
+**Commands.** `rules.packs`, `rules.set_packs`, `rules.add_pack`, `rules.remove_pack`, `rules.schema`.
+
+**Acceptance criteria.**
+- [x] Every shipped shared-format pack follows the published schema, and every rule names a source in `SOURCE_REGISTER.md`.
+- [x] A project with the ADA rule set uses `ada_2010_interiors` without being told. Naming `practice_interiors` for interiors uses only that.
+- [x] `rules.packs` lists the bathroom, vertical-transport and interiors packs together. `rules.set_packs` for the bathroom domain changes what `bath.rule_packs` reports in use. `rules.add_pack` with a bathroom pack adds it where `bath.rule_packs` sees it.
+- [x] A project pack that widens the bed space to 36 in replaces the shipped pack of its id, and is saved with the model.
+
+*Built (2026-11-06):* `riviera_core::rules`, the schema and two packs in `schemas/rules/`, and Manage › Model Properties › Interiors rules (automatic, or one tick per pack). A pack of another format, or one breaking the schema, is refused (`rules.pack_schema`). The bathroom and vertical-transport settings pages stay as they are. Not yet: the later rule kinds (type coverage, array counts, path distances, product values, integration), and moving the bathroom and vertical-transport packs onto the shared format.
+
+### 3.9b.2 Use zones and the rules check
+**ID:** ARC-RULE-002 · **Priority:** P1 · **Ref:** ARC-RULE-001; ARC-BATH-002; ARC-MOD-031; `INTERIORS_PLAN.md` §4.1; research/15 D2, G139
+
+**Purpose.** Show the space each piece of furniture or equipment needs under the rules in use, and say as soon as something takes it, as fixture spaces do for bathrooms.
+
+**Behaviour & rules.**
+- **Zones are virtual volumes** (ARC-MOD-031, kind *use zone*). Each placed copy of a custom object or component (DM-IMP-015) gets one per zone rule of the packs in use that selects it. They move and turn with the copy and never drive geometry.
+- **Selecting elements.** A rule applies to elements by IFC class (`IfcFurniture`), predefined type (`BED`) or ObjectType (`Treadmill`), compared without case. When a rule names more than one of these, an element must match each one named.
+- **The element's frame.** Its extents are taken from its body in its own frame: x across, with its **front** at −y (the side a person uses) and its **back** at +y. A zone is set out:
+  - *across*: from the element's **centre** line, or its **left** or **right** edge as one faces its front. Positive is to the right;
+  - *out*: from its **front**, positive in front of it, or from its **back**, positive behind it.
+
+  Each zone runs from just above the floor to its rule's height (1.0 m unless the rule says otherwise).
+- **What may be in a zone.** The element itself may; so may floors, floor coverings (a rug), accessories, and other elements' zones (clear floor spaces may overlap, ADA 305.2). Any other element's body is an intrusion. A rule marked `door_swing: forbidden` is also intruded on by any door's swing.
+- **Accessible elements.** The accessible layer's rules apply to an element unless it is marked not accessible (`rules.set_accessible`, RXD `rxd:accessible`): the ADA asks only some rooms and beds to comply. Code and guidance packs apply to every element.
+- **`rules.check`** checks every element with zones (or those given, or one domain's) and returns findings, each with the element, the pack, its domain, edition and layer, the rule ID, its source and confidence, and the intruding element with its depth and where. A finding from a `recommended` pack or an `advisory` rule is a **note**; any other is an **error**. Errors come first. `clearance.check` and `clearance.list` include use zones.
+- **Display.** Views show use zones with the other virtual volumes.
+
+**Data (IFC mapping).** As ARC-MOD-031: not exported unless clearances are exported, then as `IfcSpatialZone` "Clearance". The accessible mark is RXD element data (`rxd:accessible`).
+
+**Commands.** `rules.check`, `rules.set_accessible`.
+
+**Acceptance criteria.**
+- [x] Under `ada_2010_interiors`, a bed with a nightstand pushed into the 30 in beside it is reported against §806.2.3; moved clear, it is not.
+- [x] Under `practice_interiors`, a wall 600 mm in front of a dresser is a note, not an error.
+- [x] A bed marked not accessible gets no ADA zones; the practice zones still apply.
+- [x] A bed's zones follow it when it is moved and turned.
+
+*Built (2026-11-06):* use zones in `clearances::all` (kind `use_zone`, green like fixture spaces), `rules.check` in `riviera-app`, and View › Coordination › Check Rules, which lists the findings and selects and frames the one picked. A rule selects an element by its own predefined type and ObjectType, else its type's predefined type and ElementType. `mesh_object.set_type` now sets a type's `predefined_type` and `element_type`; the Properties palette shows them as *IFC Type* and *Kind*. Sample *An accessible hotel guest room*. Not yet: one clear space shared by two beds (§806.2.3's exception; mark one bed not accessible), turning spaces, and furniture from the interiors library.
+
+---
+
 ## 3.11 Massing and site
 
 ### 3.11.1 Masses
@@ -16808,6 +16884,13 @@ All commands below are registered once in the command registry and exposed autom
 | `scopebox.set_extents` | id, min, max, rotation? | — | Yes | ARC-SCOPE-001 |
 | `datum.assign_scope_box` | datum_ids, scope_box_id \| null | — | Yes | ARC-SCOPE-001 |
 | `view.assign_scope_box` | view_ids, scope_box_id \| null | — | Yes | ARC-SCOPE-001 |
+| `rules.packs` | domain? | [{domain, id, title, format, layer, jurisdiction, edition, rules, in_use, shipped}] | No (query) | ARC-RULE-001 |
+| `rules.set_packs` | domain, packs? (none for automatic) | — | Yes | ARC-RULE-001 |
+| `rules.add_pack` | pack (riviera.rules-1, bath-rules-1 or vt-rules-1) | {domain, id} | Yes | ARC-RULE-001 |
+| `rules.remove_pack` | domain, id | — | Yes | ARC-RULE-001 |
+| `rules.schema` | — | the riviera.rules-1 JSON schema | No (query) | ARC-RULE-001 |
+| `rules.set_accessible` | element_ids, accessible | — | Yes | ARC-RULE-002 |
+| `rules.check` | element_ids?, domain?, tolerance? | finding[] | No (query) | ARC-RULE-002 |
 | `bath.rule_packs` | — | [{id, title, layer, jurisdiction, edition, in_use, shipped, zones, distances}] | No (query) | ARC-BATH-001 |
 | `bath.set_rule_packs` | packs? (none for automatic) | — | Yes | ARC-BATH-001 |
 | `bath.add_rule_pack` | pack | — | Yes | ARC-BATH-001 |
@@ -30269,14 +30352,14 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 39 | 8 | 0 | 123 |
 | DM | 91 | 65 | 34 | 3 | 193 |
-| ARC | 77 | 101 | 37 | 1 | 216 |
+| ARC | 77 | 103 | 37 | 1 | 218 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 32 | 0 | 33 |
 | DOC | 68 | 40 | 13 | 1 | 122 |
 | COL | 8 | 52 | 16 | 1 | 77 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **343** | **233** | **7** | **903** |
+| **Total** | **320** | **345** | **233** | **7** | **905** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -30331,7 +30414,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.2a Riviera-originated features
 
-149 requirements are Riviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
+150 requirements are Riviera's own design: owner directives, the technology stack (IFC/RXD storage, live store, BIMserver, MCP, scripting) and extensions beyond the reference product's feature set. Their Ref lines cite no research on the reference product. Listing them separately keeps the clean-room provenance clear: every other requirement traces to public research on the reference product.
 
 | Requirement | Ch | Feature |
 |-------------|----|---------|
@@ -30438,6 +30521,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | ARC-VT-022 | 3 | 3.7a.22 Fare lines |
 | ARC-BATH-018 | 3 | 3.9a.18 Bathroom elevations and schedules |
 | ARC-BATH-019 | 3 | 3.9a.19 Bathroom compliance report |
+| ARC-RULE-001 | 3 | 3.9b.1 Shared rule packs |
 | ARC-ALN-002 | 3 | 3.11.12 Alignments in IFC 4.3 |
 | ARC-MOD-030 | 3 | 3.12.2a Volume overlaps, virtual volumes and their resolution |
 | ARC-MOD-031 | 3 | 3.12.2a Volume overlaps, virtual volumes and their resolution |
@@ -30487,7 +30571,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2356 unique commands** in 441 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2363 unique commands** in 442 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -30821,6 +30905,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `route` | 1 |
 | `route_settings` | 1 |
 | `routing_preferences` | 2 |
+| `rules` | 7 |
 | `rxd` | 9 |
 | `schedule` | 26 |
 | `scheduleinstance` | 3 |
@@ -32494,6 +32579,13 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `route_settings.set` | 4 | params | — | Yes | ANA-ROUTE-002 |
 | `routing_preferences.get` | 4 | type_id | table | No | MEP-DUCT-002 |
 | `routing_preferences.set` | 4 | type_id, table | — | Yes | MEP-DUCT-002 |
+| `rules.add_pack` | 3 | pack (riviera.rules-1, bath-rules-1 or vt-rules-1) | {domain, id} | Yes | ARC-RULE-001 |
+| `rules.check` | 3 | element_ids?, domain?, tolerance? | finding[] | No (query) | ARC-RULE-002 |
+| `rules.packs` | 3 | domain? | [{domain, id, title, format, layer, jurisdiction, edition, rules, in_use, shipped}] | No (query) | ARC-RULE-001 |
+| `rules.remove_pack` | 3 | domain, id | — | Yes | ARC-RULE-001 |
+| `rules.schema` | 3 | — | the riviera.rules-1 JSON schema | No (query) | ARC-RULE-001 |
+| `rules.set_accessible` | 3 | element_ids, accessible | — | Yes | ARC-RULE-002 |
+| `rules.set_packs` | 3 | domain, packs? (none for automatic) | — | Yes | ARC-RULE-001 |
 | `rxd.attach_sidecar` | 2 | path | — | Yes | DM-RXD-003 |
 | `rxd.export_sidecar` | 2 | path | — | No | DM-RXD-003 |
 | `rxd.get_document` | 2a | path | JSON | No (read) | DM-RXD-001 |

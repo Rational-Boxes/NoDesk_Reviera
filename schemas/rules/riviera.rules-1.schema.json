@@ -1,0 +1,225 @@
+{
+  "$id": "https://riviera.org/schemas/rules/riviera.rules-1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Riviera rule pack",
+  "description": "Rules for one domain (interiors, and later kitchens, retail, checkouts and gyms), from one code, standard or guide (ARC-RULE-001). Lengths are metres. New rule kinds are added to this format as their tools are built. Bathroom and vertical-transport packs keep their own formats. MIT licensed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "id",
+    "title",
+    "domain",
+    "jurisdiction",
+    "edition",
+    "layer"
+  ],
+  "properties": {
+    "format": {
+      "const": "riviera.rules-1"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]+$",
+      "description": "Unique among the packs a project can use; a project pack with a shipped pack's id replaces it."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "domain": {
+      "type": "string",
+      "pattern": "^[a-z_]+$",
+      "description": "What it governs: interiors, kitchen, foodservice, refrigeration, retail, checkout, gym, …"
+    },
+    "jurisdiction": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Where it applies: US, England, …"
+    },
+    "edition": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The editions and clauses its values come from."
+    },
+    "layer": {
+      "enum": [
+        "minimum",
+        "accessible",
+        "recommended"
+      ],
+      "description": "A code minimum, an accessibility standard, or guidance (findings are notes)."
+    },
+    "notes": {
+      "type": "string"
+    },
+    "zones": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/zone"
+      }
+    }
+  },
+  "$defs": {
+    "rule": {
+      "type": "object",
+      "required": [
+        "id",
+        "description",
+        "applies_to",
+        "source",
+        "confidence"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The clause it comes from, e.g. `ADA 2010 806.2.3`."
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "applies_to": {
+          "$ref": "#/$defs/selector"
+        },
+        "occupancy": {
+          "enum": [
+            "any",
+            "dwelling",
+            "other"
+          ],
+          "description": "Where it applies, as the building code settings name occupancies (default any)."
+        },
+        "source": {
+          "type": "string",
+          "pattern": "^S[0-9]{4}( S[0-9]{4})*$",
+          "description": "Source IDs in SOURCE_REGISTER.md."
+        },
+        "confidence": {
+          "enum": [
+            "verified",
+            "secondary",
+            "advisory"
+          ]
+        }
+      }
+    },
+    "selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "description": "The elements a rule applies to. Each list names alternatives; an element must match every list given. Compared without case.",
+      "properties": {
+        "classes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^Ifc[A-Za-z]+$"
+          }
+        },
+        "predefined_types": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "object_types": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "zone": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/rule"
+        }
+      ],
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": [
+        "across",
+        "out"
+      ],
+      "properties": {
+        "id": true,
+        "description": true,
+        "applies_to": true,
+        "occupancy": true,
+        "source": true,
+        "confidence": true,
+        "across": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/across"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "out": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/out"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "height": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "How high above the floor it is kept clear (default 1.0 m)."
+        },
+        "door_swing": {
+          "enum": [
+            "allowed",
+            "forbidden"
+          ],
+          "description": "Whether a door may swing into it (default allowed)."
+        }
+      }
+    },
+    "across": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "enum": [
+            "centre",
+            "left",
+            "right"
+          ]
+        },
+        {
+          "type": "number"
+        }
+      ],
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "A position across the element, from its centre line or its left or right edge as one faces its front, positive to the right."
+    },
+    "out": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "enum": [
+            "front",
+            "back"
+          ]
+        },
+        {
+          "type": "number"
+        }
+      ],
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "A position from the element's front, positive in front of it, or from its back, positive behind it."
+    }
+  }
+}

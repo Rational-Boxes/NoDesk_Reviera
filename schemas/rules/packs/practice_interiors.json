@@ -1,0 +1,119 @@
+{
+  "format": "riviera.rules-1",
+  "id": "practice_interiors",
+  "title": "Interior planning practice",
+  "domain": "interiors",
+  "jurisdiction": "Any",
+  "edition": "Furniture planning guides (research/15 D2)",
+  "layer": "recommended",
+  "notes": "Practice, not code: findings are notes. Guides give 36 in in front of a dresser as preferred and 30 in as the minimum, and 24-36 in at the foot of a bed.",
+  "zones": [
+    {
+      "id": "Dining table edge",
+      "description": "36 in round a dining table's edge, to pull chairs back and pass",
+      "applies_to": {
+        "classes": [
+          "IfcFurniture"
+        ],
+        "predefined_types": [
+          "TABLE"
+        ],
+        "object_types": [
+          "DiningTable"
+        ]
+      },
+      "across": [
+        [
+          "left",
+          -0.9144
+        ],
+        [
+          "right",
+          0.9144
+        ]
+      ],
+      "out": [
+        [
+          "front",
+          0.9144
+        ],
+        [
+          "back",
+          0.9144
+        ]
+      ],
+      "height": 0.75,
+      "source": "S1479",
+      "confidence": "secondary"
+    },
+    {
+      "id": "Dresser front",
+      "description": "30 in in front of a dresser, to open its drawers and stand at them",
+      "applies_to": {
+        "classes": [
+          "IfcFurniture"
+        ],
+        "object_types": [
+          "Dresser"
+        ]
+      },
+      "across": [
+        [
+          "left",
+          0.0
+        ],
+        [
+          "right",
+          0.0
+        ]
+      ],
+      "out": [
+        [
+          "front",
+          0.0
+        ],
+        [
+          "front",
+          0.762
+        ]
+      ],
+      "source": "S1478",
+      "confidence": "secondary"
+    },
+    {
+      "id": "Bed foot",
+      "description": "24 in clear at the foot of a bed",
+      "applies_to": {
+        "classes": [
+          "IfcFurniture"
+        ],
+        "predefined_types": [
+          "BED"
+        ]
+      },
+      "across": [
+        [
+          "left",
+          0.0
+        ],
+        [
+          "right",
+          0.0
+        ]
+      ],
+      "out": [
+        [
+          "front",
+          0.0
+        ],
+        [
+          "front",
+          0.6096
+        ]
+      ],
+      "height": 0.6,
+      "source": "S1478",
+      "confidence": "secondary"
+    }
+  ]
+}

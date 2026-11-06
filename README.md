@@ -623,6 +623,16 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
   Check Bathrooms lists what stands in a clear space, doors swinging into one, and a WC's
   distance from its side wall, as errors or notes (`bath.rule_packs`, `bath.set_rule_packs`,
   `bath.add_rule_pack`, `bath.remove_rule_pack`, `bath.set_hand`, `bath.check`).
+- **Shared rule packs and use zones** (ARC-RULE-001/002; the first step of
+  `design_documents/INTERIORS_PLAN.md`, shared with `KITCHENS_PLAN.md`). One rule-pack format,
+  `riviera.rules-1` (MIT schema `schemas/rules/`), serves every new domain, starting with
+  interiors. The packs are the 2010 ADA Standards' 30 × 48 in clear spaces beside a bed
+  (§806.2.3), and planning practice as notes. Furniture picked by its IFC type (BED, TABLE, …)
+  or its kind carries use zones as virtual volumes. View › Coordination › Check Rules lists what
+  stands in them. One command family lists, chooses, adds and removes packs in every domain,
+  bathroom and vertical transport included (`rules.packs`, `rules.set_packs`, `rules.add_pack`,
+  `rules.remove_pack`, `rules.set_accessible`, `rules.check`). Not built yet: the furniture
+  library, room layouts, hotel floors, retail fixtures, checkouts and gyms the plan goes on to.
 - **Grab bars** (ARC-BATH-003): round bars on a wall face, on brackets, following their wall,
   saved as `IfcRailing` HANDRAIL with swept-disk geometry. View › Coordination › Place Grab Bars
   puts the bars the packs ask for at fixtures (the ADA's WC side and rear bars), and Check

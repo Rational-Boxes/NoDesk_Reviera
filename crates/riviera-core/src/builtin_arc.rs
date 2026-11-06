@@ -533,6 +533,12 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(WallGetProfile),
         registry.add(BathRulePacks),
         registry.add(BathSetRulePacks),
+        registry.add(RulesPacks),
+        registry.add(RulesSetPacks),
+        registry.add(RulesAddPack),
+        registry.add(RulesRemovePack),
+        registry.add(RulesSchema),
+        registry.add(RulesSetAccessible),
         registry.add(BathAddRulePack),
         registry.add(BathRemoveRulePack),
         registry.add(BathSetHand),
@@ -4026,8 +4032,10 @@ edit_command!(
     MeshObjectSetType,
     "mesh_object.set_type",
     "Change a custom object type",
-    "Changes a custom object type's name, uniform `scale` (every copy) and slot colours, and its \
-     `category` while it has no copies.",
+    "Changes a custom object type's name, uniform `scale` (every copy) and slot colours, its \
+     `category` while it has no copies, and its IFC `predefined_type` (`BED`, `TABLE`, … for furniture) \
+     or, for a USERDEFINED type, its `element_type` (`Dresser`, `Treadmill`), which its copies take as \
+     their ObjectType. Rule packs select furniture by these (ARC-RULE-002).",
     "Edit Object Type",
     crate::mesh_objects::SetTypeParams,
     (),
@@ -6790,6 +6798,80 @@ edit_command!(
     crate::walls::cross_section::SetParams,
     (),
     crate::walls::cross_section::set
+);
+
+read_command!(
+    RulesPacks,
+    "rules.packs",
+    "List the rule packs of every domain",
+    "Lists the rule packs the project can use in every domain, or in one (ARC-RULE-001): bathroom (`bath`), \
+     vertical transport (`vt`) and the shared-format domains such as `interiors`. Each has its domain, \
+     format, layer, jurisdiction and edition, how many rules it holds, whether it is in use, and whether it \
+     ships with Riviera.",
+    Option<crate::rules::PacksParams>,
+    Vec<crate::rules::PackSummary>,
+    crate::rules::packs
+);
+
+edit_command!(
+    RulesSetPacks,
+    "rules.set_packs",
+    "Choose a domain's rule packs",
+    "Chooses the rule packs in use in a domain, by id (ARC-RULE-001); with no `packs`, they are chosen \
+     automatically (for interiors, `ada_2010_interiors` with the ADA rule set). The bathroom and \
+     vertical-transport domains keep their own choice, as `bath.set_rule_packs` and `vt.set_rule_packs` do.",
+    "Rule Packs",
+    crate::rules::SetPacksParams,
+    (),
+    crate::rules::set_packs
+);
+
+edit_command!(
+    RulesAddPack,
+    "rules.add_pack",
+    "Add a rule pack to the project",
+    "Adds a rule pack to the project, kept with the model (ARC-RULE-001), routed by its `format`: \
+     `riviera.rules-1` (any shared domain), `riviera.bath-rules-1` or `riviera.vt-rules-1`. A pack with the \
+     id of a shipped one, or of one the project has, replaces it. Returns its domain and id.",
+    "Add Rule Pack",
+    crate::rules::AddPackParams,
+    crate::rules::Added,
+    crate::rules::add_pack
+);
+
+edit_command!(
+    RulesRemovePack,
+    "rules.remove_pack",
+    "Remove a project's rule pack",
+    "Removes one of the project's own rule packs from a domain (ARC-RULE-001); a shipped pack it replaced \
+     comes back.",
+    "Remove Rule Pack",
+    crate::rules::RemovePackParams,
+    (),
+    crate::rules::remove_pack
+);
+
+read_command!(
+    RulesSchema,
+    "rules.schema",
+    "The shared rule pack schema",
+    "Returns the published JSON schema of shared-format rule packs, `riviera.rules-1` (ARC-RULE-001, MIT).",
+    Option<crate::rules::SchemaParams>,
+    serde_json::Value,
+    crate::rules::schema
+);
+
+edit_command!(
+    RulesSetAccessible,
+    "rules.set_accessible",
+    "Mark elements accessible or not",
+    "Marks furniture or equipment as subject to the accessibility packs' rules or not (ARC-RULE-002): the \
+     ADA asks only some beds, rooms and machines to comply, so the others are marked not accessible. Code \
+     and guidance packs apply to every element.",
+    "Accessible Elements",
+    crate::rules::SetAccessibleParams,
+    (),
+    crate::rules::set_accessible
 );
 
 read_command!(
