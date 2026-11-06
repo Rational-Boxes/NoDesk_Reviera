@@ -1,6 +1,6 @@
 # Kitchens, foodservice and retail refrigeration
 
-**Status:** Draft 0.1 · 2026-10-31 · for the owner's review; nothing built.
+**Status:** Draft 0.2 · 2026-11-06 · four of the owner's answers in §11a; nothing built.
 **Owner's request (2026-10-31):** "launch a research session on kitchens. include residential and
 commercial, including grocery store refrigeration hardware."
 
@@ -444,3 +444,21 @@ points (standing rules).
    2023). Ship them as dated, advisory data that Riviera updates, or leave them to user packs?
 8. **Cabinet depth:** stop at design (runs, tops, elevations, schedules), or plan for shop cut
    lists and CNC export later, as KCD does?
+
+## 11a. The owner's answers (2026-11-06)
+
+Given with `INTERIORS_PLAN.md`:
+- **Q1, rules schema:** one shared schema, `riviera.rules-1`, for every domain (§3.1). The bath
+  packs keep working.
+- **Q3, priority:** the shared steps first (the rules schema, then the counter tool), then
+  interiors. Kitchens follow, reusing the counters.
+- **Q4, IFC classes:** as proposed:
+  - countertops are `IfcSystemFurnitureElement` WORKSURFACE;
+  - gas cookers are `IfcElectricAppliance` USERDEFINED with a gas port;
+  - hoods are `IfcAirTerminal` USERDEFINED.
+- **Q5, modular units:** start line-ups and repeated kitchens on path arrays, and move them onto
+  ARC-GRP-004 when it is built.
+
+Still open: Q2 (packs), Q6 (NEC as advisory), Q7 (refrigerant and energy data) and Q8 (cabinet
+depth).
+

@@ -1,6 +1,6 @@
 # Interiors workbench, retail fixtures, checkouts and gyms
 
-**Status:** Draft 0.1 · 2026-11-06 · for the owner's review; nothing built.
+**Status:** Draft 0.2 · 2026-11-06 · four of the owner's answers in §11a; nothing built.
 **Owner's requests (2026-10-31):** "Additional research items: gym and excercise equipment.
 Retail hardware for grocery, department store, display cases, etc."; "We'll also need and
 interiors workbench section: Common furnature items, counters, ornimental lighting, bedrooms,
@@ -527,3 +527,18 @@ Question 7 asks which goes first.
 
    The proposal is interiors first (§10), since the furniture library, zones and layouts are
    what the retail, checkout and gym areas build on.
+
+## 11a. The owner's answers (2026-11-06)
+
+- **Q1, rules schema:** one shared schema, `riviera.rules-1`, for every domain. The bath packs
+  keep working.
+- **Q7, order:** the shared steps first (the rules schema, then the counter tool), then
+  interiors. Kitchens follow, reusing the counters.
+- **Q3, modular units:** start hotel floors, fixture runs and front ends on path arrays, and move
+  them onto ARC-GRP-004 when it is built.
+- **Q4, IFC classes:** the mapping in §8.1 is accepted, with IFC4 fallbacks for the 4.3-only
+  classes. The gym mirror and ceiling fan classes are still open.
+
+Still open: Q2 (default packs), Q5 (checkout rules), Q6 (planogram schema), and the mirror and
+fan classes. Each is asked when its build step comes up.
+
