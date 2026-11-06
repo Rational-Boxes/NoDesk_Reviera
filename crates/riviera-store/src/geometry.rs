@@ -492,6 +492,66 @@ pub(crate) fn remove_wall_shape(ifc: &mut IfcModel, wall: StepId) -> Result<()> 
     Ok(())
 }
 
+/// Types `objects` by `ty`, joining the type's `IfcRelDefinesByType` if it has one: a type may
+/// have only one (IFC inverse `Types`, SET [0:1]).
+pub(crate) fn type_objects(ifc: &mut IfcModel, ty: StepId, objects: &[StepId], owner_history: Option<StepId>) -> Result<()> {
+    if objects.is_empty() {
+        return Ok(());
+    }
+    let existing = ifc
+        .referenced_by(ty, "IfcRelDefinesByType")?
+        .into_iter()
+        .find(|r| ifc.attribute(*r, "RelatingType").is_ok_and(|v| v == AttrValue::Ref(ty.0)));
+    let (rel, mut list) = match existing {
+        Some(rel) => (rel, ifc.attributes_many(&[rel])?[0].refs("RelatedObjects")),
+        None => {
+            let rel = ifc.create_rooted("IfcRelDefinesByType", &GlobalId::new())?;
+            if let Some(oh) = owner_history {
+                ifc.set_attribute(rel, "OwnerHistory", &AttrValue::Ref(oh.0))?;
+            }
+            ifc.set_attribute(rel, "RelatingType", &AttrValue::Ref(ty.0))?;
+            (rel, Vec::new())
+        }
+    };
+    list.extend(objects.iter().copied().filter(|o| !list.contains(o)).collect::<Vec<_>>());
+    ifc.set_attribute(rel, "RelatedObjects", &AttrValue::List(list.into_iter().map(|o| AttrValue::Ref(o.0)).collect()))?;
+    Ok(())
+}
+
+/// Merges the `IfcRelDefinesByType`s of any type that has more than one into its first.
+pub(crate) fn merge_typings(ifc: &mut IfcModel) -> Result<()> {
+    let rels = ifc.entities_of_type("IfcRelDefinesByType")?;
+    let ids: Vec<StepId> = rels.iter().map(|r| r.id).collect();
+    let mut by_type: std::collections::BTreeMap<u32, Vec<(StepId, Vec<StepId>)>> = Default::default();
+    for (id, e) in ids.iter().zip(ifc.attributes_many(&ids)?) {
+        if let AttrValue::Ref(t) = e.get("RelatingType") {
+            by_type.entry(*t).or_default().push((*id, e.refs("RelatedObjects")));
+        }
+    }
+    for (_, mut rels) in by_type.into_iter().filter(|(_, r)| r.len() > 1) {
+        let (keep, mut objects) = rels.remove(0);
+        for (rel, more) in rels {
+            objects.extend(more.into_iter().filter(|o| !objects.contains(o)).collect::<Vec<_>>());
+            ifc.remove(rel)?;
+        }
+        ifc.set_attribute(keep, "RelatedObjects", &AttrValue::List(objects.into_iter().map(|o| AttrValue::Ref(o.0)).collect()))?;
+    }
+    Ok(())
+}
+
+/// Takes `object` out of its types' `IfcRelDefinesByType`s, removing any left empty.
+pub(crate) fn untype(ifc: &mut IfcModel, object: StepId) -> Result<()> {
+    for rel in ifc.referenced_by(object, "IfcRelDefinesByType")? {
+        let kept: Vec<AttrValue> = ifc.attributes_many(&[rel])?[0].refs("RelatedObjects").into_iter().filter(|o| *o != object).map(|o| AttrValue::Ref(o.0)).collect();
+        if kept.is_empty() {
+            ifc.remove(rel)?;
+        } else {
+            ifc.set_attribute(rel, "RelatedObjects", &AttrValue::List(kept))?;
+        }
+    }
+    Ok(())
+}
+
 /// Places `element` in `storey` (`IfcRelContainedInSpatialStructure`), moving it out of any
 /// other container.
 pub(crate) fn contain(

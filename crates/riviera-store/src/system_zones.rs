@@ -6,9 +6,12 @@
 //! from it on every save, marked `rxd:system_zone` in their Description so they are rewritten and
 //! not read back as elements:
 //!
-//! - an `IfcZone` (ObjectType "SystemZone") grouping its spaces, and the equipment that serves
-//!   it, by one `IfcRelAssignsToGroup`, with `Pset_ZoneCommon` (NetPlannedArea);
-//! - the system that serves it by `IfcRelServicesBuildings` (system → spatial zone);
+//! - an `IfcZone` (ObjectType "SystemZone") grouping its spaces by one `IfcRelAssignsToGroup`,
+//!   with `Pset_ZoneCommon` (NetPlannedArea). An IfcZone may group only spaces and zones (rule
+//!   IfcZone.WR1);
+//! - the system that serves it by `IfcRelServicesBuildings` (system → spatial zone). Equipment
+//!   that serves it directly is grouped in an `IfcSystem` (ObjectType "ZoneEquipment") that
+//!   services it the same way;
 //! - its set points as `Pset_SpaceThermalRequirements` on each of its spaces.
 //!
 //! On load, an `IfcZone` from another tool keeps its members' GlobalIds as `@GroupMembers`, so
@@ -88,6 +91,11 @@ fn remove_earlier(ifc: &mut IfcModel) -> Result<()> {
             ifc.remove(e.id)?;
         }
     }
+    for e in ifc.entities_of_type("IfcSystem")? {
+        if ours(ifc, e.id) && ifc.class_of(e.id)?.eq_ignore_ascii_case("IfcSystem") {
+            ifc.remove(e.id)?;
+        }
+    }
     Ok(())
 }
 
@@ -154,11 +162,19 @@ fn write_zone(ifc: &mut IfcModel, store: &Store, steps: &HashMap<ElementId, Step
     let group = create_rooted(ifc, "IfcZone", &derived_guid(e.guid(), "zone"), owner_history)?;
     ifc.set_attribute(group, "Name", &s(e.name.as_deref().unwrap_or("System-Zone")))?;
     ifc.set_attribute(group, "ObjectType", &s("SystemZone"))?;
-    let mut members: Vec<AttrValue> = spaces.iter().map(|st| r(*st)).collect();
+    let members: Vec<AttrValue> = spaces.iter().map(|st| r(*st)).collect();
     if let Some((eq, false)) = served
         && let Some(&st) = steps.get(&eq)
     {
-        members.push(r(st));
+        let system = create_rooted(ifc, "IfcSystem", &derived_guid(e.guid(), "equipment"), owner_history)?;
+        ifc.set_attribute(system, "Name", &s(&format!("{} equipment", e.name.as_deref().unwrap_or("System-Zone"))))?;
+        ifc.set_attribute(system, "ObjectType", &s("ZoneEquipment"))?;
+        let rel = create_rooted(ifc, "IfcRelAssignsToGroup", &GlobalId::new(), owner_history)?;
+        ifc.set_attribute(rel, "RelatedObjects", &AttrValue::List(vec![r(st)]))?;
+        ifc.set_attribute(rel, "RelatingGroup", &r(system))?;
+        let rel = create_rooted(ifc, "IfcRelServicesBuildings", &GlobalId::new(), owner_history)?;
+        ifc.set_attribute(rel, "RelatingSystem", &r(system))?;
+        ifc.set_attribute(rel, "RelatedBuildings", &AttrValue::List(vec![r(step)]))?;
     }
     if !members.is_empty() {
         let rel = create_rooted(ifc, "IfcRelAssignsToGroup", &GlobalId::new(), owner_history)?;

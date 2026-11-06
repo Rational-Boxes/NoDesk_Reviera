@@ -1314,3 +1314,40 @@ fn the_wet_room_sample_falls_and_is_tanked() {
     // Nothing for Check Bathrooms.
     assert_eq!(ok(&mut app, "bath.check", json!({})), json!([]));
 }
+
+/// Opened and saved again, no sample gives a type more than one `IfcRelDefinesByType` (IFC
+/// inverse `Types`, SET [0:1]): path arrays and stacked walls join the type's existing one. No
+/// door or window opening outlives its insert, and no member is typed by a beam type (rule
+/// CorrectTypeAssigned).
+#[test]
+fn every_sample_keeps_ifc_invariants() {
+    let work = tempfile::tempdir().unwrap();
+    let mut names: Vec<String> = std::fs::read_dir(samples())
+        .unwrap()
+        .filter_map(|e| e.ok()?.path().file_stem()?.to_str().map(str::to_owned).filter(|_| true))
+        .filter(|n| samples().join(format!("{n}.ifc")).exists())
+        .collect();
+    names.sort();
+    names.dedup();
+    for name in names {
+        let mut app = open(work.path(), &name);
+        ok(&mut app, "file.save", json!({}));
+        let ifc = riviera_ifc::IfcModel::open(&work.path().join(format!("{name}.ifc"))).unwrap();
+        let mut seen = std::collections::HashMap::new();
+        for rel in ifc.entities_of_type("IfcRelDefinesByType").unwrap() {
+            *seen.entry(format!("{:?}", ifc.attribute(rel.id, "RelatingType").unwrap())).or_insert(0) += 1;
+        }
+        assert!(seen.values().all(|n| *n == 1), "{name}: {:?}", seen.iter().filter(|(_, n)| **n > 1).collect::<Vec<_>>());
+        let s = store(&app);
+        for e in s.iter() {
+            if let Some(insert) = riviera_core::inserts::opening_of(e) {
+                assert!(riviera_core::GlobalId::parse(&insert).and_then(|g| s.find_by_guid(&g)).is_some(), "{name}: opening {} outlives its insert", e.id());
+            }
+            if e.class == "IfcMember"
+                && let Some(t) = e.param("@type").and_then(|v| v.as_str()).and_then(riviera_core::GlobalId::parse).and_then(|g| s.find_by_guid(&g)).and_then(|t| s.get(t))
+            {
+                assert_ne!(t.class, "IfcBeamType", "{name}: member {} typed by beam type {:?}", e.id(), t.name);
+            }
+        }
+    }
+}

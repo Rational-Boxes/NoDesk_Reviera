@@ -104,7 +104,9 @@ fn system_zones() {
     ok(&r, &mut doc, "edit.undo", json!({}));
     assert_eq!(doc.store().get(z2).unwrap().name.as_deref(), Some("East"));
 
-    // IFC: three spatial zones, three derived IfcZones; the first groups six spaces and the box.
+    // IFC: three spatial zones, three derived IfcZones; the first groups its six spaces, and the
+    // box that serves it is in a ZoneEquipment system servicing the spatial zone (an IfcZone may
+    // group only spaces and zones).
     project.save(&doc).unwrap();
     project.save(&doc).unwrap();
     let rows = IfcModel::open(&path).unwrap().step_rows().unwrap();
@@ -115,7 +117,11 @@ fn system_zones() {
     assert!(rows.iter().filter(|r| r.class == "IFCZONE").all(|r| r.attributes.contains("'SystemZone'")));
     assert_eq!(count("IFCRELREFERENCEDINSPATIALSTRUCTURE"), 3);
     let groups: Vec<&str> = rows.iter().filter(|r| r.class == "IFCRELASSIGNSTOGROUP").map(|r| r.attributes.as_str()).collect();
-    assert!(groups.iter().any(|g| g.matches('#').count() == 6 + 1 + 1), "six spaces, the box and the zone: {groups:?}");
+    assert!(groups.iter().any(|g| g.matches('#').count() == 6 + 1), "six spaces and the zone: {groups:?}");
+    let equipment = rows.iter().find(|r| r.class == "IFCSYSTEM" && r.attributes.contains("'ZoneEquipment'")).expect("the box's system");
+    assert!(groups.iter().any(|g| g.matches('#').count() == 1 + 1 && g.ends_with(&format!("#{})", equipment.id.0))), "the box in its system: {groups:?}");
+    assert!(rows.iter().any(|r| r.class == "IFCRELSERVICESBUILDINGS" && r.attributes.contains(&format!("#{},", equipment.id.0))));
+    assert_eq!(count("IFCSYSTEM"), 1, "rewritten, not added to");
     let psets: Vec<&str> = rows.iter().filter(|r| r.class == "IFCPROPERTYSET").map(|r| r.attributes.as_str()).collect();
     assert_eq!(psets.iter().filter(|p| p.contains("'Pset_ZoneCommon'")).count(), 3);
     assert_eq!(psets.iter().filter(|p| p.contains("'Pset_SpaceThermalRequirements'")).count(), 1);

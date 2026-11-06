@@ -1058,7 +1058,45 @@ fn create_one(txn: &mut crate::txn::Transaction<'_>, p: CreateParams) -> Result<
     finish(txn, id, class)
 }
 
+/// Types a framing element by a type of its own class: an `IfcMember` by an `IfcMemberType`,
+/// an `IfcBeam` by an `IfcBeamType` (IFC rule CorrectTypeAssigned). A framing type of the other
+/// class gets a sibling of this one, the same section and name, made once and shared.
+fn match_type_class(txn: &mut crate::txn::Transaction<'_>, id: ElementId, class: &str) -> Result<()> {
+    let store = txn.store().clone();
+    let Some(t) = store.get(id).and_then(|e| e.param("@type")).and_then(|v| v.as_str()).and_then(|g| find(&store, g)).and_then(|t| store.get(t)) else {
+        return Ok(());
+    };
+    let (want, predefined, pset, other_pset) = if class == "IfcMember" {
+        ("IfcMemberType", "MEMBER", "Pset_MemberCommon.", "Pset_BeamCommon.")
+    } else {
+        ("IfcBeamType", "BEAM", "Pset_BeamCommon.", "Pset_MemberCommon.")
+    };
+    if t.class == want || beam_type(t).is_none() {
+        return Ok(());
+    }
+    let sibling = store.iter().find(|x| x.class == want && x.name == t.name && x.param(RECIPE_KEY) == t.param(RECIPE_KEY)).map(|x| x.id());
+    let sibling = match sibling {
+        Some(s) => s,
+        None => {
+            let mut new = NewElement::new(want);
+            new.name = t.name.clone();
+            for (k, v) in &t.params {
+                let k = k.strip_prefix(other_pset).map_or_else(|| k.clone(), |rest| format!("{pset}{rest}"));
+                new.params.insert(k, v.clone());
+            }
+            new.params.insert("@PredefinedType".into(), json!(predefined));
+            txn.create(new)?
+        }
+    };
+    let guid = txn.store().get(sibling).expect("made").guid().to_string();
+    txn.modify(id, |e| {
+        e.params.insert("@type".into(), json!(guid));
+    })?;
+    Ok(())
+}
+
 fn finish(txn: &mut crate::txn::Transaction<'_>, id: ElementId, class: &str) -> Result<ElementId> {
+    match_type_class(txn, id, class)?;
     let pset = if class == "IfcMember" {
         "Pset_MemberCommon"
     } else {

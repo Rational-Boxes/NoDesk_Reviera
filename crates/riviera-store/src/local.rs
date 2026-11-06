@@ -866,6 +866,8 @@ impl LocalProject {
             crate::styles::write_default_styles(&mut self.ifc)?;
             self.styles_checked = true;
         }
+        // One typing relationship a type, also in files saved before the writers joined them.
+        geometry::merge_typings(&mut self.ifc)?;
 
         for id in dirty {
             let Some(&step) = self.steps.get(&id) else {
@@ -3089,6 +3091,17 @@ impl LocalProject {
             let (Some(&opening), Some(&host)) = (self.steps.get(&cut), self.steps.get(&target)) else {
                 continue;
             };
+            // Every cut voids its target, even one with no cutter solid (a shorten moves the
+            // member's end instead): an IfcOpeningElement must void exactly one element.
+            geometry::relate_one(
+                &mut self.ifc,
+                "IfcRelVoidsElement",
+                "RelatingBuildingElement",
+                host,
+                "RelatedOpeningElement",
+                opening,
+                owner_history,
+            )?;
             let Some(tools) = riviera_core::steel_cuts::cutter(store, &r, &body_of) else {
                 continue;
             };
@@ -3103,15 +3116,6 @@ impl LocalProject {
                 })
                 .collect();
             geometry::write_breps(&mut self.ifc, opening, geometry::BrepFrame::WORLD, &solids, self.length_scale, contexts)?;
-            geometry::relate_one(
-                &mut self.ifc,
-                "IfcRelVoidsElement",
-                "RelatingBuildingElement",
-                host,
-                "RelatedOpeningElement",
-                opening,
-                owner_history,
-            )?;
         }
         Ok(())
     }

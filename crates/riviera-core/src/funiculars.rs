@@ -289,7 +289,7 @@ pub fn properties(f: &Funicular) -> Vec<(String, Value)> {
         ("Riviera_Funicular.Layout".into(), measure("IfcLabel", serde_json::to_value(f.layout).expect("serialises"))),
         ("Riviera_Funicular.TrackLength".into(), len(f.length)),
         ("Riviera_Funicular.Rise".into(), len(f.rise)),
-        ("Riviera_Funicular.MaxGrade".into(), measure("IfcPositiveRatioMeasure", f.max_grade / 100.0)),
+        ("Riviera_Funicular.MaxGrade".into(), measure("IfcRatioMeasure", f.max_grade / 100.0)),
         ("Riviera_Funicular.Speed".into(), measure("IfcLinearVelocityMeasure", f.speed)),
         ("Riviera_Funicular.TripTime".into(), measure("IfcTimeMeasure", f.trip)),
         ("Riviera_Funicular.LineCapacity".into(), measure("IfcReal", f.capacity)),

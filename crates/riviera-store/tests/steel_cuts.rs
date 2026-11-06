@@ -213,7 +213,12 @@ fn copes_miters_shortening_and_plate_cuts() {
     let rows = IfcModel::open(&path).unwrap().step_rows().unwrap();
     let n = |class: &str| rows.iter().filter(|r| r.class == class).count();
     assert_eq!(n("IFCOPENINGELEMENT"), cuts.as_array().unwrap().len());
-    assert_eq!(n("IFCRELVOIDSELEMENT"), with_body);
+    // Every cut voids its target, even a straight shorten with no cutter solid (an
+    // IfcOpeningElement must void exactly one element); only those with a body have geometry.
+    assert_eq!(n("IFCRELVOIDSELEMENT"), cuts.as_array().unwrap().len());
+    let ifc = IfcModel::open(&path).unwrap();
+    let shaped = ifc.entities_of_type("IfcOpeningElement").unwrap().iter().filter(|o| ifc.attribute(o.id, "Representation").unwrap() != riviera_ifc::AttrValue::Null).count();
+    assert_eq!(shaped, with_body);
     assert!(text.contains("'COPE_SKEWED'") && text.contains("'MITER'") && text.contains("'SUB_CONNECTION'"));
 
     // Deleting the girder deletes its cope; deleting a mitered beam deletes both miters' partner

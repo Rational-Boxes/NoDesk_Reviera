@@ -66,12 +66,7 @@ pub(crate) fn remove_subs(ifc: &mut IfcModel, whole: StepId) -> Result<()> {
         for p in parts {
             let AttrValue::Ref(p) = p else { continue };
             let p = StepId(p);
-            for typing in ifc.referenced_by(p, "IfcRelDefinesByType")? {
-                if matches!(ifc.attribute(typing, "Description")?, AttrValue::String(d) if d == PART_TAG)
-                {
-                    ifc.remove(typing)?;
-                }
-            }
+            geometry::untype(ifc, p)?;
             geometry::remove_breps(ifc, p)?;
             ifc.remove(p)?;
         }
@@ -112,7 +107,7 @@ pub(crate) fn write_subs(
     let contexts = geometry::Contexts::find(ifc)?;
     let ifc4 = ifc.schema() != "IFC2X3";
     let mut parts = Vec::new();
-    let mut by_type: BTreeMap<ElementId, Vec<AttrValue>> = BTreeMap::new();
+    let mut by_type: BTreeMap<ElementId, Vec<StepId>> = BTreeMap::new();
     for (s, mesh) in subs {
         let e = ifc.create_rooted("IfcWall", &s.guid)?;
         let name = store
@@ -144,17 +139,11 @@ pub(crate) fn write_subs(
             contexts,
         )?;
         parts.push(r(e));
-        by_type.entry(s.wall_type).or_default().push(r(e));
+        by_type.entry(s.wall_type).or_default().push(e);
     }
     for (ty, objects) in by_type {
         let Some(&ty) = steps.get(&ty) else { continue };
-        let typing = ifc.create_rooted("IfcRelDefinesByType", &GlobalId::new())?;
-        ifc.set_attribute(typing, "Description", &AttrValue::String(PART_TAG.into()))?;
-        if let Some(oh) = owner_history {
-            ifc.set_attribute(typing, "OwnerHistory", &r(oh))?;
-        }
-        ifc.set_attribute(typing, "RelatedObjects", &AttrValue::List(objects))?;
-        ifc.set_attribute(typing, "RelatingType", &r(ty))?;
+        geometry::type_objects(ifc, ty, &objects, owner_history)?;
     }
     if parts.is_empty() {
         return Ok(());

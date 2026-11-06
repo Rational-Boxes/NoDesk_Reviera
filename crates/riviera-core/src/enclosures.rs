@@ -962,8 +962,8 @@ fn design_params(r: &EnclosureRecipe) -> Vec<(String, Value)> {
         (k("EaveHeight"), t("IfcLengthMeasure", json!(r.eave))),
         (k("RidgeHeight"), length(r.ridge())),
         (k("FloorArea"), t("IfcAreaMeasure", json!(r.width() * r.length))),
-        (k("RoofVentTarget"), t("IfcPositiveRatioMeasure", json!(r.vents / 100.0))),
-        (k("SideVentTarget"), t("IfcPositiveRatioMeasure", json!(r.side_vents / 100.0))),
+        (k("RoofVentTarget"), t("IfcRatioMeasure", json!(r.vents / 100.0))),
+        (k("SideVentTarget"), t("IfcRatioMeasure", json!(r.side_vents / 100.0))),
     ];
     if !r.form.tunnel() {
         out.push((k("Pitch"), t("IfcPlaneAngleMeasure", json!(r.pitch))));
@@ -994,13 +994,8 @@ fn number(store: &Store, v: &Value, data_type: &str, what: &str) -> Result<f64> 
 /// The parts made again from the recipe, the old ones deleted.
 fn rebuild(txn: &mut Transaction<'_>, id: ElementId, mut r: EnclosureRecipe) -> Result<()> {
     let store = txn.store().clone();
-    for g in &r.parts {
-        if let Some(part) = GlobalId::parse(g).and_then(|g| store.find_by_guid(&g))
-            && txn.store().contains(part)
-        {
-            txn.delete(part)?;
-        }
-    }
+    let old: Vec<ElementId> = r.parts.iter().filter_map(|g| GlobalId::parse(g).and_then(|g| store.find_by_guid(&g))).collect();
+    crate::builtin::delete_parts(txn, &old)?;
     let guid = store.get(id).expect("exists").guid().to_string();
     let parts = build(txn, &guid, &r)?;
     r.parts = parts.iter().map(|p| txn.store().get(*p).expect("made").guid().to_string()).collect();

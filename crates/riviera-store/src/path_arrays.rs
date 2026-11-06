@@ -68,12 +68,7 @@ pub(crate) fn remove_members(ifc: &mut IfcModel, whole: StepId) -> Result<()> {
         for p in parts {
             let AttrValue::Ref(p) = p else { continue };
             let p = StepId(p);
-            for typing in ifc.referenced_by(p, "IfcRelDefinesByType")? {
-                if matches!(ifc.attribute(typing, "Description")?, AttrValue::String(d) if d == PART_TAG)
-                {
-                    ifc.remove(typing)?;
-                }
-            }
+            geometry::untype(ifc, p)?;
             mesh_objects::remove_copy_geometry(ifc, p)?;
             ifc.remove(p)?;
         }
@@ -141,7 +136,7 @@ pub(crate) fn write_path_arrays(
             ifc.set_attribute(step, "ObjectPlacement", &r(placement))?;
         }
         let mut parts = Vec::new();
-        let mut by_type: BTreeMap<ElementId, Vec<AttrValue>> = BTreeMap::new();
+        let mut by_type: BTreeMap<ElementId, Vec<StepId>> = BTreeMap::new();
         for (m, g) in &members {
             let Some(&(_, map)) = maps.get(&g.type_id) else {
                 continue;
@@ -163,16 +158,10 @@ pub(crate) fn write_path_arrays(
             }
             mesh_objects::write_mapped(ifc, e, g.placement, map, PART_TAG, scale, contexts)?;
             parts.push(r(e));
-            by_type.entry(g.type_id).or_default().push(r(e));
+            by_type.entry(g.type_id).or_default().push(e);
         }
         for (ty, objects) in by_type {
-            let typing = ifc.create_rooted("IfcRelDefinesByType", &GlobalId::new())?;
-            ifc.set_attribute(typing, "Description", &AttrValue::String(PART_TAG.into()))?;
-            if let Some(oh) = owner_history {
-                ifc.set_attribute(typing, "OwnerHistory", &r(oh))?;
-            }
-            ifc.set_attribute(typing, "RelatedObjects", &AttrValue::List(objects))?;
-            ifc.set_attribute(typing, "RelatingType", &r(maps[&ty].0))?;
+            geometry::type_objects(ifc, maps[&ty].0, &objects, owner_history)?;
         }
         if parts.is_empty() {
             continue;

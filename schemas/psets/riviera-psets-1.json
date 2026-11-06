@@ -61,8 +61,8 @@
         { "name": "RidgeHeight", "measure": "IfcPositiveLengthMeasure", "unit": "m", "description": "The highest ridge or crown above the level." },
         { "name": "Pitch", "measure": "IfcPlaneAngleMeasure", "unit": "rad", "description": "The roof slope (not for tunnels)." },
         { "name": "FloorArea", "measure": "IfcAreaMeasure", "unit": "m2", "description": "Length times width." },
-        { "name": "RoofVentTarget", "measure": "IfcPositiveRatioMeasure", "description": "Roof vents' target area over the floor area." },
-        { "name": "SideVentTarget", "measure": "IfcPositiveRatioMeasure", "description": "Side vents' target area over the floor area." }
+        { "name": "RoofVentTarget", "measure": "IfcRatioMeasure", "description": "Roof vents' target area over the floor area (0 with none)." },
+        { "name": "SideVentTarget", "measure": "IfcRatioMeasure", "description": "Side vents' target area over the floor area." }
       ]
     },
     {

@@ -49,6 +49,17 @@ fn members(r: &CommandRegistry, doc: &mut Document, a: ElementId) -> Vec<Value> 
         .clone()
 }
 
+/// Each type has at most one `IfcRelDefinesByType` (IFC inverse `Types`, SET [0:1]).
+fn one_typing_per_type(path: &std::path::Path) {
+    let ifc = IfcModel::open(path).unwrap();
+    let mut seen = std::collections::HashMap::new();
+    for rel in ifc.entities_of_type("IfcRelDefinesByType").unwrap() {
+        let t = ifc.attribute(rel.id, "RelatingType").unwrap();
+        *seen.entry(format!("{t:?}")).or_insert(0) += 1;
+    }
+    assert!(seen.values().all(|n| *n == 1), "types with more than one typing relationship: {seen:?}");
+}
+
 #[test]
 fn temple_colonnade_round_the_stylobate() {
     let dir = tempfile::tempdir().unwrap();
@@ -220,6 +231,7 @@ fn temple_colonnade_round_the_stylobate() {
     assert_eq!(count("IFCELEMENTASSEMBLY"), 1);
     assert_eq!(count("IFCCOLUMN"), 37);
     assert_eq!(count("IFCMAPPEDITEM"), 37);
+    one_typing_per_type(&path);
     let meshes = IfcModel::open(&path).unwrap().tessellate(1).unwrap();
     let cols: Vec<_> = meshes.iter().filter(|m| m.class == "IfcColumn").collect();
     assert_eq!(cols.len(), 37);
@@ -272,6 +284,7 @@ fn temple_colonnade_round_the_stylobate() {
     let count = |class: &str| rows.iter().filter(|r| r.class == class).count();
     assert_eq!(count("IFCCOLUMN"), 37);
     assert_eq!(count("IFCELEMENTASSEMBLY"), 0);
+    one_typing_per_type(&path);
 }
 
 #[test]

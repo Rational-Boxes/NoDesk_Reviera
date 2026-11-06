@@ -608,6 +608,20 @@ pub fn delete_closure(
     }
 }
 
+/// Deletes `ids` and the openings of any doors and windows among them, for rebuilds that
+/// replace their generated parts (an opening left behind voids nothing). Already-deleted IDs are
+/// skipped; nothing else that depends on the parts is touched.
+pub fn delete_parts(txn: &mut crate::txn::Transaction<'_>, ids: &[ElementId]) -> Result<()> {
+    let guids: Vec<String> = ids.iter().filter_map(|i| txn.store().get(*i)).filter(|e| crate::inserts::kind_of(e).is_some()).map(|e| e.guid().to_string()).collect();
+    let openings: Vec<ElementId> = txn.store().iter().filter(|e| crate::inserts::opening_of(e).is_some_and(|g| guids.contains(&g))).map(|e| e.id()).collect();
+    for id in ids.iter().copied().chain(openings) {
+        if txn.store().contains(id) {
+            txn.delete(id)?;
+        }
+    }
+    Ok(())
+}
+
 #[derive(Debug)]
 struct ElementDelete;
 
