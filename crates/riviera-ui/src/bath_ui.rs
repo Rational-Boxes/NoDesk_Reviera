@@ -313,6 +313,41 @@ impl Gui {
         }
     }
 
+    /// Architecture › Build › Decorative Lighting (ARC-INT-003): sconces along the selected wall,
+    /// or a chandelier or pendants over the selected table or counter; then Check Rules.
+    pub(crate) fn decorative_lighting(&mut self) {
+        let frame = self.frame;
+        let Some(store) = self.store_now() else { return frame.set_status_text("Open a model first", 0) };
+        let sel = self.selection();
+        let Some(e) = (sel.len() == 1).then(|| store.get(sel[0])).flatten() else {
+            return error(&frame, "Select one wall (for sconces), or one table or counter (for a chandelier or pendants).");
+        };
+        let level_of = |guid: &str| riviera_core::GlobalId::parse(guid).and_then(|g| store.find_by_guid(&g)).map(|l| l.0);
+        let (command, args) = if let Some(w) = riviera_core::walls::wall_recipe(e) {
+            ("lighting.sconces", json!({ "wall_id": e.id().0, "level": level_of(&w.base_level) }))
+        } else if let Some(r) = riviera_core::mesh_objects::mesh_object_recipe(e) {
+            let d = SingleChoiceDialog::builder(&frame, "Over the selected piece:", "Decorative Lighting", &["A chandelier, sized from the room and the piece", "Pendants in a row along it"]).build();
+            if d.show_modal() != ID_OK {
+                return;
+            }
+            let pick = d.get_selection();
+            d.destroy();
+            (if pick == 1 { "lighting.pendants" } else { "lighting.chandelier" }, json!({ "over_id": e.id().0, "level": level_of(&r.level) }))
+        } else {
+            return error(&frame, "Select one wall (for sconces), or one table or counter (for a chandelier or pendants).");
+        };
+        match self.run(command, args) {
+            Ok(v) => {
+                self.refresh_scene(&frame);
+                let n = v["placed"].as_array().map_or(0, Vec::len);
+                let problems = self.run("rules.check", json!({ "element_ids": v["placed"] })).ok().and_then(|f| f.as_array().map(Vec::len)).unwrap_or(0);
+                let notes: Vec<&str> = v["notes"].as_array().map(|a| a.iter().filter_map(|x| x.as_str()).collect()).unwrap_or_default();
+                frame.set_status_text(&format!("{n} × {}, bottom {:.0} mm; Check Rules finds {problems}{}", v["item"].as_str().unwrap_or(""), v["bottom"].as_f64().unwrap_or(0.0) * 1000.0, if notes.is_empty() { String::new() } else { format!("; {}", notes.join("; ")) }), 0);
+            }
+            Err(e) => error(&frame, &format!("The lighting was not placed:\n{e}")),
+        }
+    }
+
     /// Lays out a bathroom where the Bathroom Layout tool was clicked, and reports the fit.
     pub(crate) fn layout_bathroom_at(&mut self, mut args: serde_json::Value) {
         let frame = self.frame;

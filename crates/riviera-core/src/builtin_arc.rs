@@ -348,6 +348,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(FurnishingLoad),
         registry.add(InteriorLayouts),
         registry.add(InteriorLayout),
+        registry.add(LightingChandelier),
+        registry.add(LightingPendants),
+        registry.add(LightingSconces),
         registry.add(LibraryList),
         registry.add(LibraryImportFiles),
         registry.add(LibraryGetMeta),
@@ -4148,6 +4151,46 @@ edit_command!(
     crate::interior_layouts::LayoutParams,
     crate::interior_layouts::Layout,
     crate::interior_layouts::layout
+);
+
+edit_command!(
+    LightingChandelier,
+    "lighting.chandelier",
+    "Hang a chandelier",
+    "Hangs a chandelier (ARC-INT-003) at `point`, or centred over the table `over_id`. Its size comes \
+     from the room and the table: the room's width plus length in feet is its largest diameter in \
+     inches, and over a table at most ⅔ of the table's length. Its bottom is 32 in over a table; \
+     elsewhere it hangs as high as the ceiling allows, keeping ADA's 80 in headroom where it can. Returns \
+     what was placed, its bottom and any notes.",
+    "Chandelier",
+    crate::decorative_lighting::ChandelierParams,
+    crate::decorative_lighting::Hung,
+    crate::decorative_lighting::chandelier
+);
+
+edit_command!(
+    LightingPendants,
+    "lighting.pendants",
+    "Hang pendants over a table or counter",
+    "Hangs 12 in pendants in a row along a table, island or counter (ARC-INT-003): 27 in between \
+     them, 6 in short of each end, unless `count` is given; their bottoms are 33 in above its top.",
+    "Pendants",
+    crate::decorative_lighting::PendantsParams,
+    crate::decorative_lighting::Hung,
+    crate::decorative_lighting::pendants
+);
+
+edit_command!(
+    LightingSconces,
+    "lighting.sconces",
+    "Put sconces along a wall",
+    "Puts wall sconces on a wall's face (ARC-INT-003): one every 8 ft, centred, unless `count` is \
+     given; their centres are 63 in above the level, or at `height`. A sconce projects 4 in, ADA \
+     §307.2's limit.",
+    "Sconces",
+    crate::decorative_lighting::SconcesParams,
+    crate::decorative_lighting::Hung,
+    crate::decorative_lighting::sconces
 );
 
 read_command!(

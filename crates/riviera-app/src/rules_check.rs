@@ -35,6 +35,12 @@ pub enum Severity {
 pub enum FindingKind {
     Intrusion,
     DoorSwing,
+    /// Too little clear height under a hanging element (ADA 307.4).
+    Headroom,
+    /// Projecting too far from its wall (ADA 307.2).
+    Projection,
+    /// Too high or too low over the element under it.
+    HeightOver,
 }
 
 #[derive(Debug, Clone, Serialize, JsonSchema)]
@@ -51,9 +57,19 @@ pub struct Finding {
     pub confidence: Confidence,
     pub source: String,
     pub message: String,
-    pub other: ElementId,
-    pub depth: f64,
-    pub centroid: [f64; 3],
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub other: Option<ElementId>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub depth: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub centroid: Option<[f64; 3]>,
+    /// For a mounting rule: what was measured and the rule's range (metres).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub measured: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max: Option<f64>,
 }
 
 pub(crate) struct RulesCheck;
@@ -121,9 +137,12 @@ pub(crate) fn check(app: &mut App, p: CheckParams) -> Result<Vec<Finding>> {
                 confidence: z.zone.confidence,
                 source: z.zone.source.clone(),
                 message,
-                other,
-                depth,
-                centroid,
+                other: Some(other),
+                depth: Some(depth),
+                centroid: Some(centroid),
+                measured: None,
+                min: None,
+                max: None,
             };
             let skip = |a: ElementId, b: ElementId| {
                 let other = if a == e.id() { b } else { a };
@@ -144,6 +163,42 @@ pub(crate) fn check(app: &mut App, p: CheckParams) -> Result<Vec<Finding>> {
                     }
                 }
             }
+        }
+    }
+    // Mounting rules: headroom, projection, height over.
+    let inch = |v: f64| format!("{:.1} in", v / 0.0254);
+    for e in store.iter().filter(|e| only.as_ref().is_none_or(|ids| ids.contains(&e.id()))) {
+        for m in rules::mountings_of(store, e, &packs) {
+            let pack = packs.iter().find(|pk| pk.id == m.pack).expect("a finding's pack is in use");
+            let what = label(e.id());
+            let (kind, message) = match m.kind.as_str() {
+                "headroom" => (FindingKind::Headroom, format!("{what} hangs {} above the floor; {} needs {} ({})", inch(m.measured), m.rule, inch(m.min.unwrap_or(0.0)), m.description)),
+                "projection" => (FindingKind::Projection, format!("{what} projects {} from its wall; {} allows {}", inch(m.measured), m.rule, inch(m.max.unwrap_or(0.0)))),
+                _ => (
+                    FindingKind::HeightOver,
+                    format!("{what} is {} above {}; {} asks {}–{}", inch(m.measured), m.other.map_or_else(String::new, &label), m.rule, m.min.map_or_else(|| "…".into(), inch), m.max.map_or_else(|| "…".into(), inch)),
+                ),
+            };
+            out.push(Finding {
+                severity: if pack.layer == Layer::Recommended || m.confidence == Confidence::Advisory { Severity::Note } else { Severity::Error },
+                kind,
+                element: e.id(),
+                domain: pack.domain.clone(),
+                pack: pack.id.clone(),
+                edition: pack.edition.clone(),
+                layer: pack.layer,
+                rule: m.rule.clone(),
+                description: m.description.clone(),
+                confidence: m.confidence,
+                source: m.source.clone(),
+                message,
+                other: m.other,
+                depth: None,
+                centroid: None,
+                measured: Some(m.measured),
+                min: m.min,
+                max: m.max,
+            });
         }
     }
     out.sort_by_key(|f| f.severity);

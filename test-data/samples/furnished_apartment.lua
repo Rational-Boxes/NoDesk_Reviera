@@ -22,7 +22,7 @@ end
 wall({ 0, 0 }, { 15.8, 0 })
 wall({ 15.8, 0 }, { 15.8, 4.6 })
 wall({ 15.8, 4.6 }, { 0, 4.6 })
-wall({ 0, 4.6 }, { 0, 0 })
+local west = wall({ 0, 4.6 }, { 0, 0 })
 for _, x in ipairs({ 4.2, 9.4, 13.0 }) do
   wall({ x, 0.1 }, { x, 4.5 })
 end
@@ -33,14 +33,21 @@ local rooms = {
   { "dining_4", 11.2, "Dining room" },
   { "home_office", 14.35, "Office" },
 }
+local dining_table
 for _, r in ipairs(rooms) do
   local made = riviera.interior.layout{ template = r[1], point = { r[2], 2.3 }, level = l1 }
+  if r[1] == "dining_4" then dining_table = made.placed[1] end
   assert(#made.placed > 0, r[1] .. " fits its room")
   print(string.format("%s: %d pieces; %.2f of %.2f m along, %.2f of %.2f m across", r[3], #made.placed, made.fit.length_needed, made.fit.length, made.fit.depth_needed, made.fit.depth))
   local room = riviera.room.place{ level_id = l1, point = { r[2], 0.4 } }
   riviera.room.set{ room_ids = { room }, name = r[3] }
 end
-assert(#riviera.rules.check{} == 0, "every piece's clear spaces are free")
+-- Decorative lighting (ARC-INT-003): sconces along the bedroom's west wall, every 8 ft at 63 in,
+-- and a chandelier over the dining table, sized from the room and the table, 32 in above it.
+riviera.lighting.sconces{ wall_id = west, level = l1 }
+local c = riviera.lighting.chandelier{ over_id = dining_table, level = l1 }
+print(string.format("Dining room: a %s, its bottom %.0f mm up", c.item, c.bottom * 1000))
+assert(#riviera.rules.check{} == 0, "every piece's clear spaces are free, and the lighting keeps its heights")
 
 -- A room too small for a layout is refused with its shortfall: a queen bedroom in the office.
 local tight = riviera.interior.layout{ template = "bedroom_queen", point = { 14.35, 2.3 }, level = l1, fit_only = true }

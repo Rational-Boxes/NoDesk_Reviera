@@ -4844,6 +4844,7 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             g.bathroom_layout();
             focus(g);
         }),
+        "ui.decorative_lighting" => with(gui, Gui::decorative_lighting),
         "ui.room_layout" => with(gui, |g| {
             g.room_layout();
             focus(g);

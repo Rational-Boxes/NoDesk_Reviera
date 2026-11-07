@@ -58,6 +58,24 @@
       "items": {
         "$ref": "#/$defs/zone"
       }
+    },
+    "headroom": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/headroom"
+      }
+    },
+    "projections": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/projection"
+      }
+    },
+    "heights_over": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/height_over"
+      }
     }
   },
   "$defs": {
@@ -224,6 +242,111 @@
       "minItems": 2,
       "maxItems": 2,
       "description": "A position from the element's front, positive in front of it, or from its back, positive behind it."
+    },
+    "headroom": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/rule"
+        }
+      ],
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": [
+        "min"
+      ],
+      "description": "The clear height an element's bottom keeps above the floor, unless it is over an element unless_over selects.",
+      "properties": {
+        "id": true,
+        "description": true,
+        "applies_to": true,
+        "occupancy": true,
+        "source": true,
+        "confidence": true,
+        "min": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "unless_over": {
+          "$ref": "#/$defs/selector"
+        }
+      }
+    },
+    "projection": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/rule"
+        }
+      ],
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": [
+        "band",
+        "max"
+      ],
+      "description": "How far an element may project from its wall where it lies between two heights above the floor.",
+      "properties": {
+        "id": true,
+        "description": true,
+        "applies_to": true,
+        "occupancy": true,
+        "source": true,
+        "confidence": true,
+        "band": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "max": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "height_over": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/rule"
+        }
+      ],
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": [
+        "over"
+      ],
+      "anyOf": [
+        {
+          "required": [
+            "min"
+          ]
+        },
+        {
+          "required": [
+            "max"
+          ]
+        }
+      ],
+      "description": "How far an element's bottom stays above the top of an element under it that over selects.",
+      "properties": {
+        "id": true,
+        "description": true,
+        "applies_to": true,
+        "occupancy": true,
+        "source": true,
+        "confidence": true,
+        "over": {
+          "$ref": "#/$defs/selector"
+        },
+        "min": {
+          "type": "number"
+        },
+        "max": {
+          "type": "number"
+        }
+      }
     }
   }
 }

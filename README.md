@@ -633,6 +633,16 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
   bathroom and vertical transport included (`rules.packs`, `rules.set_packs`, `rules.add_pack`,
   `rules.remove_pack`, `rules.set_accessible`, `rules.check`). Not built yet: room layouts,
   hotel floors, fixture runs, front ends and gym layouts, which the plan goes on to.
+- **Decorative lighting** (ARC-INT-003). Chandeliers, pendants, sconces and lamps join the
+  Interiors library as typed light fixtures:
+  - a chandelier is sized from its room and table and hung 32 in over the table;
+  - pendants are spaced 27 in apart along a table or counter;
+  - sconces go every 8 ft along a wall at 63 in.
+
+  Check Rules applies the 2010 ADA Standards' 80 in headroom (§307.4) and 4 in projection
+  (§307.2), and practice heights over tables, through new headroom, projection and
+  height-over rule kinds. Architecture › Build › Decorative Lighting works on the selection
+  (`lighting.chandelier`, `lighting.pendants`, `lighting.sconces`).
 - **Room layouts** (ARC-INT-001). Architecture › Build › Room Layout furnishes a room closed by
   walls from a template:
   - queen, king, twin and UK double bedrooms;

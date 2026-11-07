@@ -246,5 +246,10 @@ fn the_bundled_libraries_hold_every_item_and_each_places_typed() {
     let zones = ok(&mut app, "clearance.list", json!({}));
     let beds = zones.as_array().unwrap().iter().filter(|z| z["rule"] == "ADA 2010 806.2.3 left").count();
     assert_eq!(beds, 8, "seven beds and the bedroom set's");
-    assert_eq!(ok(&mut app, "rules.check", json!({})), json!([]), "the sets keep their own clear spaces free");
+    // Nothing in any use zone: the sets keep their own clear spaces free. The only findings are
+    // the hanging fixtures placed on the floor, short of ADA's 80 in headroom.
+    let found = ok(&mut app, "rules.check", json!({}));
+    let hanging = furnishings::catalogue().iter().filter(|i| matches!(i.kind, Some("Chandelier" | "Pendant"))).count();
+    assert!(found.as_array().unwrap().iter().all(|f| f["kind"] == "headroom" && f["rule"] == "ADA 2010 307.4"), "{found:#}");
+    assert_eq!(found.as_array().unwrap().len(), hanging, "{found:#}");
 }

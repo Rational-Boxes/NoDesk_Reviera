@@ -5393,15 +5393,19 @@ unchanged. The first domain on the shared format is **interiors**: use zones aro
 **Behaviour & rules.**
 - **A pack** is a JSON file following `schemas/rules/riviera.rules-1.schema.json` (MIT). It has:
   - an `id`, a title, its **domain** (`interiors` first; later `kitchen`, `foodservice`, `refrigeration`, `retail`, `checkout`, `gym`), its jurisdiction and edition, and a **layer** (`minimum`, `accessible` or `recommended`, as bathroom packs);
-  - rules of the kinds the format defines. The first kind is **zones** (ARC-RULE-002). Later kinds (type coverage, array counts, path distances, product values, integration rules) are added to the same format as their tools are built.
+  - rules of the kinds the format defines:
+    - **zones** (ARC-RULE-002);
+    - the mounting kinds: **headroom** (an element's bottom above the floor, unless it is over selected furniture), **projections** (how far an element may stand out from its wall between two heights), and **heights over** (the gap above the element under it).
+
+    Later kinds (type coverage, array counts, path distances, product values, integration rules) are added to the same format as their tools are built.
 
   Each rule has an ID (its clause), a description, the elements it applies to, a source ID from `SOURCE_REGISTER.md`, a confidence (`verified`, `secondary` or `advisory`), and optionally the occupancy it applies to (`dwelling` or `other`).
 - **Packs that ship** for interiors (values in research/15 Part G):
 
 | Pack | Layer | Covers |
 |---|---|---|
-| `ada_2010_interiors` | accessible | 2010 ADA Standards §806.2.3: a 30 × 48 in clear floor space for a parallel approach along each side of a bed (G139) |
-| `practice_interiors` | recommended | Practice clearances, as notes: 36 in round a dining table's edge, to pull chairs back and pass; 30 in in front of a dresser (36 in preferred); 24 in at the foot of a bed (research/15 D2, S1478 and S1479, [guide]) |
+| `ada_2010_interiors` | accessible | 2010 ADA Standards: a 30 × 48 in clear floor space for a parallel approach along each side of a bed (§806.2.3, G139); 80 in headroom under a hanging fixture on a circulation path (§307.4); 4 in at most for a sconce between 27 and 80 in above the floor (§307.2) |
+| `practice_interiors` | recommended | Practice, as notes: 36 in round a dining table's edge, where its chairs may stand; 30 in in front of a dresser (36 in preferred); 24 in at the foot of a bed (research/15 D2, S1478 and S1479, [guide]); a chandelier's bottom 30–34 in and a pendant's 30–36 in over the table or counter under it (D4, S1471, S1472) |
 
 - **Choosing packs.** A project uses the packs it names for a domain (`rules.set_packs`), or packs chosen automatically: for interiors, `ada_2010_interiors` when the accessibility rule set (ARC-MOD-031) is the ADA. `practice_interiors` is only chosen by name.
 - **One command family for every domain.**
@@ -5436,6 +5440,12 @@ unchanged. The first domain on the shared format is **interiors**: use zones aro
   Each zone runs from just above the floor to its rule's height (1.0 m unless the rule says otherwise).
 - **What may be in a zone.** The element itself may; so may floors, floor coverings (a rug), accessories, and other elements' zones (clear floor spaces may overlap, ADA 305.2). So may whatever the rule's `allows` selects: a dining table's 36 in pull-back zone allows chairs. Any other element's body is an intrusion. A rule marked `door_swing: forbidden` is also intruded on by any door's swing.
 - **Accessible elements.** The accessible layer's rules apply to an element unless it is marked not accessible (`rules.set_accessible`, RXD `rxd:accessible`): the ADA asks only some rooms and beds to comply. Code and guidance packs apply to every element.
+- **Mounting rules** are checked with the zones:
+  - **headroom**: the element's bottom above its floor;
+  - **projection**: its depth from its wall, where its height range meets the band;
+  - **height over**: the gap between its bottom and the top of the highest selected piece whose footprint is under its centre.
+
+  Each finding gives what was measured and the rule's range.
 - **`rules.check`** checks every element with zones (or those given, or one domain's) and returns findings, each with the element, the pack, its domain, edition and layer, the rule ID, its source and confidence, and the intruding element with its depth and where. A finding from a `recommended` pack or an `advisory` rule is a **note**; any other is an **error**. Errors come first. `clearance.check` and `clearance.list` include use zones.
 - **Display.** Views show use zones with the other virtual volumes.
 
@@ -5488,6 +5498,38 @@ unchanged. The first domain on the shared format is **interiors**: use zones aro
 - [x] The sample *A furnished apartment* furnishes four rooms with no overlaps or clearance intrusions.
 
 *Built (2026-11-06):* `riviera_core::interior_layouts`, Architecture › Build › Room Layout (a template, then a click in the room). Defaults are E-104. Not yet: furniture already in the room (other than an earlier layout) is not avoided, doors' clearances are not part of the fit, and rooms must be rectangles; hotel rooms come with ARC-INT-002.
+
+### 3.9b.5 Decorative lighting
+**ID:** ARC-INT-003 · **Priority:** P1 · **Ref:** `INTERIORS_PLAN.md` §4.5; research/15 D4 (S1471–S1473, S1354); ARC-RULE-002; ARC-FURN-001
+
+**Purpose.** Place decorative fixtures where design guides and accessibility rules put them, sized from the room and the furniture, without working the heights out by hand.
+
+**Behaviour & rules.**
+- **Fixtures** (the Interiors library's *Lighting* folder, ARC-FURN-001): chandeliers 24 and 36 in across, a 12 in pendant, a wall sconce projecting 4 in, and table and floor lamps.
+  - Each is an `IfcLightFixture` USERDEFINED with its kind (Chandelier, Pendant, Sconce, TableLamp, FloorLamp).
+  - Each carries `Pset_LightFixtureTypeCommon` LightFixtureMountingType (SUSPENDED, SURFACE, FREESTANDING), LightFixturePlacingType (CEILING, WALL, FURNITURE, FLOOR) and TotalWattage, and a power connector.
+  - A hanging fixture's geometry starts at its bottom, so its offset is its bottom's height.
+- **`lighting.chandelier`**, at a point or over a table:
+  - **size:** the largest that both of these allow:
+    - the room's width plus length in feet, as its diameter in inches;
+    - over a table, ⅔ of the table's length.
+  - **height:** its bottom is 32 in over the table (30–34 in). Elsewhere it hangs as high as the ceiling allows (150 mm for canopy and stem). The result says when the ceiling cannot keep 80 in under it.
+- **`lighting.pendants`**: 12 in pendants along a table's, island's or counter's length, 27 in between them (24–30 in) and 6 in short of each end, their bottoms 33 in over its top (30–36 in).
+- **`lighting.sconces`**: sconces along a wall's face, one every 8 ft (the sources give 6–8 and 8–10 ft), centred, at 63 in (60–66 in). They go on the face with a room on it unless a side or a point is given.
+- **Checks.** The rule packs check what is placed, through `rules.check`:
+  - ADA §307.4's headroom over circulation (not over furniture);
+  - §307.2's 4 in projection;
+  - practice heights over tables.
+
+**Commands.** `lighting.chandelier(point? | over_id, level, ceiling?)`, `lighting.pendants(over_id, level, count?)`, `lighting.sconces(wall_id, level, side? | toward?, count?, height?)`, each returning `{placed, item, diameter_max?, bottom, notes}`.
+
+**Acceptance criteria.**
+- [x] Over a 48 in table in a 4 × 5 m room, the chandelier is the 24 in one (29.5 in allowed), its bottom 32 in over the table, and Check Rules finds nothing. In open floor under a 2.4 m ceiling, the result notes the ceiling is too low, and Check Rules reports §307.4.
+- [x] Over a 72 in table, two pendants hang 33 in above it. Lowered to 24 in above it, one is a note against the 30–36 in practice.
+- [x] Sconces on a 4.2 m wall are two, on the room's side, centred at 63 in, and §307.2 is met.
+- [x] The furnished apartment sample's sconces and chandelier pass every check, and the FF&E schedule counts them.
+
+*Built (2026-11-06):* `riviera_core::decorative_lighting`, the mounting rule kinds, the *Lighting* items, and Architecture › Build › Decorative Lighting (on the selected wall or piece). Defaults are E-105. Not yet: ceiling fans (their IFC class is open, `INTERIORS_PLAN.md` Q4), outlet-box weight checks (NEC 314.27), photometric files, and lamps placed on furniture.
 
 ### 3.9b.3 Generic furniture and equipment
 **ID:** ARC-FURN-001 · **Priority:** P1 · **Ref:** `INTERIORS_PLAN.md` §4.1, §5.1, §7.1, §8.1 (the owner accepted the IFC mapping); research/15 A1, B1–B7, C2, C7, D1, E2; DM-LIB-006
@@ -6727,6 +6769,9 @@ All commands below are registered once in the command registry and exposed autom
 | `scopebox.set_extents` | id, min, max, rotation? | — | Yes | ARC-SCOPE-001 |
 | `datum.assign_scope_box` | datum_ids, scope_box_id \| null | — | Yes | ARC-SCOPE-001 |
 | `view.assign_scope_box` | view_ids, scope_box_id \| null | — | Yes | ARC-SCOPE-001 |
+| `lighting.chandelier` | point? \| over_id, level, ceiling? | {placed, item, diameter_max?, bottom, notes} | Yes | ARC-INT-003 |
+| `lighting.pendants` | over_id, level, count? | {placed, item, bottom, notes} | Yes | ARC-INT-003 |
+| `lighting.sconces` | wall_id, level, side? \| toward?, count?, height? | {placed, item, bottom, notes} | Yes | ARC-INT-003 |
 | `interior.layouts` | — | [{id, title, items}] | No (query) | ARC-INT-001 |
 | `interior.layout` | template, point, level, wall_id?, replace?, fit_only? | {placed, fit, packs} | Yes | ARC-INT-001 |
 | `furnishing.catalogue` | library? | [{library, folder, name, predefined_type, kind, uniclass, description, source, size}] | No (query) | ARC-FURN-001 |

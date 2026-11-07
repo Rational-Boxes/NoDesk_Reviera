@@ -1438,6 +1438,10 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "rules_check" => format!(
             r#"<rect x="13" y="4" width="12" height="18" rx="1" fill="{f}" {s}/><path d="M13 9h12" {s}/><rect x="4" y="10" width="8" height="12" fill="none" {sa} stroke-dasharray="3 2"/><path d="M6 26l3 3 6-6" fill="none" {s}/>"#
         ),
+        // A chandelier: a stem from the ceiling, a bowl and arms with candles.
+        "decorative_lighting" => format!(
+            r#"<path d="M6 3h20M16 3v8" {s}/><path d="M7 15c2 5 16 5 18 0z" fill="{f}" {s}/><path d="M7 15v-4M25 15v-4M16 18v-5" {s}/><circle cx="7" cy="9" r="1.6" fill="{a}" {s}/><circle cx="25" cy="9" r="1.6" fill="{a}" {s}/><path d="M12 23l4 6 4-6" fill="none" {sa}/>"#
+        ),
         // A room in plan: a bed against one wall, a nightstand beside it, a dresser opposite.
         "room_layout" => format!(
             r#"<rect x="3" y="3" width="26" height="26" fill="none" {s}/><rect x="10" y="5" width="12" height="14" rx="1" fill="{f}" {s}/><path d="M10 8h12" {s}/><rect x="5" y="5" width="4" height="4" fill="{a}" {s}/><rect x="11" y="24" width="10" height="3" fill="{a}" {s}/>"#

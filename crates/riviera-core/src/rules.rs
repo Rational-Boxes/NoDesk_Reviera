@@ -132,6 +132,56 @@ impl Zone {
     }
 }
 
+/// The clear height an element's bottom keeps above the floor (ADA 2010 §307.4: 80 in over
+/// circulation), unless it is over an element `unless_over` selects (a table, a bed).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct Headroom {
+    pub id: String,
+    pub description: String,
+    pub applies_to: Selector,
+    #[serde(default)]
+    pub occupancy: RuleOccupancy,
+    pub source: String,
+    pub confidence: Confidence,
+    pub min: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unless_over: Option<Selector>,
+}
+
+/// How far an element may project from its wall where it is between two heights above the floor
+/// (ADA 2010 §307.2: 4 in between 27 and 80 in).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct Projection {
+    pub id: String,
+    pub description: String,
+    pub applies_to: Selector,
+    #[serde(default)]
+    pub occupancy: RuleOccupancy,
+    pub source: String,
+    pub confidence: Confidence,
+    /// From and to, above the floor.
+    pub band: [f64; 2],
+    pub max: f64,
+}
+
+/// How far an element's bottom stays above the top of an element under it (a chandelier
+/// 30–34 in over a dining table).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct HeightOver {
+    pub id: String,
+    pub description: String,
+    pub applies_to: Selector,
+    #[serde(default)]
+    pub occupancy: RuleOccupancy,
+    pub source: String,
+    pub confidence: Confidence,
+    pub over: Selector,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max: Option<f64>,
+}
+
 /// A shared-format rule pack.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Pack {
@@ -146,6 +196,12 @@ pub struct Pack {
     pub notes: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub zones: Vec<Zone>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub headroom: Vec<Headroom>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub projections: Vec<Projection>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub heights_over: Vec<HeightOver>,
 }
 
 fn validator() -> &'static jsonschema::Validator {
@@ -245,6 +301,8 @@ pub struct Item {
     pub x: [f64; 2],
     pub front: f64,
     pub back: f64,
+    /// Its bottom and top (absolute).
+    pub z: [f64; 2],
     /// The floor it stands on.
     pub floor: f64,
     /// Whether the accessible layer's rules apply to it.
@@ -290,10 +348,11 @@ pub fn item(store: &Store, e: &Element) -> Option<Item> {
     let r = mesh_objects::mesh_object_recipe(e)?;
     let g = mesh_objects::regenerate(store, e).ok()?;
     let s = g.placement.scale;
-    let (mut x, mut y) = ([f64::MAX, f64::MIN], [f64::MAX, f64::MIN]);
+    let (mut x, mut y, mut z) = ([f64::MAX, f64::MIN], [f64::MAX, f64::MIN], [f64::MAX, f64::MIN]);
     for p in &g.mesh.positions {
         x = [x[0].min(f64::from(p[0]) * s), x[1].max(f64::from(p[0]) * s)];
         y = [y[0].min(f64::from(p[1]) * s), y[1].max(f64::from(p[1]) * s)];
+        z = [z[0].min(f64::from(p[2]) * s), z[1].max(f64::from(p[2]) * s)];
     }
     if x[0] > x[1] {
         return None;
@@ -305,9 +364,112 @@ pub fn item(store: &Store, e: &Element) -> Option<Item> {
         x,
         front: y[0],
         back: y[1],
+        z: [g.placement.origin[2] + z[0], g.placement.origin[2] + z[1]],
         floor,
         accessible: e.param(ACCESSIBLE_KEY).and_then(Value::as_bool) != Some(false),
     })
+}
+
+impl Item {
+    /// Whether a plan point is over its footprint.
+    pub fn covers(&self, q: [f64; 2]) -> bool {
+        let (dx, dy) = (q[0] - self.frame.origin[0], q[1] - self.frame.origin[1]);
+        let (c, s) = (self.frame.rotation.cos(), self.frame.rotation.sin());
+        let (lx, mut ly) = (dx * c + dy * s, -dx * s + dy * c);
+        if self.frame.mirror {
+            ly = -ly;
+        }
+        (self.x[0] - 1e-9..=self.x[1] + 1e-9).contains(&lx) && (self.front - 1e-9..=self.back + 1e-9).contains(&ly)
+    }
+}
+
+/// A mounting finding (headroom, projection, height over): the rule, its pack, and what was
+/// measured against its range.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct Mounting {
+    pub element: ElementId,
+    /// `headroom`, `projection` or `height_over`.
+    pub kind: String,
+    pub pack: String,
+    pub rule: String,
+    pub description: String,
+    pub source: String,
+    pub confidence: Confidence,
+    pub measured: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max: Option<f64>,
+    /// The element under it, for a height over.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub other: Option<ElementId>,
+}
+
+/// The highest of the placed copies whose footprint is under `it`'s centre and whose top is below
+/// its bottom, that `sel` selects (any, without one).
+fn under(store: &Store, it: &Item, sel: Option<&Selector>) -> Option<(ElementId, f64)> {
+    let c = [it.frame.origin[0], it.frame.origin[1]];
+    store
+        .iter()
+        .filter(|o| o.id() != it.element && mesh_objects::mesh_object_recipe(o).is_some())
+        .filter(|o| sel.is_none_or(|s| s.selects_element(store, o)))
+        .filter_map(|o| item(store, o))
+        .filter(|o| o.covers(c) && o.z[1] <= it.z[0] + 1e-6)
+        .map(|o| (o.element, o.z[1]))
+        .max_by(|a, b| a.1.total_cmp(&b.1))
+}
+
+/// The mounting rules of the packs that apply to one element, broken.
+pub fn mountings_of(store: &Store, e: &Element, packs: &[Pack]) -> Vec<Mounting> {
+    let occupancy = crate::codes::settings(store).occupancy;
+    let any = packs.iter().any(|p| {
+        p.headroom.iter().any(|r| r.applies_to.selects_element(store, e))
+            || p.projections.iter().any(|r| r.applies_to.selects_element(store, e))
+            || p.heights_over.iter().any(|r| r.applies_to.selects_element(store, e))
+    });
+    if !any {
+        return Vec::new();
+    }
+    let Some(it) = item(store, e) else { return Vec::new() };
+    let bottom = it.z[0] - it.floor;
+    let top = it.z[1] - it.floor;
+    let mut out = Vec::new();
+    for p in packs.iter().filter(|p| p.layer != Layer::Accessible || it.accessible) {
+        let finding = |kind: &str, rule: &str, description: &str, source: &str, confidence: Confidence, measured: f64, min: Option<f64>, max: Option<f64>, other: Option<ElementId>| Mounting {
+            element: it.element,
+            kind: kind.into(),
+            pack: p.id.clone(),
+            rule: rule.into(),
+            description: description.into(),
+            source: source.into(),
+            confidence,
+            measured,
+            min,
+            max,
+            other,
+        };
+        for r in p.headroom.iter().filter(|r| r.applies_to.selects_element(store, e) && r.occupancy.applies(occupancy)) {
+            let over_allowed = r.unless_over.as_ref().is_some_and(|s| under(store, &it, Some(s)).is_some());
+            if bottom < r.min - 1e-6 && !over_allowed {
+                out.push(finding("headroom", &r.id, &r.description, &r.source, r.confidence, bottom, Some(r.min), None, None));
+            }
+        }
+        for r in p.projections.iter().filter(|r| r.applies_to.selects_element(store, e) && r.occupancy.applies(occupancy)) {
+            let depth = it.back - it.front;
+            if bottom < r.band[1] && top > r.band[0] && depth > r.max + 1e-6 {
+                out.push(finding("projection", &r.id, &r.description, &r.source, r.confidence, depth, None, Some(r.max), None));
+            }
+        }
+        for r in p.heights_over.iter().filter(|r| r.applies_to.selects_element(store, e) && r.occupancy.applies(occupancy)) {
+            if let Some((o, t)) = under(store, &it, Some(&r.over)) {
+                let gap = it.z[0] - t;
+                if r.min.is_some_and(|m| gap < m - 1e-6) || r.max.is_some_and(|m| gap > m + 1e-6) {
+                    out.push(finding("height_over", &r.id, &r.description, &r.source, r.confidence, gap, r.min, r.max, Some(o)));
+                }
+            }
+        }
+    }
+    out
 }
 
 /// A use zone and the rule it comes from.
@@ -617,9 +779,10 @@ mod tests {
         assert!(shipped().len() >= 2);
         for p in shipped() {
             assert_eq!(p.format, FORMAT);
-            for z in &p.zones {
-                for s in z.source.split(' ') {
-                    assert!(register.contains(&format!("| {s} |")), "{}: {s} is not in SOURCE_REGISTER.md", z.id);
+            let sources = p.zones.iter().map(|z| (&z.id, &z.source)).chain(p.headroom.iter().map(|r| (&r.id, &r.source))).chain(p.projections.iter().map(|r| (&r.id, &r.source))).chain(p.heights_over.iter().map(|r| (&r.id, &r.source)));
+            for (id, src) in sources {
+                for s in src.split(' ') {
+                    assert!(register.contains(&format!("| {s} |")), "{id}: {s} is not in SOURCE_REGISTER.md");
                 }
             }
         }

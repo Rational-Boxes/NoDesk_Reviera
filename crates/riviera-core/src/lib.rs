@@ -184,6 +184,7 @@ pub mod steel_numbering;
 pub mod steel_fab;
 pub mod roofs;
 pub mod room_separators;
+pub mod decorative_lighting;
 pub mod furnishings;
 pub mod interior_layouts;
 pub mod rooms;

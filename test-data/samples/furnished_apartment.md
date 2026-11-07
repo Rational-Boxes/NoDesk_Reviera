@@ -27,13 +27,20 @@ Room layouts fit each room with these packs' clear spaces.
 
    The pieces come from the bundled Interiors library's catalogue. The main piece goes against
    one of the longer walls; the layout may also name the wall.
-3. **Rooms.** Place an **Architecture › Room** in each room and name it: *Bedroom*, *Living
+3. **Lighting.**
+   - Select the bedroom's west wall and choose **Architecture › Build › Decorative Lighting**.
+     Sconces go along its room side, one every 8 ft at 63 in. Each projects 4 in, ADA §307.2's
+     limit.
+   - Select the dining table and choose **Decorative Lighting** › *A chandelier*. The room
+     (11.2 + 14.4 ft) and the table (⅔ of 48 in) allow 25.6 in across, so the 24 in chandelier is
+     used, its bottom 32 in over the table.
+4. **Rooms.** Place an **Architecture › Room** in each room and name it: *Bedroom*, *Living
    room*, *Dining room*, *Office*. **View › Coordination › Check Rules** finds nothing.
-4. **Too small.** Try *Bedroom, queen bed* in the office. It is refused, with the shortfall: about
+5. **Too small.** Try *Bedroom, queen bed* in the office. It is refused, with the shortfall: about
    180 mm across the room, because the bed and the 24 in at its foot need 2.78 m and the office
    is 2.6 m deep.
-5. **The schedule.** Choose **View › Schedules › New Schedule** › *FF&E*. Each row is one type in
-   one room, counted.
+6. **The schedule.** Choose **View › Schedules › New Schedule** › *FF&E*. Each row is one type in
+   one room, counted: the lighting is there too.
 
 ## Gaps
 

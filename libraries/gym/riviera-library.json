@@ -23,7 +23,7 @@
         "licence": "CC0-1.0",
         "sources": "S1368"
       },
-      "sha256": "9cc8e39139ce58599c09a7792320439bfa3a5d05f2630cbbcab8a56f08aef04e"
+      "sha256": "89ae0b0260b3c883d7c4581ee73a3eb07e81845771fa10cf588002c68b3f3379"
     },
     "Cardio/indoor_cycle.ifc": {
       "guid": "5c0beb4e-90a2-487f-9002-0d1118ac085a",
@@ -40,7 +40,7 @@
         "licence": "CC0-1.0",
         "sources": "S1369"
       },
-      "sha256": "350468f9ece23dc37ee77d713a599ad87e1e2fdfa951078388e3e1b641a00925"
+      "sha256": "0122abda235013070bd46787d0b391c403fb9b5e812d3ea435f17b2b717aa2e6"
     },
     "Cardio/recumbent_bike.ifc": {
       "guid": "4380b719-13f0-4071-bad8-53e177ef4079",
@@ -57,7 +57,7 @@
         "licence": "CC0-1.0",
         "sources": "S1369"
       },
-      "sha256": "cc363ce6533805fdb64e6f6e04388e9a8c396e40aafa2ae2b68370e918eca858"
+      "sha256": "29747d79ae9af87186ca317ef661b6f3238ab1de55c1f21adfe6a4a2f372527b"
     },
     "Cardio/rower.ifc": {
       "guid": "675eb42f-a02a-4810-84e3-302e95251875",
@@ -74,7 +74,7 @@
         "licence": "CC0-1.0",
         "sources": "S1360"
       },
-      "sha256": "6d083487b4da3bda4cb9d0856eea1ea0fd1bfa3c42cfdff67a275d1a82ba447b"
+      "sha256": "2be427bc123a578d0fb10539ae92270f9864f9095ee844ae64b18234c47561d2"
     },
     "Cardio/stair_climber.ifc": {
       "guid": "55f8c7bf-0ed8-4d2a-a3e2-78b36a146a7c",
@@ -91,7 +91,7 @@
         "licence": "CC0-1.0",
         "sources": "S1367"
       },
-      "sha256": "6374c915411bd0c73c6a8d8680216eab94f8a7f545a804de5aa6526961c003f6"
+      "sha256": "15ccad7c0d611cbe401dc3e2acee69729d9237304c247533d01ede84a2c7ea41"
     },
     "Cardio/treadmill_commercial.ifc": {
       "guid": "5ac248bf-0762-41d7-9934-7d07efbd1db4",
@@ -108,7 +108,7 @@
         "licence": "CC0-1.0",
         "sources": "S1356"
       },
-      "sha256": "649e12ba1d56d31ed2edbdf2d1485384d2c7f01ea3ed494e3ed310da55b09aac"
+      "sha256": "6ebdbea3dbc95d59dd69f0cf2317512d58facf19c2fdd9acb13228ba82d63767"
     },
     "Cardio/upright_bike.ifc": {
       "guid": "5a6a0e23-d0e2-4b11-8bc1-e13025641fde",
@@ -125,7 +125,7 @@
         "licence": "CC0-1.0",
         "sources": "S1369"
       },
-      "sha256": "bd987e4d4d2042a87d93d7720da41a068d971a2f529890edc5003d1cb2be40dc"
+      "sha256": "4f14038d0769aad1d4bbe620a1d5a8bc1c1fdefe48cb1cb10e526e2dc1f4d431"
     },
     "Free weights/dumbbell_rack_two_tier.ifc": {
       "guid": "bbee08e6-42f2-45c6-96d8-46bbbcf53eb0",
@@ -142,7 +142,7 @@
         "licence": "CC0-1.0",
         "sources": "S1366"
       },
-      "sha256": "bb0c18c9eeb9ba679f74c6b4a0a6b7867c8977948dc7efa12b30d9daea4033bf"
+      "sha256": "66262a4f61ac837b59bf0cdefb45b03f0eb0108acac64848dfe911f3ae4ae329"
     },
     "Free weights/flat_bench.ifc": {
       "guid": "193e8eab-88f1-4bfa-9a83-329c0238d540",
@@ -157,7 +157,7 @@
         "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
         "licence": "CC0-1.0"
       },
-      "sha256": "ca536a0701a00e908ecb4921f8e6e93d2b1c83e2e566ac944ccd7b26264fef95"
+      "sha256": "c2de0c7e67a8443630735e22ea4eaeb270f5e0a22c52fbf8e90e2ec967c09010"
     },
     "Free weights/lifting_platform_8_x_8_ft.ifc": {
       "guid": "cf65c993-46fe-41cb-99ef-f0df8b3ac3e2",
@@ -173,7 +173,7 @@
         "licence": "CC0-1.0",
         "sources": "S1363"
       },
-      "sha256": "895c8bfae587c1d263fbeb8491d06052f3a78f63ef9061a985e074034c535e7e"
+      "sha256": "8c9e377092b01899f06068c697369848d9b765d2bf1c67c893c3d38d77226cea"
     },
     "Free weights/plate_tree.ifc": {
       "guid": "189be05f-1dd4-4008-bc83-f6502468da5b",
@@ -188,7 +188,7 @@
         "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
         "licence": "CC0-1.0"
       },
-      "sha256": "8f4f0790f7bd94452438310f269046a431ba63ac4c4586834fc8684828b0e784"
+      "sha256": "b86ea3692d23c09ee5784772a083af9634991c8d6aa244a596639e821d6224d8"
     },
     "Strength/cable_crossover.ifc": {
       "guid": "8c597f1a-a056-4cc7-a6a9-856dd546325e",
@@ -205,7 +205,7 @@
         "licence": "CC0-1.0",
         "sources": "S1364"
       },
-      "sha256": "02b3fde1f4e9f8ab8271ed8832a6c5a2d822e3567286c49234d167887c7c6264"
+      "sha256": "8b3aa9b932e300892da6e5ea9f710840738ac1db61b11ddf10c481ccbce4e4a8"
     },
     "Strength/half_rack.ifc": {
       "guid": "c454f164-4730-4e4e-bb86-832532cd8489",
@@ -222,7 +222,7 @@
         "licence": "CC0-1.0",
         "sources": "S1362"
       },
-      "sha256": "1225aff19d160eed2e6a973bf0d42cd34f5afceff5019b94e1e4432c6f6ad618"
+      "sha256": "364fc65aa27c92a0d8578cad66573f9e497c135f2f4fd0d6de42685a1d980843"
     },
     "Strength/leg_press_selectorised.ifc": {
       "guid": "18a0a347-64c4-4699-bd51-123792da2cfa",
@@ -239,7 +239,7 @@
         "licence": "CC0-1.0",
         "sources": "S1365"
       },
-      "sha256": "339641d7591d2c96ff7b325120a54263cbca3a28b946d946f16926aaa54d7d2f"
+      "sha256": "06d0215cee8f9efbc929be6b37ad4acbb8cc9c6cb9a4ea5ee7a3ac52e399d978"
     },
     "Strength/power_rack.ifc": {
       "guid": "fb84ce75-b688-4564-be64-ac944eae70ca",
@@ -256,7 +256,7 @@
         "licence": "CC0-1.0",
         "sources": "S1361"
       },
-      "sha256": "f5df84128e8c78011981436798eae7b159832e78f5c217e8dadaa3139232a491"
+      "sha256": "07668a030be36622fd8a9d279506ce73d7d806343f9557542bae2831d39d6cd8"
     },
     "Strength/smith_machine.ifc": {
       "guid": "c2280891-5862-4a02-a12c-e9d1c75bdf82",
@@ -273,7 +273,7 @@
         "licence": "CC0-1.0",
         "sources": "S1371"
       },
-      "sha256": "a5a8ffb6dfe435f5bab8aecd9ac0c23b61af873a2cdd776f44783d964121f5b4"
+      "sha256": "562b22996e136d1716464a10e65d8d605b9c5a0f138870cf446aaf7f809631be"
     }
   }
 }

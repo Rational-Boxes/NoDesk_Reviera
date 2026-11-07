@@ -76,6 +76,8 @@ pub struct Item {
     pub source: &'static str,
     shape: fn() -> Shape,
     connectors: fn() -> Vec<Connector>,
+    /// Properties on its type (a light fixture's mounting and placing types and wattage).
+    params: fn() -> Vec<(&'static str, serde_json::Value)>,
 }
 
 impl Item {
@@ -88,6 +90,20 @@ fn none() -> Vec<Connector> {
     Vec::new()
 }
 
+fn no_params() -> Vec<(&'static str, serde_json::Value)> {
+    Vec::new()
+}
+
+/// A light fixture's `Pset_LightFixtureTypeCommon`: mounting, placing and wattage
+/// (research/15 D4).
+fn fixture(mounting: &str, placing: &str, watts: f64) -> Vec<(&'static str, serde_json::Value)> {
+    vec![
+        ("Pset_LightFixtureTypeCommon.LightFixtureMountingType", serde_json::json!({ "type": "IfcLabel", "value": mounting })),
+        ("Pset_LightFixtureTypeCommon.LightFixturePlacingType", serde_json::json!({ "type": "IfcLabel", "value": placing })),
+        ("Pset_LightFixtureTypeCommon.TotalWattage", serde_json::json!({ "type": "IfcPowerMeasure", "value": watts })),
+    ]
+}
+
 const WOOD: [f32; 4] = [0.62, 0.47, 0.32, 1.0];
 const LINEN: [f32; 4] = [0.88, 0.86, 0.80, 1.0];
 const FABRIC: [f32; 4] = [0.42, 0.48, 0.55, 1.0];
@@ -96,6 +112,7 @@ const STEEL: [f32; 4] = [0.66, 0.68, 0.70, 1.0];
 const WHITE: [f32; 4] = [0.93, 0.93, 0.92, 1.0];
 const GLASS: [f32; 4] = [0.75, 0.85, 0.90, 0.6];
 const RUBBER: [f32; 4] = [0.25, 0.25, 0.27, 1.0];
+const BRASS: [f32; 4] = [0.78, 0.64, 0.32, 1.0];
 
 // ---- Shapes ----
 
@@ -241,6 +258,42 @@ fn checkstand(l: f64, w: f64, deck: f64) -> Shape {
         .cuboid([l / 2.0 - 0.1, l / 2.0 - 0.05], [w / 2.0 - 0.1, w / 2.0 - 0.05], [deck, 2.38])
 }
 
+/// A chandelier, its bottom at 0: a bowl, a ring of arms and candles, a canopy stem up to `h`.
+fn chandelier(dia: f64, h: f64) -> Shape {
+    let mut s = Shape::default()
+        .prism(&rounded([0.0, 0.0], dia * 0.3, dia * 0.3, dia * 0.15), 0.0, h * 0.2)
+        .prism(&rounded([0.0, 0.0], 0.03, 0.03, 0.015), h * 0.2, h);
+    for k in 0..6 {
+        let a = std::f64::consts::PI / 3.0 * f64::from(k);
+        let (x, y) = (a.cos() * (dia / 2.0 - 0.03), a.sin() * (dia / 2.0 - 0.03));
+        s = s.prism(&rounded([x / 2.0, y / 2.0], (x.abs() + 0.02).max(0.02), (y.abs() + 0.02).max(0.02), 0.01), h * 0.25, h * 0.3).prism(&rounded([x, y], 0.04, 0.04, 0.02), h * 0.3, h * 0.55);
+    }
+    s
+}
+
+/// A pendant shade, its bottom at 0, on a cord to `h`.
+fn pendant(dia: f64, h: f64) -> Shape {
+    Shape::default()
+        .prism(&rounded([0.0, 0.0], dia, dia, dia / 2.0), 0.0, h * 0.25)
+        .prism(&rounded([0.0, 0.0], dia * 0.6, dia * 0.6, dia * 0.3), h * 0.25, h * 0.55)
+        .prism(&rounded([0.0, 0.0], 0.01, 0.01, 0.005), h * 0.55, h)
+}
+
+/// A wall sconce, its bottom at 0, its back plate at +y against the wall.
+fn sconce(w: f64, d: f64, h: f64) -> Shape {
+    Shape::default()
+        .cuboid([-w / 4.0, w / 4.0], [d / 2.0 - 0.015, d / 2.0], [h * 0.2, h * 0.8])
+        .prism(&rounded([0.0, -0.01], w, d - 0.02, (w.min(d) - 0.02) / 2.0), 0.0, h)
+}
+
+/// A lamp: a base, a stem, and a shade `dia` across and `shade` tall at the top of `h`.
+fn lamp(dia: f64, h: f64, shade: f64) -> Shape {
+    Shape::default()
+        .prism(&rounded([0.0, 0.0], dia * 0.6, dia * 0.6, dia * 0.3), 0.0, 0.03)
+        .prism(&rounded([0.0, 0.0], 0.03, 0.03, 0.015), 0.03, h - shade)
+        .prism(&rounded([0.0, 0.0], dia, dia, dia / 2.0), h - shade, h)
+}
+
 fn power(va: f64, voltage: f64, z: f64, back: f64) -> Connector {
     crate::mep::power("Power", [0.0, back, z], [0.0, 1.0, 0.0], D::In, voltage, 1, va, "Power")
 }
@@ -252,7 +305,10 @@ macro_rules! item {
         item!($lib, $folder, $name, $cat, $pre, $kind, $uni, $color, $desc, $src, $shape, none)
     };
     ($lib:ident, $folder:expr, $name:expr, $cat:ident, $pre:expr, $kind:expr, $uni:expr, $color:expr, $desc:expr, $src:expr, $shape:expr, $conn:expr) => {
-        Item { library: Library::$lib, folder: $folder, name: $name, category: C::$cat, predefined: $pre, kind: $kind, uniclass: $uni, color: $color, description: $desc, source: $src, shape: $shape, connectors: $conn }
+        item!($lib, $folder, $name, $cat, $pre, $kind, $uni, $color, $desc, $src, $shape, $conn, no_params)
+    };
+    ($lib:ident, $folder:expr, $name:expr, $cat:ident, $pre:expr, $kind:expr, $uni:expr, $color:expr, $desc:expr, $src:expr, $shape:expr, $conn:expr, $params:expr) => {
+        Item { library: Library::$lib, folder: $folder, name: $name, category: C::$cat, predefined: $pre, kind: $kind, uniclass: $uni, color: $color, description: $desc, source: $src, shape: $shape, connectors: $conn, params: $params }
     };
 }
 
@@ -293,6 +349,13 @@ pub fn catalogue() -> Vec<Item> {
         item!(Interiors, "Office", "Conference table, 8 seats 96 × 42 in", Furniture, "TABLE", Some("ConferenceTable"), Some("Pr_40_50_21_15"), WOOD, "A table for eight, 96 × 42 in (24 in of edge a seat), 29 in high.", "S1479 S1485", || table(96.0 * IN, 42.0 * IN, 29.0 * IN)),
         item!(Interiors, "Office", "Bookcase 36 in", Furniture, "SHELF", None, None, WOOD, "Five shelves 36 in wide; its 12 in depth and 72 in height are unverified.", "", || shelves(36.0 * IN, 12.0 * IN, 72.0 * IN, 5)),
         item!(Interiors, "Office", "Reception desk 72 × 30 in", Furniture, "USERDEFINED", Some("ServiceCounter"), None, WOOD, "A work surface at 29 in behind a 42 in transaction ledge, 72 × 30 in.", "S1492", || block(72.0 * IN, 30.0 * IN, 29.0 * IN).cuboid([-36.0 * IN, 36.0 * IN], [-15.0 * IN, -9.0 * IN], [29.0 * IN, 42.0 * IN])),
+        // ---- Interiors: decorative lighting (research/15 D4) ----
+        item!(Interiors, "Lighting", "Chandelier 24 in", LightingFixture, "USERDEFINED", Some("Chandelier"), Some("Pr_70_70_48_13"), BRASS, "A chandelier 24 in across and 20 in tall (2.5 in a foot of an 8 ft ceiling), hung from the ceiling; its geometry starts at its bottom.", "S1471", || chandelier(24.0 * IN, 20.0 * IN), || vec![power(240.0, 120.0, 20.0 * IN, 0.0)], || fixture("SUSPENDED", "CEILING", 240.0)),
+        item!(Interiors, "Lighting", "Chandelier 36 in", LightingFixture, "USERDEFINED", Some("Chandelier"), Some("Pr_70_70_48_13"), BRASS, "A chandelier 36 in across and 30 in tall, for a large room or a long table.", "S1471", || chandelier(36.0 * IN, 30.0 * IN), || vec![power(480.0, 120.0, 30.0 * IN, 0.0)], || fixture("SUSPENDED", "CEILING", 480.0)),
+        item!(Interiors, "Lighting", "Pendant 12 in", LightingFixture, "USERDEFINED", Some("Pendant"), Some("Pr_70_70_48_62"), BLACK, "A pendant shade 12 in across and 14 in tall, for islands and tables (24–30 in apart).", "S1472", || pendant(12.0 * IN, 14.0 * IN), || vec![power(60.0, 120.0, 14.0 * IN, 0.0)], || fixture("SUSPENDED", "CEILING", 60.0)),
+        item!(Interiors, "Lighting", "Wall sconce", LightingFixture, "USERDEFINED", Some("Sconce"), None, BRASS, "A wall sconce 6 in wide and 12 in tall, projecting 4 in (ADA §307.2's limit between 27 and 80 in); its back against the wall.", "S1473 S1354", || sconce(6.0 * IN, 4.0 * IN, 12.0 * IN), || vec![power(60.0, 120.0, 6.0 * IN, 2.0 * IN)], || fixture("SURFACE", "WALL", 60.0)),
+        item!(Interiors, "Lighting", "Table lamp", LightingFixture, "USERDEFINED", Some("TableLamp"), Some("Pr_70_70_48_32"), LINEN, "A table lamp 16 in across its shade and 24 in tall: no source gave a size.", "", || lamp(16.0 * IN, 24.0 * IN, 9.0 * IN), || vec![power(60.0, 120.0, 0.1, 0.0)], || fixture("FREESTANDING", "FURNITURE", 60.0)),
+        item!(Interiors, "Lighting", "Floor lamp", LightingFixture, "USERDEFINED", Some("FloorLamp"), Some("Pr_70_70_48_32"), LINEN, "A floor lamp 16 in across its shade and 63 in tall: no source gave a size.", "", || lamp(16.0 * IN, 63.0 * IN, 10.0 * IN), || vec![power(100.0, 120.0, 0.1, 0.0)], || fixture("FREESTANDING", "FLOOR", 100.0)),
         // ---- Gym: cardio (research/15 A1) ----
         item!(Gym, "Cardio", "Treadmill, commercial", Furniture, "USERDEFINED", Some("Treadmill"), Some("Pr_40_70_84_91"), BLACK, "211 × 89 cm and 173 cm high (Precor TRM 885); 120 V on its own 20 A circuit. Its user steps on at the rear, its front here.", "S1356", || machine(0.89, 2.11, 1.73, 0.25), || vec![power(1920.0, 120.0, 0.2, 1.055)]),
         item!(Gym, "Cardio", "Elliptical", Furniture, "USERDEFINED", Some("Elliptical"), Some("Pr_40_70_84_26"), BLACK, "203 × 76 cm, 170 cm high (Precor EFX 885); self-powered.", "S1368", || machine(0.76, 2.03, 1.7, 0.45)),
@@ -424,10 +487,13 @@ pub(crate) fn load(txn: &mut Transaction<'_>, p: LoadParams) -> Result<BTreeMap<
                 let s = c.shape();
                 let connectors = (c.connectors)().into_iter().map(crate::mep::validate).collect::<Result<Vec<_>>>()?;
                 let id = crate::mesh_objects::create_generated_type(txn, c.name, c.category, &s.p, &s.t, c.color, connectors, Some(c.predefined))?;
-                let (kind, description) = (c.kind, c.description);
+                let (kind, description, params) = (c.kind, c.description, (c.params)());
                 txn.modify(id, |e| {
                     e.params.insert(MARK.into(), true.into());
                     e.params.insert("@Description".into(), description.into());
+                    for (k, v) in params {
+                        e.params.insert(k.into(), v);
+                    }
                     if let Some(k) = kind {
                         e.params.insert("@ElementType".into(), k.into());
                     }

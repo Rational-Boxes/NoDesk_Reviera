@@ -23,7 +23,7 @@
         "licence": "CC0-1.0",
         "sources": "S1465"
       },
-      "sha256": "572f0b29b99e4148d7f08db6cbd313d7a8060cd86835b5a2ba9668eb18316b02"
+      "sha256": "4b38639b38e9dcb41534754a1a96181b8cd624f22283a1f4855ab343a834fe54"
     },
     "Bedroom/bed_full_54_x_75_in.ifc": {
       "guid": "4b8a0cb2-71ad-4018-b32c-de9019c99fa5",
@@ -40,7 +40,7 @@
         "licence": "CC0-1.0",
         "sources": "S1476"
       },
-      "sha256": "4bb6535603979508e40cb6434b4cdceaa959c7deb2ad64f4200ff62bff39ad2d"
+      "sha256": "ab5ec26808da7551a30170575d5089ed033dadc4a6c0c72909a58ccb12172289"
     },
     "Bedroom/bed_king_76_x_80_in.ifc": {
       "guid": "bc807098-3cda-4fed-b124-c66c0e68da59",
@@ -57,7 +57,7 @@
         "licence": "CC0-1.0",
         "sources": "S1476"
       },
-      "sha256": "ca1294208b044f7d80754634972ccb1469092a28055362525f3cb16bb1cd9047"
+      "sha256": "ad99b938b3dbf59498d42883c138aa64e297eba657972690882677d19ebdb823"
     },
     "Bedroom/bed_principal_double_1500_x_2000.ifc": {
       "guid": "c493f8b8-5171-4380-99dd-60946afd0ffe",
@@ -74,7 +74,7 @@
         "licence": "CC0-1.0",
         "sources": "S1465"
       },
-      "sha256": "cb297d3c89f6677faf00f55ed4a8d1094437c028451861e0c70915497a50241c"
+      "sha256": "9cdd440e611d8867dda2e975411fe992e2f5e708d1da62f2385eaf69bed4cdc4"
     },
     "Bedroom/bed_queen_60_x_80_in.ifc": {
       "guid": "cbc45f50-dc8f-468b-a364-39bf27712d28",
@@ -91,7 +91,7 @@
         "licence": "CC0-1.0",
         "sources": "S1476"
       },
-      "sha256": "4b4fcd7cba239d79dd4047e80e6495dc19ffade8320a3b5385940b6f9ff23780"
+      "sha256": "17887a402388877f2d0e7825a2801706be5a4c2461428232c9c51358a062a328"
     },
     "Bedroom/bed_single_900_x_1900.ifc": {
       "guid": "a7b71476-daa2-46fa-b271-c1855b66ca22",
@@ -108,7 +108,7 @@
         "licence": "CC0-1.0",
         "sources": "S1465"
       },
-      "sha256": "5bdb17dfb55f822f0247d1366c561d7f2b83ef4306236576cb27a90f336dd1e1"
+      "sha256": "8b19e6486d4ad83b28e521d16f81f58c12290ea85923109b696e3c3360a158be"
     },
     "Bedroom/bed_twin_38_x_75_in.ifc": {
       "guid": "940f72db-3aaf-41e3-8f5d-a3e119098fe1",
@@ -125,7 +125,7 @@
         "licence": "CC0-1.0",
         "sources": "S1476"
       },
-      "sha256": "e7d00c75ab77a0ce3c457347afd599fb92408e846425822cb3ec23cb9383cbe2"
+      "sha256": "36c59fb01c588aba7d54203f80b3e69648d27a91557ae967ec3275cf91a04818"
     },
     "Bedroom/chest_of_drawers_750_x_450.ifc": {
       "guid": "5635902c-dc9f-4b30-9cd3-1e83db630c2d",
@@ -141,7 +141,7 @@
         "licence": "CC0-1.0",
         "sources": "S1465"
       },
-      "sha256": "bc044c4680a145bf0dd1d5be3423ebc17767cc69df96fccb4f471cf6f0a1ec42"
+      "sha256": "049d8947334bfdc680a0873b79208ec54a291982d1046823b3ce5556c07c22ce"
     },
     "Bedroom/dresser.ifc": {
       "guid": "bf17e283-9c2d-4dd5-8636-5657b0156d03",
@@ -157,7 +157,7 @@
         "licence": "CC0-1.0",
         "sources": "S1503"
       },
-      "sha256": "f1183f961ffc9fa5a251421e84ac2d7aa2c4e44c9929094cbb36b55004f7e833"
+      "sha256": "ea52f2612b408e419f0506401da1cfedf1ccd8a78910e5a03e0afcfb43ed4042"
     },
     "Bedroom/luggage_rack.ifc": {
       "guid": "1f1c9b64-77da-431f-a772-b721ef089483",
@@ -173,7 +173,7 @@
         "licence": "CC0-1.0",
         "sources": "S1499"
       },
-      "sha256": "c7513f79d5f30de50816444ad84fac0449273a729c37a25a517d1d897454bad3"
+      "sha256": "df2b9c184d335bc065807ecfe90bf4105e95678fecaa5b23a288b03f7e3eb5ae"
     },
     "Bedroom/nightstand.ifc": {
       "guid": "e0c2b513-0267-4e8d-88e5-5376393d951e",
@@ -189,7 +189,7 @@
         "licence": "CC0-1.0",
         "sources": "S1503"
       },
-      "sha256": "bcdfc9a3a723af0c1024b99f0f9a909d167176dadbdfab5be575311e1ca6ac09"
+      "sha256": "2205450e95aa028c3e65b6ba9b7508d8f149af374ff544535d59bde849bec169"
     },
     "Bedroom/wardrobe_double_1200_x_600.ifc": {
       "guid": "d9b2628d-568d-4056-997e-6e2d0d74c0b3",
@@ -205,7 +205,7 @@
         "licence": "CC0-1.0",
         "sources": "S1465 S1477"
       },
-      "sha256": "94bc17e288683fc011c80ef0f155352660adee7b5d8a693dfd9b469a893c5ec7"
+      "sha256": "a0bdaf2b96697b84e28c4b08cb38d4dd9dccf17228084544dfb8893109c6a49f"
     },
     "Dining/counter_stool.ifc": {
       "guid": "f2a038e8-9c4d-4c96-ad27-571cc7c1937b",
@@ -223,7 +223,7 @@
         "licence": "CC0-1.0",
         "sources": "S1491"
       },
-      "sha256": "20a6b2b858a63cec16752a5c1bdc272972a4c3ce53d9308cd2fbd3c2aca07b56"
+      "sha256": "4f6760aad1fb965f07e4b8699ee463c2d1a397629c2d7e05e9949abbef738c49"
     },
     "Dining/dining_chair.ifc": {
       "guid": "8d05ead8-9651-4f2c-81fc-1c3d62bd1847",
@@ -239,7 +239,7 @@
         "licence": "CC0-1.0",
         "sources": "S1503"
       },
-      "sha256": "d83bc0c273dbf4f9834a7fcbf1639532c4144ac5056018a074dc1299845c0e6f"
+      "sha256": "3ccc8bbad6860e84db32a836b15713d4b4d983d6eba535ad578082b2b0eb1678"
     },
     "Dining/dining_table_4_seats_48_x_30_in.ifc": {
       "guid": "5d857055-a443-401a-b653-b412502ecf46",
@@ -257,7 +257,7 @@
         "licence": "CC0-1.0",
         "sources": "S1479 S1503"
       },
-      "sha256": "620b37bdeaf0c75e9140552a3945a2a777cb899ca0848a772f2d8e8680d5cc40"
+      "sha256": "cd0d318f0f9df4f0778490fbeab82561076fe4dd8a60b6f17fe7a4f0a6a222d8"
     },
     "Dining/dining_table_6_seats_72_x_36_in.ifc": {
       "guid": "7f2c5c24-5526-45de-b33b-1149fbb448f9",
@@ -275,7 +275,7 @@
         "licence": "CC0-1.0",
         "sources": "S1479 S1503"
       },
-      "sha256": "44e7bc3cfe647ebccc9291eed0994027b9dedafdad1badd8b3714ae93bec1711"
+      "sha256": "b66d534d105f37b6e7494aa81b904fce5a0d784fa3e4fab800d261c5025b2a50"
     },
     "Dining/dining_table_round_42_in.ifc": {
       "guid": "458006b1-5379-482d-a79b-84f5f2a1d876",
@@ -293,7 +293,106 @@
         "licence": "CC0-1.0",
         "sources": "S1479 S1503"
       },
-      "sha256": "9686896d8202e19dfdd165c6c310e32924934113e1c09ca3be0cff12828a6307"
+      "sha256": "59f88f3857ceca38df19c3d4be7819d878223db90d80629d233f7d2530f1036f"
+    },
+    "Lighting/chandelier_24_in.ifc": {
+      "guid": "6d696a3d-7c83-4883-994a-a6b273d574ff",
+      "name": "Chandelier 24 in",
+      "description": "A chandelier 24 in across and 20 in tall (2.5 in a foot of an 8 ft ceiling), hung from the ceiling; its geometry starts at its bottom.",
+      "tags": [
+        "lighting",
+        "Chandelier",
+        "Uniclass Pr_70_70_48_13"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1471"
+      },
+      "sha256": "5145aa1d0dbc3fa9be8236909289892e49a4eccb087334b4276de3a020de5625"
+    },
+    "Lighting/chandelier_36_in.ifc": {
+      "guid": "2ebcc716-e08f-4ba2-855b-38c5b698c03d",
+      "name": "Chandelier 36 in",
+      "description": "A chandelier 36 in across and 30 in tall, for a large room or a long table.",
+      "tags": [
+        "lighting",
+        "Chandelier",
+        "Uniclass Pr_70_70_48_13"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1471"
+      },
+      "sha256": "edaefd85dbe521ed4e09a9432addfedeb14bb2e44fa00556d57ae9d9b18f72c4"
+    },
+    "Lighting/floor_lamp.ifc": {
+      "guid": "e059e3dc-d039-431d-b305-89ce2ccdfc5d",
+      "name": "Floor lamp",
+      "description": "A floor lamp 16 in across its shade and 63 in tall: no source gave a size.",
+      "tags": [
+        "lighting",
+        "FloorLamp",
+        "Uniclass Pr_70_70_48_32"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0"
+      },
+      "sha256": "27b822a021f014991072add229995149c8a40613a772caccd678458aaa53e310"
+    },
+    "Lighting/pendant_12_in.ifc": {
+      "guid": "b640a266-431d-4d7c-a9bc-f12662c24f1e",
+      "name": "Pendant 12 in",
+      "description": "A pendant shade 12 in across and 14 in tall, for islands and tables (24–30 in apart).",
+      "tags": [
+        "lighting",
+        "Pendant",
+        "Uniclass Pr_70_70_48_62"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1472"
+      },
+      "sha256": "b232fb8716dea94c4afa913732867f85a194a35d61ca210de324e1814bd9d603"
+    },
+    "Lighting/table_lamp.ifc": {
+      "guid": "6d6a6290-8d8e-4d0e-8a38-1c01b9e677f1",
+      "name": "Table lamp",
+      "description": "A table lamp 16 in across its shade and 24 in tall: no source gave a size.",
+      "tags": [
+        "lighting",
+        "TableLamp",
+        "Uniclass Pr_70_70_48_32"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0"
+      },
+      "sha256": "39d7154e01dcc8407b9c340f39670b2e3d9787bc795d7fddc1261a9c8ebc9674"
+    },
+    "Lighting/wall_sconce.ifc": {
+      "guid": "4ef75314-9e8e-4483-aace-56d51c84377f",
+      "name": "Wall sconce",
+      "description": "A wall sconce 6 in wide and 12 in tall, projecting 4 in (ADA §307.2's limit between 27 and 80 in); its back against the wall.",
+      "tags": [
+        "lighting",
+        "Sconce"
+      ],
+      "provenance": {
+        "author": "Riviera contributors",
+        "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
+        "licence": "CC0-1.0",
+        "sources": "S1473 S1354"
+      },
+      "sha256": "f7dbd6b7e51c274069b8874a089fa5ccaf97bf2d145c56a9da14bfcf69cced1d"
     },
     "Living/armchair_850_x_850.ifc": {
       "guid": "971874a6-80a7-4c9c-a15b-c4eb1249d7de",
@@ -310,7 +409,7 @@
         "licence": "CC0-1.0",
         "sources": "S1465 S1490"
       },
-      "sha256": "ef1dc55b43b404d622f30ee18915603f829da9652cb9c0a35e1fe68fdb703a7d"
+      "sha256": "36efc91d8832556f79a3a2b7999e9a58a3e41ae7241b707d296e6084069cbeaf"
     },
     "Living/coffee_table_1050_x_500.ifc": {
       "guid": "85c4fc9e-6f3f-494c-95e6-2dad3afd3a2a",
@@ -328,7 +427,7 @@
         "licence": "CC0-1.0",
         "sources": "S1465"
       },
-      "sha256": "340d57e27b19701328288d8322c7ba9838714de6ab7dcda08aa12b32f86cbded"
+      "sha256": "60a5746206f379abd4e395a29b0454aff5d9b7d10bf41518ef0e24f3bb6fb9a2"
     },
     "Living/occasional_table_450_x_450.ifc": {
       "guid": "77a51566-d159-4ac7-9767-f5546807f8db",
@@ -345,7 +444,7 @@
         "licence": "CC0-1.0",
         "sources": "S1465"
       },
-      "sha256": "027176b47eb455449f5484716ac614c0d7eabbe807e023f40512aafd1aeb62dc"
+      "sha256": "c99e06da106d3386ed5f16c609d06cb121962788a698750e3a826a9b0f96e7ff"
     },
     "Living/rug_8_x_10_ft.ifc": {
       "guid": "ea8c7739-b1e3-4f5b-b7d6-05922bf30879",
@@ -362,7 +461,7 @@
         "licence": "CC0-1.0",
         "sources": "S1480"
       },
-      "sha256": "e02a805b2621ddf6c082fff74ff98ec6884eccdf4a4216e8669474c446e111d4"
+      "sha256": "cba4a2c2e1c71da2050f3fc634833ac8d5fa681b3dd0cc0046f10266f3703872"
     },
     "Living/sofa_2_seat_1300_x_850.ifc": {
       "guid": "cf6edb45-1a30-480e-8e0c-d52affb3f589",
@@ -379,7 +478,7 @@
         "licence": "CC0-1.0",
         "sources": "S1465 S1490"
       },
-      "sha256": "ed2f0403a13eb0e33157b086dbd1752789e6101ddd73471656a8b70d53d55e75"
+      "sha256": "80f597f999a35d403067b585c91f1264f5e58e1b9fca7ee83a03cd2408453e59"
     },
     "Living/sofa_3_seat_1850_x_850.ifc": {
       "guid": "7bc64b89-d1b0-4a00-90e0-aaaea0d682b0",
@@ -396,7 +495,7 @@
         "licence": "CC0-1.0",
         "sources": "S1465 S1490"
       },
-      "sha256": "679434fbb5e03688ba7cafb1e85248b85759a87e17729f3ca2d98833623e54d0"
+      "sha256": "aeec060f3ef46859e481c87ee32c185835bc18b75617fcb43eb23040f83a0cfc"
     },
     "Living/storage_unit_1500_x_500.ifc": {
       "guid": "d8326a38-f241-4393-92ae-282e85dd4f5b",
@@ -412,7 +511,7 @@
         "licence": "CC0-1.0",
         "sources": "S1465"
       },
-      "sha256": "7e0918a2560666937082c43d3d925c4f80d0471a38bbacd8450271319d8818ee"
+      "sha256": "bc714215ef30ff09aa22d2ed4650368fbb72db51b64f20721820b48a62767622"
     },
     "Office/bookcase_36_in.ifc": {
       "guid": "1af9e5c9-5409-4f18-8bec-8ced529de077",
@@ -427,7 +526,7 @@
         "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
         "licence": "CC0-1.0"
       },
-      "sha256": "49357770fa255dc43d66698cfe5103982bc35bc6a2ca2e6226b6c098cd798acb"
+      "sha256": "9afeb2ded9ee7bb27cdde5c36f0d62bb14c482d3672de16a8737c85518a995c9"
     },
     "Office/conference_table_8_seats_96_x_42_in.ifc": {
       "guid": "f250f168-f7d4-47b6-a881-7c944a1fc70b",
@@ -445,7 +544,7 @@
         "licence": "CC0-1.0",
         "sources": "S1479 S1485"
       },
-      "sha256": "2b88f4236b6e0a2baf442309ec45378d2241351ac74dd0ada73535cb35efeb49"
+      "sha256": "e6958f0512f0747a176eea7e69a309cd07efc8cd209148303a71e9fee769008e"
     },
     "Office/desk_60_x_30_in.ifc": {
       "guid": "a9fab1ac-6084-474d-a302-0d11c00fed84",
@@ -462,7 +561,7 @@
         "licence": "CC0-1.0",
         "sources": "S1503"
       },
-      "sha256": "300ee627e43b3f4c6cb648795a445c5269d83d014d5955c644acde63f85f8a68"
+      "sha256": "c31360a2483e019e3305afbef08a90e3f4a1f5bf39f29f92750a808f192c1214"
     },
     "Office/reception_desk_72_x_30_in.ifc": {
       "guid": "734af12c-b161-492f-b642-bcf11c9bec07",
@@ -478,7 +577,7 @@
         "licence": "CC0-1.0",
         "sources": "S1492"
       },
-      "sha256": "ef53a37e2c696eb5e060266eb2e89ec1486514e03608ef7c3f3a84cdeb002c7c"
+      "sha256": "d276092f3c460663badb75d13bd4bd318f529b89b877b507bbac6635cc20315a"
     },
     "Office/standing_desk_60_x_30_in.ifc": {
       "guid": "b1f1c24c-9045-4127-b2a7-5753d707a1c9",
@@ -496,7 +595,7 @@
         "licence": "CC0-1.0",
         "sources": "S1482 S1503"
       },
-      "sha256": "f37cd293fa7b9db096d383ece09fca337feb0a2cf11d85a5cde097c1882cb310"
+      "sha256": "ab5c9ecc5812cc8d236478ba2c930717cc04a4ecb3d07e1aaa29775c8e3e092a"
     },
     "Office/task_chair.ifc": {
       "guid": "2e4fb205-8348-44cf-b457-f7db161d5531",
@@ -514,7 +613,7 @@
         "licence": "CC0-1.0",
         "sources": "S1482 S1483"
       },
-      "sha256": "3b1011bb3505be0873c6c9ad6ac81389e044e817f18581cfec4c98a1f5895809"
+      "sha256": "bb7b45b33a7613f2ba6ecfad964fe55e209c6c1ee36e4d472c130e6052cd022f"
     },
     "Sets/bedroom_set_queen.ifc": {
       "guid": "bb1f82a3-538d-4811-90c2-635c414fa138",
@@ -528,7 +627,7 @@
         "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
         "licence": "CC0-1.0"
       },
-      "sha256": "2d815f6f05fa3779a1499ba9fbc66589297c2a419393475f2e541c5b9dfe70f6"
+      "sha256": "bcd262efca47113eab5eca114e0ab96cbb465ad312532e97da09b8680187b178"
     },
     "Sets/dining_set_4_seats.ifc": {
       "guid": "d65dbc28-5706-4a17-8140-6cb5cf8be81e",
@@ -542,7 +641,7 @@
         "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
         "licence": "CC0-1.0"
       },
-      "sha256": "552f5d95b229c8529b5dee1fedd3acf967c2aee3b8bf3817f88afd59229973a9"
+      "sha256": "127f1a1d42cf39b705854f026d80b8f85b3812aa8c930d11f91f05f4fc71ca0b"
     },
     "Sets/office_workstation.ifc": {
       "guid": "f7f6cc6d-b5b6-4f59-b16c-a9857e5387dc",
@@ -556,7 +655,7 @@
         "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
         "licence": "CC0-1.0"
       },
-      "sha256": "1ed570ac8db7380ba7f9b8ce69235915fa2ecee3faf5c579ec66433ea5bb8109"
+      "sha256": "3b14f4850d4dd13c0ab068448ef01d4bf835fb20be322a49c4dfe32e7b7a8186"
     }
   }
 }

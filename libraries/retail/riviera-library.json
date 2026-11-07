@@ -23,7 +23,7 @@
         "licence": "CC0-1.0",
         "sources": "S1403"
       },
-      "sha256": "2157794a8eca24c9c4e59a3805ebc4bf46b7d1a7176bd845c2d977cfccd6abe4"
+      "sha256": "ea4301951d1aac2ce9864e361c56cc38f58b4c5e9ed5bcd1a55cc7027996d401"
     },
     "Apparel/garment_rounder_42_in.ifc": {
       "guid": "76c1acef-4b5d-4c69-b9af-4e87e561697d",
@@ -40,7 +40,7 @@
         "licence": "CC0-1.0",
         "sources": "S1403"
       },
-      "sha256": "1638b6b0781ca02f4cc8cb9a53d3f2aa4c89ee21cecccec5213066fa653a4589"
+      "sha256": "9c691d217136a38370f09e623cac9f1608ad97f6b73d46acd5c69580e1ff28b0"
     },
     "Apparel/mannequin.ifc": {
       "guid": "f521987d-6327-43f5-a598-13992f37a497",
@@ -55,7 +55,7 @@
         "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
         "licence": "CC0-1.0"
       },
-      "sha256": "49502dda6b226a2bc8c872613197da349cf31e16474544edc9ad5150421a1c2d"
+      "sha256": "89a90076a3b30c69005ed662806e5a734588466bb44dc09058ff03b9fb46f144"
     },
     "Carts and security/eas_pedestal.ifc": {
       "guid": "7caed3a9-fe67-472c-a068-bdc2aaeca252",
@@ -71,7 +71,7 @@
         "licence": "CC0-1.0",
         "sources": "S1409"
       },
-      "sha256": "300e1ebd03c6d90efcd98c129676ca8a1a16ec7da4128420a0d50369faaab89e"
+      "sha256": "11c3f213135c5061ffb81bdec527c1c92a282d68e82f791f79edb93c3ea19d76"
     },
     "Carts and security/shopping_cart.ifc": {
       "guid": "68729d2e-3262-43c9-ad8f-530d789fe1fe",
@@ -88,7 +88,7 @@
         "licence": "CC0-1.0",
         "sources": "S1411"
       },
-      "sha256": "0f8d84e30d89337efc1934be0d30c801253e4feb2adaa03e162f93dabc16d32a"
+      "sha256": "1453a0d66e3db524e848a5f1b8945f48e86fa60f96adfe9f5192ee7563a3e6e0"
     },
     "Checkouts/attendant_station.ifc": {
       "guid": "18e7d31f-60b4-4af7-a312-e6f725d04173",
@@ -104,7 +104,7 @@
         "licence": "CC0-1.0",
         "sources": "S1408"
       },
-      "sha256": "c9d2eda41c21b29a35966fafeebf32d6b00e81588505280678a3f3086213943c"
+      "sha256": "80e1a09cee0e83220372b256ec4040d3f4baa488a80cecf8b668b6004e82d9a0"
     },
     "Checkouts/cash_desk_compact_2500_x_1250.ifc": {
       "guid": "5709995d-febc-4680-a0ee-fc032c69aa83",
@@ -121,7 +121,7 @@
         "licence": "CC0-1.0",
         "sources": "S1436"
       },
-      "sha256": "cdf6231f613ca7d9bb93fe82a7790e1628cda543d0348bceef9d699be3516421"
+      "sha256": "71726337028a09954ff973fd75bf01872eed9ae32f36c6df82259fd65ece2348"
     },
     "Checkouts/checkstand_belted_take_away_150_x_48_in.ifc": {
       "guid": "a581ef00-81b4-490e-ab02-3470b1be5c4d",
@@ -138,7 +138,7 @@
         "licence": "CC0-1.0",
         "sources": "S1432 S1406"
       },
-      "sha256": "7e3d2e8621fde03125958abedc750c2fb7a0dffb6d76041cb0b05e9c59ed053a"
+      "sha256": "843dd7d11715e229443da79b2df9e7d16632bf6f2b83c055db552265270148af"
     },
     "Checkouts/checkstand_carousel_rear_142_x_48_in.ifc": {
       "guid": "97f5eebf-cf1c-4d2b-b468-bf630651d346",
@@ -155,7 +155,7 @@
         "licence": "CC0-1.0",
         "sources": "S1432 S1406"
       },
-      "sha256": "b03332c9c0c3ba7da1ee04502ba4c32c29acd131258e9255a5b4dcb4c2e15028"
+      "sha256": "2943a46052ecb89cee385101e911463204cb7a59268d74297851b0918571371d"
     },
     "Checkouts/self_checkout_lane.ifc": {
       "guid": "1e159f09-f1be-4e81-9b66-612e731aed8a",
@@ -172,7 +172,7 @@
         "licence": "CC0-1.0",
         "sources": "S1408"
       },
-      "sha256": "da23afe332b0fbc1d958a7dbfb5ea29d15004874da29db863adff9fcd0627790"
+      "sha256": "2a23a1d6a67eb54b0e1186a6edd3028fb623ffa95accf5df9c63c476bcd0995b"
     },
     "Checkouts/self_checkout_pedestal.ifc": {
       "guid": "910a7932-5b53-4b39-93a6-f69269951197",
@@ -189,7 +189,7 @@
         "licence": "CC0-1.0",
         "sources": "S1439"
       },
-      "sha256": "387dbbcab49e5c962dbf632c192c7711314e32cd56345c7b189137439279c2be"
+      "sha256": "8e7592627f5e37adc50795c7b6b14f20c107c7aa09dde221d7ee1eee4e74f6b9"
     },
     "Shelving/gondola_end_cap_36_in.ifc": {
       "guid": "5b85cc1d-a74f-4f48-a280-dd593feb1ff8",
@@ -207,7 +207,7 @@
         "licence": "CC0-1.0",
         "sources": "S1400"
       },
-      "sha256": "bbd32fa20565bcbdbd1076cfe26240567f115413a8a3828e0f72acfdbd18b3d0"
+      "sha256": "44c7a15adf1f24b2747c1b8a3d135b3690092c21121460f77acef269ab4549a7"
     },
     "Shelving/gondola_island_48_in_x_72_in.ifc": {
       "guid": "59a3c911-1378-4211-a235-ac22a8fa90ae",
@@ -225,7 +225,7 @@
         "licence": "CC0-1.0",
         "sources": "S1400"
       },
-      "sha256": "0a029a973fc1b728d04194d78cd7c9b1a6d70ff7999210f3afb2184dbc010112"
+      "sha256": "26fe92321714f9a286fe7a77a664973b472afbb5979cb36b6f1532c81dda22e2"
     },
     "Shelving/gondola_wall_48_in_x_84_in.ifc": {
       "guid": "16700861-8cb3-4946-a973-4255afcba9be",
@@ -243,7 +243,7 @@
         "licence": "CC0-1.0",
         "sources": "S1400"
       },
-      "sha256": "7033f3a64c52ab4c6bb3ca9ffefda2b4b994cec67791dddb2b7b6727d771b429"
+      "sha256": "00a2e149e40d2d3134179cceeecccbab56d8e5c2f5a9602d4650b5e29dcabc83"
     },
     "Shelving/pallet_rack_bay_96_x_42_in.ifc": {
       "guid": "a79002d7-c5a3-4133-92d3-ae8e1bf7810d",
@@ -260,7 +260,7 @@
         "licence": "CC0-1.0",
         "sources": "S1399"
       },
-      "sha256": "ff6c45ee660e49d99383bb22275a8c310ffa74a109d0eb9527d5c511c43129ee"
+      "sha256": "bad26c4ccb84a60b7d26be77682e04c597d58955017a87ac740c8571147ad512"
     },
     "Shelving/produce_table_72_x_48_in.ifc": {
       "guid": "60fae669-a36d-48b1-9419-b9ca0717d4b8",
@@ -277,7 +277,7 @@
         "generated_by": "riviera_core::furnishings (ARC-FURN-001)",
         "licence": "CC0-1.0"
       },
-      "sha256": "6482a8cf2df63c3677c9b61f8a52834541ef4a881d08b622216d9eae6c65929e"
+      "sha256": "901348a26c7fa4c6d7fe60da8bef47cb98a42ba2fdd85b1e760052dd5c409d7d"
     },
     "Showcases/cash_wrap_72_x_22_in.ifc": {
       "guid": "08bb40da-1b54-4fa1-9bec-489191d95db8",
@@ -294,7 +294,7 @@
         "licence": "CC0-1.0",
         "sources": "S1460 S1354"
       },
-      "sha256": "acf3e3cb3956695f5c8aa44d3adaa5486a71ea11255f1c0cb1988e142c0344ed"
+      "sha256": "915e2023c025b6e24a63b59601eaf8151443566beb02a9421c08d21b675f031a"
     },
     "Showcases/showcase_counter_70_in.ifc": {
       "guid": "6284ec3b-acc8-4e11-a97c-b6276a9eb327",
@@ -311,7 +311,7 @@
         "licence": "CC0-1.0",
         "sources": "S1405"
       },
-      "sha256": "7402e87ceffe858cd15404a04686bf39a25f20f7af6a197222c627ff3449af66"
+      "sha256": "9a49d900d840cce0e029858cac982ace726fee0e0dae55b3744f80fae4fa5d34"
     }
   }
 }

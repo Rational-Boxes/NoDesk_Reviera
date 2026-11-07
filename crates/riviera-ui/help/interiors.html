@@ -12,6 +12,7 @@ that room as <b>rule packs</b>, each from one standard or guide. It shows each p
   <a href="#zones">Use zones</a>
   <a href="#check">Check Rules</a>
   <a href="#layouts">Room layouts</a>
+  <a href="#lighting">Decorative lighting</a>
   <a href="#accessible">Accessible and not</a>
   <a href="#own">Your own packs</a>
   <a href="#limits">Limits and what to check</a>
@@ -66,6 +67,22 @@ room and clear of the other pieces. Otherwise nothing is placed, and Riviera say
 longer or deeper the room must be. Choosing <i>Replace it</i> clears an earlier layout in the same
 room first. The sample <a href="riviera:sample/furnished_apartment">A furnished apartment</a> lays
 out four rooms. (<code>interior.layouts</code>, <code>interior.layout</code>)</p>
+
+<h2 id="lighting">Decorative lighting</h2>
+<p>The Interiors library's <i>Lighting</i> folder holds chandeliers, a pendant, a wall sconce and
+lamps. Select a wall, or a table or counter, and choose <b>Architecture › Build › Decorative
+Lighting</b>:</p>
+<ul>
+  <li><b>on a wall</b>, sconces along its room side, one every 8 ft, centred at 63 in;</li>
+  <li><b>over a table</b>, a chandelier sized from the room and the table (the room's width plus
+  length in feet gives its largest diameter in inches; over a table, ⅔ of the table's length),
+  its bottom 32 in over the table;</li>
+  <li><b>pendants</b> in a row along a table or counter, 27 in apart, 33 in over it.</li>
+</ul>
+<p>Check Rules then applies the 2010 ADA Standards: 80 in headroom under anything hanging over a
+walkway (§307.4), and no more than 4 in out from a wall between 27 and 80 in up (§307.2). Planning
+practice's heights over tables come as notes. (<code>lighting.chandelier</code>,
+<code>lighting.pendants</code>, <code>lighting.sconces</code>)</p>
 
 <h2 id="accessible">Accessible and not</h2>
 <p>The ADA asks only some beds and rooms to have their clear spaces. The accessibility pack's rules

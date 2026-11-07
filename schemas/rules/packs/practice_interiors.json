@@ -6,7 +6,7 @@
   "jurisdiction": "Any",
   "edition": "Furniture planning guides (research/15 D2)",
   "layer": "recommended",
-  "notes": "Practice, not code: findings are notes. Guides give 36 in in front of a dresser as preferred and 30 in as the minimum, and 24-36 in at the foot of a bed.",
+  "notes": "Practice, not code: findings are notes. Guides give 36 in in front of a dresser as preferred and 30 in as the minimum, and 24-36 in at the foot of a bed. Light fixtures over tables follow retailers' guides (30–34 in for chandeliers, 30–36 in for pendants).",
   "zones": [
     {
       "id": "Dining table edge",
@@ -121,6 +121,53 @@
       ],
       "height": 0.6,
       "source": "S1478",
+      "confidence": "secondary"
+    }
+  ],
+  "heights_over": [
+    {
+      "id": "Chandelier over a table",
+      "description": "A chandelier's bottom 30–34 in above the table under it",
+      "applies_to": {
+        "classes": [
+          "IfcLightFixture"
+        ],
+        "object_types": [
+          "Chandelier"
+        ]
+      },
+      "over": {
+        "classes": [
+          "IfcFurniture"
+        ],
+        "predefined_types": [
+          "TABLE"
+        ]
+      },
+      "min": 0.762,
+      "max": 0.8636,
+      "source": "S1471",
+      "confidence": "secondary"
+    },
+    {
+      "id": "Pendant over a table",
+      "description": "A pendant's bottom 30–36 in above the table or counter under it",
+      "applies_to": {
+        "classes": [
+          "IfcLightFixture"
+        ],
+        "object_types": [
+          "Pendant"
+        ]
+      },
+      "over": {
+        "classes": [
+          "IfcFurniture"
+        ]
+      },
+      "min": 0.762,
+      "max": 0.9144,
+      "source": "S1472",
       "confidence": "secondary"
     }
   ]

@@ -4,7 +4,7 @@
   "title": "2010 ADA Standards: furniture in accessible rooms",
   "domain": "interiors",
   "jurisdiction": "US",
-  "edition": "2010 ADA Standards for Accessible Design, §806.2.3 (guest rooms with mobility features)",
+  "edition": "2010 ADA Standards for Accessible Design: §806.2.3 (guest rooms with mobility features), §307.2 and §307.4 (protruding objects)",
   "layer": "accessible",
   "notes": "A117.1-2017 asks 30 × 52 in; the ADA's 30 × 48 in is used here. One clear space between two beds also complies (§806.2.3 exception): mark one bed not accessible when two share a space.",
   "zones": [
@@ -73,6 +73,50 @@
           -1.2192
         ]
       ],
+      "source": "S1354",
+      "confidence": "verified"
+    }
+  ],
+  "headroom": [
+    {
+      "id": "ADA 2010 307.4",
+      "description": "80 in clear headroom under a hanging fixture on a circulation path (not over furniture)",
+      "applies_to": {
+        "classes": [
+          "IfcLightFixture"
+        ],
+        "object_types": [
+          "Chandelier",
+          "Pendant"
+        ]
+      },
+      "min": 2.032,
+      "unless_over": {
+        "classes": [
+          "IfcFurniture"
+        ]
+      },
+      "source": "S1354",
+      "confidence": "verified"
+    }
+  ],
+  "projections": [
+    {
+      "id": "ADA 2010 307.2",
+      "description": "An object with its leading edge 27–80 in above the floor projects 4 in at most from its wall",
+      "applies_to": {
+        "classes": [
+          "IfcLightFixture"
+        ],
+        "object_types": [
+          "Sconce"
+        ]
+      },
+      "band": [
+        0.6858,
+        2.032
+      ],
+      "max": 0.1016,
       "source": "S1354",
       "confidence": "verified"
     }

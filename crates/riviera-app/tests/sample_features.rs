@@ -1397,8 +1397,9 @@ fn the_furnished_apartment_sample_keeps_its_layouts_clear() {
         let room = r["cells"][col("room")]["text"].as_str().unwrap().to_owned();
         *by_room.entry(room.split_once(' ').map_or(room.clone(), |(_, n)| n.to_owned())).or_default() += r["cells"][col("count")]["text"].as_str().unwrap().parse::<u64>().unwrap();
     }
-    assert_eq!(by_room.get("Bedroom"), Some(&4), "{by_room:?}");
+    // The bedroom's two sconces and the dining room's chandelier are counted with the furniture.
+    assert_eq!(by_room.get("Bedroom"), Some(&6), "{by_room:?}");
     assert_eq!(by_room.get("Living room"), Some(&5), "{by_room:?}");
-    assert_eq!(by_room.get("Dining room"), Some(&5), "{by_room:?}");
+    assert_eq!(by_room.get("Dining room"), Some(&6), "{by_room:?}");
     assert_eq!(by_room.get("Office"), Some(&3), "{by_room:?}");
 }
