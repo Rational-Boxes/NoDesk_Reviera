@@ -351,6 +351,9 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(LightingChandelier),
         registry.add(LightingPendants),
         registry.add(LightingSconces),
+        registry.add(CabinetRun),
+        registry.add(CabinetRuns),
+        registry.add(CountertopFromRuns),
         registry.add(LibraryList),
         registry.add(LibraryImportFiles),
         registry.add(LibraryGetMeta),
@@ -4191,6 +4194,46 @@ edit_command!(
     crate::decorative_lighting::SconcesParams,
     crate::decorative_lighting::Hung,
     crate::decorative_lighting::sconces
+);
+
+edit_command!(
+    CabinetRun,
+    "cabinet.run",
+    "Lay out a run of cabinets",
+    "Lays out a run of base, wall or tall cabinets along a back line from `start` to `end` (ARC-KIT-001), \
+     facing away from the wall behind it (or toward `toward`). The run is filled with the region's \
+     standard widths: US (36 in units, then the widest of 9–48 in in 3 in steps that fits) or EU (600 mm \
+     modules, then the widest of 150–1200 mm), or the `widths` given; a filler takes the rest. US base \
+     units are 34½ in high and 24 in deep on a 4 × 3 in toe kick; wall units 12 in deep and 30 in high, \
+     18 in over a 36 in counter; tall units 84 in. The region defaults from the building code. Units are \
+     built-in IfcFurniture (BaseCabinet, WallCabinet, TallCabinet, Filler) in the Casework category.",
+    "Cabinet Run",
+    crate::cabinets::RunParams,
+    crate::cabinets::Run,
+    crate::cabinets::run
+);
+
+read_command!(
+    CabinetRuns,
+    "cabinet.runs",
+    "List the cabinet runs",
+    "Lists the model's cabinet runs (ARC-KIT-001): each run's id, kind and units, and its countertop.",
+    Option<crate::cabinets::RunsParams>,
+    Vec<crate::cabinets::RunInfo>,
+    crate::cabinets::runs
+);
+
+edit_command!(
+    CountertopFromRuns,
+    "countertop.from_runs",
+    "Put countertops on cabinet runs",
+    "Puts a countertop on each run of base units given (by run id or any unit), or on every run (ARC-KIT-002): \
+     one top from the first unit to the last, on the units' backs and overhanging their fronts (1 in US, \
+     20 mm EU, or `overhang`), 1½ in or 40 mm thick, an IfcSystemFurnitureElement WORKSURFACE.",
+    "Countertop",
+    crate::cabinets::TopsParams,
+    Vec<crate::cabinets::Top>,
+    crate::cabinets::tops
 );
 
 read_command!(

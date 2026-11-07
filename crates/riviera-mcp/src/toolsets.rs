@@ -215,6 +215,8 @@ pub fn toolset_of(command: &str) -> String {
             | "rules"
             | "furnishing"
             | "interior"
+            | "cabinet"
+            | "countertop"
             | "report"
             | "vt"
             | "elevator"

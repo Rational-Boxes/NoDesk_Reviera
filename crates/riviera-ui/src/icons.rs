@@ -1438,6 +1438,14 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "rules_check" => format!(
             r#"<rect x="13" y="4" width="12" height="18" rx="1" fill="{f}" {s}/><path d="M13 9h12" {s}/><rect x="4" y="10" width="8" height="12" fill="none" {sa} stroke-dasharray="3 2"/><path d="M6 26l3 3 6-6" fill="none" {s}/>"#
         ),
+        // Base units in elevation: three doors on a toe kick, under a top.
+        "cabinet_run" => format!(
+            r#"<path d="M2 12h28" {s}/><rect x="3" y="13" width="26" height="14" fill="{f}" {s}/><path d="M11.7 13v14M20.3 13v14M3 25h26" {s}/><circle cx="9" cy="19" r="0.9" fill="{a}"/><circle cx="14" cy="19" r="0.9" fill="{a}"/><circle cx="23" cy="19" r="0.9" fill="{a}"/>"#
+        ),
+        // A countertop slab over a cabinet, overhanging its front.
+        "countertop" => format!(
+            r#"<rect x="3" y="10" width="26" height="4" fill="{a}" {s}/><rect x="5" y="14" width="22" height="14" fill="{f}" {s}/><path d="M16 14v14" {s}/>"#
+        ),
         // A chandelier: a stem from the ceiling, a bowl and arms with candles.
         "decorative_lighting" => format!(
             r#"<path d="M6 3h20M16 3v8" {s}/><path d="M7 15c2 5 16 5 18 0z" fill="{f}" {s}/><path d="M7 15v-4M25 15v-4M16 18v-5" {s}/><circle cx="7" cy="9" r="1.6" fill="{a}" {s}/><circle cx="25" cy="9" r="1.6" fill="{a}" {s}/><path d="M12 23l4 6 4-6" fill="none" {sa}/>"#

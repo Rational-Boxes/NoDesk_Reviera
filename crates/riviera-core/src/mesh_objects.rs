@@ -54,6 +54,8 @@ pub enum Category {
     #[default]
     GenericModel,
     Furniture,
+    /// Work surfaces and panels (`IfcSystemFurnitureElement`): countertops (ARC-KIT-002).
+    SystemFurniture,
     Column,
     PlumbingFixture,
     LightingFixture,
@@ -91,7 +93,7 @@ pub enum Category {
 }
 
 impl Category {
-    pub const ALL: [Category; 27] = [
+    pub const ALL: [Category; 28] = [
         Category::GenericModel,
         Category::Furniture,
         Category::Column,
@@ -119,6 +121,7 @@ impl Category {
         Category::ElectricAppliance,
         Category::Humidifier,
         Category::Transport,
+        Category::SystemFurniture,
     ];
 
     pub fn label(self) -> &'static str {
@@ -150,6 +153,7 @@ impl Category {
             Category::ElectricAppliance => "Electric Appliance",
             Category::Humidifier => "Humidifier",
             Category::Transport => "Transport Element",
+            Category::SystemFurniture => "System Furniture",
         }
     }
 
@@ -183,6 +187,7 @@ impl Category {
             Category::ElectricAppliance => "IfcElectricAppliance",
             Category::Humidifier => "IfcHumidifier",
             Category::Transport => "IfcTransportElement",
+            Category::SystemFurniture => "IfcSystemFurnitureElement",
         }
     }
 
@@ -216,6 +221,7 @@ impl Category {
             Category::ElectricAppliance => "IfcElectricApplianceType",
             Category::Humidifier => "IfcHumidifierType",
             Category::Transport => "IfcTransportElementType",
+            Category::SystemFurniture => "IfcSystemFurnitureElementType",
         }
     }
 
@@ -263,6 +269,7 @@ impl Category {
     pub fn predefined_types(self) -> Vec<&'static str> {
         let mut out = match self {
             Category::Furniture => vec!["CHAIR", "TABLE", "DESK", "BED", "FILECABINET", "SHELF", "SOFA"],
+            Category::SystemFurniture => vec!["PANEL", "WORKSURFACE"],
             _ => vec![self.predefined()],
         };
         out.extend(["USERDEFINED", "NOTDEFINED"]);

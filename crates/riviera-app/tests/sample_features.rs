@@ -1403,3 +1403,30 @@ fn the_furnished_apartment_sample_keeps_its_layouts_clear() {
     assert_eq!(by_room.get("Dining room"), Some(&6), "{by_room:?}");
     assert_eq!(by_room.get("Office"), Some(&3), "{by_room:?}");
 }
+
+#[test]
+fn the_galley_kitchen_sample_runs_its_cabinets_clear() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "galley_kitchen");
+    // Four runs survive the round trip: two base, one wall, one tall.
+    let runs = ok(&mut app, "cabinet.runs", json!({}));
+    let mut kinds: Vec<&str> = runs.as_array().unwrap().iter().map(|r| r["kind"].as_str().unwrap()).collect();
+    kinds.sort_unstable();
+    assert_eq!(kinds, ["base", "base", "tall", "wall"], "{runs:#}");
+    // Nothing overlaps, and both countertops are there, 25 in deep, their tops at 36 in.
+    assert_eq!(ok(&mut app, "overlap.find", json!({}))["overlaps"], json!([]));
+    let s = store(&app);
+    let tops: Vec<_> = s.iter().filter(|e| e.class == "IfcSystemFurnitureElement").collect();
+    assert_eq!(tops.len(), 2);
+    for t in tops {
+        let it = riviera_core::rules::item(&s, t).unwrap();
+        assert!((it.z[1] - 36.0 * 0.0254).abs() < 1e-6 && (it.back - it.front - 25.0 * 0.0254).abs() < 1e-6, "{it:?}");
+    }
+    // The units are casework, each facing into the room: the north ones' centres south of y = 2.6.
+    let units: Vec<_> = s.iter().filter(|e| riviera_core::categories::category_of(e).map(|c| c.key) == Some("cat.casework") && e.class == "IfcFurniture").collect();
+    assert!(units.len() >= 12, "{}", units.len());
+    for u in units {
+        let o = riviera_core::mesh_objects::regenerate(&s, u).unwrap().placement.origin;
+        assert!(o[1] > 0.1 && o[1] < 2.6, "{o:?}");
+    }
+}

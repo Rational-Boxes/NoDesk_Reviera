@@ -677,7 +677,9 @@ pub fn category_of(e: &Element) -> Option<&'static Category> {
             "SpecialtyEquipment" => "cat.specialty_equipment",
             _ => "cat.generic_models",
         },
-        "IfcFurniture" if object_type == "Casework" => "cat.casework",
+        // Cabinets and counters (ARC-KIT-001/002), and work surfaces.
+        "IfcFurniture" if matches!(object_type, "Casework" | "BaseCabinet" | "WallCabinet" | "TallCabinet" | "Filler") => "cat.casework",
+        "IfcSystemFurnitureElement" => "cat.casework",
         "IfcSpace" if object_type.starts_with("Area:") => "cat.areas",
         "IfcSpace" if object_type == crate::mep_spaces::OBJECT_TYPE => "cat.spaces",
         "IfcAnnotation" if object_type == crate::ref_planes::OBJECT_TYPE => "cat.reference_planes",

@@ -348,6 +348,65 @@ impl Gui {
         }
     }
 
+    /// Architecture › Build › Cabinet Run (ARC-KIT-001): base, wall or tall units along a back
+    /// line clicked from start to end along a wall.
+    pub(crate) fn cabinet_run(&mut self) {
+        let frame = self.frame;
+        let f = super::reinforcement_ui::Form::new(&frame, "Cabinet Run");
+        let kind = f.choice("Units", &["Base units".to_owned(), "Wall units".to_owned(), "Tall units".to_owned()], 0);
+        let region = f.choice("Sizes", &["From the building code".to_owned(), "US (inches)".to_owned(), "EU (600 mm modules)".to_owned()], 0);
+        let ok = f.show("Then click the run's start and end along the wall's face, in a plan: the units face away from the wall, in standard widths, with a filler for what is left.", "Pick the Run");
+        let k = ["base", "wall", "tall"][kind.get_selection().unwrap_or(0) as usize];
+        let r = match region.get_selection() {
+            Some(1) => json!("us"),
+            Some(2) => json!("eu"),
+            _ => serde_json::Value::Null,
+        };
+        f.dialog.destroy();
+        if !ok {
+            return;
+        }
+        let mut args = json!({ "kind": k });
+        if !r.is_null() {
+            args["region"] = r;
+        }
+        self.start_picking(
+            "cabinet.run",
+            vec![json!({ "key": "start", "kind": "at", "prompt": "Cabinet Run: click the run's start on the wall face" }), json!({ "key": "end", "kind": "point", "prompt": "Cabinet Run: click its end" })],
+            args,
+        );
+    }
+
+    /// The run picked: made, and reported.
+    pub(crate) fn cabinet_run_finish(&mut self, mut args: serde_json::Value) {
+        let frame = self.frame;
+        let start = args["start"].take();
+        args["start"] = start["point"].clone();
+        args["level"] = start["level"].clone();
+        match self.run("cabinet.run", args) {
+            Ok(v) => {
+                self.refresh_scene(&frame);
+                let n = v["units"].as_array().map_or(0, Vec::len);
+                frame.set_status_text(&format!("{n} unit(s) over {:.2} m, filler {:.0} mm; Countertop tops base runs", v["length"].as_f64().unwrap_or(0.0), v["filler"].as_f64().unwrap_or(0.0) * 1000.0), 0);
+            }
+            Err(e) => error(&frame, &format!("The run was not made:\n{e}")),
+        }
+    }
+
+    /// Architecture › Build › Countertop (ARC-KIT-002): tops on the selected units' runs, or every
+    /// base run.
+    pub(crate) fn countertop(&mut self) {
+        let frame = self.frame;
+        let sel: Vec<u64> = self.selection().into_iter().map(|id| id.0).collect();
+        match self.run("countertop.from_runs", json!({ "element_ids": sel })) {
+            Ok(v) => {
+                self.refresh_scene(&frame);
+                frame.set_status_text(&format!("{} countertop(s) placed", v.as_array().map_or(0, Vec::len)), 0);
+            }
+            Err(e) => error(&frame, &format!("No countertop was placed:\n{e}")),
+        }
+    }
+
     /// Lays out a bathroom where the Bathroom Layout tool was clicked, and reports the fit.
     pub(crate) fn layout_bathroom_at(&mut self, mut args: serde_json::Value) {
         let frame = self.frame;

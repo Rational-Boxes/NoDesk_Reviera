@@ -5531,6 +5531,54 @@ unchanged. The first domain on the shared format is **interiors**: use zones aro
 
 *Built (2026-11-06):* `riviera_core::decorative_lighting`, the mounting rule kinds, the *Lighting* items, and Architecture › Build › Decorative Lighting (on the selected wall or piece). Defaults are E-105. Not yet: ceiling fans (their IFC class is open, `INTERIORS_PLAN.md` Q4), outlet-box weight checks (NEC 314.27), photometric files, and lamps placed on furniture.
 
+### 3.9b.6 Cabinet runs
+**ID:** ARC-KIT-001 · **Priority:** P1 · **Ref:** `KITCHENS_PLAN.md` §4.1, §4.3; `INTERIORS_PLAN.md` §4.4 (step 5); research/14 A4, D1
+
+**Purpose.** Lay a straight run of kitchen, bathroom or office casework along a wall in standard widths, so a kitchen or a counter can be planned without placing each unit by hand.
+
+**Behaviour & rules.**
+- **The run** is a back line from a start to an end, on a wall's face, picked in a plan or typed (standing rule). Its units face away from a wall within 0.3 m behind the line, or toward a given point.
+- **Kinds and sizes**, by region (US for the IBC and IRC, otherwise EU, or as given):
+
+  | | US base | US wall | US tall | EU base | EU wall | EU tall |
+  |---|---|---|---|---|---|---|
+  | Depth | 24 in | 12 in | 24 in | 600 | 350 | 600 |
+  | Height | 34½ in | 30 in | 84 in | 870 | 720 | 2100 |
+  | Bottom | floor | 54 in | floor | floor | 1460 | floor |
+  | Toe kick | 4 × 3 in | — | 4 × 3 in | 150 × 60 | — | 150 × 60 |
+  | Widths | 9–48 in in 3 in steps; 36 in preferred | as base | 18–36 in; 24 in preferred | 150–1200; 600 preferred | as base | 400–600; 600 preferred |
+
+- **Fill.** The run is filled with the preferred width and one or two other standard widths, leaving the least over. A **filler** takes the rest (none under 3 mm). Ties keep more preferred units, then fewer units. Explicit widths may be given instead; units longer than the run are refused.
+- **Units** are `IfcFurniture` USERDEFINED with ObjectType BaseCabinet, WallCabinet, TallCabinet or Filler. Each width is its own generated type with `Pset_FurnitureTypeCommon` IsBuiltIn TRUE and its nominal sizes. They are in the *Casework* category. Each carries its run's id, kind and region, which `cabinet.runs` lists.
+
+**Commands.** `cabinet.run(start, end, level, kind, region?, widths?, toward?)` → `{run, region, length, units: [{element, width, filler}], filler}`; `cabinet.runs()` → `[{run, kind, units}]`.
+
+**Acceptance criteria.**
+- [x] A 3.6 m US base run is 36 + 36 + 36 + 33 in and a 19 mm filler. It faces away from its wall, stands 34½ in high, and is Casework.
+- [x] A 3.8 m run is 36 + 36 + 36 + 39 in, not four 36 in units and a 142 mm filler. An EU 2.5 m run needs no filler. A 0.8 m tall run is one 30 in unit.
+- [x] A run whose back line lies on a wall's face faces into the room, on either side of the room.
+- [x] Wall units sit at 54 in, 12 in deep. Nothing in the galley kitchen sample overlaps.
+
+*Built (2026-11-06):* `riviera_core::cabinets` and Architecture › Build › Cabinet Run (the kind and sizes, then the start and end picked). Defaults are E-106. Not yet: corner units where runs meet; sink, cooktop and drawer bases and appliance openings; grips that change widths; a shortfall report; the `IfcRelConnectsElements` link to the wall; EU worktop heights other than 910 mm.
+
+### 3.9b.7 Countertops
+**ID:** ARC-KIT-002 · **Priority:** P1 · **Ref:** `KITCHENS_PLAN.md` §4.2, §4.3; research/14 D1, D3
+
+**Purpose.** Top each run of base units in one action, at the right height and overhang.
+
+**Behaviour & rules.**
+- **One top per run** of base units: the selected units' runs, the runs named, or every base run. It runs from the first unit to the last. Its back is on the units' backs and its front passes their fronts by the overhang (1 in US, 20 mm EU, or as given).
+- **Thickness** is 1½ in (US) or 40 mm (EU), so the US surface is at 36 in.
+- **IFC:** an `IfcSystemFurnitureElement` WORKSURFACE (Uniclass Pr_40_30_30_46), in the *Casework* category, tagged with its run.
+
+**Commands.** `countertop.from_runs(runs?, element_ids?, overhang?)` → `[{element, run, length, depth, height}]`.
+
+**Acceptance criteria.**
+- [x] A 3.6 m US base run's top is 3.6 m × 25 in, its surface at 36 in, its back on the wall face.
+- [x] The galley kitchen sample's two tops leave 1.23 m between them and overlap nothing.
+
+*Built (2026-11-06):* `riviera_core::cabinets::tops` and Architecture › Build › Countertop (the selected units' runs, or all). Defaults are E-106. Not yet: tops across joined or corner runs, islands and seating overhangs, backsplashes, edge profiles and joints, and sink and cooktop cut-outs.
+
 ### 3.9b.3 Generic furniture and equipment
 **ID:** ARC-FURN-001 · **Priority:** P1 · **Ref:** `INTERIORS_PLAN.md` §4.1, §5.1, §7.1, §8.1 (the owner accepted the IFC mapping); research/15 A1, B1–B7, C2, C7, D1, E2; DM-LIB-006
 
@@ -6772,6 +6820,9 @@ All commands below are registered once in the command registry and exposed autom
 | `lighting.chandelier` | point? \| over_id, level, ceiling? | {placed, item, diameter_max?, bottom, notes} | Yes | ARC-INT-003 |
 | `lighting.pendants` | over_id, level, count? | {placed, item, bottom, notes} | Yes | ARC-INT-003 |
 | `lighting.sconces` | wall_id, level, side? \| toward?, count?, height? | {placed, item, bottom, notes} | Yes | ARC-INT-003 |
+| `cabinet.run` | start, end, level, kind, region?, widths?, toward? | {run, region, length, units, filler} | Yes | ARC-KIT-001 |
+| `cabinet.runs` | — | [{run, kind, units}] | No | ARC-KIT-001 |
+| `countertop.from_runs` | runs?, element_ids?, overhang? | [{element, run, length, depth, height}] | Yes | ARC-KIT-002 |
 | `interior.layouts` | — | [{id, title, items}] | No (query) | ARC-INT-001 |
 | `interior.layout` | template, point, level, wall_id?, replace?, fit_only? | {placed, fit, packs} | Yes | ARC-INT-001 |
 | `furnishing.catalogue` | library? | [{library, folder, name, predefined_type, kind, uniclass, description, source, size}] | No (query) | ARC-FURN-001 |

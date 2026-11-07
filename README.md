@@ -633,6 +633,12 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
   bathroom and vertical transport included (`rules.packs`, `rules.set_packs`, `rules.add_pack`,
   `rules.remove_pack`, `rules.set_accessible`, `rules.check`). Not built yet: room layouts,
   hotel floors, fixture runs, front ends and gym layouts, which the plan goes on to.
+- **Cabinet runs and countertops** (ARC-KIT-001/002). Architecture › Build › Cabinet Run lays
+  base, wall or tall units along a wall from a clicked start to end, in US (36 in, 9–48 in) or
+  EU (600 mm) widths chosen to leave the least filler, facing away from the wall; Countertop
+  tops each base run, 1 in past the fronts at 36 in (`cabinet.run`, `cabinet.runs`,
+  `countertop.from_runs`). Not built yet: corner units, appliances, islands, backsplashes and
+  cut-outs.
 - **Decorative lighting** (ARC-INT-003). Chandeliers, pendants, sconces and lamps join the
   Interiors library as typed light fixtures:
   - a chandelier is sized from its room and table and hung 32 in over the table;

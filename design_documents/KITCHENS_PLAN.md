@@ -418,6 +418,10 @@ sheets (Hussmann), not IFC (E3); import stays through meshes and IFC types.
 11. Racks, circuits, piping and loads; refrigerant and energy checks; refrigeration schedules
     and the COBie Connection sheet (§8.4–8.6, §9).
 
+**Progress (2026-11-06):** step 3 is begun, brought forward for the interiors plan's counters:
+straight cabinet runs and countertops (ARC-KIT-001/002), on the shared rules schema built as the
+interiors plan's step 1. Corners, cut-outs and appliances in cabinets are next in it.
+
 Each step gets its spec section first, its samples and a help walkthrough. Every tool is a
 registered command (`kitchen.*`, `cabinet.*`, `countertop.*`, `foodservice.*`, `hood.*`,
 `refrig.*`), exposed to Lua and MCP, and every tool that takes points, paths or outlines

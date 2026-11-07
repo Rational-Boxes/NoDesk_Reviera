@@ -352,6 +352,19 @@
     ]
   },
   {
+    "name": "galley_kitchen",
+    "title": "A galley kitchen",
+    "group": "Architecture",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "galley_kitchen.lua"
+        }
+      }
+    ]
+  },
+  {
     "name": "wet_room",
     "title": "Family bathroom and wet room (England)",
     "group": "Architecture",
