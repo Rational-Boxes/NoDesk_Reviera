@@ -442,6 +442,41 @@ impl Gui {
         }
     }
 
+    /// Architecture › Build › Closet (ARC-INT-005): rods and a shelf along a closet's back wall,
+    /// clicked from one side to the other.
+    pub(crate) fn closet(&mut self) {
+        let frame = self.frame;
+        let f = super::reinforcement_ui::Form::new(&frame, "Closet");
+        let layouts = ["Single rod at 66 in, shelf at 68 in".to_owned(), "Double hang at 40 and 80 in, shelf at 84 in".to_owned(), "Accessible: rod at 42 in, shelf at 46 in".to_owned()];
+        let layout = f.choice("Fittings", &layouts, 0);
+        let ok = f.show("Then click the closet's back wall face from one side to the other, in a plan. The rods are centred in a 24 in deep closet; the accessible fittings are within ADA §308.3.2's reach.", "Pick the Closet");
+        let l = ["single", "double", "accessible"][layout.get_selection().unwrap_or(0) as usize];
+        f.dialog.destroy();
+        if !ok {
+            return;
+        }
+        self.start_picking(
+            "closet.create",
+            vec![json!({ "key": "start", "kind": "at", "prompt": "Closet: click one end of its back wall face" }), json!({ "key": "end", "kind": "point", "prompt": "Closet: click the other end" })],
+            json!({ "layout": l }),
+        );
+    }
+
+    /// The closet picked: fitted, and reported.
+    pub(crate) fn closet_finish(&mut self, mut args: serde_json::Value) {
+        let frame = self.frame;
+        let start = args["start"].take();
+        args["start"] = start["point"].clone();
+        args["level"] = start["level"].clone();
+        match self.run("closet.create", args) {
+            Ok(v) => {
+                self.refresh_scene(&frame);
+                frame.set_status_text(&format!("{} rod(s) and a shelf over {:.2} m", v["rods"].as_array().map_or(0, Vec::len), v["length"].as_f64().unwrap_or(0.0)), 0);
+            }
+            Err(e) => error(&frame, &format!("The closet was not fitted:\n{e}")),
+        }
+    }
+
     /// Architecture › Build › Countertop (ARC-KIT-002): tops on the selected units' runs, or every
     /// base run.
     pub(crate) fn countertop(&mut self) {

@@ -355,6 +355,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(CabinetRuns),
         registry.add(CountertopFromRuns),
         registry.add(CounterRun),
+        registry.add(ClosetCreate),
         registry.add(LibraryList),
         registry.add(LibraryImportFiles),
         registry.add(LibraryGetMeta),
@@ -4252,6 +4253,22 @@ edit_command!(
     crate::counters::CounterParams,
     crate::counters::Counter,
     crate::counters::run
+);
+
+edit_command!(
+    ClosetCreate,
+    "closet.create",
+    "Fit out a closet",
+    "Fits rods and a shelf along a closet's back wall from `start` to `end` (ARC-INT-005): `single` (a rod \
+     at 66 in, a shelf at 68 in), `double` (rods at 40 and 80 in, a shelf at 84 in) or `accessible` (a rod \
+     at 42 in and a shelf at 46 in, within ADA 2010 §308.3.2's side reach over the closet's 24 in), or the \
+     heights given. Rods are centred in the closet's `depth`; the 12 in shelf is on the back wall. Parts are \
+     IfcSystemFurnitureElement USERDEFINED ClosetRod / ClosetShelf (AccessibleClosetRod / \
+     AccessibleClosetShelf, which the interiors packs check), in the Casework category.",
+    "Closet",
+    crate::closets::ClosetParams,
+    crate::closets::Closet,
+    crate::closets::create
 );
 
 read_command!(

@@ -4850,6 +4850,10 @@ fn perform(gui: &Rc<RefCell<Gui>>, f: &Frame, action: &str) {
             focus(g);
         }),
         "ui.countertop" => with(gui, Gui::countertop),
+        "ui.closet" => with(gui, |g| {
+            g.closet();
+            focus(g);
+        }),
         "ui.counter_run" => with(gui, |g| {
             g.counter_run();
             focus(g);

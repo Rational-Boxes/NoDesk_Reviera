@@ -500,8 +500,8 @@ No standard set exists for retail, checkout or gym data (E1). Three sets are pro
 - Step 3 is built: room layouts for dwellings and workplaces (ARC-INT-001).
 - Step 4 is built: decorative lighting (ARC-INT-003).
 - Step 5 is begun: straight cabinet runs and countertops (ARC-KIT-001/002, kitchen step 3 brought
-  forward), and counters with accessible portions (ARC-INT-004). Next in it are closets, then
-  corners and cut-outs.
+  forward), counters with accessible portions (ARC-INT-004) and closets (ARC-INT-005). Corners,
+  cut-outs and walk-in closets remain; next is step 6, hotel guest rooms.
 
 Each step gets its spec section first, its samples and a help walkthrough. Every tool is a
 registered command, exposed to Lua and MCP:

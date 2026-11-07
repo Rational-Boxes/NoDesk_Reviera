@@ -1453,3 +1453,23 @@ fn the_service_counters_sample_keeps_its_accessible_portions() {
     assert_eq!(found.as_array().unwrap().len(), 1, "{found:#}");
     assert_eq!((found[0]["kind"].as_str(), found[0]["rule"].as_str()), (Some("surface_height"), Some("ADA 2010 904.4.1 surface")));
 }
+
+#[test]
+fn the_closets_sample_keeps_its_accessible_closet_within_reach() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "closets");
+    assert_eq!(ok(&mut app, "rules.check", json!({})), json!([]));
+    assert_eq!(ok(&mut app, "overlap.find", json!({}))["overlaps"], json!([]));
+    // Four rods (one, two, one) and three shelves; the accessible ones at 42 and 46 in.
+    let s = store(&app);
+    let sel = |ot: &str| riviera_core::rules::Selector { object_types: vec![ot.into()], ..Default::default() };
+    let tops = |ot: &str| -> Vec<f64> { s.iter().filter(|e| sel(ot).selects_element(&s, e)).map(|e| riviera_core::rules::item(&s, e).unwrap().z[1] / 0.0254).collect() };
+    assert_eq!((tops("ClosetRod").len(), tops("ClosetShelf").len()), (3, 2));
+    let (rod, shelf) = (tops("AccessibleClosetRod"), tops("AccessibleClosetShelf"));
+    assert!(rod.len() == 1 && (rod[0] - 42.0).abs() < 1e-4 && shelf.len() == 1 && (shelf[0] - 46.0).abs() < 1e-4, "{rod:?} {shelf:?}");
+    // Raised 2 in, the accessible shelf is out of reach (§308.3.2).
+    let id = s.iter().find(|e| sel("AccessibleClosetShelf").selects_element(&s, e)).unwrap().id().0;
+    ok(&mut app, "mesh_object.set", json!({ "element_ids": [id], "offset": 47.25 * 0.0254 }));
+    let found = ok(&mut app, "rules.check", json!({}));
+    assert_eq!((found.as_array().unwrap().len(), found[0]["rule"].as_str()), (1, Some("ADA 2010 308.3.2")), "{found:#}");
+}

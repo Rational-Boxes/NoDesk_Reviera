@@ -32,7 +32,7 @@
 **Document:** Functional and technical specification of Riviera, an open-source BIM authoring application
 **Functional reference:** Autodesk® Revit® 2026/2027 (described from public sources only; see `RESEARCH_LOG.md`)
 **Licence of Riviera:** GPL-3.0-or-later
-**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 914 numbered requirements (320 P0 · 354 P1 · 233 P2 · 7 P3), 2,378 commands
+**Version:** 0.1 (draft) · 2026-10-16 · **Size:** 915 numbered requirements (320 P0 · 355 P1 · 233 P2 · 7 P3), 2,379 commands
 
 > **Clean-room statement.** This specification describes features, workflows and behaviour in Riviera's own words. Every input was publicly available: vendor online help, public blogs and tutorials, public forums and open-source repositories. All of it is listed with URLs and access checks in `SOURCE_REGISTER.md`. No proprietary, confidential, leaked or NDA-covered information was used. No vendor code, binaries, file formats or assets were examined or copied. Autodesk and Revit are trademarks of Autodesk, Inc. They are used here only to identify the functional reference. Riviera is not affiliated with or endorsed by Autodesk.
 
@@ -64,7 +64,7 @@ This document covers:
 | 6 | Collaboration, linking and coordination (Local and BIMserver modes) |
 | 7 | Advanced features beyond the reference product: scene protocol, simulated walkthroughs, Godot translation layer for VR/AR, render bridges |
 | 8 | Remote computation and analysis (overview): the remote computation subsystem and the analysis plugin layer, how they fit together, and a build order |
-| A | Appendix A: requirement summary, shared commands, consolidated command index (2,378 commands; 911 requirements) |
+| A | Appendix A: requirement summary, shared commands, consolidated command index (2,379 commands; 911 requirements) |
 
 Out of scope:
 - reproducing vendor-cloud services such as ACC/Forma and Autodesk Assistant (open alternatives are specified instead)
@@ -15660,7 +15660,7 @@ unchanged. The first domain on the shared format is **interiors**: use zones aro
 
 | Pack | Layer | Covers |
 |---|---|---|
-| `ada_2010_interiors` | accessible | 2010 ADA Standards: a 30 × 48 in clear floor space for a parallel approach along each side of a bed (§806.2.3, G139); 80 in headroom under a hanging fixture on a circulation path (§307.4); 4 in at most for a sconce between 27 and 80 in above the floor (§307.2); an accessible counter portion 36 in high at most and 36 in (parallel) or 30 in (forward) long at least, with its 30 × 48 in clear floor space and, for a forward approach, knee clearance 30 in wide, 17 in deep and 27 in high (§904.4, §306) |
+| `ada_2010_interiors` | accessible | 2010 ADA Standards: a 30 × 48 in clear floor space for a parallel approach along each side of a bed (§806.2.3, G139); 80 in headroom under a hanging fixture on a circulation path (§307.4); 4 in at most for a sconce between 27 and 80 in above the floor (§307.2); an accessible counter portion 36 in high at most and 36 in (parallel) or 30 in (forward) long at least, with its 30 × 48 in clear floor space and, for a forward approach, knee clearance 30 in wide, 17 in deep and 27 in high (§904.4, §306); an accessible closet rod or shelf between 15 and 46 in, a side reach over 24 in (§811, §308.3.2) |
 | `practice_interiors` | recommended | Practice, as notes: 36 in round a dining table's edge, where its chairs may stand; 30 in in front of a dresser (36 in preferred); 24 in at the foot of a bed (research/15 D2, S1478 and S1479, [guide]); a chandelier's bottom 30–34 in and a pendant's 30–36 in over the table or counter under it (D4, S1471, S1472) |
 
 - **Choosing packs.** A project uses the packs it names for a domain (`rules.set_packs`), or packs chosen automatically: for interiors, `ada_2010_interiors` when the accessibility rule set (ARC-MOD-031) is the ADA. `practice_interiors` is only chosen by name.
@@ -15861,6 +15861,32 @@ unchanged. The first domain on the shared format is **interiors**: use zones aro
 - [x] The service counters sample's three counters pass every check and overlap nothing.
 
 *Built (2026-11-06):* `riviera_core::counters`, the surfaces rule kind, and Architecture › Build › Counter. Defaults are E-107. Not yet: closets (shelves, rods and doors, §308 reach); bars' lowered dining sections (§902) and check-out aisles (§904.3); toe clearance as its own zone; legs, brackets and modesty panels; EU heights.
+
+### 3.9b.9 Closets
+**ID:** ARC-INT-005 · **Priority:** P1 · **Ref:** `INTERIORS_PLAN.md` §4.4 (step 5); research/15 §8 (S1489, S1404), B11 and G6–G8, G13 (S1354); ARC-RULE-002
+
+**Purpose.** Fit a closet's rods and shelf at the usual heights, or within reach for an accessible room, and check them.
+
+**Behaviour & rules.**
+- **The closet** is its back wall face, picked from one side to the other in a plan or typed. The rods are centred in its depth (24 in by default, the usual minimum for hangers). The 12 in shelf is on the back wall.
+- **Layouts:**
+  - **single:** a rod at 66 in (64–70 in), a shelf at 68 in;
+  - **double:** rods at 40 and 80 in, a shelf at 84 in;
+  - **accessible:** a rod at 42 in and a shelf at 46 in. A side reach over 10–24 in reaches 46 in at most (§308.3.2), so a 66 in rod fails.
+
+  Rod and shelf heights may be given instead. Each rod needs 1 in under the shelf for hangers.
+- **IFC:** rods and shelves are `IfcSystemFurnitureElement` USERDEFINED ClosetRod and ClosetShelf (AccessibleClosetRod, AccessibleClosetShelf), in the *Casework* category.
+- **Check.** `ada_2010_interiors` holds an accessible rod's and shelf's tops between 15 and 46 in (the surfaces kind).
+
+**Commands.** `closet.create(start, end, level, layout?, depth?, rod_heights?, shelf_height?, toward?)` → `{closet, layout, length, rods, shelves}`.
+
+**Acceptance criteria.**
+- [x] A single closet's rod is at 66 in, 12 in from the back wall; its shelf at 68 in is on the wall. Double hang is at 40 and 80 in.
+- [x] The accessible fittings at 42 and 46 in pass Check Rules. The shelf raised to 48 in is reported against §308.3.2.
+- [x] A rod with no room for hangers under the shelf is refused.
+- [x] The closets sample's three closets pass every check and overlap nothing.
+
+*Built (2026-11-06):* `riviera_core::closets` and Architecture › Build › Closet. Defaults are E-108. Not yet: doors and the 30 × 48 in clear floor space in front of an accessible closet; walk-ins with rods on several walls; drawers, shoe shelves and hooks; closet lighting's storage zone (NEC 410.16).
 
 ### 3.9b.3 Generic furniture and equipment
 **ID:** ARC-FURN-001 · **Priority:** P1 · **Ref:** `INTERIORS_PLAN.md` §4.1, §5.1, §7.1, §8.1 (the owner accepted the IFC mapping); research/15 A1, B1–B7, C2, C7, D1, E2; DM-LIB-006
@@ -17107,6 +17133,7 @@ All commands below are registered once in the command registry and exposed autom
 | `cabinet.runs` | — | [{run, kind, units}] | No | ARC-KIT-001 |
 | `countertop.from_runs` | runs?, element_ids?, overhang? | [{element, run, length, depth, height}] | Yes | ARC-KIT-002 |
 | `counter.run` | start, end, level, kind?, height?, depth?, toward?, accessible? | {counter, length, height, elements, portion?} | Yes | ARC-INT-004 |
+| `closet.create` | start, end, level, layout?, depth?, rod_heights?, shelf_height?, toward? | {closet, layout, length, rods, shelves} | Yes | ARC-INT-005 |
 | `interior.layouts` | — | [{id, title, items}] | No (query) | ARC-INT-001 |
 | `interior.layout` | template, point, level, wall_id?, replace?, fit_only? | {placed, fit, packs} | Yes | ARC-INT-001 |
 | `furnishing.catalogue` | library? | [{library, folder, name, predefined_type, kind, uniclass, description, source, size}] | No (query) | ARC-FURN-001 |
@@ -30645,14 +30672,14 @@ Generated by `tools/build_spec.py` from the chapter command catalogs and require
 |------|---:|---:|---:|---:|------:|
 | UI | 76 | 39 | 8 | 0 | 123 |
 | DM | 91 | 66 | 34 | 3 | 194 |
-| ARC | 77 | 109 | 37 | 1 | 224 |
+| ARC | 77 | 110 | 37 | 1 | 225 |
 | STR | 0 | 15 | 47 | 0 | 62 |
 | MEP | 0 | 30 | 42 | 0 | 72 |
 | ANA | 0 | 1 | 32 | 0 | 33 |
 | DOC | 68 | 42 | 13 | 1 | 124 |
 | COL | 8 | 52 | 16 | 1 | 77 |
 | ADV | 0 | 0 | 4 | 1 | 5 |
-| **Total** | **320** | **354** | **233** | **7** | **914** |
+| **Total** | **320** | **355** | **233** | **7** | **915** |
 
 Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver)"), it is counted under the first. The non-functional requirements (NFR-…) are in Chapter 0 §0.7 and are not counted here.
 
@@ -30866,7 +30893,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 
 ## A.3 Consolidated command index
 
-**2378 unique commands** in 448 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
+**2379 unique commands** in 449 domains. Every command is exposed automatically to the UI, to Lua (`riviera.<domain>.<verb>`) and to MCP (`<domain>_<verb>`), subject to its permission class.
 
 | Domain | Commands |
 |--------|---------:|
@@ -30931,6 +30958,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `classification` | 3 |
 | `clearance` | 3 |
 | `clipboard` | 3 |
+| `closet` | 1 |
 | `cme` | 12 |
 | `cobie` | 2 |
 | `code` | 2 |
@@ -31600,6 +31628,7 @@ Where a requirement gives two priorities (for example "P0 (Local), P1 (BIMserver
 | `clipboard.copy` | 3 | element_ids | — | No (session state) | ARC-MOD-021 |
 | `clipboard.cut` | 3 | element_ids | — | Yes | ARC-MOD-021 |
 | `clipboard.paste` | 3 | mode: Free(vector)\ | Levels([id])\ | Views([id])\ | CurrentView\ |
+| `closet.create` | 3 | start, end, level, layout?, depth?, rod_heights?, shelf_height?, toward? | {closet, layout, length, rods, shelves} | Yes | ARC-INT-005 |
 | `cme.divide_path` | 2 | curve_refs[], spec | element_id | Yes | DM-CME-002 |
 | `cme.divide_surface` | 2 | face_ref, {u, v} \ | {references[]} | element_id | Yes |
 | `cme.form.add_edge` | 2 | face_ref, p1, p2 | — | Yes | DM-CME-001 |

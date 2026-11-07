@@ -218,6 +218,7 @@ pub fn toolset_of(command: &str) -> String {
             | "cabinet"
             | "countertop"
             | "counter"
+            | "closet"
             | "report"
             | "vt"
             | "elevator"

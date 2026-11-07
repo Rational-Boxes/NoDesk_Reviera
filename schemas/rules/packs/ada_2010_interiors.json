@@ -4,7 +4,7 @@
   "title": "2010 ADA Standards: furniture in accessible rooms",
   "domain": "interiors",
   "jurisdiction": "US",
-  "edition": "2010 ADA Standards for Accessible Design: §806.2.3 (guest rooms with mobility features), §307.2 and §307.4 (protruding objects), §904.4 and §306 (sales and service counters, knee and toe clearance)",
+  "edition": "2010 ADA Standards for Accessible Design: §806.2.3 (guest rooms with mobility features), §307.2 and §307.4 (protruding objects), §904.4 and §306 (sales and service counters, knee and toe clearance), §811 and §308 (storage within reach)",
   "layer": "accessible",
   "notes": "A117.1-2017 asks 30 × 52 in; the ADA's 30 × 48 in is used here. One clear space between two beds also complies (§806.2.3 exception): mark one bed not accessible when two share a space.",
   "zones": [
@@ -239,6 +239,20 @@
       },
       "height_max": 0.9144,
       "length_min": 0.762,
+      "source": "S1354",
+      "confidence": "verified"
+    },
+    {
+      "id": "ADA 2010 308.3.2",
+      "description": "An accessible closet rod or shelf is within a side reach over the closet's depth: 46 in high at most (reach over 10–24 in) and 15 in at least",
+      "applies_to": {
+        "object_types": [
+          "AccessibleClosetRod",
+          "AccessibleClosetShelf"
+        ]
+      },
+      "height_min": 0.381,
+      "height_max": 1.1684,
       "source": "S1354",
       "confidence": "verified"
     }

@@ -645,6 +645,10 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
   Standards §904.4 and §306 (its length and height, its clear floor space and knee clearance)
   through a new surfaces rule kind (`counter.run`). Not built yet: closets, lowered bar sections
   and check-out aisles.
+- **Closets** (ARC-INT-005). Architecture › Build › Closet fits rods and a shelf along a closet's
+  back wall: a single rod at 66 in, double hang at 40 and 80 in, or accessible fittings at 42 and
+  46 in, which Check Rules holds within the 2010 ADA Standards' side reach (§308.3.2)
+  (`closet.create`). Not built yet: closet doors, walk-ins and drawers.
 - **Decorative lighting** (ARC-INT-003). Chandeliers, pendants, sconces and lamps join the
   Interiors library as typed light fixtures:
   - a chandelier is sized from its room and table and hung 32 in over the table;
