@@ -6,7 +6,7 @@
 #
 #   packaging/flatpak/build.sh                  # build, then dist/BIM-Riviera-<ver>-<arch>.flatpak
 #   packaging/flatpak/build.sh --install        # ... and install the bundle for this user
-#   RIVIERA_VERSION=0.1.0-pre.11 packaging/flatpak/build.sh
+#   RIVIERA_VERSION=0.1.0-pre.12 packaging/flatpak/build.sh
 #
 # Needs flatpak and flatpak-builder, plus python3 (to refresh cargo-sources.json when Cargo.lock
 # changes). The GNOME 51 SDK and the LLVM extension are installed from Flathub (user
@@ -24,7 +24,7 @@ BUILD_DIR="$HERE/build-dir"
 REPO="$HERE/repo"
 DIST="$ROOT/dist"
 ARCH="$(flatpak --default-arch)"
-VERSION="${RIVIERA_VERSION:-0.1.0-pre.11}"
+VERSION="${RIVIERA_VERSION:-0.1.0-pre.12}"
 BUNDLE="$DIST/BIM-Riviera-$VERSION-$ARCH.flatpak"
 
 INSTALL=0

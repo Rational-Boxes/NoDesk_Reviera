@@ -5,7 +5,7 @@
 # Builds "BIM Riviera.app" and a .dmg on macOS (run it on a Mac; it cannot cross-build).
 #
 #   packaging/macos/build-dmg.sh
-#   RIVIERA_VERSION=0.1.0-pre.11 packaging/macos/build-dmg.sh
+#   RIVIERA_VERSION=0.1.0-pre.12 packaging/macos/build-dmg.sh
 #   SKIP_BREW=1 SKIP_IFCOS=1 packaging/macos/build-dmg.sh      # reuse deps and IfcOpenShell
 #
 # Prerequisites: Xcode command-line tools (clang, libclang for bindgen, codesign, hdiutil,
@@ -27,7 +27,7 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
-VERSION="${RIVIERA_VERSION:-0.1.0-pre.11}"
+VERSION="${RIVIERA_VERSION:-0.1.0-pre.12}"
 # CFBundleVersion must be numbers and dots.
 BUNDLE_VERSION="${VERSION%%-*}"
 BUNDLE_ID="io.github.rational_boxes.Riviera"

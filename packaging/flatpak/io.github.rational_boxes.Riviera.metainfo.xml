@@ -78,6 +78,11 @@
   </supports>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.0~pre.12" date="2026-11-06" type="development">
+      <description>
+        <p>Twelfth pre-release (tag 0.1.0-pre.12), for testing. New: shared rule packs with use zones and mounting rules; bundled Interiors, Gym and Retail component libraries; FF&amp;E schedules; room layouts from templates; decorative lighting; cabinet runs and countertops; counters with accessible portions; closets; report files from every check; IFC 4.3 alignments, inclined elevators, funiculars, people movers and ropeways.</p>
+      </description>
+    </release>
     <release version="0.1.0~pre.11" date="2026-11-05" type="development">
       <description>
         <p>Eleventh pre-release (tag 0.1.0-pre.11), for testing: the program is that of 0.1.0-pre.10. The Windows installer now removes what an install under the old spelling left behind when it upgrades one: the old programs, their Start menu and desktop shortcuts, and their .ifc association.</p>
