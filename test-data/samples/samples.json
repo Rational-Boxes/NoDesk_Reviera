@@ -365,6 +365,19 @@
     ]
   },
   {
+    "name": "service_counters",
+    "title": "Service counters",
+    "group": "Architecture",
+    "steps": [
+      {
+        "command": "script.run",
+        "args": {
+          "file": "service_counters.lua"
+        }
+      }
+    ]
+  },
+  {
     "name": "wet_room",
     "title": "Family bathroom and wet room (England)",
     "group": "Architecture",

@@ -319,6 +319,7 @@ impl Gui {
             Some("inclined_elevator.create") => self.inclined_elevator_run(args),
             Some("apm.station") => self.apm_station_run(args),
             Some("cabinet.run") => self.cabinet_run_finish(args),
+            Some("counter.run") => self.counter_run_finish(args),
             _ => {}
         }
     }

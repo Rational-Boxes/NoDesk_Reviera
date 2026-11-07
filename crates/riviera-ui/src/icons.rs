@@ -1442,6 +1442,10 @@ fn body(name: &str, dark: bool) -> Option<String> {
         "cabinet_run" => format!(
             r#"<path d="M2 12h28" {s}/><rect x="3" y="13" width="26" height="14" fill="{f}" {s}/><path d="M11.7 13v14M20.3 13v14M3 25h26" {s}/><circle cx="9" cy="19" r="0.9" fill="{a}"/><circle cx="14" cy="19" r="0.9" fill="{a}"/><circle cx="23" cy="19" r="0.9" fill="{a}"/>"#
         ),
+        // A service counter in elevation with a lowered accessible portion at its right.
+        "counter_run" => format!(
+            r#"<path d="M2 10h18v18H2zM20 15h10v13" fill="{f}" {s}/><path d="M2 10h18M20 15h10" stroke="{a}" stroke-width="2.5"/><path d="M24 22a2 2 0 1 0 0.1 0" {s}/>"#
+        ),
         // A countertop slab over a cabinet, overhanging its front.
         "countertop" => format!(
             r#"<rect x="3" y="10" width="26" height="4" fill="{a}" {s}/><rect x="5" y="14" width="22" height="14" fill="{f}" {s}/><path d="M16 14v14" {s}/>"#

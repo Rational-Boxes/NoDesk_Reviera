@@ -639,6 +639,12 @@ Libraries**: plain folders of ordinary 3D files, readable by any other tool.
   tops each base run, 1 in past the fronts at 36 in (`cabinet.run`, `cabinet.runs`,
   `countertop.from_runs`). Not built yet: corner units, appliances, islands, backsplashes and
   cut-outs.
+- **Counters** (ARC-INT-004). Architecture › Build › Counter lays a transaction (42 in), service
+  (36 in), bar or work (29 in) counter along a wall, with an accessible portion lowered to 36 in
+  for a parallel or forward approach. Check Rules checks the portion against the 2010 ADA
+  Standards §904.4 and §306 (its length and height, its clear floor space and knee clearance)
+  through a new surfaces rule kind (`counter.run`). Not built yet: closets, lowered bar sections
+  and check-out aisles.
 - **Decorative lighting** (ARC-INT-003). Chandeliers, pendants, sconces and lamps join the
   Interiors library as typed light fixtures:
   - a chandelier is sized from its room and table and hung 32 in over the table;

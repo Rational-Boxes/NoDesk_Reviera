@@ -1430,3 +1430,26 @@ fn the_galley_kitchen_sample_runs_its_cabinets_clear() {
         assert!(o[1] > 0.1 && o[1] < 2.6, "{o:?}");
     }
 }
+
+#[test]
+fn the_service_counters_sample_keeps_its_accessible_portions() {
+    let work = tempfile::tempdir().unwrap();
+    let mut app = open(work.path(), "service_counters");
+    assert_eq!(ok(&mut app, "rules.check", json!({})), json!([]));
+    assert_eq!(ok(&mut app, "overlap.find", json!({}))["overlaps"], json!([]));
+    // The two portions survive the round trip, typed for the packs: 36 in high, 36 and 30 in long.
+    let s = store(&app);
+    let sel = |ot: &str| riviera_core::rules::Selector { object_types: vec![ot.into()], ..Default::default() };
+    for (ot, len) in [("AccessibleCounterParallel", 36.0), ("AccessibleCounterForward", 30.0)] {
+        let tops: Vec<_> = s.iter().filter(|e| e.class == "IfcSystemFurnitureElement" && sel(ot).selects_element(&s, e)).collect();
+        assert_eq!(tops.len(), 1, "{ot}");
+        let it = riviera_core::rules::item(&s, tops[0]).unwrap();
+        assert!((it.z[1] - it.floor - 36.0 * 0.0254).abs() < 1e-6 && (it.x[1] - it.x[0] - len * 0.0254).abs() < 1e-6, "{ot}: {it:?}");
+    }
+    // Raised to 38 in, the parallel portion is reported against §904.4.1.
+    let p = s.iter().find(|e| sel("AccessibleCounterParallel").selects_element(&s, e)).unwrap().id().0;
+    ok(&mut app, "mesh_object.set", json!({ "element_ids": [p], "offset": 38.0 * 0.0254 - 1.5 * 0.0254 }));
+    let found = ok(&mut app, "rules.check", json!({}));
+    assert_eq!(found.as_array().unwrap().len(), 1, "{found:#}");
+    assert_eq!((found[0]["kind"].as_str(), found[0]["rule"].as_str()), (Some("surface_height"), Some("ADA 2010 904.4.1 surface")));
+}

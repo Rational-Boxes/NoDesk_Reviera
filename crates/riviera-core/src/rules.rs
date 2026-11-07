@@ -182,6 +182,25 @@ pub struct HeightOver {
     pub max: Option<f64>,
 }
 
+/// A surface's height above the floor and its length along its own x (ADA 2010 §904.4: an
+/// accessible counter portion 36 in long at least and 36 in high at most).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct Surface {
+    pub id: String,
+    pub description: String,
+    pub applies_to: Selector,
+    #[serde(default)]
+    pub occupancy: RuleOccupancy,
+    pub source: String,
+    pub confidence: Confidence,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub height_min: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub height_max: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub length_min: Option<f64>,
+}
+
 /// A shared-format rule pack.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Pack {
@@ -202,6 +221,8 @@ pub struct Pack {
     pub projections: Vec<Projection>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub heights_over: Vec<HeightOver>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub surfaces: Vec<Surface>,
 }
 
 fn validator() -> &'static jsonschema::Validator {
@@ -388,7 +409,7 @@ impl Item {
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct Mounting {
     pub element: ElementId,
-    /// `headroom`, `projection` or `height_over`.
+    /// `headroom`, `projection`, `height_over`, `surface_height` or `surface_length`.
     pub kind: String,
     pub pack: String,
     pub rule: String,
@@ -426,6 +447,7 @@ pub fn mountings_of(store: &Store, e: &Element, packs: &[Pack]) -> Vec<Mounting>
         p.headroom.iter().any(|r| r.applies_to.selects_element(store, e))
             || p.projections.iter().any(|r| r.applies_to.selects_element(store, e))
             || p.heights_over.iter().any(|r| r.applies_to.selects_element(store, e))
+            || p.surfaces.iter().any(|r| r.applies_to.selects_element(store, e))
     });
     if !any {
         return Vec::new();
@@ -466,6 +488,15 @@ pub fn mountings_of(store: &Store, e: &Element, packs: &[Pack]) -> Vec<Mounting>
                 if r.min.is_some_and(|m| gap < m - 1e-6) || r.max.is_some_and(|m| gap > m + 1e-6) {
                     out.push(finding("height_over", &r.id, &r.description, &r.source, r.confidence, gap, r.min, r.max, Some(o)));
                 }
+            }
+        }
+        for r in p.surfaces.iter().filter(|r| r.applies_to.selects_element(store, e) && r.occupancy.applies(occupancy)) {
+            if r.height_min.is_some_and(|m| top < m - 1e-6) || r.height_max.is_some_and(|m| top > m + 1e-6) {
+                out.push(finding("surface_height", &r.id, &r.description, &r.source, r.confidence, top, r.height_min, r.height_max, None));
+            }
+            let length = it.x[1] - it.x[0];
+            if let Some(m) = r.length_min.filter(|m| length < m - 1e-6) {
+                out.push(finding("surface_length", &r.id, &r.description, &r.source, r.confidence, length, Some(m), None, None));
             }
         }
     }
@@ -779,7 +810,7 @@ mod tests {
         assert!(shipped().len() >= 2);
         for p in shipped() {
             assert_eq!(p.format, FORMAT);
-            let sources = p.zones.iter().map(|z| (&z.id, &z.source)).chain(p.headroom.iter().map(|r| (&r.id, &r.source))).chain(p.projections.iter().map(|r| (&r.id, &r.source))).chain(p.heights_over.iter().map(|r| (&r.id, &r.source)));
+            let sources = p.zones.iter().map(|z| (&z.id, &z.source)).chain(p.headroom.iter().map(|r| (&r.id, &r.source))).chain(p.projections.iter().map(|r| (&r.id, &r.source))).chain(p.heights_over.iter().map(|r| (&r.id, &r.source))).chain(p.surfaces.iter().map(|r| (&r.id, &r.source)));
             for (id, src) in sources {
                 for s in src.split(' ') {
                     assert!(register.contains(&format!("| {s} |")), "{id}: {s} is not in SOURCE_REGISTER.md");

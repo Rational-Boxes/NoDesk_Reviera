@@ -76,6 +76,12 @@
       "items": {
         "$ref": "#/$defs/height_over"
       }
+    },
+    "surfaces": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/surface"
+      }
     }
   },
   "$defs": {
@@ -345,6 +351,53 @@
         },
         "max": {
           "type": "number"
+        }
+      }
+    },
+    "surface": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/rule"
+        }
+      ],
+      "type": "object",
+      "unevaluatedProperties": false,
+      "description": "A surface's height above the floor and its length (an accessible counter portion: 36 in long at most 36 in high).",
+      "anyOf": [
+        {
+          "required": [
+            "height_max"
+          ]
+        },
+        {
+          "required": [
+            "height_min"
+          ]
+        },
+        {
+          "required": [
+            "length_min"
+          ]
+        }
+      ],
+      "properties": {
+        "id": true,
+        "description": true,
+        "applies_to": true,
+        "occupancy": true,
+        "source": true,
+        "confidence": true,
+        "height_min": {
+          "type": "number",
+          "minimum": 0
+        },
+        "height_max": {
+          "type": "number",
+          "minimum": 0
+        },
+        "length_min": {
+          "type": "number",
+          "minimum": 0
         }
       }
     }

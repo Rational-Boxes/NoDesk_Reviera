@@ -50,6 +50,7 @@ pub const RESERVED_DOMAINS: &[&str] = &[
     "interior",
     "cabinet",
     "countertop",
+    "counter",
     "report",
     "vt",
     "elevator",

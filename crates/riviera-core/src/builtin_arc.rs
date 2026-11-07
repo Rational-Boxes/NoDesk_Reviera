@@ -354,6 +354,7 @@ pub(crate) fn register(registry: &mut CommandRegistry) {
         registry.add(CabinetRun),
         registry.add(CabinetRuns),
         registry.add(CountertopFromRuns),
+        registry.add(CounterRun),
         registry.add(LibraryList),
         registry.add(LibraryImportFiles),
         registry.add(LibraryGetMeta),
@@ -4234,6 +4235,23 @@ edit_command!(
     crate::cabinets::TopsParams,
     Vec<crate::cabinets::Top>,
     crate::cabinets::tops
+);
+
+edit_command!(
+    CounterRun,
+    "counter.run",
+    "Lay out a counter",
+    "Lays out a counter along a back line from `start` to `end` (ARC-INT-004), facing away from the wall \
+     behind it (or toward `toward`): a casework body on a 4 × 3 in toe kick under a 1½ in top that passes it \
+     by 1 in. Its height comes from its `kind`: transaction or bar 42 in, service 36 in, or work 29 in (open \
+     below). An `accessible` portion is lowered to 36 in (ADA 2010 §904.4) at the start, the end or an \
+     offset: 36 in long for a parallel approach, or 30 in long and open below for a forward one. Its top is \
+     typed AccessibleCounterParallel or AccessibleCounterForward, which the interiors packs check: its \
+     length and height, its 30 × 48 in clear floor space and, for a forward approach, its knee clearance.",
+    "Counter",
+    crate::counters::CounterParams,
+    crate::counters::Counter,
+    crate::counters::run
 );
 
 read_command!(

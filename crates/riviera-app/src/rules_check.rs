@@ -41,6 +41,10 @@ pub enum FindingKind {
     Projection,
     /// Too high or too low over the element under it.
     HeightOver,
+    /// A surface too high or too low (an accessible counter portion over 36 in, ADA 904.4).
+    SurfaceHeight,
+    /// A surface too short (an accessible counter portion under 36 in long).
+    SurfaceLength,
 }
 
 #[derive(Debug, Clone, Serialize, JsonSchema)]
@@ -165,7 +169,7 @@ pub(crate) fn check(app: &mut App, p: CheckParams) -> Result<Vec<Finding>> {
             }
         }
     }
-    // Mounting rules: headroom, projection, height over.
+    // Mounting rules: headroom, projection, height over; surfaces' heights and lengths.
     let inch = |v: f64| format!("{:.1} in", v / 0.0254);
     for e in store.iter().filter(|e| only.as_ref().is_none_or(|ids| ids.contains(&e.id()))) {
         for m in rules::mountings_of(store, e, &packs) {
@@ -174,6 +178,11 @@ pub(crate) fn check(app: &mut App, p: CheckParams) -> Result<Vec<Finding>> {
             let (kind, message) = match m.kind.as_str() {
                 "headroom" => (FindingKind::Headroom, format!("{what} hangs {} above the floor; {} needs {} ({})", inch(m.measured), m.rule, inch(m.min.unwrap_or(0.0)), m.description)),
                 "projection" => (FindingKind::Projection, format!("{what} projects {} from its wall; {} allows {}", inch(m.measured), m.rule, inch(m.max.unwrap_or(0.0)))),
+                "surface_height" => (
+                    FindingKind::SurfaceHeight,
+                    format!("{what}'s surface is {} above the floor; {} asks {}–{}", inch(m.measured), m.rule, m.min.map_or_else(|| "…".into(), inch), m.max.map_or_else(|| "…".into(), inch)),
+                ),
+                "surface_length" => (FindingKind::SurfaceLength, format!("{what} is {} long; {} needs {}", inch(m.measured), m.rule, inch(m.min.unwrap_or(0.0)))),
                 _ => (
                     FindingKind::HeightOver,
                     format!("{what} is {} above {}; {} asks {}–{}", inch(m.measured), m.other.map_or_else(String::new, &label), m.rule, m.min.map_or_else(|| "…".into(), inch), m.max.map_or_else(|| "…".into(), inch)),

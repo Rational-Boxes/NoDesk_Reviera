@@ -5395,7 +5395,7 @@ unchanged. The first domain on the shared format is **interiors**: use zones aro
   - an `id`, a title, its **domain** (`interiors` first; later `kitchen`, `foodservice`, `refrigeration`, `retail`, `checkout`, `gym`), its jurisdiction and edition, and a **layer** (`minimum`, `accessible` or `recommended`, as bathroom packs);
   - rules of the kinds the format defines:
     - **zones** (ARC-RULE-002);
-    - the mounting kinds: **headroom** (an element's bottom above the floor, unless it is over selected furniture), **projections** (how far an element may stand out from its wall between two heights), and **heights over** (the gap above the element under it).
+    - the mounting kinds: **headroom** (an element's bottom above the floor, unless it is over selected furniture), **projections** (how far an element may stand out from its wall between two heights), **heights over** (the gap above the element under it), and **surfaces** (a surface's height above the floor and its length).
 
     Later kinds (type coverage, array counts, path distances, product values, integration rules) are added to the same format as their tools are built.
 
@@ -5404,7 +5404,7 @@ unchanged. The first domain on the shared format is **interiors**: use zones aro
 
 | Pack | Layer | Covers |
 |---|---|---|
-| `ada_2010_interiors` | accessible | 2010 ADA Standards: a 30 × 48 in clear floor space for a parallel approach along each side of a bed (§806.2.3, G139); 80 in headroom under a hanging fixture on a circulation path (§307.4); 4 in at most for a sconce between 27 and 80 in above the floor (§307.2) |
+| `ada_2010_interiors` | accessible | 2010 ADA Standards: a 30 × 48 in clear floor space for a parallel approach along each side of a bed (§806.2.3, G139); 80 in headroom under a hanging fixture on a circulation path (§307.4); 4 in at most for a sconce between 27 and 80 in above the floor (§307.2); an accessible counter portion 36 in high at most and 36 in (parallel) or 30 in (forward) long at least, with its 30 × 48 in clear floor space and, for a forward approach, knee clearance 30 in wide, 17 in deep and 27 in high (§904.4, §306) |
 | `practice_interiors` | recommended | Practice, as notes: 36 in round a dining table's edge, where its chairs may stand; 30 in in front of a dresser (36 in preferred); 24 in at the foot of a bed (research/15 D2, S1478 and S1479, [guide]); a chandelier's bottom 30–34 in and a pendant's 30–36 in over the table or counter under it (D4, S1471, S1472) |
 
 - **Choosing packs.** A project uses the packs it names for a domain (`rules.set_packs`), or packs chosen automatically: for interiors, `ada_2010_interiors` when the accessibility rule set (ARC-MOD-031) is the ADA. `practice_interiors` is only chosen by name.
@@ -5443,7 +5443,8 @@ unchanged. The first domain on the shared format is **interiors**: use zones aro
 - **Mounting rules** are checked with the zones:
   - **headroom**: the element's bottom above its floor;
   - **projection**: its depth from its wall, where its height range meets the band;
-  - **height over**: the gap between its bottom and the top of the highest selected piece whose footprint is under its centre.
+  - **height over**: the gap between its bottom and the top of the highest selected piece whose footprint is under its centre;
+  - **surface**: its top above its floor, and its length across (its own x).
 
   Each finding gives what was measured and the rule's range.
 - **`rules.check`** checks every element with zones (or those given, or one domain's) and returns findings, each with the element, the pack, its domain, edition and layer, the rule ID, its source and confidence, and the intruding element with its depth and where. A finding from a `recommended` pack or an `advisory` rule is a **note**; any other is an **error**. Errors come first. `clearance.check` and `clearance.list` include use zones.
@@ -5578,6 +5579,32 @@ unchanged. The first domain on the shared format is **interiors**: use zones aro
 - [x] The galley kitchen sample's two tops leave 1.23 m between them and overlap nothing.
 
 *Built (2026-11-06):* `riviera_core::cabinets::tops` and Architecture › Build › Countertop (the selected units' runs, or all). Defaults are E-106. Not yet: tops across joined or corner runs, islands and seating overhangs, backsplashes, edge profiles and joints, and sink and cooktop cut-outs.
+
+### 3.9b.8 Counters and accessible portions
+**ID:** ARC-INT-004 · **Priority:** P1 · **Ref:** `INTERIORS_PLAN.md` §4.4 (step 5); research/15 C1–C3; 2010 ADA Standards §904.4, §306, §305 (S1354); ARC-KIT-001; ARC-RULE-002
+
+**Purpose.** Lay out transaction, service, bar and work counters with the lowered portion the ADA asks of sales and service counters, and check it, without drawing each piece.
+
+**Behaviour & rules.**
+- **The counter** runs along a back line from a start to an end, picked in a plan or typed, facing away from the wall behind it (as cabinet runs, ARC-KIT-001). Its height comes from its kind: transaction and bar 42 in, service 36 in, work 29 in, or as given.
+- **Parts.** Each segment has a casework body (`IfcFurniture` USERDEFINED "Casework", built in, 24 in deep on a 4 × 3 in toe kick) and a top (`IfcSystemFurnitureElement` WORKSURFACE, 1½ in thick, 1 in past the body). Work surfaces have no body.
+- **The accessible portion** is at the start, the end or an offset. It is 36 in long for a parallel approach (§904.4.1) or 30 in for a forward one (§904.4.2), and lowered to 36 in, or kept at the counter's height if that is lower. A forward portion has no body: the space under it is the knee clearance. Its top's type is AccessibleCounterParallel or AccessibleCounterForward.
+- **Checks.** `ada_2010_interiors` selects those types:
+  - **surfaces:** at most 36 in high; at least 36 in or 30 in long;
+  - **clear floor space** (§305): 48 × 30 in along a parallel portion, or 30 × 48 in in front of a forward one, centred on it;
+  - **knee clearance** (§306.3): 30 in wide, 17 in deep under the top's front, 27 in high.
+
+  `rules.check` reports a portion too high or too short, and anything in its spaces.
+
+**Commands.** `counter.run(start, end, level, kind?, height?, depth?, toward?, accessible?: {at? | offset?, approach?, length?, height?})` → `{counter, length, height, elements, portion?: {top, from, to, height, approach}}`.
+
+**Acceptance criteria.**
+- [x] A 3 m transaction counter at 42 in with a parallel portion at its end: the portion is the last 36 in, its surface at 36 in, its back on the wall, and Check Rules finds nothing.
+- [x] A forward portion has no body below it. A chair under it is in its knee clearance.
+- [x] A portion raised to 38 in, or a forward portion 28 in long, is reported (the short one's knee clearance also takes in the body beside it). A portion longer than its counter is refused.
+- [x] The service counters sample's three counters pass every check and overlap nothing.
+
+*Built (2026-11-06):* `riviera_core::counters`, the surfaces rule kind, and Architecture › Build › Counter. Defaults are E-107. Not yet: closets (shelves, rods and doors, §308 reach); bars' lowered dining sections (§902) and check-out aisles (§904.3); toe clearance as its own zone; legs, brackets and modesty panels; EU heights.
 
 ### 3.9b.3 Generic furniture and equipment
 **ID:** ARC-FURN-001 · **Priority:** P1 · **Ref:** `INTERIORS_PLAN.md` §4.1, §5.1, §7.1, §8.1 (the owner accepted the IFC mapping); research/15 A1, B1–B7, C2, C7, D1, E2; DM-LIB-006
@@ -6823,6 +6850,7 @@ All commands below are registered once in the command registry and exposed autom
 | `cabinet.run` | start, end, level, kind, region?, widths?, toward? | {run, region, length, units, filler} | Yes | ARC-KIT-001 |
 | `cabinet.runs` | — | [{run, kind, units}] | No | ARC-KIT-001 |
 | `countertop.from_runs` | runs?, element_ids?, overhang? | [{element, run, length, depth, height}] | Yes | ARC-KIT-002 |
+| `counter.run` | start, end, level, kind?, height?, depth?, toward?, accessible? | {counter, length, height, elements, portion?} | Yes | ARC-INT-004 |
 | `interior.layouts` | — | [{id, title, items}] | No (query) | ARC-INT-001 |
 | `interior.layout` | template, point, level, wall_id?, replace?, fit_only? | {placed, fit, packs} | Yes | ARC-INT-001 |
 | `furnishing.catalogue` | library? | [{library, folder, name, predefined_type, kind, uniclass, description, source, size}] | No (query) | ARC-FURN-001 |

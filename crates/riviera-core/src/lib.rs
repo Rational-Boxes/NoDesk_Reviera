@@ -17,6 +17,7 @@ pub mod bath_cores;
 pub mod bath_layouts;
 pub mod bath_rules;
 pub mod cabinets;
+pub mod counters;
 pub mod bcf;
 pub mod bcf_archive;
 pub mod issues;

@@ -80,8 +80,9 @@ fn interiors_packs_and_use_zones() {
     ok(&mut app, "clearance.set_rule_set", json!({ "standard": "ada_2010" }));
     assert!(in_use(&mut app, "ada_2010_interiors") && !in_use(&mut app, "practice_interiors"));
     let ada = ok(&mut app, "rules.packs", json!({ "domain": "interiors" })).as_array().unwrap().iter().find(|p| p["id"] == "ada_2010_interiors").unwrap().clone();
-    // Two bed spaces (§806.2.3), headroom (§307.4) and projection (§307.2).
-    assert_eq!((ada["rules"].as_u64(), ada["layer"].as_str(), ada["shipped"].as_bool()), (Some(4), Some("accessible"), Some(true)), "{ada:#}");
+    // Two bed spaces (§806.2.3), headroom (§307.4), projection (§307.2), and the counter
+    // portions' two clear floor spaces, knee clearance and two surfaces (§904.4, §306).
+    assert_eq!((ada["rules"].as_u64(), ada["layer"].as_str(), ada["shipped"].as_bool()), (Some(9), Some("accessible"), Some(true)), "{ada:#}");
 
     // A queen bed (60 × 80 in) with its foot toward −y: a 30 × 48 in space along each side,
     // from its foot.

@@ -4,7 +4,7 @@
   "title": "2010 ADA Standards: furniture in accessible rooms",
   "domain": "interiors",
   "jurisdiction": "US",
-  "edition": "2010 ADA Standards for Accessible Design: §806.2.3 (guest rooms with mobility features), §307.2 and §307.4 (protruding objects)",
+  "edition": "2010 ADA Standards for Accessible Design: §806.2.3 (guest rooms with mobility features), §307.2 and §307.4 (protruding objects), §904.4 and §306 (sales and service counters, knee and toe clearance)",
   "layer": "accessible",
   "notes": "A117.1-2017 asks 30 × 52 in; the ADA's 30 × 48 in is used here. One clear space between two beds also complies (§806.2.3 exception): mark one bed not accessible when two share a space.",
   "zones": [
@@ -75,6 +75,100 @@
       ],
       "source": "S1354",
       "confidence": "verified"
+    },
+    {
+      "id": "ADA 2010 904.4.1",
+      "description": "30 × 48 in clear floor space for a parallel approach along an accessible counter portion, centred on it",
+      "applies_to": {
+        "object_types": [
+          "AccessibleCounterParallel"
+        ]
+      },
+      "across": [
+        [
+          "centre",
+          -0.6096
+        ],
+        [
+          "centre",
+          0.6096
+        ]
+      ],
+      "out": [
+        [
+          "front",
+          0.0
+        ],
+        [
+          "front",
+          0.762
+        ]
+      ],
+      "source": "S1354",
+      "confidence": "verified"
+    },
+    {
+      "id": "ADA 2010 904.4.2",
+      "description": "30 × 48 in clear floor space for a forward approach to an accessible counter portion, centred on it",
+      "applies_to": {
+        "object_types": [
+          "AccessibleCounterForward"
+        ]
+      },
+      "across": [
+        [
+          "centre",
+          -0.381
+        ],
+        [
+          "centre",
+          0.381
+        ]
+      ],
+      "out": [
+        [
+          "front",
+          0.0
+        ],
+        [
+          "front",
+          1.2192
+        ]
+      ],
+      "source": "S1354",
+      "confidence": "verified"
+    },
+    {
+      "id": "ADA 2010 306.3",
+      "description": "Knee clearance under a forward-approach counter portion: 30 in wide, 17 in deep, 27 in high",
+      "applies_to": {
+        "object_types": [
+          "AccessibleCounterForward"
+        ]
+      },
+      "across": [
+        [
+          "centre",
+          -0.381
+        ],
+        [
+          "centre",
+          0.381
+        ]
+      ],
+      "out": [
+        [
+          "front",
+          0.0
+        ],
+        [
+          "front",
+          -0.4318
+        ]
+      ],
+      "source": "S1354",
+      "confidence": "verified",
+      "height": 0.6858
     }
   ],
   "headroom": [
@@ -117,6 +211,34 @@
         2.032
       ],
       "max": 0.1016,
+      "source": "S1354",
+      "confidence": "verified"
+    }
+  ],
+  "surfaces": [
+    {
+      "id": "ADA 2010 904.4.1 surface",
+      "description": "A parallel-approach counter portion is 36 in long at least and 36 in high at most",
+      "applies_to": {
+        "object_types": [
+          "AccessibleCounterParallel"
+        ]
+      },
+      "height_max": 0.9144,
+      "length_min": 0.9144,
+      "source": "S1354",
+      "confidence": "verified"
+    },
+    {
+      "id": "ADA 2010 904.4.2 surface",
+      "description": "A forward-approach counter portion is 30 in long at least and 36 in high at most",
+      "applies_to": {
+        "object_types": [
+          "AccessibleCounterForward"
+        ]
+      },
+      "height_max": 0.9144,
+      "length_min": 0.762,
       "source": "S1354",
       "confidence": "verified"
     }

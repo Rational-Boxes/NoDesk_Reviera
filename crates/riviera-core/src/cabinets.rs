@@ -138,7 +138,7 @@ fn shape(w: f64, s: &Spec) -> Shape {
 }
 
 /// A generated type of this name, made once (built in, with its nominal sizes).
-fn unit_type(txn: &mut Transaction<'_>, name: &str, category: Category, predefined: &str, kind: &str, sh: &Shape, size: [f64; 3], color: [f32; 4]) -> Result<ElementId> {
+pub(crate) fn unit_type(txn: &mut Transaction<'_>, name: &str, category: Category, predefined: &str, kind: &str, sh: &Shape, size: [f64; 3], color: [f32; 4]) -> Result<ElementId> {
     if let Some(e) = txn.store().iter().find(|e| e.name.as_deref() == Some(name) && crate::mesh_objects::mesh_object_type(e).is_some()) {
         return Ok(e.id());
     }
@@ -157,8 +157,8 @@ fn unit_type(txn: &mut Transaction<'_>, name: &str, category: Category, predefin
     Ok(id)
 }
 
-const CARCASS: [f32; 4] = [0.86, 0.84, 0.80, 1.0];
-const WORKTOP: [f32; 4] = [0.45, 0.45, 0.47, 1.0];
+pub(crate) const CARCASS: [f32; 4] = [0.86, 0.84, 0.80, 1.0];
+pub(crate) const WORKTOP: [f32; 4] = [0.45, 0.45, 0.47, 1.0];
 
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -214,6 +214,32 @@ fn in_wall(store: &crate::Store, p: [f64; 2], z: f64) -> bool {
     })
 }
 
+/// A back line's length, direction, front (away from a wall just behind it, or toward a point)
+/// and the rotation that turns a unit's front (local −y) to face it.
+pub(crate) fn line_frame(store: &Store, start: [f64; 2], end: [f64; 2], z0: f64, toward: Option<[f64; 2]>) -> Result<(f64, [f64; 2], [f64; 2], f64)> {
+    let v = [end[0] - start[0], end[1] - start[1]];
+    let length = v[0].hypot(v[1]);
+    if length < 0.1 {
+        return Err(bad("cabinet.too_short", "a run needs a start and an end at least 100 mm apart"));
+    }
+    let d = [v[0] / length, v[1] / length];
+    let left = [-d[1], d[0]];
+    let mid = [start[0] + v[0] / 2.0, start[1] + v[1] / 2.0];
+    let sign = match toward {
+        Some(q) => ((q[0] - mid[0]) * left[0] + (q[1] - mid[1]) * left[1]).signum(),
+        None => {
+            // Probed 50 mm to each side, so a line on a wall's face is behind on one only.
+            let wall = |s: f64| {
+                let q = [mid[0] + left[0] * s * 0.05, mid[1] + left[1] * s * 0.05];
+                in_wall(store, q, z0 + 0.5) || crate::bath_rules::ray_to_walls(store, q, [left[0] * s, left[1] * s], z0 + 0.5, 0.25).is_some()
+            };
+            if wall(1.0) && !wall(-1.0) { -1.0 } else { 1.0 }
+        }
+    };
+    let front = [left[0] * sign, left[1] * sign];
+    Ok((length, d, front, front[0].atan2(-front[1])))
+}
+
 /// Lays out a run of cabinets (`cabinet.run`).
 pub(crate) fn run(txn: &mut Transaction<'_>, p: RunParams) -> Result<Run> {
     let store = txn.store().clone();
@@ -224,28 +250,7 @@ pub(crate) fn run(txn: &mut Transaction<'_>, p: RunParams) -> Result<Run> {
         _ => Region::Eu,
     });
     let s = spec(region, p.kind);
-    let v = [p.end[0] - p.start[0], p.end[1] - p.start[1]];
-    let length = v[0].hypot(v[1]);
-    if length < 0.1 {
-        return Err(bad("cabinet.too_short", "a run needs a start and an end at least 100 mm apart"));
-    }
-    let d = [v[0] / length, v[1] / length];
-    let left = [-d[1], d[0]];
-    let mid = [p.start[0] + v[0] / 2.0, p.start[1] + v[1] / 2.0];
-    // Its front: toward the point given, else away from a wall just behind the line.
-    let sign = match p.toward {
-        Some(q) => ((q[0] - mid[0]) * left[0] + (q[1] - mid[1]) * left[1]).signum(),
-        None => {
-            // Probed 50 mm to each side, so a line on a wall's face is behind on one only.
-            let wall = |s: f64| {
-                let q = [mid[0] + left[0] * s * 0.05, mid[1] + left[1] * s * 0.05];
-                in_wall(&store, q, z0 + 0.5) || crate::bath_rules::ray_to_walls(&store, q, [left[0] * s, left[1] * s], z0 + 0.5, 0.25).is_some()
-            };
-            if wall(1.0) && !wall(-1.0) { -1.0 } else { 1.0 }
-        }
-    };
-    let front = [left[0] * sign, left[1] * sign];
-    let rotation = front[0].atan2(-front[1]);
+    let (length, d, front, rotation) = line_frame(&store, p.start, p.end, z0, p.toward)?;
     let (widths, filler) = match &p.widths {
         Some(ws) => {
             let sum: f64 = ws.iter().sum();

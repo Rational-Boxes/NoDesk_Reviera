@@ -393,6 +393,55 @@ impl Gui {
         }
     }
 
+    /// Architecture › Build › Counter (ARC-INT-004): a transaction, service, bar or work counter
+    /// clicked from start to end along a wall, with an accessible portion if asked.
+    pub(crate) fn counter_run(&mut self) {
+        let frame = self.frame;
+        let f = super::reinforcement_ui::Form::new(&frame, "Counter");
+        let kinds = ["Transaction counter, 42 in".to_owned(), "Service counter, 36 in".to_owned(), "Bar counter, 42 in".to_owned(), "Work surface, 29 in".to_owned()];
+        let kind = f.choice("Counter", &kinds, 0);
+        let portions = [
+            "None".to_owned(),
+            "Parallel approach at the end".to_owned(),
+            "Parallel approach at the start".to_owned(),
+            "Forward approach at the end".to_owned(),
+            "Forward approach at the start".to_owned(),
+        ];
+        let portion = f.choice("Accessible portion", &portions, 1);
+        let ok = f.show("Then click the counter's start and end along the wall's face, in a plan. An accessible portion is lowered to 36 in (ADA §904.4): 36 in long for a parallel approach, 30 in and open below for a forward one.", "Pick the Counter");
+        let k = ["transaction", "service", "bar", "work"][kind.get_selection().unwrap_or(0) as usize];
+        let pi = portion.get_selection().unwrap_or(0) as usize;
+        f.dialog.destroy();
+        if !ok {
+            return;
+        }
+        let mut args = json!({ "kind": k });
+        if pi > 0 {
+            args["accessible"] = json!({ "approach": if pi <= 2 { "parallel" } else { "forward" }, "at": if pi % 2 == 1 { "end" } else { "start" } });
+        }
+        self.start_picking(
+            "counter.run",
+            vec![json!({ "key": "start", "kind": "at", "prompt": "Counter: click its start on the wall face" }), json!({ "key": "end", "kind": "point", "prompt": "Counter: click its end" })],
+            args,
+        );
+    }
+
+    /// The counter picked: made, and reported.
+    pub(crate) fn counter_run_finish(&mut self, mut args: serde_json::Value) {
+        let frame = self.frame;
+        let start = args["start"].take();
+        args["start"] = start["point"].clone();
+        args["level"] = start["level"].clone();
+        match self.run("counter.run", args) {
+            Ok(v) => {
+                self.refresh_scene(&frame);
+                let portion = v["portion"].as_object().map_or(String::new(), |p| format!(", an accessible portion {:.2}–{:.2} m at {:.0} in", p["from"].as_f64().unwrap_or(0.0), p["to"].as_f64().unwrap_or(0.0), p["height"].as_f64().unwrap_or(0.0) / 0.0254));
+                frame.set_status_text(&format!("A {:.2} m counter at {:.0} in{portion}; Check Rules checks it", v["length"].as_f64().unwrap_or(0.0), v["height"].as_f64().unwrap_or(0.0) / 0.0254), 0);
+            }
+            Err(e) => error(&frame, &format!("The counter was not made:\n{e}")),
+        }
+    }
+
     /// Architecture › Build › Countertop (ARC-KIT-002): tops on the selected units' runs, or every
     /// base run.
     pub(crate) fn countertop(&mut self) {
